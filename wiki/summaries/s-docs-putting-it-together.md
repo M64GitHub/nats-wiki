@@ -44,7 +44,7 @@ nats-server: leaf nodes and gateways (both being defined) require a system accou
 ```
 
 and `nats-server -c n1-east.conf -t` reports the file **valid** first. Both reproduced on
-nats-server v2.14.5; the check is `validateLeafNodeOptions` at `leafnode.go:346–349` (v2.14.6). The
+nats-server v2.14.6; the check is `validateLeafNodeOptions` at `leafnode.go:346–349`. The
 page then says, two sections later, that the chapter "doesn't set up" a system account — so the
 omission is deliberate and the config is unrunnable as printed. Recorded as `inbox/docs-issues.md`
 #24. See [[s-nats-server-topology]].

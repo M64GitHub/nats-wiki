@@ -133,7 +133,7 @@ is **not expressible** with these keys.
 version of parseUsers" and accepts exactly `user`, `pass`, `account` and `proxy_required`
 (`opts.go:3005–3064`). `permissions` inside `leafnodes.authorization` is a parse error. And a
 same-named user in the *global* `authorization.users` block governs client connections, not this one:
-its denies are simply not applied — reproduced on v2.14.5
+its denies are simply not applied — reproduced on v2.14.6
 (source: [[s-nats-server-topology]], [[s-gh-5941-restrict-leafnode-subjects]]).
 
 So:

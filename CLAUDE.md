@@ -320,6 +320,13 @@ the maintainers or filed as an issue upstream).
   read directly: quote the constant or the code with **file and line**, and quote the doc page
   verbatim next to it. A discrepancy you have not checked against the source is a suspicion, not an
   issue.
+- **Run the server when the claim is behavioural.** Reading a constant settles a default; it does
+  not settle "does this config start", "what does `nats-server -t` accept", or "what does the CLI
+  print". Run those, and record the exact config and output in `raw/` alongside the source ranges.
+  **The local binary must be the same release the page cites** — `nats-server --version` against
+  `verified-against`. Upgrade the binary and the `verified-against` fields **together**, never
+  independently: a binary that drifts ahead makes every "observed" note in the wiki unattributable.
+  If the two differ, say which version was run rather than implying the cited one.
 - **Prefer the server over the docs** on the wiki page itself, and say on the page that the two
   disagree — see the *A docs error worth knowing* section of `wiki/reference/advisories.md`.
 - **Separate wrong from terse.** `wrong-value` and `missing` are defects; `enhancement` is a page

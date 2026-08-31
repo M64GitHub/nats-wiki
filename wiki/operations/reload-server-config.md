@@ -104,7 +104,7 @@ offending line and exits non-zero — which is what makes it usable as a gate in
 That is not a gap in coverage — it is the boundary of what `-t` is. `-t` parses; the semantic checks
 live in `validateOptions`, which runs inside `NewServer` (`server.go:729`), long after the parser is
 done. **Every** `validateOptions` failure therefore passes the dry run and kills the server on start.
-Three reproduced on v2.14.5 (source: [[s-nats-server-topology]]):
+Three reproduced on v2.14.6 (source: [[s-nats-server-topology]]):
 
 | config | `-t` says | starting says |
 |---|---|---|

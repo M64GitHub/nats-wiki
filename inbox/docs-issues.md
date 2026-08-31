@@ -16,7 +16,9 @@ factually wrong.
 
 Rows 1–10 were found while working `inbox/plan-first-ingests-2026-08-31.md`; rows 11–26 while
 working `inbox/plan-runbooks-and-security-2026-08-31.md`. Verified against **nats-server v2.14.6**
-and the docs tree fetched **2026-08-31**. Rows 8–10 concern **client** claims, so their authority is
+and the docs tree fetched **2026-08-31**. Where a row says *observed*, the behaviour was **run on the
+v2.14.6 binary**, not only read from the source at that tag; the configs and output are in
+`raw/nats-server-src/topology-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
 the client repository at its current release plus the package registry, not the server — stated per
 row.
 
@@ -955,7 +957,7 @@ any listener work when the port is zero, and no accept loop is started:
 `if opts.Gateway.Port != 0 {`. The same table is therefore right about `host` and wrong about `port`,
 which is part of what makes the error easy to miss.
 
-**Observed on nats-server v2.14.5.**
+**Observed on nats-server v2.14.6.**
 
 ```
 $ cat lf.conf
@@ -964,7 +966,7 @@ leafnodes { }
 $ nats-server -c lf.conf
 [INF] Listening for client connections on 127.0.0.1:4222
 $ lsof -nP -iTCP -sTCP:LISTEN -a -p <pid>
-nats-serv 30905 m64 6u IPv4 … TCP 127.0.0.1:4222 (LISTEN)
+nats-serv 127.0.0.1:4222
 ```
 
 One listening socket, 4222. No 7422. `cluster { name: east }` with no port behaves the same way — no
@@ -1013,7 +1015,7 @@ chapter does not set one up: "To *survey* the whole fabric instead… you need t
 `validateOptions`, which is called inside `NewServer` at `server.go:729` — so it cannot satisfy the
 check.
 
-**Observed on nats-server v2.14.5**, with the page's config typed verbatim:
+**Observed on nats-server v2.14.6**, with the page's config typed verbatim:
 
 ```
 $ nats-server -c n1-east.conf -t
@@ -1026,7 +1028,7 @@ nats-server: leaf nodes and gateways (both being defined) require a system accou
 `nats-server -c … -t` as the way to check a config before applying it, and qualifies it with one
 exception: "A JetStream cluster missing `server_name` or `routes` passes `-t` yet still fails to
 boot." That understates the boundary. `-t` parses and exits; **every** `validateOptions` check is
-downstream of it. Another, observed on v2.14.5:
+downstream of it. Another, observed on v2.14.6:
 
 ```
 $ cat ld.conf
@@ -1150,7 +1152,7 @@ and why the accepted answer redirects to user permissions instead.
 not work in config mode: `leafnodes.authorization` users accept no `permissions` at all
 (`parseLeafUsers`, `opts.go:3005–3064`, "a trimmed down version of parseUsers", four keys), and a
 same-named entry in the global `authorization.users` block governs client connections, not leafnode
-ones. Both reproduced on v2.14.5; the second is a parse error:
+ones. Both reproduced on v2.14.6; the second is a parse error:
 
 ```
 nats-server: hub2.conf:8:9: unknown field "permissions"

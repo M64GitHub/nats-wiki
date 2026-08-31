@@ -915,7 +915,11 @@ message crosses the gateway regardless, which is the unanswered gh#7494 exactly.
 **leafnode user cannot carry permissions in config mode** (`parseLeafUsers` takes four keys), so the
 accepted answer in gh#5941 has no implementation there — its unanswered follow-up was reproduced
 locally, and the boundary that does exist is the account. Items 1–3 and 5 were **reproduced on the
-v2.14.5 binary**, with the configs and output kept in the raw extract.
+v2.14.6 binary**, with the configs and output kept in the raw extract. (They were first run on
+v2.14.5, the binary the machine had; `brew upgrade nats-server` and a re-run the same day confirmed
+all five on **v2.14.6** — identical output, down to the configuration checksums `-t` prints — so the
+observations and the source ranges now name the same release. Both runs are kept:
+`raw/nats-server-src/topology-v2.14.6.md` and `topology-observed-v2.14.6.md`.)
 
 **Docs issues #23–#26**, three of them ★. #23 the three phantom port defaults; #24 the composed
 config that will not start, plus `-t`'s real boundary; #25 the fast-producer stall and **both**

@@ -19,8 +19,13 @@ updated: 2026-08-31
 
 Read to settle four things the docs state loosely: what an omitted topology port does, what a
 composed server requires before it will start, what geo-affinity actually suppresses, and what
-`deny_imports` / `deny_exports` are. Quoted ranges are in `raw/nats-server-src/topology-v2.14.6.md`;
-behaviour marked *observed* was reproduced on the **v2.14.5** binary with the configs recorded there.
+`deny_imports` / `deny_exports` are. Quoted ranges are in `raw/nats-server-src/topology-v2.14.6.md`.
+
+**Behaviour marked *observed* was run on the v2.14.6 binary**, the same release the source is read
+at. The first runs were made on v2.14.5, which was what the machine had; after
+`brew upgrade nats-server` all five were re-run on **v2.14.6** and **reproduce identically**, down to
+the configuration checksums `-t` prints. Configs and output for both are in
+`raw/nats-server-src/topology-v2.14.6.md` and `topology-observed-v2.14.6.md`.
 
 ## Key claims
 
@@ -47,8 +52,8 @@ gateway is configured. Past both:
 trusted operator supplies one (`opts.go:1535`). The runtime fallback that creates `$SYS`
 (`server.go:2371–2373`) happens **later**, so it cannot satisfy this check.
 
-*Observed:* the composed `n1-east.conf` from `learn/topologies/putting-it-together.md` passes
-`nats-server -t` and then refuses to start with exactly that message.
+*Observed (v2.14.6):* the composed `n1-east.conf` from `learn/topologies/putting-it-together.md`
+passes `nats-server -t` and then refuses to start with exactly that message.
 
 ### The three topology ports have no defaults
 
@@ -66,8 +71,8 @@ shapes differ:
 in a missing port on a *remote's* URL (`opts.go:6096`), never to open a listener. The `host` defaults
 (`0.0.0.0`) *are* applied, but only once a port is set (`opts.go:6072–6074`, `6140–6142`).
 
-*Observed:* `leafnodes { }` on a server with `listen: 127.0.0.1:4222` holds exactly one listening
-socket, 4222.
+*Observed (v2.14.6):* `leafnodes { }` on a server with `listen: 127.0.0.1:4222` holds exactly one
+listening socket, 4222. `cluster { name: east }` with no port behaves the same way — no 6222.
 
 ### An unset `cluster.name` is adopted from `gateway.name`
 
@@ -165,7 +170,7 @@ in the opposite direction" (`leafnode.go:2307–2318`), and pushed back by `send
 `authorization{}` section of `leafnodes {}`" (`opts.go:3005–3007`). It accepts exactly four keys:
 `user`/`username`, `pass`/`password`, `account`, `proxy_required`.
 
-*Observed:* `permissions` inside a `leafnodes.authorization` user is a parse error —
+*Observed (v2.14.6):* `permissions` inside a `leafnodes.authorization` user is a parse error —
 `unknown field "permissions"`. And a `leafuser` entry in the **global** `authorization.users` block
 does not govern the leafnode connection at all: the deny is simply not applied. Both reproduce
 gh#5941's unanswered follow-up exactly.

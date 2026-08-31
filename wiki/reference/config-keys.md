@@ -264,7 +264,7 @@ surface the wiki actually explains.
 **Corrected 2026-08-31.** The generated reference gives `cluster.port` `6222`, `gateway.port` `7222`
 and `leafnodes.port` `7422` as **defaults**, and this page repeated `6222` above. The server applies
 none of them; what it does instead differs per key
-(source: [[s-nats-server-topology]], reproduced on v2.14.5):
+(source: [[s-nats-server-topology]], reproduced on v2.14.6):
 
 | key | reference says | what an omitted value actually does |
 |---|---|---|

@@ -313,7 +313,7 @@ failure; four tolerate exactly what three do ([[raft-in-nats]]).
 
 Three checks that belong in the same change, because two of them stop the server from starting and
 `nats-server -c … -t` reports the file valid first (source: [[s-nats-server-topology]], reproduced on
-v2.14.5).
+v2.14.6).
 
 **1 · `gateway.name` must equal `cluster.name`.** A *conflicting* pair fails with
 `cluster name conflicts between cluster and gateway definitions` (`errors.go:192`). An **unset**

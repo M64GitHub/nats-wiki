@@ -115,7 +115,7 @@ start without one:
 nats-server: gateway "east" has no port specified (select -1 for random port)
 ```
 
-(`gateway.go:316–318`; reproduced on v2.14.5). `nats-server -t` passes the same file
+(`gateway.go:316–318`; reproduced on v2.14.6). `nats-server -t` passes the same file
 (source: [[s-nats-server-topology]]; `inbox/docs-issues.md` #23).
 
 **Only TLS material reloads.** Everything else in the block — `host`, `port`, `name`,

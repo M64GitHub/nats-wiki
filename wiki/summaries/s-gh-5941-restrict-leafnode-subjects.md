@@ -66,7 +66,7 @@ publishes from the leaf and sees the message on the hub anyway:
 
 > "Shouldn't this be denied on the hub with a config of `publish: { deny: ">" }`?"
 
-**It should not, and this wiki reproduced it** on nats-server v2.14.5 (source:
+**It should not, and this wiki reproduced it** on nats-server v2.14.6 (source:
 [[s-nats-server-topology]]). Two facts explain it:
 
 1. The `leafuser` entry in the **global** `authorization.users` block governs *client* connections.
