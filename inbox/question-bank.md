@@ -20,42 +20,42 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 |---|---|---|---|---|---|
 | 1 | How do I size a 3-node R3 JetStream cluster (disk, RAM, IOPS) for a given message rate, size and retention? | jetstream deploy | [gh#6879](https://github.com/nats-io/nats-server/discussions/6879) | ★ sizing | |
 | 2 | How much disk does a stream actually use beyond the raw message bytes (blocks, index, per-subject state)? | jetstream | [gh#5742](https://github.com/nats-io/nats-server/discussions/5742) | ★ sizing internals | |
-| 3 | What does a stream actually cost in resources, and how do I run JetStream in the most resource-effective way? | jetstream | [gh#4227](https://github.com/nats-io/nats-server/discussions/4227) | ★ sizing | |
+| 3 | What does a stream actually cost in resources, and how do I run JetStream in the most resource-effective way? | jetstream | [gh#4227](https://github.com/nats-io/nats-server/discussions/4227) | ★ sizing | [[jetstream-sizing]] |
 | 4 | Is there a practical cap on the number of messages in a single stream? | jetstream | [gh#7147](https://github.com/nats-io/nats-server/discussions/7147) | sizing | |
 | 5 | What is the largest known-good value for MaxMsgs on a stream? | jetstream | [gh#7032](https://github.com/nats-io/nats-server/discussions/7032) | sizing config | |
-| 6 | How many consumers can one stream and one server support before it hurts? | jetstream | [gh#7863](https://github.com/nats-io/nats-server/discussions/7863) | ★ sizing | |
-| 7 | Why does publisher throughput collapse when many consumers attach to the stream? | jetstream | [gh#6274](https://github.com/nats-io/nats-server/discussions/6274) | ★ sizing gotcha | |
+| 6 | How many consumers can one stream and one server support before it hurts? | jetstream | [gh#7863](https://github.com/nats-io/nats-server/discussions/7863) | ★ sizing | [[jetstream-slows-as-consumers-grow]] · [[jetstream-sizing]] |
+| 7 | Why does publisher throughput collapse when many consumers attach to the stream? | jetstream | [gh#6274](https://github.com/nats-io/nats-server/discussions/6274) | ★ sizing gotcha | [[jetstream-slows-as-consumers-grow]] |
 | 8 | Why is my async publish throughput far below the numbers in the docs? | jetstream | [gh#7599](https://github.com/nats-io/nats-server/discussions/7599) | sizing gotcha | |
 | 9 | Does a high-cardinality subject space hurt stream performance? | jetstream | [gh#8333](https://github.com/nats-io/nats-server/discussions/8333) | sizing | |
 | 10 | Why does server memory grow with the number of unacknowledged (pending) messages? | core jetstream | [gh#6820](https://github.com/nats-io/nats-server/discussions/6820) | sizing gotcha | |
 | 11 | How do I scale core NATS for bursty traffic — bigger nodes, more nodes, or partitioning? | core topology | [gh#7738](https://github.com/nats-io/nats-server/discussions/7738) | sizing | |
-| 12 | What breaks if I raise max_payload above 8MB, and what is the real limit? | core | [gh#7068](https://github.com/nats-io/nats-server/discussions/7068) | ★ config sizing | |
+| 12 | What breaks if I raise max_payload above 8MB, and what is the real limit? | core | [gh#7068](https://github.com/nats-io/nats-server/discussions/7068) | ★ config sizing | [[jetstream-sizing]] · [[defaults-and-limits]] |
 | 13 | Why is JetStream startup and recovery slow with tens of millions of messages? | jetstream | [gh#8001](https://github.com/nats-io/nats-server/discussions/8001) | gotcha sizing | |
-| 14 | Why does my consumer keep redelivering messages that were acknowledged? | jetstream | [so#78603662](https://stackoverflow.com/questions/78603662/nats-jetstream-messages-being-processed-multiple-times-by-my-consumer-even-when) | ★ gotcha | |
-| 15 | What does max_ack_pending actually do, and what happens when it is reached? | jetstream | [gh#5211](https://github.com/nats-io/nats-server/discussions/5211) | ★ config gotcha | |
+| 14 | Why does my consumer keep redelivering messages that were acknowledged? | jetstream | [so#78603662](https://stackoverflow.com/questions/78603662/nats-jetstream-messages-being-processed-multiple-times-by-my-consumer-even-when) | ★ gotcha | [[ack-and-redelivery]] |
+| 15 | What does max_ack_pending actually do, and what happens when it is reached? | jetstream | [gh#5211](https://github.com/nats-io/nats-server/discussions/5211) | ★ config gotcha | [[ack-and-redelivery]] · [[consumer]] |
 | 16 | How do ack_wait and the duplicate window interact? | jetstream | [gh#6628](https://github.com/nats-io/nats-server/discussions/6628) | gotcha config | |
 | 17 | Does JetStream support exponential backoff for redelivery? | jetstream | [gh#6350](https://github.com/nats-io/nats-server/discussions/6350) | config | |
 | 18 | Why doesn't a NAK cause an immediate redelivery? | jetstream | [gh#5631](https://github.com/nats-io/nats-server/discussions/5631) | gotcha | |
 | 19 | Does NakWithDelay hold a max_ack_pending slot and block other messages? | jetstream | [gh#4972](https://github.com/nats-io/nats-server/discussions/4972) | gotcha | |
-| 20 | What happens when several consumers share a durable name with different filter subjects on a WorkQueue stream? | jetstream | [gh#6044](https://github.com/nats-io/nats-server/discussions/6044) | ★ gotcha | |
-| 21 | What does "disjoint filter subjects" mean for a WorkQueue stream? | jetstream | [gh#3637](https://github.com/nats-io/nats-server/discussions/3637) | config | |
-| 22 | How do I inspect which messages are still pending in a work-queue stream? | jetstream monitoring | [gh#4778](https://github.com/nats-io/nats-server/discussions/4778) | ★ monitoring | |
+| 20 | What happens when several consumers share a durable name with different filter subjects on a WorkQueue stream? | jetstream | [gh#6044](https://github.com/nats-io/nats-server/discussions/6044) | ★ gotcha | [[retention-policies]] |
+| 21 | What does "disjoint filter subjects" mean for a WorkQueue stream? | jetstream | [gh#3637](https://github.com/nats-io/nats-server/discussions/3637) | config | [[retention-policies]] |
+| 22 | How do I inspect which messages are still pending in a work-queue stream? | jetstream monitoring | [gh#4778](https://github.com/nats-io/nats-server/discussions/4778) | ★ monitoring | [[consumer]] |
 | 23 | Does JetStream give exactly-once delivery, and how does the dedup window work? | jetstream | [so#72814502](https://stackoverflow.com/questions/72814502/nats-jetstream-exactly-once-delivery) | ★ concept | |
 | 24 | What ordering does JetStream guarantee, and per what — stream, subject, key? | jetstream | [so#68984906](https://stackoverflow.com/questions/68984906/does-nats-jetstream-provide-message-ordering-by-a-key) | concept | |
 | 25 | What ordering guarantees does core NATS give? | core | [gh#7577](https://github.com/nats-io/nats-server/discussions/7577) | concept | |
 | 26 | What happens when JetStream runs out of disk? | jetstream | [gh#5924](https://github.com/nats-io/nats-server/discussions/5924) | ★ gotcha | |
 | 27 | How do I recover a stream that is full under a DiscardNew policy? | jetstream | [gh#2794](https://github.com/nats-io/nats-server/discussions/2794) | gotcha runbook | |
-| 28 | How do per-message TTLs and subject delete markers behave? | jetstream | [gh#7227](https://github.com/nats-io/nats-server/discussions/7227) | config | |
+| 28 | How do per-message TTLs and subject delete markers behave? | jetstream | [gh#7227](https://github.com/nats-io/nats-server/discussions/7227) | config | [[message-ttl]] |
 | 29 | Can the server schedule a message for later, with cron-style patterns? | jetstream | [gh#7672](https://github.com/nats-io/nats-server/discussions/7672) | config | |
 | 30 | Message scheduler vs NAK-with-delay for scheduled work at scale — which one? | jetstream | [gh#7628](https://github.com/nats-io/nats-server/discussions/7628) | pattern | |
 | 31 | How does JetStream filestore compression work and what does it cost? | jetstream | [gh#5259](https://github.com/nats-io/nats-server/discussions/5259) | sizing internals | |
 | 32 | How do I back up and restore JetStream, including memory streams? | jetstream | [gh#4342](https://github.com/nats-io/nats-server/discussions/4342) | ★ runbook | |
-| 33 | Can I change the replica count of a live stream, and why does it fail with "no suitable peers for placement"? | jetstream topology | [gh#7982](https://github.com/nats-io/nats-server/discussions/7982) | ★ gotcha | |
+| 33 | Can I change the replica count of a live stream, and why does it fail with "no suitable peers for placement"? | jetstream topology | [gh#7982](https://github.com/nats-io/nats-server/discussions/7982) | ★ gotcha | [[stream-placement]] · [[replicas]] · [[no-suitable-peers-for-placement]] |
 | 34 | How do I rebalance streams after adding nodes to a cluster? | topology | [gh#7215](https://github.com/nats-io/nats-server/discussions/7215) | ★ runbook | |
-| 35 | How do I move a stream to a different set of peers? | topology | [gh#2730](https://github.com/nats-io/nats-server/discussions/2730) | runbook | |
-| 36 | Why does the cluster report no quorum and stall on JetStream consumers? | topology | [gh#3210](https://github.com/nats-io/nats-server/discussions/3210) | ★ gotcha | |
+| 35 | How do I move a stream to a different set of peers? | topology | [gh#2730](https://github.com/nats-io/nats-server/discussions/2730) | runbook | [[stream-placement]] |
+| 36 | Why does the cluster report no quorum and stall on JetStream consumers? | topology | [gh#3210](https://github.com/nats-io/nats-server/discussions/3210) | ★ gotcha | [[raft-in-nats]] |
 | 37 | What causes unexpected quorum loss after days of stable operation? | topology | [gh#7533](https://github.com/nats-io/nats-server/discussions/7533) | gotcha | |
-| 38 | Why were my streams marked orphan and deleted when converting a standalone server into a cluster? | topology | [gh#7831](https://github.com/nats-io/nats-server/discussions/7831) | ★ gotcha | |
+| 38 | Why were my streams marked orphan and deleted when converting a standalone server into a cluster? | topology | [gh#7831](https://github.com/nats-io/nats-server/discussions/7831) | ★ gotcha | [[streams-deleted-when-clustering-a-standalone-server]] |
 | 39 | How do I find out what corrupted a JetStream cluster, and how do I recover it? | topology | [gh#7463](https://github.com/nats-io/nats-server/discussions/7463) | ★ gotcha runbook | |
 | 40 | How should a cluster survive hardware failure of one or more nodes? | topology | [gh#6892](https://github.com/nats-io/nats-server/discussions/6892) | runbook | |
 | 41 | Leafnode, gateway or cluster — when do I use which? | topology | [gh#6328](https://github.com/nats-io/nats-server/discussions/6328) | ★ concept | |
@@ -74,9 +74,9 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 54 | How do I add accounts and reload a running cluster without dropping clients? | security deploy | [gh#5890](https://github.com/nats-io/nats-server/discussions/5890) | ★ runbook | |
 | 55 | Which configuration changes actually take effect on reload, and which need a restart? | deploy | [gh#7126](https://github.com/nats-io/nats-server/discussions/7126) | ★ config gotcha | |
 | 56 | How do I deny unauthenticated connections without breaking system users? | security | [gh#4535](https://github.com/nats-io/nats-server/discussions/4535) | gotcha | |
-| 57 | Which endpoints and metrics should I actually alert on for a JetStream cluster? | monitoring | [gh#6182](https://github.com/nats-io/nats-server/discussions/6182) | ★ runbook | |
+| 57 | Which endpoints and metrics should I actually alert on for a JetStream cluster? | monitoring | [gh#6182](https://github.com/nats-io/nats-server/discussions/6182) | ★ runbook | [[monitoring-endpoints]] · [[advisories]] |
 | 58 | How do I find which consumer the server has flagged as slow? | monitoring | [gh#6605](https://github.com/nats-io/nats-server/discussions/6605) | ★ gotcha | |
-| 59 | Are there metrics for acked, naked, terminated and redelivered messages? | monitoring jetstream | [gh#6962](https://github.com/nats-io/nats-server/discussions/6962) | monitoring | |
+| 59 | Are there metrics for acked, naked, terminated and redelivered messages? | monitoring jetstream | [gh#6962](https://github.com/nats-io/nats-server/discussions/6962) | monitoring | [[advisories]] · [[consumer]] |
 | 60 | How is CPU % in /varz measured, and why does it look wrong in containers? | monitoring | [gh#7483](https://github.com/nats-io/nats-server/discussions/7483) | gotcha | |
 | 61 | How are the RTT values in /routez and /connz measured? | monitoring | [gh#7362](https://github.com/nats-io/nats-server/discussions/7362) | monitoring | |
 | 62 | How do I read and act on JetStream warnings in the server log? | monitoring jetstream | [gh#6490](https://github.com/nats-io/nats-server/discussions/6490) | ★ gotcha | |
@@ -87,9 +87,9 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 67 | LoadBalancer or seed URLs — how should clients reach a cluster on Kubernetes? | deploy clients | [gh#6094](https://github.com/nats-io/nats-server/discussions/6094) | pattern | |
 | 68 | Why did throughput drop after moving from Kubernetes to a standalone VM (or back)? | deploy | [gh#6594](https://github.com/nats-io/nats-server/discussions/6594) | sizing gotcha | |
 | 69 | Why does my KV watcher miss updates, and how do I watch many keys at once? | kv | [gh#6746](https://github.com/nats-io/nats-server/discussions/6746) | ★ gotcha | |
-| 70 | How do I count the keys in a KV bucket without fetching them all? | kv | [gh#7365](https://github.com/nats-io/nats-server/discussions/7365) | gotcha | |
-| 71 | Does KV support a TTL per key, and since which version? | kv | [gh#7264](https://github.com/nats-io/nats-server/discussions/7264) | config | |
-| 72 | Why doesn't deleting or purging keys reclaim disk space in a bucket? | kv | [gh#6015](https://github.com/nats-io/nats-server/discussions/6015) | ★ gotcha | |
+| 70 | How do I count the keys in a KV bucket without fetching them all? | kv | [gh#7365](https://github.com/nats-io/nats-server/discussions/7365) | gotcha | [[key-value]] |
+| 71 | Does KV support a TTL per key, and since which version? | kv | [gh#7264](https://github.com/nats-io/nats-server/discussions/7264) | config | [[message-ttl]] · [[key-value]] |
+| 72 | Why doesn't deleting or purging keys reclaim disk space in a bucket? | kv | [gh#6015](https://github.com/nats-io/nats-server/discussions/6015) | ★ gotcha | [[key-value]] |
 | 73 | When is KV or Object Store the wrong tool — where does Redis or a database win? | kv objectstore | [so#75576454](https://stackoverflow.com/questions/75576454/nats-object-store-or-key-value-store-vs-redis-cache) | concept | |
 | 74 | How do I implement a distributed lock or lease with KV? | kv | [so#79400839](https://stackoverflow.com/questions/79400839/how-to-use-nats-kv-for-distributed-locking) | pattern | |
 | 75 | Why is listing an object-store bucket slow (or timing out) while uploads run? | objectstore | [gh#6836](https://github.com/nats-io/nats-server/discussions/6836) | gotcha | |
@@ -99,7 +99,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 79 | How do I run NATS WebSocket behind nginx or another proxy? | interop deploy | [gh#7375](https://github.com/nats-io/nats-server/discussions/7375) | runbook | |
 | 80 | How does MQTT QoS 1/2 map onto JetStream, and what does it cost? | interop | [gh#7641](https://github.com/nats-io/nats-server/discussions/7641) | concept | |
 | 81 | How do I restrict MQTT client ids per account with JWT? | interop security | [gh#7397](https://github.com/nats-io/nats-server/discussions/7397) | config | |
-| 82 | How do I track client connect and disconnect events? | monitoring core | [gh#6445](https://github.com/nats-io/nats-server/discussions/6445) | runbook | |
+| 82 | How do I track client connect and disconnect events? | monitoring core | [gh#6445](https://github.com/nats-io/nats-server/discussions/6445) | runbook | [[advisories]] |
 
 ## Thread titles behind the rows
 

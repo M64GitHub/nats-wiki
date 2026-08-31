@@ -9,14 +9,14 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 
 | # | file | title | status | area | tags | flags | summary |
 |---|---|---|---|---|---|---|---|
-| 1 | ADR-1.md | JetStream JSON API Design | Implemented | clients core jetstream | jetstream, client, server | ★ implemented |  |
+| 1 | ADR-1.md | JetStream JSON API Design | Implemented | clients core jetstream | jetstream, client, server | ★ implemented | [[s-adr-1-jetstream-json-api]] |
 | 2 | ADR-2.md | NATS Typed Messages | Implemented | clients core jetstream | jetstream, server, client | ★ implemented |  |
 | 3 | ADR-3.md | NATS Service Latency Distributed Tracing Interoperability | Approved | core monitoring | observability, server | approved |  |
 | 4 | ADR-4.md | NATS Message Headers | Implemented | clients core | server, client | ★ implemented |  |
 | 5 | ADR-5.md | Lame Duck Notification | Partially Implemented | clients core | server, client | ★ partial |  |
 | 6 | ADR-6.md | Naming Rules | Approved | clients core | server, client | approved |  |
-| 7 | ADR-7.md | NATS Server Error Codes | Partially Implemented | clients core jetstream | server, client, jetstream | ★ partial |  |
-| 8 | ADR-8.md | JetStream based Key-Value Stores | Implemented | clients jetstream kv | jetstream, client, kv, spec | implemented |  |
+| 7 | ADR-7.md | NATS Server Error Codes | Partially Implemented | clients core jetstream | server, client, jetstream | ★ partial | [[s-adr-7-server-error-codes]] |
+| 8 | ADR-8.md | JetStream based Key-Value Stores | Implemented | clients jetstream kv | jetstream, client, kv, spec | implemented | [[s-adr-8-key-value-store]] |
 | 9 | ADR-9.md | JetStream Consumer Idle Heartbeats | Approved | clients core jetstream | server, client, jetstream | approved |  |
 | 10 | ADR-10.md | JetStream Extended Purge | Implemented | clients core jetstream | server, client, jetstream | ★ implemented |  |
 | 11 | ADR-11.md | Hostname resolution | Approved | clients | client | approved |  |
@@ -24,10 +24,10 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 13 | ADR-13.md | Pull Subscribe internals | Partially Implemented | clients jetstream | jetstream, client | partial |  |
 | 14 | ADR-14.md | JWT library free jwt user generation | Approved | clients security | client, security | approved |  |
 | 15 | ADR-15.md | JetStream Subscribe Workflow | Deprecated |  | deprecated | deprecated |  |
-| 17 | ADR-17.md | Ordered Consumer | Implemented | clients jetstream | jetstream, client | implemented |  |
+| 17 | ADR-17.md | Ordered Consumer | Implemented | clients jetstream | jetstream, client | implemented | [[s-adr-17-ordered-consumer]] |
 | 18 | ADR-18.md | URL support for all client options | Deprecated |  | deprecated | deprecated |  |
 | 19 | ADR-19.md | API prefixes for materialized JetStream views | Partially Implemented | clients jetstream kv objectstore | jetstream, client, kv, objectstore | partial |  |
-| 20 | ADR-20.md | JetStream based Object Stores | Implemented | clients jetstream objectstore | jetstream, client, objectstore, spec | implemented |  |
+| 20 | ADR-20.md | JetStream based Object Stores | Implemented | clients jetstream objectstore | jetstream, client, objectstore, spec | implemented | [[s-adr-20-object-store]] |
 | 21 | ADR-21.md | NATS Configuration Contexts | Partially Implemented | clients | client | partial |  |
 | 22 | ADR-22.md | JetStream Publish Retries on No Responders | Partially Implemented | clients jetstream | jetstream, client | partial |  |
 | 26 | ADR-26.md | NATS Authorization Callouts | Implemented | core | server | ★ implemented |  |
@@ -44,8 +44,8 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 39 | ADR-39.md | Certificate Store | Implemented | core security | server, security | ★ implemented |  |
 | 40 | ADR-40.md | NATS Connection | Implemented | clients core | client, server, spec | ★ implemented |  |
 | 41 | ADR-41.md | NATS Message Path Tracing | Implemented | core monitoring | observability, server, 2.11 | ★ implemented 2.11 |  |
-| 42 | ADR-42.md | Pull Consumer Priority Groups | Approved | core jetstream | jetstream, server, 2.11 | approved 2.11 |  |
-| 43 | ADR-43.md | JetStream Per-Message TTL | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 |  |
+| 42 | ADR-42.md | Pull Consumer Priority Groups | Approved | core jetstream | jetstream, server, 2.11 | approved 2.11 | [[s-adr-42-priority-groups]] |
+| 43 | ADR-43.md | JetStream Per-Message TTL | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 | [[s-adr-43-per-message-ttl]] |
 | 44 | ADR-44.md | Versioning for JetStream Assets | Implemented | core jetstream | jetstream, server, 2.11, 2.12 | ★ implemented 2.11 2.12 |  |
 | 47 | ADR-47.md | Request Many | Partially Implemented | clients | client, spec, orbit | partial |  |
 | 48 | ADR-48.md | TTL Support for Key-Value Buckets | Implemented | clients jetstream kv | jetstream, client, kv, refinement, 2.11 | implemented refinement 2.11 |  |
