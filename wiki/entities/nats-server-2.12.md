@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.12, strict-mode, elastic-pointers, offline-assets, GOMEMLIMIT]
 aliases: ["2.12", v2.12, v2.12.0, v2.12.15]
-sources: [s-docs-upgrade-to-2.12]
+sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -37,7 +37,12 @@ Dates and tags from `raw/release-notes/_tags-and-dates.md` (GitHub releases API,
 **Streams**
 
 - **`AllowAtomicPublish`** — atomically publish N messages into a stream, replicated or not, with
-  per-message consistency checks before committing (ADR-50).
+  per-message consistency checks before committing (ADR-50). What a publisher actually sends —
+  `Nats-Batch-Id`, `Nats-Batch-Sequence`, `Nats-Batch-Commit`, and the `batch`/`count` fields on the
+  committing `PubAck` — plus the three ways a batch ends without committing, is on [[publishing]]
+  (source: [[s-docs-advanced-publishing]]). Two constraints arrived with it: the flag is refused
+  alongside `persist_mode: async`, and a **mirror** cannot be a batch target
+  (`10209`, [[error-codes]]).
 - **`AllowMsgCounter`** — distributed counter CRDT semantics on a stream; counter streams can be
   mirrored or aggregated (ADR-49).
 - **`AllowMsgSchedules`** — delayed message scheduling (ADR-51); 2.14 extends it with cron.
@@ -139,4 +144,4 @@ anything older gives up that protection.
 
 ## Sources
 
-[[s-docs-upgrade-to-2.12]]
+[[s-docs-upgrade-to-2.12]] · [[s-docs-advanced-publishing]]

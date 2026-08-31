@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, certificates, rotation, expiry, tls_cert_not_after, nats-account-tls, reload, SIGHUP]
 aliases: [certificate rotation, cert rotation, certificate expiry, tls renewal, rotate certs]
-sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units, s-docs-hardening]
+sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units, s-docs-hardening, s-nats-server-tls-reload]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -120,6 +120,33 @@ The reload is driven by a diff of the parsed options, so a certificate whose **c
 produces a `tlsconfig` change even though the path did not. What the reload cannot do is reach a
 connection that has already handshaken.
 
+**The reload does pick the new file up — measured, not assumed.** On the v2.14.6 binary, replacing
+`cert_file` in place and signalling moved `/varz`'s `tls_cert_not_after` from `2026-09-30T20:18:19Z`
+to `2029-02-16T20:18:19Z`; replacing **both** files with a fresh keypair, the shape a real renewal
+takes, worked the same way (source: [[s-nats-server-tls-reload]]). No restart is needed on either
+surface tested — a client listener or a leafnode remote.
+
+**But the reload tells you nothing.** Those four `Reloaded:` lines, including `Reloaded: tls =
+enabled`, are printed **verbatim by a reload that changed nothing** — the no-op control was run first
+for exactly this reason. `config_digest` does not move either: it digests the configuration *text*,
+which is unchanged when only the file behind the path is new. So a monitoring check watching the log
+or the digest will never see a rotation, and will never see one fail. **`tls_cert_not_after` is the
+only field that distinguishes a landed rotation from a no-op** — which is why *Verify* below leads
+with it.
+
+**And `nats-server --signal reload` exits 0 even when the reload failed.** With a certificate and key
+that do not match — a renewal that wrote one file and not the other — the server logs
+
+```
+[ERR] Failed to reload server configuration: nats.conf:5:1: error parsing X509 certificate/key pair: tls: private key does not match public key
+```
+
+and the signal command still exits **0**. A missing certificate file behaves identically
+(`open certs/server-cert.pem: no such file or directory`). This is why step 3 starts with
+`nats-server -t`, which catches both, exits **1** and names the file and line. The consolation is
+that a failed reload is safe: the **old certificate stays live** and clients keep connecting and
+handshaking normally (source: [[s-nats-server-tls-reload]]).
+
 ### 4 · Roll the connections that still hold the old certificate
 
 Existing connections keep the certificate they negotiated for their whole life. Whether you need to
@@ -133,6 +160,12 @@ force them depends on the certificate:
 - **A cluster or gateway certificate** — the routes themselves are long-lived connections. They
   re-handshake when the route is re-established, so the same one-node-at-a-time drain applies, and
   [[build-a-3-node-cluster]]'s checks are the ones to gate on.
+- **A leafnode remote's certificate** — the same, and it is the case most likely to be missed,
+  because the leaf holds *one* long-lived connection to the hub. The reload does replace the
+  certificate the leaf will present, but the hub keeps seeing the **old** identity until that
+  connection re-establishes: observed at v2.14.6, where the hub still counted the leaf as connected
+  under the previous certificate immediately after the reload and only saw the new one after a
+  re-handshake (source: [[s-nats-server-tls-reload]]). See [[leafnode]].
 
 ## Verify
 
@@ -140,6 +173,15 @@ force them depends on the certificate:
 
 ```
 curl -s http://127.0.0.1:8222/varz | jq .tls_cert_not_after
+```
+
+**This is the check, not a nicety.** The reload's log lines and `config_digest` are identical whether
+the rotation landed or did nothing, and the signal command exits 0 either way — so a date that has
+*not* moved means the reload did not take the new file, and the server log will say why
+(source: [[s-nats-server-tls-reload]]). Compare against the file you just installed:
+
+```
+openssl x509 -in /etc/nats/certs/server-cert.pem -noout -enddate
 ```
 
 **2 · A client verifies the new chain end to end:**
@@ -175,14 +217,24 @@ gives the client `nats: error: nats: Authorization Violation` and the server
   take the server down. Fix the file and signal again.
 - **If a rotation left clients failing anyway**, restarting the server is the blunt instrument that
   is known to work: the incident in [[s-gh-7684-certificate-expiry]] was resolved that way after a
-  reload appeared not to take effect. Nobody diagnosed why; treat a restart as the escalation, not
-  the routine.
+  reload appeared not to take effect. Nobody in that thread diagnosed why, and this wiki cannot
+  reproduce it: at v2.14.6 the reload picks the file up on every shape tested
+  (source: [[s-nats-server-tls-reload]]). Before restarting, read the server log for
+  `Failed to reload server configuration` — a reload that was **refused** looks from the outside
+  exactly like one that did nothing, and is by far the likelier explanation. Treat a restart as the
+  escalation, not the routine.
 
 ## Pitfalls
 
 - **Overwriting the files does nothing on its own.** No watcher, no timer. The reload signal is the
   whole mechanism, and forgetting it is the classic Let's Encrypt-renewal failure: the certificate on
   disk is valid and the one in memory is not.
+- **Do not gate a rotation script on the exit status of `nats-server --signal reload`.** It exits 0
+  whether the reload was applied or refused. Gate on `nats-server -t` before it (exit 1 on a bad
+  pair, with the file and line) and on `tls_cert_not_after` after it.
+- **Do not alert on `config_digest` to catch a rotation.** Rotating a certificate does not change the
+  configuration text, so the digest is unchanged — a landed rotation and a forgotten one look
+  identical through that field.
 - **`/varz` shows the leaf only.** An expiring **intermediate or root** fails the handshake exactly
   the same way and does not appear there. `nats account tls` walks the chain; alert on both.
 - **An expired certificate is a handshake rejection, not an auth error.** Clients report
@@ -198,15 +250,31 @@ gives the client `nats: error: nats: Authorization Violation` and the server
   `prev_key` rotation needs a **restart**, not a reload, and `prev_key` must be dropped afterwards —
   see [[tls-in-nats]].
 
+## Settled by running it
+
+Both of this page's open questions were answered on the v2.14.6 binary on 2026-08-31; the runs are in
+`raw/nats-server-src/tls-reload-observed-v2.14.6.md` and summarised in [[s-nats-server-tls-reload]].
+
+- **Does a reload pick up changed certificate files? Yes** — on a client listener and on a leafnode
+  remote, with the file replaced in place and with the path changed in the config, and with a fresh
+  keypair as well as a fresh certificate. The failure reported in
+  [[s-gh-7684-certificate-expiry]] did not reproduce. What did emerge is that a reload gives no
+  positive signal, and that a *refused* reload is indistinguishable from a successful one anywhere
+  except the server log — which is a sufficient explanation for an operator concluding "the reload
+  didn't work", without the reload being broken.
+- **`nats server check` has no certificate-expiry check** at natscli **v0.4.0**. Its ten subcommands
+  are `connection`, `stream`, `consumer`, `message`, `meta`, `request`, `jetstream`, `server`, `kv`
+  and `credential`; `connection` carries only timing thresholds, and `credential` checks a NATS
+  **credential file** — a user JWT, with `--validity-warn` / `--validity-critical` — not an X.509
+  certificate. So a Nagios or Prometheus pipeline gets its certificate expiry from `/varz`'s
+  `tls_cert_not_after` (leaf certificate, per listener) or from `nats account tls --expire-warn`'s
+  exit status (whole chain, but no `--format` support, since it is not a `check` subcommand).
+
 ## To verify
 
-- **Whether a config reload always picks up changed certificate *files***. The docs say it does; the
-  reporter in [[s-gh-7684-certificate-expiry]] says a reload did not, and nobody in the thread
-  diagnosed it. The reload path diffs the parsed `tls.Config`, which does change when the certificate
-  bytes change, so the mechanism looks sound — but this wiki has not reproduced the failure and does
-  not claim to explain it. **(unverified)**
-- Whether `nats server check` has a certificate-expiry check to pair with `nats account tls` in a
-  monitoring pipeline; only `nats account tls` has been read at v0.4.0.
+- The three remaining caveated leafnode-remote keys — `cipher_suites`, `curve_preferences` and
+  `insecure` — which the generated reference says reload without effect on 2.11/2.12 and which were
+  **not** tested here. `cert_file`, `key_file` and `ca_file` were, and all three reload.
 
 ## Related
 
@@ -218,4 +286,4 @@ gives the client `nats: error: nats: Authorization Violation` and the server
 
 [[s-docs-encryption-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] ·
 [[s-nats-server-auth-and-tls]] · [[s-docs-config-management]] · [[s-docs-hardening]] ·
-[[s-nats-server-systemd-units]]
+[[s-nats-server-systemd-units]] · [[s-nats-server-tls-reload]]

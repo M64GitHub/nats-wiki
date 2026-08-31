@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -118,6 +118,17 @@ Two structural notes from the table's own appendix:
 | **10165** | `JSMessageTTLInvalidErr` | 400 | invalid per-message TTL | [[message-ttl]] |
 | **10166** | `JSMessageTTLDisabledErr` | 400 | per-message TTL is disabled | [[message-ttl]] |
 | **10130** | `JSStreamNameExistRestoreFailedErr` | 400 | stream name already in use, cannot restore | [[backup-and-restore-jetstream]] |
+| **10176** | `JSAtomicPublishIncompleteBatchErr` | 400 | atomic publish batch is incomplete | [[publishing]] |
+| **10179** | `JSAtomicPublishInvalidBatchIDErr` | 400 | atomic publish batch ID is invalid | [[publishing]] |
+| **10199** | `JSAtomicPublishTooLargeBatchErrF` | 400 | atomic publish batch is too large: `{size}` | [[publishing]] |
+| **10201** | `JSAtomicPublishContainsDuplicateMessageErr` | 400 | atomic publish batch contains duplicate message id | [[publishing]] |
+| **10210** | `JSAtomicPublishTooManyInflight` | **429** | atomic publish too many inflight | [[publishing]] |
+| **10205** | `JSBatchPublishDisabledErr` | 400 | batch publish is disabled | [[publishing]] |
+| **10206** | `JSBatchPublishInvalidPatternErr` | 400 | batch publish pattern is invalid | [[publishing]] |
+| **10207** | `JSBatchPublishInvalidBatchIDErr` | 400 | batch publish ID is invalid | [[publishing]] |
+| **10208** | `JSBatchPublishUnknownBatchIDErr` | 400 | batch publish ID unknown | [[publishing]] |
+| **10209** | `JSMirrorWithBatchPublishErr` | 400 | stream mirrors can not also use batch publishing | [[publishing]] · [[mirrors-and-sources]] |
+| **10211** | `JSBatchPublishTooManyInflight` | **429** | batch publish too many inflight | [[publishing]] |
 | **10202** | `JSClusterServerMemberChangeInflightErr` | 400 | cluster member change is in progress | [[rebalance-streams]] |
 
 **`10047` and `10028` do not mean the disk or the RAM is full.** They compare **reservations** —
@@ -142,6 +153,29 @@ record of it is a rate-limited *debug* line (`server/stream.go:7063`), so at the
 nothing appears. Its description is `{err}` again, and the three substituted strings
 (`server/store.go:48-53`) are what tell you *which* limit was hit. See
 [[maximum-messages-exceeded]].
+
+### The batch-publish family, and the only two `429`s this wiki cites
+
+The eleven codes above are two families, one per publish mode ([[publishing]]), and they are worth
+reading as a pair because the names are nearly identical and the modes are not:
+
+- **`JSAtomicPublish*`** — atomic batch publishing, `allow_atomic`, **since 2.12**. An
+  `IncompleteBatch` is the sequence-gap rejection; `TooLargeBatch` carries the offending `{size}`.
+- **`JSBatchPublish*`** — fast-ingest batch publishing, `allow_batched`, **since 2.14**.
+  `Disabled` is what you get when the stream never set the flag.
+
+**`10210` and `10211` are `429 Too Many Requests`** — the only two codes in this table that are, and
+the in-flight-batch ceiling is the thing they report. The docs say a stream allows at most 50 batches
+in flight by default; this wiki has not confirmed that number against the server
+(see *To verify* on [[publishing]]).
+
+**`10209 stream mirrors can not also use batch publishing`** is a configuration rejection, not a
+runtime one: a stream cannot be both a mirror and a batch-publish target
+([[mirrors-and-sources]]).
+
+**`10052` also covers a republish cycle.** Its whole description is `{err}`, so the code alone never
+tells you which config was rejected; a republish destination overlapping the stream's own subjects is
+one of its cases ([[subject-transforms]], source: [[s-docs-subject-mapping]]).
 
 **`10005` and `10052` are the two to know.** Both have `{err}` as their whole description, so the
 number alone tells you almost nothing and the *text* is the only detail — the exact inversion of the
@@ -225,4 +259,5 @@ summaries that put them there — [[s-adr-43-per-message-ttl]] (`10052`, `10165`
 [[s-docs-scaling-and-peers]] (`10075`, `10202`) · [[s-docs-single-server]] (`10074`) ·
 [[s-docs-stream-backup-restore]] (`10064`) · [[s-gh-7982-no-suitable-peers]] (`10005`) ·
 [[s-issue-4281-insufficient-storage]] (`10028`, `10047`) · [[s-nats-server-snapshot-restore]]
-(`10060`, `10064`, `10130`).
+(`10060`, `10064`, `10130`) · [[s-docs-advanced-publishing]] (the eleven `JSAtomicPublish*` and
+`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle).

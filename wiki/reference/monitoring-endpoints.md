@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -193,6 +193,12 @@ Three things to know before alerting on it:
 - **No docs page names this field**, which is why the public answer to "how do I see the expiry?"
   is still an `openssl` pipeline (source: [[s-gh-7684-certificate-expiry]]; `inbox/docs-issues.md`
   #20). It shipped in [PR #7709](https://github.com/nats-io/nats-server/pull/7709).
+- **It is also the only way to confirm a certificate rotation landed.** A reload prints
+  `Reloaded: tls = enabled` whether or not the certificate changed, `config_digest` digests the
+  configuration *text* and so does not move when only the file behind `cert_file` is new, and
+  `nats-server --signal reload` exits 0 even for a reload the server refused. Observed on the
+  v2.14.6 binary (source: [[s-nats-server-tls-reload]]); the procedure is in
+  [[rotate-tls-certificates]].
 
 Do not reach for `openssl s_client` against the client port: the first bytes there are the plaintext
 `INFO` line, so it fails with `wrong version number` unless `handshake_first` is on. See
@@ -360,4 +366,4 @@ default), which is the cadence on which block compaction and the `index.db` snap
 
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] · [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] · [[s-docs-putting-it-together]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-nats-server-filestore-layout]] ·
 [[s-docs-hardening]] ·
-[[s-docs-accounts-and-multitenancy]] · [[s-docs-encryption-and-tls]] · [[s-docs-kubernetes]] · [[s-docs-mirrors-as-dr]] · [[s-docs-prometheus-and-dashboards]] · [[s-docs-single-server]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7190-asymmetric-cluster]]
+[[s-docs-accounts-and-multitenancy]] · [[s-docs-encryption-and-tls]] · [[s-docs-kubernetes]] · [[s-docs-mirrors-as-dr]] · [[s-docs-prometheus-and-dashboards]] · [[s-docs-single-server]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7190-asymmetric-cluster]] · [[s-nats-server-tls-reload]]

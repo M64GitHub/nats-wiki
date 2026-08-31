@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.14, feature_flags, js_ack_fc_v2]
 aliases: ["2.14", v2.14, v2.14.0, v2.14.6]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -37,6 +37,13 @@ Dates and tags are from the GitHub releases API, mirrored at
 
 - **`AllowBatchPublish`** — fast, flow-controlled batch ingest, replicated or not, with per-message
   consistency checks and no intermediate staging (ADR-50).
+
+  The operator-facing half is the **gap policy**, chosen per batch: `gap: fail` abandons the batch at
+  the first missing message so what is stored has no holes, and `gap: ok` reports the gap and keeps
+  going — **losing data by design**, which is fine for metrics and not for the chunks of an object
+  ([[object-store]]). The mode also has no stable publisher in most clients yet: the CLI reaches it
+  only through `nats bench js pub fast`, and Go, Rust and JavaScript through [[orbit]]
+  (source: [[s-docs-advanced-publishing]]; [[publishing]]).
 - **`AllowMsgSchedules` grows recurring schedules** — the `Nats-Schedule` header takes
   `@every 5m`, `@hourly` or crontab syntax — plus **subject sampling** (`Nats-Schedule-Source`) and
   **scheduled rollups** (`Nats-Schedule-Rollup`) (ADR-51).
@@ -55,7 +62,7 @@ Dates and tags are from the GitHub releases API, mirrored at
 - New ack policy **`AckFlowControl`**, used by the durable consumers that back WorkQueue/Interest
   sourcing — visible as `JS_MIRROR_<suffix>` / `JS_SRC_<suffix>` on the upstream, and requiring
   **API level 4** there, so a half-upgraded cluster does not get the reliable path (ADR-60, source:
-  [[s-adr-60-reliable-sourcing]]).
+  [[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]]).
 - **`404 No Messages` is now returned for a `no_wait` pull with no expiry** when nothing is pending.
 - **Invalid or divergent consumer state is reset to match the stream** on startup after an unclean
   shutdown.
@@ -161,4 +168,4 @@ reliable ephemeral consumer mode, and **durable consumers created with `AckFlowC
 
 [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
 [[s-nats-server-jetstream-resources]] ·
-[[s-adr-60-reliable-sourcing]]
+[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]]

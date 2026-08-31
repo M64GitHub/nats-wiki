@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -109,7 +109,7 @@ stream sequence alone, `{"seq":<n>}` moves that floor to one below `<n>`. It is 
 of what the start policy already allowed, so a reset cannot smuggle a consumer back past its own
 start. The reply looks like a consumer-create response with the `ResetSeq` actually used, and a
 client must tolerate its delivery sequence restarting at 1, because the caller may be the CLI or the
-server rather than the client itself (source: [[s-adr-60-reliable-sourcing]]).
+server rather than the client itself (source: [[s-adr-60-reliable-sourcing]] · [[s-docs-reading-back]] · [[s-docs-filtering]]).
 
 Related: since 2.14, **invalid or divergent consumer state is reset to match the stream on
 startup**, after an unclean shutdown.
@@ -127,7 +127,7 @@ The practical consequence is in `nats consumer ls`: a stream that is being mirro
 consumers named **`JS_MIRROR_<suffix>`** or **`JS_SRC_<suffix>`**, carrying metadata
 `_nats.mirror.stream` / `_nats.src.stream` that names the stream which created them. They are not
 yours to delete while the replication exists — and are yours to delete if it no longer does, because
-their removal is best-effort ([[mirrors-and-sources]], source: [[s-adr-60-reliable-sourcing]]).
+their removal is best-effort ([[mirrors-and-sources]], source: [[s-adr-60-reliable-sourcing]] · [[s-docs-reading-back]] · [[s-docs-filtering]]).
 
 ### Fixed at creation
 
@@ -156,7 +156,36 @@ consumer leader does all the work and the followers only stand by.
   creation; a client that re-attaches to the durable resumes from its saved position, backlog
   included (source: [[s-docs-policies]]).
 - **On a `workqueue` stream the server refuses overlapping consumers** — see
-  [[retention-policies]].
+  [[retention-policies]]. Overlap *between* consumers is otherwise fine: on `limits` and `interest`
+  streams "two separate consumers whose filters match the same subject each get their own full copy
+  of those messages" (source: [[s-docs-filtering]]).
+- **Overlap *inside* one consumer is an error with a quotable string.** A consumer may carry several
+  filter subjects, but if one covers another — `orders.>` beside `orders.shipped` — the create call
+  fails with `consumer subject filters cannot overlap`. Filters that only *partly* overlap, where
+  neither covers the other, are accepted (source: [[s-docs-filtering]]).
+- **A filter that matches nothing is accepted silently.** "There's no error and no warning, just an
+  empty pull" — a typo like `orders.shiped` creates a perfectly valid consumer that never receives
+  anything. When a pull comes back empty, check the `Filter Subject` line in `nats consumer info`
+  against the stream's subjects before concluding the stream is empty. **No `Filter Subject` line at
+  all means no filter**, i.e. every subject in the stream (source: [[s-docs-filtering]]).
+- **A filter is a view, never a retention mechanism.** What a consumer skips is still stored and
+  still readable by every other consumer (source: [[s-docs-filtering]]).
+- **Reusing a durable name with a different config is refused**, not silently applied: the server
+  returns `consumer already exists`. Use `nats consumer edit`, or a new name
+  (source: [[s-docs-reading-back]]).
+- **A pause with a deadline in the past does nothing.** Pause stores a fixed moment; if it has
+  already passed "the server leaves the consumer running", and the CLI says so rather than acting as
+  if the pause took. Pause with a duration (`1h`), which is always measured from now.
+- **Pausing a consumer does not stop publishers.** Pause is a consumer setting and does not touch the
+  stream: "new messages keep arriving… and they count toward the stream's storage limits. A long
+  pause on a stream with a tight `MaxMsgs` or `MaxBytes` can drop the oldest orders before the
+  consumer reads them" ([[stream]]). Size the stream for the longest pause you expect. (Both from
+  `learn/jetstream/pausing.md`, spot-checked 2026-08-31; that page has not been ingested.)
+- **Delivery policy sets where a consumer starts; `replay_policy` sets the pace once it is reading.**
+  The default `instant` hands messages over as fast as the client takes them; `original` "spaces
+  deliveries out to match the gaps between the messages' original timestamps", replaying recorded
+  traffic at roughly its real speed — rarely what production wants
+  (source: [[s-docs-reading-back]]).
 - Two different features answer to "last per subject": the deliver policy `last_per_subject`
   (a standing view) and the Direct Get `--last-per-subject` flag (a one-shot read with no
   consumer). They are not the same feature (source: [[s-docs-policies]]).
@@ -200,6 +229,26 @@ Both are cheap at prototype scale and expensive across tens of thousands of clie
 
 The CLI renders the same three numbers as `Last Delivered`, `Acknowledgment Floor` and
 `Outstanding Acks` (source: [[s-docs-delivery-and-acknowledgment]]).
+
+### Two sequences, and why they drift
+
+`Last Delivered Message` prints two numbers side by side, and they answer different questions
+(source: [[s-docs-reading-back]]):
+
+- **stream sequence** — the message's fixed position in the log, assigned at publish and never
+  changed ([[stream]]);
+- **consumer sequence** — this consumer's own counter, incremented on **every delivery, redeliveries
+  included**. It counts deliveries, not distinct messages.
+
+They agree only for a consumer that started at sequence 1, has no filter, and has never redelivered.
+They drift for the three ordinary reasons: a consumer that starts partway through, one that filters
+to a subset of subjects, and one that has had a message redelivered. **A consumer sequence running
+ahead of the stream sequence is redelivery, not corruption.**
+
+And the same rule as above applies to reading them: the state rides on every delivered message —
+stream and consumer sequence, pending count, delivery count — "while `nats consumer info` is a
+separate request to the server: fine for a one-off check, too costly to call for every message"
+(source: [[s-docs-reading-back]]).
 
 ## Cheat sheet
 
@@ -247,4 +296,4 @@ See [[filestore-layout]] for the rest of the directory.
 [[s-docs-consumer-config]] · [[s-docs-acknowledgment]] · [[s-docs-surviving-node-loss]] ·
 [[s-docs-retention-policies]] · [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] ·
 [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-filestore-layout]] ·
-[[s-adr-60-reliable-sourcing]]
+[[s-adr-60-reliable-sourcing]] · [[s-docs-reading-back]] · [[s-docs-filtering]]

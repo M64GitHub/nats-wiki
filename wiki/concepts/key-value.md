@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [kv, bucket, tombstone, watch, direct-get]
 aliases: [KV, key value, KV bucket, KV_]
-sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout]
+sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -41,7 +41,39 @@ stream.
 
 This means **`nats stream info KV_<bucket>` works and tells you the truth** — a KV bucket is
 inspectable, sizable and placeable with everything on [[stream]], [[replicas]] and
-[[stream-placement]].
+[[stream-placement]]. The docs print exactly that output as the proof
+(source: [[s-docs-kv-under-the-hood]]):
+
+```
+Subjects: $KV.INVENTORY.>          # one subject per key
+Discard Policy: New                # at a limit, rejects the newest write
+Direct Get: true                   # get reads without a consumer
+Allows Rollups: true               # purge replaces a key with one marker
+Allows Msg Delete: false           # deny_delete: no raw stream deletes
+Maximum Per Subject: 10            # this IS the history depth
+```
+
+**`discard: new` is why a full bucket rejects rather than forgets**: "the bucket keeps the messages it
+already holds rather than evicting them", which is the opposite of the `discard: old` default a
+plain stream gets ([[stream]]).
+
+**And `deny_delete` is narrower protection than it looks.** It blocks the JetStream *message-delete*
+API, so nothing can remove entries behind the KV API's back — but **it does not stop a raw publish**:
+
+> "That setting doesn't stop a raw publish — which is exactly why you avoid one." A raw `nats pub` to
+> `$KV.<bucket>.<key>` "writes a bare message with none of them, so a watcher can't tell it from a
+> real put and a purge you meant never happens." (source: [[s-docs-kv-under-the-hood]])
+
+The headers a raw publish omits are the ones that make the store correct: the expected-revision header
+behind compare-and-swap, and `KV-Operation` / `Nats-Rollup` behind delete and purge. **The only thing
+that actually prevents this is an ACL** denying publish on `$KV.<bucket>.>` to everything but the KV
+clients ([[subject-permissions]]).
+
+**A get is a [[direct-get]], addressed literally.** The request goes to
+`$JS.API.DIRECT.GET.<stream>.<subject>` — for a key `widget-blue` in bucket `INVENTORY`, that is
+`$JS.API.DIRECT.GET.KV_INVENTORY.$KV.INVENTORY.widget-blue`. "That last message is the current value,
+its sequence is the revision, and its store time is the entry timestamp"
+(source: [[s-docs-kv-under-the-hood]]).
 
 ### The `max_age` / `duplicate_window` rule
 
@@ -58,6 +90,43 @@ this logic itself and defaults to 2 minutes. See *The deduplication window* on [
 
 **Writes are publishes.** Key `auth.username` in bucket `CONFIGURATION` is a JetStream request to
 `$KV.CONFIGURATION.auth.username`.
+
+**A revision is the stream sequence, so the counter is bucket-wide, not per key.**
+
+> "The bucket keeps one counter across all of its keys, and every write — to any key — takes the next
+> number. So a revision always increases when you write a key, but not by one each time: writes to
+> other keys advance the counter in between." (source: [[s-docs-kv-history-and-revisions]])
+
+The docs' worked history shows one key at revisions **2** and **5**, with 3 and 4 taken by other keys.
+**Never derive anything from the gap between two revisions of one key** — it is other keys' traffic,
+not lost data.
+
+### Compare-and-swap is two operations
+
+Optimistic concurrency, no locks and no waiting (source: [[s-docs-kv-history-and-revisions]]):
+
+| operation | the condition it checks |
+|---|---|
+| **`create`** | the key is at **revision 0** — i.e. it does not exist |
+| **`update`** | the key is still at **the revision you name** |
+
+```
+REVISION=$(nats kv get INVENTORY widget-blue | sed -n 's/.*revision: \([0-9]*\).*/\1/p')
+nats kv update INVENTORY widget-blue 40 "$REVISION"
+```
+
+Three rules follow, and each is a real bug when broken:
+
+- **A rejected update is dropped, not queued.** "If you fire-and-forget an update, a conflict silently
+  loses the write." Every read-modify-write needs a re-get-and-retry loop; without it, `update` has
+  exactly the lost-write bug `put` had.
+- **Read the value and its revision from a *single* get.** Two gets "could pair a stale value with a
+  fresh revision if a concurrent write landed in between".
+- **`put` is unconditional** and belongs only where the new value does not depend on the old one.
+
+**History depth is raised in place and is not retroactive**: `nats kv edit <bucket> --history 10`
+starts keeping revisions from that moment, and "the values written before the raise are already gone".
+It caps at **64**, and it is also "the most messages any single key may hold".
 
 **Compare-and-set is a header.** `Nats-Expected-Last-Subject-Sequence` carries the revision the
 write expects; the special value `0` means "only if this is the first message on the subject", and
@@ -118,6 +187,45 @@ options sends every `last_per_subject` value **including delete and purge operat
 **End of initial data** is signalled the first time a message has `Pending == 0`, and the spec
 requires the signal to be sent **always** — including for an empty bucket.
 
+**What that signal looks like to a client differs per language, and one client does not have it at
+all** (source: [[s-docs-kv-watching]]):
+
+| client | how the boundary arrives |
+|---|---|
+| Go, Python | a **nil / `None` entry** in the same stream as real entries |
+| JavaScript | an **`isUpdate` flag** on each entry |
+| Java | an **`endOfData()` callback** |
+| C# | an **`OnNoData` option** |
+| **Rust** | **no marker** — snapshot-plus-live or live-only is chosen when the watch is opened |
+| `nats` CLI | consumed silently; never printed |
+
+**This is the most common watch bug, and it is what "the watcher missed updates" usually means.** A
+loop that treats the nil entry as end-of-stream reads the snapshot, sees the boundary, and quits
+before the first live change — "stopping the loop on the nil entry would miss every live change".
+The signal is also useful in its own right: hold a dashboard in "loading" until it arrives, or treat
+it as "cache warm".
+
+**`IncludeHistory` and `UpdatesOnly` conflict** — one asks for a full snapshot with history, the
+other for no snapshot — "and a client rejects the pair" (source: [[s-docs-kv-watching]]).
+
+### A filter is a subject filter, so key naming decides what can be watched
+
+A watch's key filter is matched the way a subject is: **`*` is exactly one whole token**, `>` is one
+or more trailing tokens. So on flat keys the obvious filter does not work:
+
+> "`widget-blue` is one token, and the hyphen is an ordinary character, not a separator. So a filter
+> like `widget-*` **is not a wildcard at all** … and it matches nothing. To split keys with a
+> wildcard you'd design them with dots, such as `widget.blue` and `widget.red`, so that `widget.*`
+> matches both." (source: [[s-docs-kv-watching]])
+
+The filter applies to **both** halves — snapshot and live — so a filtered watch is genuinely cheaper,
+not a client-side filter over everything. This is a second reason *Keys are subjects* below is a
+design decision made once: a hyphen buys you nothing, a dot buys you a filter.
+
+**A watch is not a point read.** It is an ephemeral consumer that dies with the process; using one to
+fetch a single value "pays for a consumer and a snapshot to get one value get would have handed you
+directly" ([[direct-get]]).
+
 Because watches and key listings create and drop ephemeral consumers, a busy KV workload shows up
 as consumer churn; see [[ordered-consumer]] and the memory note on [[jetstream-sizing]]. At scale the
 churn — not the count — is what breaks: 1000 clients each watching one key in a bucket holding a
@@ -153,6 +261,47 @@ Three rules from ADR-48, the refinement that added per-key TTL (source: [[s-adr-
   "a TTL on `Put()` might mean older revisions could come back from the dead once the TTL expires".
   A `Purge` with a TTL is also the supported replacement for compaction — it removes old subjects
   permanently while still producing something a watcher can see.
+
+**The `put`-over-a-TTL trap.** The spec says why `Put` cannot take a TTL; the docs say what actually
+happens when someone writes the key again anyway, and it is worse than an error:
+
+> "Writing the key again doesn't extend its TTL: a put or an update appends a new latest value
+> **with no TTL of its own, so the key simply stops expiring**." (source: [[s-docs-kv-ttl-and-limits]])
+
+No error, no warning — the key silently becomes permanent. **To change a key's TTL you delete it and
+create it again.** This is the failure mode to watch for on a bucket used for sessions or leases: one
+ordinary `put` from anywhere turns an expiring key into a permanent one.
+
+**The CLI spelling is `--marker-ttl`**, on `nats kv add` or `nats kv edit`:
+
+```
+nats kv edit INVENTORY --marker-ttl 1h
+nats kv create INVENTORY flash-sale 99 --ttl 30m
+```
+
+**A watcher cannot tell a TTL expiry from a manual purge.** The expiry marker carries the reason
+`MaxAge`, but the operation a watcher receives is `PURGE` either way, "just as if someone had purged
+it by hand" — the reason header is the only distinguishing signal
+(source: [[s-docs-kv-ttl-and-limits]]).
+
+### Bucket limits reject; they never make room
+
+The three limits, and the CLI's unit convention (source: [[s-docs-kv-ttl-and-limits]]):
+
+| flag | bounds | stream field |
+|---|---|---|
+| `--max-bucket-size` | total bytes across every key **and every kept revision** | `max_bytes` |
+| `--max-value-size` | the largest single value | `max_msg_size` |
+| `--history` | prior revisions per key, **max 64** | `max_msgs_per_subject` |
+| `--ttl` | every value's age — **the bucket-wide clock, not the per-key one** | `max_age` |
+
+"A put of a value larger than the bucket's max value size is rejected outright, and so is a put that
+would push the bucket past its max size; the server returns an error and leaves every existing value
+in place." That is `discard: new` doing what it says. **Size a bucket for the working set, not the
+average** — a bucket at its cap starts bouncing writes during exactly the busy minute you needed them.
+
+**The CLI parses `MB` and `KB` as binary units** — `16MB` prints back as `16 MiB`, `64KB` as
+`64 KiB`.
 
 ## Mirrors and sources of a bucket
 
@@ -193,6 +342,61 @@ Two consequences an operator meets before the design does:
 **Key naming is decided before the first `Put`.** Changing it later is a rewrite of the bucket.
 
 
+## A lock or a lease, built from `create` and a TTL
+
+There is **no lock primitive**, and no source publishes a recipe — but every part of one is a
+documented operation, and they compose in exactly one way:
+
+| step | operation | why it is safe |
+|---|---|---|
+| **acquire** | `create <bucket> <lock-key> <holder-id> --ttl <lease>` | `create` is CAS against revision 0, so **exactly one caller wins**; the loser gets an error, not a queue slot |
+| **hold / renew** | `update <bucket> <lock-key> <holder-id> <revision>` | CAS against the revision you hold, so a holder that was superseded cannot renew |
+| **release** | `delete` (or `purge`) the key | leaves a marker a watcher sees |
+| **expire** | the per-key TTL fires on its own | the server removes the key with reason `MaxAge`; nothing has to be running to clean up |
+
+(sources: [[s-docs-kv-history-and-revisions]] for the CAS semantics,
+[[s-docs-kv-ttl-and-limits]] for the per-key TTL and its marker, [[s-adr-48-kv-ttl]] for what the TTL
+spec allows.)
+
+**What this is not.** Being explicit matters more here than the recipe:
+
+- **It is a lease, not a mutual-exclusion guarantee.** The holder's TTL can expire while its work is
+  still running — the server does not know what the holder is doing. Anything the lock protects must
+  still be safe if two holders overlap briefly, exactly as with [[priority-groups]]' pinned client.
+- **Renewal is the hard part, and the `put` trap is lethal here.** A renewal written with `put`
+  instead of `update` silently drops the TTL and the lock **never expires again**
+  ([[s-docs-kv-ttl-and-limits]]). On a lock bucket that is an outage, not a bug report.
+- **There is no fencing token beyond the revision.** The revision is bucket-wide and monotonic, so it
+  works as one — but nothing downstream checks it for you.
+- **A waiter has to watch or poll.** `create` fails immediately; there is no blocking acquire. A
+  watcher on the lock key ([[s-docs-kv-watching]]) is the event-driven form, and it inherits the
+  watcher costs on [[kv-watchers-stall-the-cluster]].
+- **Per-key TTL needs 2.11+** and limit markers enabled on the bucket first.
+
+No public source states this composition end to end; the pieces are each sourced above and the
+composition is this wiki's, which is why the caveats are spelled out rather than the recipe polished.
+
+## When a bucket is the wrong tool
+
+A bucket is a stream with a key-value face, and every limit of the stream shows through. Reach for
+something else when:
+
+- **You need read-after-write.** There is none — see *There is no read-after-write consistency*
+  above. A `put` followed immediately by a `get` on another connection can return the old value.
+- **Values are large.** They are capped by `max_msg_size` and meant to be small; "large values belong
+  in the Object Store" ([[object-store]], source: [[s-docs-kv-ttl-and-limits]]).
+- **You need an audit trail.** History is per key, bounded at **64** revisions, and trimmed silently.
+  "It isn't an audit log of the whole bucket" (source: [[s-docs-kv-history-and-revisions]]). Use a
+  [[stream]] with the retention you actually need.
+- **You need writes to keep succeeding under pressure.** A bucket is `discard: new`: at its cap it
+  **rejects the writer**. That is the right behaviour for a config store and the wrong one for
+  telemetry.
+- **Deleting must actually delete.** A delete keeps every prior revision within the history depth;
+  only a purge removes them (source: [[s-docs-kv-under-the-hood]]).
+- **Many clients each watch a key.** The cost is consumer churn, not key count — see
+  [[kv-watchers-stall-the-cluster]].
+- **Keys are not legal subject tokens.** Nothing escapes them for you; see *Keys are subjects* below.
+
 ## Sharing a bucket with another account
 
 There is no KV-specific sharing mechanism. Because a bucket **is** the stream `KV_<bucket>`, the two
@@ -225,15 +429,21 @@ over the account's whole JetStream control plane, not one bucket; narrowing it t
 
 ## To verify
 
-- **Why a KV watcher would *miss* updates** is still unexplained, and now known to be unsourced: the
-  thread question-bank Q69 was mined from (gh#6746) asks how to watch **many keys on one watcher**, not
-  about missed updates, and a search of `nats-io/nats-server` discussions on 2026-08-31 found nobody
-  publicly reporting a missed KV update. The row has been corrected; the mechanism ADR-8 does give —
-  an ordered consumer that rebuilds itself on a detected gap ([[ordered-consumer]]) — remains a
-  candidate cause with no report behind it. The KV-watcher failure people **do** report is
-  [[kv-watchers-stall-the-cluster]].
-- Whether a **mirror on file storage** is materially slower than on memory storage (Q76) is not
-  covered.
+- ~~**Why a KV watcher would *miss* updates**~~ — **answered, and the answer is client-side.** The
+  docs name it as "the most common watch bug": a reader that treats the end-of-initial-data signal as
+  end-of-stream stops at the snapshot boundary and never sees a live change
+  (source: [[s-docs-kv-watching]], now in *Watch, history and listing keys* above). That is a
+  watcher that appears to miss every update while the server did nothing wrong. The earlier note
+  stands on its own terms — nobody has publicly reported a *server-side* missed update, and the
+  gap-detection mechanism ADR-8 gives ([[ordered-consumer]]) remains a candidate cause with no report
+  behind it. The KV-watcher failure people do report is [[kv-watchers-stall-the-cluster]].
+- Whether a **mirror on file storage** is materially slower than on memory storage (Q76) is **still
+  not covered**. The `learn/key-value` chapter was read end to end on 2026-08-31 and mentions mirrors
+  exactly once, in its closing recap, with no performance claim of any kind. No source in `raw/`
+  states one.
+- **The server-side default for `subject_delete_marker_ttl`** is still unstated. `ttl-and-limits.md`
+  always passes `--marker-ttl` explicitly and never says what happens without it — see the same open
+  item on [[message-ttl]].
 
 ## What a bucket costs on disk
 
@@ -267,4 +477,6 @@ See [[filestore-layout]] for the mechanism and [[jetstream-sizing]] for sizing a
 
 [[s-adr-8-key-value-store]] · [[s-adr-43-per-message-ttl]] · [[s-adr-17-ordered-consumer]] ·
 [[s-docs-stream-config]] · [[s-gh-7017-kv-across-accounts]] · [[s-gh-5606-cross-account-jetstream]] ·
-[[s-gh-6746-watch-many-keys]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-adr-48-kv-ttl]] · [[s-adr-57-kv-subject-transforms]] · [[s-adr-54-kv-codecs]] · [[s-nats-server-filestore-layout]]
+[[s-gh-6746-watch-many-keys]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-adr-48-kv-ttl]] · [[s-adr-57-kv-subject-transforms]] · [[s-adr-54-kv-codecs]] · [[s-nats-server-filestore-layout]] ·
+[[s-docs-kv-under-the-hood]] · [[s-docs-kv-watching]] · [[s-docs-kv-history-and-revisions]] ·
+[[s-docs-kv-ttl-and-limits]] · [[s-docs-kv-your-first-bucket]]

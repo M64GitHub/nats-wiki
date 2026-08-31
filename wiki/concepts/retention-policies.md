@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -67,7 +67,9 @@ The migration path is a **new stream with the right policy**, then move the data
 has acked it, so a single stalled consumer (a stuck worker, a service that is down) holds up cleanup
 for every message it still owes an ack on. The stream grows until it hits its limits or runs out of
 room. Interest retention **still needs limits set**, and it makes consumer-health monitoring more
-important than on a `limits` stream (source: [[s-docs-retention-policies]]). See
+important than on a `limits` stream (source: [[s-docs-retention-policies]]). The limits themselves —
+the three ceilings, which one wins, and why `discard` does not govern `max_age` — are on [[stream]]
+(source: [[s-docs-shaping-the-stream]]). See
 [[jetstream-out-of-disk]].
 
 **WorkQueue rejects consumers that overlap.** Because the first ack removes a message for everyone,
@@ -78,6 +80,12 @@ letting it happen at runtime:
 |---|---|
 | a second **unfiltered** consumer | `multiple non-filtered consumers not allowed on workqueue stream` (**10099**) |
 | two consumers whose **filters overlap** | `filtered consumer not unique on workqueue stream` (**10100**) |
+
+The `learn` chapter states the same rule from the consumer's side, and draws the contrast that makes
+it memorable: overlap *between* consumers is not merely allowed on `limits` and `interest` streams,
+it is the point — "two separate consumers whose filters match the same subject each get their own
+full copy of those messages". **Work-queue retention is the one exception**
+(source: [[s-docs-filtering]]).
 
 A wildcard filter such as `fulfill.>` overlaps `fulfill.us` and `fulfill.eu` and is rejected. Two
 valid shapes exist (source: [[s-docs-retention-policies]]):
@@ -114,8 +122,10 @@ nats stream purge ORDERS --subject='orders.eu.>'
 nats stream purge ORDERS --seq=45000
 ```
 
-A purge does not renumber the stream, and `--seq` and `--keep` cannot be combined (the server
-answers `10003 bad request`). On a `workqueue` stream a purge throws away unprocessed work — fix the
+A purge does not renumber the stream — it "sets the stream's first sequence to one past its last",
+so the next publish continues from there rather than from `1`
+(source: [[s-docs-altering-stream-state]]; see *Sequences are addresses* on [[stream]]) — and
+`--seq` and `--keep` cannot be combined (the server answers `10003 bad request`). On a `workqueue` stream a purge throws away unprocessed work — fix the
 consumers first.
 
 
@@ -179,4 +189,5 @@ interest, and new messages were removed before they could be copied
 ## Sources
 
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
-[[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]]
+[[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
+[[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]]

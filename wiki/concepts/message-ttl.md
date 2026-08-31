@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ttl, Nats-TTL, subject_delete_marker_ttl, tombstone, markers]
 aliases: [Nats-TTL, per-message TTL, message TTL, subject delete marker, limit marker]
-sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl]
+sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -131,6 +131,24 @@ description field — which is exactly the case ADR-7 warns not to match on as t
   is not stated; the `StreamConfig` schema lists the field with no default
   (source: [[s-docs-stream-config]]).
 
+## The KV spelling, and the default that is still missing
+
+On a [[key-value]] bucket the same two stream fields are set by one CLI flag:
+
+```
+nats kv add   CACHE     --marker-ttl 1h
+nats kv edit  INVENTORY --marker-ttl 1h
+```
+
+`--marker-ttl` is `subject_delete_marker_ttl`, and the docs describe the duration as "how long the
+bucket keeps the expiry marker" (source: [[s-docs-kv-ttl-and-limits]]). **That page always passes the
+value explicitly and never states a server-side default** — so the open item below survives a second
+source. A per-key TTL then rides on it, and requires **2.11 or newer**: on an older server "enabling
+markers on the bucket is rejected, and the timed create fails with it."
+
+A KV watcher sees an expiry as a **`PURGE` operation**, indistinguishable from a hand purge except by
+the marker's `MaxAge` reason ([[key-value]]).
+
 ## Related
 
 [[stream]] · [[key-value]] · [[retention-policies]] · [[error-codes]] · [[js-api]] ·
@@ -139,4 +157,4 @@ description field — which is exactly the case ADR-7 warns not to match on as t
 ## Sources
 
 [[s-adr-43-per-message-ttl]] · [[s-docs-stream-config]] · [[s-adr-8-key-value-store]] ·
-[[s-adr-48-kv-ttl]]
+[[s-adr-48-kv-ttl]] · [[s-docs-kv-ttl-and-limits]]

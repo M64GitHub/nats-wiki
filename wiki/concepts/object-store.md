@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [objectstore, chunks, digest, OBJ_]
 aliases: [object store, OBJ_, "$O."]
-sources: [s-adr-20-object-store, s-docs-stream-config]
+sources: [s-adr-20-object-store, s-docs-stream-config, s-docs-kv-ttl-and-limits]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -98,10 +98,21 @@ there.
 - The ADR gives no guidance on **choosing a chunk size** beyond "clients may tune this as
   appropriate".
 
+## When a KV value should have been an object
+
+The KV chapter draws the boundary in one sentence: "key-value values are meant to be small; large
+values belong in the Object Store" (source: [[s-docs-kv-ttl-and-limits]]). Mechanically the boundary
+is a hard one — a bucket's `--max-value-size` maps to the stream's `max_msg_size`, so a KV value must
+fit in **one message**, while an object is chunked across many ([[key-value]]).
+
+The failure mode when the boundary is crossed the wrong way is a rejected write, not a slow one: a KV
+bucket is `discard: new`, so an oversized put "is rejected outright… and leaves every existing value
+in place".
+
 ## Related
 
 [[stream]] · [[key-value]] · [[jetstream-sizing]] · [[replicas]] · [[direct-get]]
 
 ## Sources
 
-[[s-adr-20-object-store]] · [[s-docs-stream-config]]
+[[s-adr-20-object-store]] · [[s-docs-stream-config]] · [[s-docs-kv-ttl-and-limits]]

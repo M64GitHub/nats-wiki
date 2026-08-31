@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [filestore, store_dir, tmpfs, ram-disk, tmpreaper, msg-block, kubernetes]
 aliases: ["error opening msg block file", "no such file or directory", "JetStream failed to store a msg", "missing stream directories", "tmpfs store_dir"]
-sources: [s-gh-5924-filestore-dirs-vanished, s-nats-server-jetstream-resources, s-docs-hardening]
+sources: [s-gh-5924-filestore-dirs-vanished, s-nats-server-jetstream-resources, s-docs-hardening, s-gh-7749-hostpath-jetstream]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -115,7 +115,11 @@ the stream is still assigned here.
   sandboxed unit in [[install-nats-server]] and the hardening guidance in [[s-docs-hardening]] both
   assume a persistent path.
 - On Kubernetes, a `PersistentVolumeClaim` — not `emptyDir`, whose `Memory` medium is tmpfs, and not
-  `hostPath` on a node pool that recycles.
+  `hostPath` on a node pool that recycles. That is also the public answer to the question asked
+  directly — "should we use `hostPath`… will this impact HA?" — whose reasoning is the same failure
+  from the other end: a rescheduled pod with a `hostPath` store starts **empty**, so the replica has
+  to resync from scratch (source: [[s-gh-7749-hostpath-jetstream]]). The whole argument, the chart
+  values that implement it, and the ceiling to set alongside them are on [[kubernetes-storage]].
 - Watch for `Temporary storage directory used, data could be lost on system reboot` at startup. It is
   a one-line warning that your entire JetStream store is in `/tmp`.
 
@@ -137,3 +141,5 @@ path and only logs `Resource not found: %v` (`raft.go:5160–5163`).
 - [[s-gh-5924-filestore-dirs-vanished]] — the thread, the symptom and the maintainer's diagnosis.
 - [[s-nats-server-jetstream-resources]] — the default `store_dir` and its warning, at v2.14.6.
 - [[s-docs-hardening]] — the deployment shape that assumes a real, persistent store directory.
+- [[s-gh-7749-hostpath-jetstream]] — the same failure asked about in advance, as `hostPath` on
+  Kubernetes.

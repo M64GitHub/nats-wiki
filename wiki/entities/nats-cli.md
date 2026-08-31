@@ -7,7 +7,7 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -78,6 +78,43 @@ nats context ls
 nats context unselect
 ```
 
+**Publishing**
+
+```
+nats pub --jetstream orders.created '{"order_id":"ord_8w2k"}'     # reads the PubAck
+nats pub --jetstream orders.created --header "Nats-Msg-Id:ord_8w2k-created" '{…}'
+printf '%s\n' '{"line":"sku-1"}' '{"line":"sku-2"}' \
+  | nats pub --atomic --send-on=newline --force-stdin orders.created
+nats bench js pub async orders.created --batch 1000                # the only async path in the CLI
+nats bench js pub fast                                             # fast-ingest, benchmark only
+```
+
+**A plain `nats pub` is a core publish** and prints `Published N bytes` whether or not a stream stored
+the message. Only `--jetstream` reads the `PubAck` and surfaces a missed subject as
+`nats: error: nats: no responders available for request` (source: [[s-docs-publishing]]; see
+[[publishing]]). And **`nats stream rmm` securely erases** — it overwrites the stored bytes — where a
+client's `DeleteMsg` does not (source: [[s-docs-altering-stream-state]]).
+
+**Key/Value**
+
+```
+nats kv add INVENTORY --history 1                       # --history caps at 64; 1 is the default
+nats kv put INVENTORY widget-blue 42                    # unconditional
+nats kv create INVENTORY flash-sale 99 --ttl 30m        # CAS against revision 0; --ttl on CREATE only
+nats kv update INVENTORY widget-blue 40 "$REVISION"     # CAS against a named revision
+nats kv edit INVENTORY --history 10 --marker-ttl 1h     # raising history is not retroactive
+nats kv get INVENTORY widget-blue --raw                 # --raw prints the value without the entry
+nats kv watch INVENTORY widget-blue                     # snapshot, then live
+nats kv history INVENTORY widget-blue
+nats kv del INVENTORY widget-blue                       # marker, history kept
+nats kv purge INVENTORY widget-red                      # rollup marker, history dropped
+```
+
+**`--ttl` is accepted on `create` only**, and a later `put` or `update` silently drops it — the key
+stops expiring rather than keeping its clock (source: [[s-docs-kv-ttl-and-limits]]). The CLI parses
+`MB`/`KB` as **binary** units, so `--max-bucket-size 16MB` prints back as `16 MiB`. See
+[[key-value]].
+
 **Streams**
 
 ```
@@ -93,7 +130,10 @@ nats stream get ORDERS --last-for orders.shipped
 nats stream find --replicas=1               # every R1 stream in the account
 nats stream purge ORDERS --subject orders.shipped
 nats stream purge ORDERS --keep 50
-nats stream rmm ORDERS 2                    # delete one message by sequence
+nats stream rmm ORDERS 2                    # delete one message by sequence -- SECURELY ERASES
+nats stream edit ORDERS --transform-source "ingest.*" --transform-destination "orders.{{partition(3,1)}}.{{wildcard(1)}}"
+nats stream edit ORDERS --republish-source "orders.>" --republish-destination "dash.orders.>"
+nats server mappings "orders.*" "orders.{{wildcard(1)}}.archived" orders.created   # test a transform
 nats stream backup  ORDERS ./backups/orders/2026-06-04 --consumers   # --consumers is the default
 nats stream backup  ORDERS ./backups/orders/2026-06-04 --check       # verify checksums first
 nats stream backup  ORDERS ./b --chunk-size 64k --window-size 1m     # for a slow or distant link
@@ -265,4 +305,6 @@ is in the docs (source: [[s-natscli-stream-external]]). See [[cross-domain-sourc
 [[s-docs-prometheus-and-dashboards]] · [[s-natscli-account-tls]] ·
 [[s-docs-authentication-basics]] · [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]] ·
 [[s-natscli-stream-external]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]] ·
-[[s-natscli-backup-restore]]
+[[s-natscli-backup-restore]] · [[s-docs-publishing]] ·
+[[s-docs-altering-stream-state]] · [[s-docs-subject-mapping]] · [[s-docs-kv-ttl-and-limits]] ·
+[[s-docs-kv-your-first-bucket]]

@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -166,6 +166,15 @@ Defaults from the generated `StreamConfig` schema unless a line reference is giv
 | `no_ack`, `sealed`, `deny_delete`, `deny_purge`, `allow_rollup_hdrs`, `allow_direct`, `mirror_direct`, `allow_atomic`, `allow_batched`, `allow_msg_counter`, `allow_msg_schedules`, `allow_msg_ttl`, `discard_new_per_subject`, `pedantic` | all `false` | |
 | `description` | — | max 4096 characters |
 | `name` | — | pattern `^[^.*>]*$` |
+
+**Batch-publish limits are stated by the docs and not confirmed here.** `learn/jetstream/advanced-publishing.md`
+gives **1,000 messages per atomic batch**, **at most 50 batches in flight per stream**, and a
+**ten-second** stall before a batch is abandoned, describing all three as "operator-configurable
+server limits, not fixed protocol caps" (source: [[s-docs-advanced-publishing]]). No config key for
+any of them appears in `inbox/config-keys-table.md`, and none has been checked against
+`nats-server` — so this table records them as the docs' claim, not as verified defaults. The two
+`429` error codes they surface are `10210` and `10211` ([[error-codes]]); the mechanism is
+[[publishing]]. **(unverified)**
 
 ### When the 2-minute duplicate window applies
 
@@ -341,4 +350,5 @@ states neither the version they were measured against nor the method
 [[s-synadia-jetstream-anti-patterns]] · [[s-docs-consumer-config]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] · [[s-docs-authentication-basics]] ·
 [[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] ·
 [[s-nats-server-filestore-layout]] ·
-[[s-adr-31-direct-get]] · [[s-docs-auth-callout]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]]
+[[s-adr-31-direct-get]] · [[s-docs-auth-callout]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
+[[s-docs-advanced-publishing]] · [[s-docs-reading-back]]

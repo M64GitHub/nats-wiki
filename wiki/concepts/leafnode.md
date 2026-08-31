@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -102,6 +102,29 @@ leafnodes {
 
 \* The generated reference notes that on 2.11/2.12 "the reload returns success; the new
 deny\_exports take effect only after a restart" (source: `reference/config/leafnodes/remotes/deny_exports.md`).
+
+### Rotating a remote's certificate
+
+The same reference carries a stronger version of that caveat on six keys under
+`leafnodes { remotes[].tls { … } }` — *"On 2.11/2.12 the reload succeeds but the old certificate keeps
+being used"* (`cert_file`), and *"…but nothing changes"* on `ca_file`, `key_file`, `cipher_suites`,
+`curve_preferences` and `insecure`. None of the six says whether it still holds on the current
+release, and taken at face value it means a leaf's certificate can only be rotated by restarting the
+leaf.
+
+**On 2.14.6 it does not hold for the three that matter.** Tested against a hub that accepts exactly
+one certificate identity, so the hub reports which certificate the leaf presented: replacing
+`cert_file` and `key_file` **in place**, and repointing them at new **paths** in the config, both make
+the leaf present the new certificate; repointing `ca_file` at a CA that did not sign the hub makes
+the leaf reject the hub with `x509: certificate signed by unknown authority`. Both controls — a hub
+restart with no reload, and a reload with no change — leave the leaf connected
+(source: [[s-nats-server-tls-reload]]). `cipher_suites`, `curve_preferences` and `insecure` were not
+tested.
+
+**The catch is the one long-lived connection.** A leaf holds a single connection to its hub, and it
+keeps the certificate it handshook with; immediately after the reload the hub still saw the *old*
+identity. The rotation only reaches the hub when that connection re-establishes. See
+[[rotate-tls-certificates]].
 
 The full 621-key table is `inbox/config-keys-table.md`; the operator-facing subset is [[config-keys]].
 
@@ -227,13 +250,16 @@ Needs the system account. `Spoke` is a property of **where you ran the command**
 [[s-docs-leaf-nodes]] · [[s-docs-putting-it-together]] · [[s-nats-server-topology]] ·
 [[s-nats-server-leafnode-js-domains]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
 [[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-gh-6328-jetstream-behind-gateways]] ·
-[[s-gh-7438-multi-region-availability]]
+[[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]]
 
 ## To verify
 
 - `leafnodes.reconnect` is documented as "interval in seconds"; `DEFAULT_LEAF_NODE_RECONNECT` is
   `1 * time.Second` (`const.go:162`). Whether an explicitly configured value is read as seconds or as
   a duration string has not been checked against the parser.
+- The three leafnode-remote TLS keys **not** tested for reload — `cipher_suites`,
+  `curve_preferences` and `insecure` — which the generated reference says reload without effect on
+  2.11/2.12.
 - **No `since:` on this page.** No source in `raw/` states which nats-server release introduced
   leafnodes, so the frontmatter leaves it out rather than guess. `leafnodes.min_version` must be at
   least `2.8.0` (`reference/config/leafnodes/min_version.md`), which is a floor on the *option*, not

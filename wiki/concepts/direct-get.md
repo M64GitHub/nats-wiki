@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [direct-get, allow_direct, mirror_direct, last_by_subj, multi_last, batch, EOB]
 aliases: [direct get, allow_direct, "$JS.API.DIRECT.GET", direct read, mirror_direct]
-sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources]
+sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -127,6 +127,21 @@ its four alignment rules — in particular that it is captured at create time an
 - **Client coverage is uneven.** `nats.js` sends a batched Direct Get directly; Go, Rust, Java and C#
   reach batched direct reads through [[orbit]] helper libraries (source: [[s-docs-get-direct]]).
 
+## The KV get, addressed literally
+
+A KV `get` is a direct get, and the docs write the subject out in full — worth having because the
+stream name and the subject stack in a way that looks wrong the first time. For key `widget-blue` in
+bucket `INVENTORY` (stream `KV_INVENTORY`, subjects `$KV.INVENTORY.>`):
+
+```
+$JS.API.DIRECT.GET.KV_INVENTORY.$KV.INVENTORY.widget-blue
+```
+
+"That last message is the current value, its sequence is the revision, and its store time is the entry
+timestamp" (source: [[s-docs-kv-under-the-hood]]). This is why a KV get "is fast and stateless: there's
+no position to track, no message to acknowledge, and no consumer to clean up" — and why a bucket
+behaves as a key-value store while being an append-only log underneath. See [[key-value]].
+
 ## Related
 
 [[stream]] · [[consumer]] · [[key-value]] · [[object-store]] · [[mirrors-and-sources]] ·
@@ -134,4 +149,5 @@ its four alignment rules — in particular that it is captured at create time an
 
 ## Sources
 
-[[s-docs-get-direct]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-and-sources]]
+[[s-docs-get-direct]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-and-sources]] ·
+[[s-docs-kv-under-the-hood]]

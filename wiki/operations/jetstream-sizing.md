@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -66,7 +66,10 @@ comfortably in a few hundred megabytes. What actually drives JetStream memory is
 **File descriptors.** Connections, routes and streams each consume them, and **JetStream spends
 roughly two FDs per stream**. The default per-process limit is fine on a small cluster and not on a
 large one; the unit the server repo ships sets **`LimitNOFILE=800000`**, with the reason in a comment —
-"JetStream requires 2 FDs open per stream" (source: [[s-nats-server-systemd-units]] · [[s-nats-server-filestore-layout]]). Setting it is
+"JetStream requires 2 FDs open per stream" (source: [[s-nats-server-systemd-units]] · [[s-nats-server-filestore-layout]] ·
+[[s-nats-helm-chart-values-2.14.6]] · [[s-gh-7749-hostpath-jetstream]] ·
+[[s-k8s-760-jetstream-pvc-per-replica]] ·
+[[s-docs-shaping-the-stream]]). Setting it is
 part of [[install-nats-server]].
 
 ## The calculation
@@ -408,13 +411,24 @@ Roughly in the order it bites:
    else does. A server configured `max_file_store: 4MB` was measured holding **3.79 MB on disk while
    reporting 133,000 bytes used** — 3% of its own ceiling (source:
    [[s-nats-server-filestore-layout]]; recorded as docs issue #33). Setting it equal to the volume
-   size, as the docs' own example does, leaves the volume unprotected.
+   size, as the docs' own example does, leaves the volume unprotected. **The Helm chart does exactly
+   that by default**: with `fileStore.maxSize` unset it renders `max_file_store` equal to
+   `fileStore.pvc.size`, so a stock install has a 10Gi ceiling on a 10Gi volume
+   (source: [[s-nats-helm-chart-values-2.14.6]]; the storage layout is on [[kubernetes-storage]]).
 4. **The meta leader** — memory, and Raft/API load that scales with **consumer count** rather than
    message count. Not on every node, and not in proportion to traffic.
 5. **File descriptors**, in the hundreds of streams, with a symptom that misleads: **connection
    refusals that look like a network fault**.
 6. **CPU**, mostly during TLS handshakes and replication, and mostly visible as a node that cannot
    catch up after a rebalance.
+
+**A note on where the disk comes from.** This page sizes the number; it does not choose the storage.
+On Kubernetes the choice is settled — one PVC per replica on SSD-backed block storage, never NFS or
+other shared file storage, because "most fast block based storage in the cloud only works with a
+single host as a writer" (source: [[s-k8s-760-jetstream-pvc-per-replica]]), and never `hostPath`,
+which turns a rescheduled pod into an empty replica
+(source: [[s-gh-7749-hostpath-jetstream]]). Three replicas therefore cost three disks, which belongs
+in the budget this page produces. The argument and the chart values are on [[kubernetes-storage]].
 
 ## How to measure it on a running system
 
@@ -440,6 +454,13 @@ Deeper per-stream and per-account accounting lives on the `/jsz` endpoint — se
 [[monitoring-endpoints]].
 
 ## Pitfalls
+
+**A `max_age` window is not a retention promise.** The three stream limits are independent and all
+active, and the first one reached triggers the discard — so "a seven-day `MaxAge` does not guarantee
+seven days of history. If traffic spikes, `MaxBytes` can be reached first and discard messages that
+are only hours old" (source: [[s-docs-shaping-the-stream]]). If the age window is something you
+promised someone, size `max_bytes` against **peak** traffic, not the average this page's worked
+example uses. The same paragraph is the reason the sizing input on this page is a rate, not a total.
 
 - **Sizing the volume from payload bytes.** Every stored message also carries 30 bytes and its
   subject. On 100-byte events that is 40% you did not budget; on 100 KB documents it is nothing.
@@ -497,4 +518,6 @@ wiki could contain.
 [[s-nats-server-constants-2.14.6]] · [[s-docs-monitoring-endpoints]] ·
 [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] ·
 [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-35-filestore-compression]] ·
-[[s-nats-server-systemd-units]] · [[s-nats-server-filestore-layout]]
+[[s-nats-server-systemd-units]] · [[s-nats-server-filestore-layout]] ·
+[[s-nats-helm-chart-values-2.14.6]] · [[s-gh-7749-hostpath-jetstream]] ·
+[[s-k8s-760-jetstream-pvc-per-replica]] · [[s-docs-shaping-the-stream]]

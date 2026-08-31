@@ -1481,3 +1481,340 @@ to it.
 `inbox/plan-the-unread-chapters-2026-08-31.md` had spotted it as answered-but-unmarked and this step
 confirmed it. **Q47** gains [[monitoring-endpoints]] for the `/routez` check, **Q100** gains
 [[config-keys]] for the recomputed ceiling.
+
+## 2026-08-31 — unread-chapters plan step 1: the ★ rows, closed by running and by scouting
+
+**Operation:** plan step (`inbox/plan-the-unread-chapters-2026-08-31.md`, step 1) — one *ingest*, one
+run on the binary, two scouts and an audit. Not a consolidation.
+
+**Before → after:** pages **215 → 219**; unlanded ripples **206 across 57 pages → 206 across 57**;
+citation drift **0 → 0**; unverified markers 9 across 6 pages → 9 across 6; staleness 0; lint clean.
+Question bank **68 → 72 answered**, ★ **37 → 41 of 42**. `inbox/docs-issues.md` **33 → 34**.
+
+**Rows closed:** **Q51** ([[cross-account-sharing]] · [[mirrors-and-sources]] — audit only, the page
+already answered it), **Q97** ([[rotate-tls-certificates]] · [[reload-server-config]]), **Q65**
+([[kubernetes-storage]], a new page), **Q103** (closed as *no public answer*, stated on
+[[choosing-a-topology]]). **Q58** was already filled by consolidation step 4, so the bank started at
+68, not the 67 the plan file predicted. The one ★ row still open is **Q23**, which is step 2's.
+
+**Pages created:** [[kubernetes-storage]] (operation, `kind: pattern`) ·
+[[s-nats-server-tls-reload]] · [[s-gh-7749-hostpath-jetstream]] ·
+[[s-k8s-760-jetstream-pvc-per-replica]].
+**Pages updated:** [[rotate-tls-certificates]] · [[reload-server-config]] · [[tls-in-nats]] ·
+[[leafnode]] · [[monitoring-endpoints]] · [[jetstream-sizing]] · [[jetstream-out-of-disk]] ·
+[[stream-directories-disappear]] · [[replicas]] · [[choosing-a-topology]] ·
+[[multi-region-jetstream]] · [[s-nats-helm-chart-values-2.14.6]] (extended with a third extract) ·
+[[index]].
+
+**New in `raw/`:** `nats-server-src/tls-reload-observed-v2.14.6.md` (the eight experiments and two
+controls), `gh-discussions/gh-7749.md`, `gh-discussions/k8s-760.md` — **the first file here from a
+`nats-io` repo other than `nats-server`**, so the naming rule is now recorded in `raw/sources.md`:
+`gh-<n>.md` is a `nats-server` discussion, anything else carries its repo in the slug — and
+`github-repos/nats-io__k8s.values-jetstream-storage-nats-2.14.6.md`.
+
+### Q97 — the reload works; nothing tells you so
+
+Eight experiments and two controls on the **v2.14.6** binary with **nats CLI 0.4.0**, the binary
+matching every `verified-against` on the pages touched. A client listener's `cert_file` replaced in
+place moved `/varz`'s `tls_cert_not_after` from `2026-09-30T20:18:19Z` to `2029-02-16T20:18:19Z`; a
+fresh **keypair** worked the same way; `nats account tls` confirmed it from the client side. So the
+`## To verify` item that had stood since [[s-gh-7684-certificate-expiry]] was ingested is settled in
+the affirmative, and the incident there did **not** reproduce.
+
+The findings worth having are the three negative ones, all of which explain how a working reload can
+look broken:
+
+- **The log lies by being identical.** A reload that changed nothing prints the same four `Reloaded:`
+  lines, `Reloaded: tls = enabled` included. The no-op control was run first for this reason.
+- **`config_digest` never moves**, because it digests the configuration *text* and a rotation changes
+  only the file behind the path. A monitoring check on the digest cannot see a rotation at all.
+- **`nats-server --signal reload` exits 0 even when the server refused the reload.** A mismatched
+  certificate/key pair and a missing certificate file both produce
+  `[ERR] Failed to reload server configuration: …` in the server log and **exit 0** at the caller,
+  with the old certificate left live and clients unaffected. `nats-server -t` catches both and exits
+  1.
+
+The leafnode half was worth its extra hour: the generated reference warns on six keys under
+`leafnodes { remotes[].tls }` that *"On 2.11/2.12 the reload succeeds but the old certificate keeps
+being used"*, and never says whether that still holds. Tested with a hub accepting exactly one
+certificate identity (`verify_and_map` plus `authorization { users: [ { user: "CN=leaf-A" } ] }`),
+**`cert_file`, `key_file` and `ca_file` all reload at 2.14.6** — with the file replaced in place *and*
+with the path changed in the config. Both controls clean. That is docs issue **#34**;
+`cipher_suites`, `curve_preferences` and `insecure` were not tested and the page says so.
+
+**A methodological note worth keeping.** The first version of the leafnode test used a certificate
+signed by a CA the hub did not trust and expected a rejection to prove the swap. The hub instead
+logged `tls: client didn't provide a certificate` — Go's TLS client filters its own certificates
+against the acceptable-CA list in the server's `CertificateRequest`, so an unknown-CA certificate is
+never offered. The result still pointed the right way, but it could not distinguish "rejected" from
+"not sent". Keeping both certificates under one CA and telling them apart by subject is the design
+that answers the question, and the failed attempt is recorded in `raw/` so it is not repeated.
+
+Two side observations, both landed: `verify_and_map` matches the certificate's **RFC 2253 DN**, so
+`user: "CN=leaf-A"` works and `user: "leaf-A"` produces
+`User in cert ["CN=leaf-A"], not found` ([[tls-in-nats]] already had the mapping order and now has
+the observation); and **`nats server check` has no certificate-expiry check** at natscli v0.4.0 —
+`server check credential` checks a user JWT, not an X.509 certificate — which settles the second
+`## To verify` item on [[rotate-tls-certificates]]. Both `## To verify` items on that page are now a
+*Settled by running it* section, with one new item taking their place.
+
+### Q65 — the scout found two threads, and the chart contradicted one of them
+
+`gh#7749` asks the question in exactly the bank's words and was answered **five months later by a
+community member**; there is no chosen answer and **no maintainer ever replied**. That provenance is
+on the summary and on the page, because the answer is used. `nats-io/k8s#760` supplies the reasoning
+that makes it trustworthy — a chart maintainer: *"JetStream needs fast block based storage. Should
+not use NFS or other slow file based storage with it. Most fast block based storage in the cloud only
+works with a single host as a writer."* That is the only public maintainer statement this wiki has
+found ruling out network file storage for JetStream.
+
+Checking the community answer's YAML against the chart at `nats-2.14.6` was the right instinct: its
+key path `nats.jetstream.fileStorage.*` is an older generation's, and the chart uses
+`config.jetstream.fileStore.*`. The page states the real keys and warns about the drift.
+A `grep` for `hostPath` and `emptyDir` across all 741 lines of `values.yaml` returns **nothing** —
+the chart does not offer the choice the question is about, which is itself the answer.
+
+**And it found a live one for docs issue #33.** `helm/charts/nats/files/config/jetstream.yaml`
+renders `max_file_store: << {{ .pvc.size }} >>` when `fileStore.maxSize` is unset, and `pvc.size`
+defaults to `10Gi`. So the *stock* JetStream install runs a 10Gi ceiling on a 10Gi volume — precisely
+the arrangement #33 shows to be unsafe, since every JetStream storage figure is logical while the
+directory is larger ([[filestore-layout]]). Recorded inside #33 rather than as a new row, because it
+is a chart default rather than a doc sentence, but it changes the fix: "set `fileStore.maxSize`", not
+just "pin `max_file_store`". [[jetstream-out-of-disk]] and [[jetstream-sizing]] now say so.
+
+### Q103 — a dead end, stated once
+
+The two questions in gh#7438 (2025-10-20) were never answered by anyone. Searched again on
+2026-08-31 across the docs tree, the ADRs, GitHub discussions and issues, and the public blogs:
+nothing states a procedure, states that one exists, or states that one does not. Rather than leave
+three passages hedging the same unknown, the finding now lives in one place — *Choosing the hub is a
+one-way decision* on [[choosing-a-topology]], which also says what the neighbouring published facts
+imply and why assembling them into a runbook would be invention — and [[multi-region-jetstream]]
+points at it, losing one hedge in *When not to use it* and one `## To verify` bullet. The bank row
+carries a new **`no-public-answer`** flag, added to the legend, and names the page in bold.
+
+**Scouted, not ingested:** `nats-io/nats-server` issue **#6921** (open, 2025-05-23, *defect*,
+assigned to @neilalexander) — explicit acks stalling on a stream with `max_msgs_per_subject: 5` under
+a `LastPerSubject` deliver policy, ack floor frozen, cleared by `AckPolicy: None` or
+`DeliverPolicy: All`. Recorded in the plan file as the best candidate yet for the wanted
+`consumer-keeps-redelivering` page.
+
+## 2026-08-31 — unread-chapters plan step 2: the JetStream chapter's unread half
+
+**Operation:** ingest ×7 (`inbox/plan-the-unread-chapters-2026-08-31.md`, step 2) —
+`learn/jetstream/`'s `publishing`, `advanced-publishing`, `shaping-the-stream`,
+`altering-stream-state`, `filtering`, `reading-back` and `subject-mapping`, all already mirrored in
+`raw/nats-docs/`.
+
+**Before → after:** pages **219 → 228**; unlanded ripples **206 across 57 pages → 206 across 57**;
+citation drift **0 → 0**; lint clean. Question bank **72 → 74 answered**, **★ 41 → 42 of 42 — every
+starred row is now answered.** `inbox/docs-issues.md` stays at 34 rows; **#5 was corrected**.
+
+**Rows closed:** **Q23** (★, exactly-once and the dedup window) → [[publishing]] · [[stream]];
+**Q24** (what ordering JetStream guarantees, and per what) → [[publishing]] · [[stream]] ·
+[[subject-transforms]].
+
+**Pages created:** [[publishing]] · [[subject-transforms]] · [[s-docs-publishing]] ·
+[[s-docs-advanced-publishing]] · [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
+[[s-docs-subject-mapping]] · [[s-docs-reading-back]] · [[s-docs-filtering]].
+**Pages updated:** [[stream]] · [[consumer]] · [[retention-policies]] · [[ordered-consumer]] ·
+[[priority-groups]] · [[mirrors-and-sources]] · [[maximum-messages-exceeded]] · [[error-codes]] ·
+[[advisories]] · [[defaults-and-limits]] · [[jetstream-sizing]] · [[worker-pool]] · [[nats-cli]] ·
+[[orbit]] · [[nats-server-2.12]] · [[nats-server-2.14]] · [[index]].
+
+### The unit of ingestion, applied
+
+These seven pages are **5,388 lines**, and most of that is one example repeated in seven client
+languages under `#### Go`, `#### Python`, `#### Java`, `#### Rust`, `#### C#/.NET`, `#### C` and
+`#### JavaScript/TypeScript`. `CLAUDE.md` puts per-language client API documentation out of scope, so
+the article ingested was the **prose and the `#### CLI` block**. A filter that drops the
+per-language sections cut `advanced-publishing.md` from 796 lines to 149 — and nothing in the
+summaries came from a code block in a language other than the shell.
+
+### Two mechanisms the wiki had no page for
+
+**Publishing.** The wiki knew `allow_atomic` (2.12) and `allow_batched` (2.14) as boolean rows in
+[[defaults-and-limits]] and one line each in the release entities. Nothing said what they do.
+[[publishing]] now carries:
+
+- **the two failure modes, which are not the same.** `no responders` means *nothing was stored* and
+  arrives immediately; a **timeout means nothing at all** — "the server may have stored the message
+  and the ack got lost on the way back". That distinction is the whole reason `Nats-Msg-Id` exists.
+- **exactly-once, stated honestly.** JetStream gives at-least-once storage with duplicate
+  suppression over a bounded window, plus at-least-once delivery. The promise is precisely *a publish
+  repeated within `duplicate_window` with the same `Nats-Msg-Id` is stored once* — and a retry later
+  than the window stores a second copy, header or not. Nothing protects a side effect from running
+  twice except an idempotent consumer.
+- **the async order trap.** Nothing is resent automatically; a failed async publish is simply
+  missing, and by the time the retry runs the later messages hold lower sequences, so the retry lands
+  last. `Nats-Msg-Id` fixes a lost ack; `Nats-Expected-Last-Subject-Sequence` is what fixes *order*,
+  by failing the retry fast.
+- **the three ways an atomic batch ends without committing**, and that only two of them tell you: a
+  sequence gap and an over-limit batch return an error `PubAck`, while **ten seconds without a
+  message drops the batch with no error reply at all** — only a `stream_batch_abandoned` advisory.
+  The committing `PubAck` is the sole proof.
+- **`allow_atomic` and `persist_mode: async` are mutually exclusive**, because atomicity depends on
+  the synchronous write path. Fast-ingest is fine on such a stream.
+- **`gap: ok` fast ingest loses data by design**, which is correct for metrics and wrong for object
+  chunks.
+- **Orbit is a dependency of both batch modes in most clients**, not an optional extra — landed on
+  [[orbit]], which said nothing about it.
+
+**Subject transforms and republish.** The `{{wildcard(n)}}` / `{{partition(n,1)}}` language,
+`nats server mappings` for testing one without a stream, deterministic sharding, and republish's five
+headers — including `Nats-Last-Sequence`, "the stream sequence of the previous message *on the same
+subject*", which is how a plain core subscriber can tell it missed something. Plus the pitfall that
+matters at design time: **a partition count is permanent once consumers filter on buckets.**
+
+### Reference work the reading paid for
+
+**Eleven batch error codes were sitting in `raw/nats-docs/reference/jetstream/errors.md` and none was
+in [[error-codes]]** — `JSAtomicPublish*` (`10176`, `10179`, `10199`, `10201`, `10210`) and
+`JSBatchPublish*` (`10205`–`10209`, `10211`). They are two families, one per publish mode, with
+near-identical names. **`10210` and `10211` are the only two `429`s in that table**, and they report
+the in-flight-batch ceiling.
+
+**And the limits behind them are recorded as unverified, deliberately.** The docs state 1,000
+messages per atomic batch, 50 batches in flight, and a ten-second stall, calling all three
+"operator-configurable server limits". **No config key for any of them exists in
+`inbox/config-keys-table.md`**, and none was checked against the server. [[defaults-and-limits]] and
+[[publishing]] both say so rather than presenting them as defaults.
+
+### Sharper facts landed on existing pages
+
+- **Sequences are addresses** ([[stream]]): deletes leave permanent holes, a purge sets first-seq to
+  one past last rather than rewinding, a stored sequence "either still points at the same message or
+  points at nothing", and a count is never a sequence. Plus the CLI/library asymmetry —
+  **`nats stream rmm` securely erases** (overwrites the bytes) where a client's `DeleteMsg` does not;
+  the server sees only a `no_erase` flag.
+- **Stream vs consumer sequence** ([[consumer]]): the consumer's counter increments on **every
+  delivery, redeliveries included**, so a consumer sequence ahead of the stream sequence is
+  redelivery, not corruption — and the numbers ride on every delivered message, so
+  `nats consumer info` should never be in a per-message path.
+- **Two meanings of "overlap"** ([[consumer]]): between consumers it is the point of the design on
+  `limits` and `interest` streams; inside one consumer a covering filter is refused with
+  `consumer subject filters cannot overlap`, while a *partial* overlap is accepted. And **a filter
+  that matches nothing is accepted silently** — an empty pull is as likely a typo as an empty stream.
+- **`max_age` never rejects a publish** ([[stream]], [[maximum-messages-exceeded]]): it expires
+  stored messages under either discard policy, so a "full" stream is always full on bytes or count.
+  With it, the third rejection string and the fact that `discard: new` alone does **not** make a full
+  *subject* reject — that needs `discard_new_per_subject` on top.
+
+### Docs issue #5, corrected rather than quietly fixed
+
+#5 recorded that the two-minute `duplicate_window` default is "never stated", and said the only
+public statement of it was a Synadia blog post from 2025-08-08. **That was wrong.** The `learn`
+chapter states it in three pages — `publishing.md` in prose ("the duplicate-tracking window is two
+minutes by default"), and `your-first-stream.md` and `shaping-the-stream.md` in `nats stream info`
+output — and all three agree with `StreamDefaultDuplicatesWindow` at v2.14.6.
+
+The row is now scoped to what is genuinely defective: **the generated reference page where the field
+is defined**, which says only "0 for default" and is where a reader goes for a default. Severity
+medium → low. The correction is written into the issue's detail section, because a report that
+quietly revises its own claims is worth less than one that shows them being tested.
+
+### Checked and not ingested
+
+The plan named six tutorial pages to skip unless they added something. All six were checked and four
+did add something — the comma-list priority-group trap, the two pause pitfalls, the ordered-consumer
+fan-out, and the `Duplicate Window: 2m0s` evidence. `message-ttl.md` is recorded as **read, added
+nothing**: [[message-ttl]] already had `allow_msg_ttl`'s irreversibility with both error codes.
+Those four additions cite the doc **path** and say the page has not been ingested, so a later pass
+can tell a spot-check from a summary.
+
+**Q29 and Q30 stay open, and the plan's expectation for them was wrong.** Message scheduling is not
+in `learn/jetstream/` at all: a grep of the full 861-page tree for `allow_msg_schedules`,
+`Nats-Schedule` and "message schedul" hits exactly three files, none under `learn/` —
+`release-notes/upgrade-to-2.14.md`, `reference/jetstream/api/headers.md` and
+`reference/jetstream/errors.md`. Those are where a later step should go for them.
+
+## 2026-08-31 — unread-chapters plan step 3: `learn/key-value`, all five articles
+
+**Operation:** ingest ×5 (`inbox/plan-the-unread-chapters-2026-08-31.md`, step 3) —
+`your-first-bucket`, `watching`, `history-and-revisions`, `ttl-and-limits`, `under-the-hood`.
+`where-next.md` skipped as a chapter recap, though its production checklist supplied the
+bucket-name charset.
+
+**Before → after:** pages **228 → 233**; unlanded ripples **206 across 57 pages → 206 across 57**;
+citation drift **0 → 0**; lint clean. Question bank **74 → 76 answered**, ★ **42 of 42** (unchanged).
+
+**Rows closed:** **Q73** (when a bucket is the wrong tool — the KV half; the Object Store half is
+step 4's) and **Q74** (a distributed lock or lease with KV), both → [[key-value]].
+
+**Pages created:** [[s-docs-kv-under-the-hood]] · [[s-docs-kv-watching]] ·
+[[s-docs-kv-history-and-revisions]] · [[s-docs-kv-ttl-and-limits]] ·
+[[s-docs-kv-your-first-bucket]].
+**Pages updated:** [[key-value]] (substantially) · [[stream]] · [[direct-get]] ·
+[[subject-permissions]] · [[message-ttl]] · [[object-store]] · [[ordered-consumer]] ·
+[[subject-transforms]] · [[kv-watchers-stall-the-cluster]] · [[nats-cli]] · [[index]].
+
+### The watcher gap closes, and the answer was never the server
+
+[[key-value]] has carried "why a KV watcher would *miss* updates" as an open item since the ADRs were
+ingested. `watching.md` names it outright as **"the most common watch bug"**, and it is client-side:
+a watch delivers a snapshot, then **one end-of-initial-data signal**, then live changes — and a loop
+that treats that signal as end-of-stream reads the snapshot and quits before the first live change.
+
+The signal's shape differs per client, which is the part worth having in a wiki:
+
+| client | how the boundary arrives |
+|---|---|
+| Go, Python | a **nil / `None` entry** in the same stream as real entries |
+| JavaScript | an **`isUpdate` flag** on each entry |
+| Java | an **`endOfData()` callback** |
+| C# | an **`OnNoData` option** |
+| **Rust** | **no marker at all** — snapshot-plus-live or live-only is chosen when the watch opens |
+| `nats` CLI | consumed silently; never printed |
+
+The earlier note stands on its own terms: nobody has publicly reported a *server-side* missed update,
+and ADR-8's gap-detection remains a candidate cause with no report behind it. What changed is that
+there is now a documented, ordinary explanation for the symptom.
+
+### Five facts the wiki did not have
+
+- **A revision is the stream sequence, so the counter is bucket-wide, not per key.** The docs' own
+  worked history shows one key at revisions **2** and **5**, with 3 and 4 taken by writes to other
+  keys. Anything that reasons about the gap between two revisions of one key is wrong. Landed on
+  [[key-value]] and on [[stream]], where it explains *why*.
+- **`put` over a TTL'd key silently makes it permanent.** "A put or an update appends a new latest
+  value with no TTL of its own, so the key simply stops expiring." No error, no warning. On a bucket
+  used for sessions or leases this is an outage, and it is the single most dangerous thing in the
+  chapter.
+- **`deny_delete` does not stop a raw publish.** The setting blocks the JetStream message-delete API
+  so nothing removes entries behind the KV API's back — but a `nats pub` to `$KV.<bucket>.<key>`
+  lands a bare message with none of the headers the KV API sets, so "a watcher can't tell it from a
+  real put and a purge you meant never happens". **The only thing that actually prevents it is an
+  ACL**, which is now a section on [[subject-permissions]] rather than an aside on the KV page: it is
+  a security control, and the stream setting that looks like one is not.
+- **`*` is a whole token in a key filter.** `widget-*` over flat hyphenated keys matches **nothing**;
+  only `widget.blue` / `widget.red` can be filtered as `widget.*`. Key naming decides once, before
+  the first put, whether a subset can ever be watched cheaply — which makes it the same decision
+  [[subject-transforms]] makes about `{{partition(n,1)}}`, and it is cross-linked as such.
+- **CAS is two operations, and a rejected update is dropped rather than queued.** `create` is CAS
+  against revision 0, `update` against a named revision; value and revision must come from a
+  **single** get, "two separate gets could pair a stale value with a fresh revision".
+
+### Q74 answered by composing documented primitives, with the caveats larger than the recipe
+
+No public source publishes a KV lock recipe. Every piece is documented, and they compose in exactly
+one way — `create` to acquire, `update` to renew, delete to release, the per-key TTL to expire — so
+[[key-value]] now states it, and then spends more words on what it is **not**: a lease rather than
+mutual exclusion (a holder's TTL can expire mid-work), no fencing token beyond the revision, no
+blocking acquire, and the renewal trap — **a renewal written with `put` instead of `update` drops the
+TTL and the lock never expires again.** The composition is marked as this wiki's, not a source's.
+
+### Two open items, honestly
+
+- **Q76** (a KV mirror on file storage slower than on memory) is **not answered and now known not to
+  be answerable from this chapter**: `learn/key-value` mentions mirrors exactly once, in its closing
+  recap, with no performance claim. That is a result — it stops the same chapter being re-read for it
+  in a later plan — and both the bank row and [[key-value]]'s *To verify* say so.
+- **`subject_delete_marker_ttl` still has no documented default.** `ttl-and-limits.md` always passes
+  `--marker-ttl` explicitly and never says what happens without it. The item on [[message-ttl]]
+  survives a second source and now records that it was checked.
+
+**A note on `under-the-hood.md`**, the page the plan expected most from: most of it **confirmed**
+[[key-value]]'s existing stream-config table, which was built from ADR-8. That is worth recording as
+a result in itself — the ADR-derived table is correct against the docs — and the page's real
+contributions were the three things above plus the literal direct-get subject,
+`$JS.API.DIRECT.GET.KV_INVENTORY.$KV.INVENTORY.widget-blue`, now on [[direct-get]].

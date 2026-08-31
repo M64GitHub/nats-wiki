@@ -30,7 +30,7 @@ last true.
 
 _none._
 
-## Authority the tool cannot check (1)
+## Authority the tool cannot check (2)
 
 `verified-against` names something with no release feed here — a site capture, a date, a spec. Not
 stale, not verifiable mechanically; re-read them by hand when the thing they name changes.
@@ -38,3 +38,4 @@ stale, not verifiable mechanically; re-read them by hand when the thing they nam
 | page | type | verified against | verified on | claims | verified from |
 |---|---|---|---|---|---|
 | [[nats-helm-charts]] | entity | `nats-io/k8s chart nats-2.14.6` | 2026-08-31 | config key | [[s-nats-helm-chart-values-2.14.6]] · [[s-docs-rolling-upgrades]] · [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]] |
+| [[orbit]] | entity | `synadia-io/orbit.* as of 2026-08-31` | 2026-08-31 | config key | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-advanced-publishing]] |

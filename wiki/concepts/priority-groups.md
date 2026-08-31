@@ -31,7 +31,12 @@ Hard rules:
 
 - **Pull consumers only.** Configuring it on a push consumer is an error.
 - **`PriorityGroups` needs at least one entry**, and the initial implementation allows **exactly
-  one group per consumer** — more is an error.
+  one group per consumer** — more is an error. **The CLI does not stop you asking for more, and the
+  server does not error either**: `--overflow-groups` and `--pinned-groups` take a comma-separated
+  list, "so passing two looks legal, and the server accepts it, but it uses only the first group and
+  ignores the rest" (source: `learn/jetstream/priority-groups.md`, spot-checked 2026-08-31 — that
+  page has not been ingested). To split work by region or tier today, run **separate consumers** on
+  the same stream, each with its own group.
 - Group names must match `limited-term` (`A-Z a-z 0-9 - _ / =`) and are **capped at 16 characters**.
 - **Every pull request must carry `"group": "<name>"`.** A pull outside a valid group errors.
 - **You cannot add groups to a consumer that has none, remove them, or switch policy.** Only

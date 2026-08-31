@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10047, 10028, max_bytes, max_file_store, reserved_storage, out-of-space, OUT_OF_STORAGE]
 aliases: ["JetStream out of disk", "insufficient storage resources available", "insufficient memory resources available", "JetStream out of resources will be DISABLED", "10047", "10028", "out of storage"]
-sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout]
+sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -174,8 +174,12 @@ inside the container while the host has space (source: [[s-issue-4281-insufficie
 
 ## Prevention
 
-- **Pin `max_file_store`** to the volume, and `max_memory_store` below the container's memory limit.
-  [[jetstream-sizing]] step 4 has the arithmetic.
+- **Pin `max_file_store` *below* the volume**, and `max_memory_store` below the container's memory
+  limit. [[jetstream-sizing]] step 4 has the arithmetic, and the section below has the reason the
+  margin is not optional. **On Kubernetes this is a change you have to make**: with
+  `config.jetstream.fileStore.maxSize` unset, the Helm chart at `nats-2.14.6` renders
+  `max_file_store` equal to `fileStore.pvc.size` — a 10Gi ceiling on a 10Gi volume, out of the box
+  (source: [[s-nats-helm-chart-values-2.14.6]]; [[kubernetes-storage]]).
 - **Alert on `$JS.EVENT.ADVISORY.SERVER.OUT_OF_STORAGE`.** It fires once and JetStream is already
   down by the time you see it, so the alert has to be on the event, not on a threshold crossing.
 - **Track `reserved_storage` alongside `storage`**, not just `storage`. The gap between them is your
@@ -247,4 +251,7 @@ values.
 - [[s-issue-8322-dynamic-maxstore-shrinks]] — the shrinking dynamic limit and the 2.14.6 fix.
 - [[s-nats-server-jetstream-resources]] — every code path above, read at v2.14.6 with file and line.
 - [[s-gh-7463-jetstream-corruption]] — the log line appearing with a nearly empty disk.
-- [[s-docs-sizing-and-resources]] — the docs page that states the 75% default correctly. · [[s-nats-server-filestore-layout]]
+- [[s-docs-sizing-and-resources]] — the docs page that states the 75% default correctly.
+- [[s-nats-server-filestore-layout]] — why the ceiling bounds a logical figure and the directory is
+  bigger.
+- [[s-nats-helm-chart-values-2.14.6]] — the chart rendering `max_file_store` equal to the PVC size.

@@ -158,10 +158,9 @@ slows the local leg too — [[supercluster-slows-when-a-remote-subscriber-joins]
 
 - **Symmetric regions with good connectivity and one operator.** A super-cluster is simpler, has one
   JetStream namespace, and gives queue-group locality for free.
-- **When no region may be subordinate, even in name.** The shape is hub-and-spoke, and whether a leaf
-  region can later become the hub — or a cluster become a leaf without losing data — is **unanswered
-  in public** (source: [[s-gh-7438-multi-region-availability]]). Choosing the hub is a decision to
-  make once.
+- **When no region may be subordinate, even in name.** The shape is hub-and-spoke, and no public
+  source describes a way to reverse it — see *Choosing the hub is a one-way decision* on
+  [[choosing-a-topology]], which owns that finding. Choosing the hub is a decision to make once.
 - **When you need one stream replicated across regions.** Nothing does that. Replicas stay in a
   cluster; cross-region copies are mirrors and sources, which are asynchronous and whose `Lag` is
   your RPO (source: [[s-docs-mirrors-as-dr]]).
@@ -198,7 +197,5 @@ the connection **is** extending.
   source publishes a complete working hub-and-leaf multi-region configuration**, which is the same
   gap [[cross-domain-sourcing]] runs into. Each key used is individually sourced; the combination is
   not.
-- Whether a leaf region can be promoted to hub, or a cluster converted to a leaf without data loss,
-  is unanswered — see above.
 - Hub-mediated latency between two leaf regions is a consequence of the shape, not a measured number.
   No source in `raw/` benchmarks it.

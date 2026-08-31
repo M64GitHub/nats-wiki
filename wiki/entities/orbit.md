@@ -7,7 +7,7 @@ verified-against: synadia-io/orbit.* as of 2026-08-31
 verified-on: 2026-08-31
 tags: [orbit, extensions, incubator, partitioned-consumer-groups, kv-codecs, counters]
 aliases: [orbit, orbit.go, orbit.js, orbit.py, orbit.java, orbit.rs, orbit.net, orbit.c, "synadia-io/orbit"]
-sources: [s-docs-ecosystem, s-github-repo-facts]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-advanced-publishing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -71,6 +71,15 @@ retry / chaos utilities", and warn that the "Exact module set differs per langua
 
 ## What an operator needs to know
 
+**Two 2.12/2.14 server features are reachable only through Orbit in most clients.** Atomic batch
+publishing (`allow_atomic`, 2.12) is in the core client for the `nats` CLI and nats.js; **Go, Java,
+Rust and .NET reach it through Orbit**, and nats.py has to drive the `Nats-Batch-*` headers itself.
+Fast-ingest batch publishing (`allow_batched`, 2.14) is worse served: `jetstreamext.NewFastPublisher`
+in Go, `fast_publish` in Rust and `@synadiaorbit/fastingest` (`startFastIngest`) in JavaScript are the
+only publishers that exist, with Python, Java and .NET still catching up
+(source: [[s-docs-advanced-publishing]]). **That makes Orbit a dependency of the feature, not an
+optional extra** — worth knowing before designing around either mode ([[publishing]]).
+
 - **An Orbit dependency is not covered by the client's stability promise.** Sub-1.0 modules may break
   between releases; the core client will not. Pin Orbit modules individually.
 - **`pcgroups` is a client-side construct.** Partitioned consumer groups are implemented in the
@@ -86,4 +95,4 @@ retry / chaos utilities", and warn that the "Exact module set differs per langua
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-advanced-publishing]]

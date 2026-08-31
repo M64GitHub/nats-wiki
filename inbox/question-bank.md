@@ -6,6 +6,9 @@ answer a row here; a row is *answered* only when a page states the answer with a
 version — not when a page merely touches the topic.
 
 - `★` marks the questions that must be answerable for the wiki to be useful at all.
+- `no-public-answer` marks a row this wiki searched for and could not answer from public sources.
+  Its `answered by` cell names the page that says so, in bold — a stated dead end is an answer; an
+  empty cell is unfinished work.
 - `answered by` holds `[[wikilinks]]`; the viewer counts filled rows as "ingested" and the
   filters at the top let you see what is still open.
 - Add rows whenever a query, an ingest or a thread reveals a question the bank does not cover.
@@ -40,8 +43,8 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 20 | What happens when several consumers share a durable name with different filter subjects on a WorkQueue stream? | jetstream | [gh#6044](https://github.com/nats-io/nats-server/discussions/6044) | ★ gotcha | [[retention-policies]] |
 | 21 | What does "disjoint filter subjects" mean for a WorkQueue stream? | jetstream | [gh#3637](https://github.com/nats-io/nats-server/discussions/3637) | config | [[retention-policies]] |
 | 22 | How do I inspect which messages are still pending in a work-queue stream? | jetstream monitoring | [gh#4778](https://github.com/nats-io/nats-server/discussions/4778) | ★ monitoring | [[consumer]] · [[worker-pool]] |
-| 23 | Does JetStream give exactly-once delivery, and how does the dedup window work? | jetstream | [so#72814502](https://stackoverflow.com/questions/72814502/nats-jetstream-exactly-once-delivery) | ★ concept | |
-| 24 | What ordering does JetStream guarantee, and per what — stream, subject, key? | jetstream | [so#68984906](https://stackoverflow.com/questions/68984906/does-nats-jetstream-provide-message-ordering-by-a-key) | concept | |
+| 23 | Does JetStream give exactly-once delivery, and how does the dedup window work? | jetstream | [so#72814502](https://stackoverflow.com/questions/72814502/nats-jetstream-exactly-once-delivery) | ★ concept | [[publishing]] · [[stream]] |
+| 24 | What ordering does JetStream guarantee, and per what — stream, subject, key? | jetstream | [so#68984906](https://stackoverflow.com/questions/68984906/does-nats-jetstream-provide-message-ordering-by-a-key) | concept | [[publishing]] · [[stream]] · [[subject-transforms]] |
 | 25 | What ordering guarantees does core NATS give? | core | [gh#7577](https://github.com/nats-io/nats-server/discussions/7577) | concept | |
 | 26 | Why do stream directories disappear from `store_dir` while `nats stream info` still lists the streams? | jetstream deploy | [gh#5924](https://github.com/nats-io/nats-server/discussions/5924) | ★ gotcha | [[stream-directories-disappear]] |
 | 27 | How do I recover a stream that is full under a DiscardNew policy? | jetstream | [gh#2794](https://github.com/nats-io/nats-server/discussions/2794) | gotcha runbook | [[maximum-messages-exceeded]] · [[retention-policies]] |
@@ -68,7 +71,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 48 | How do I restrict which subjects a leafnode exports and imports? | topology security | [gh#5941](https://github.com/nats-io/nats-server/discussions/5941) | config | [[leafnode]] · [[cross-account-sharing]] |
 | 49 | How do I set up operator / account / user JWTs correctly? | security | [gh#7854](https://github.com/nats-io/nats-server/discussions/7854) | ★ runbook | [[set-up-operator-mode]] · [[operator-mode]] |
 | 50 | How do I rotate TLS certificates without downtime, and how do I detect expiry? | security | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ runbook | [[rotate-tls-certificates]] · [[tls-in-nats]] |
-| 51 | How do I share a stream or KV bucket between accounts? | security jetstream | [gh#7017](https://github.com/nats-io/nats-server/discussions/7017) | ★ config | |
+| 51 | How do I share a stream or KV bucket between accounts? | security jetstream | [gh#7017](https://github.com/nats-io/nats-server/discussions/7017) | ★ config | [[cross-account-sharing]] · [[mirrors-and-sources]] |
 | 52 | How do I prevent a user from creating durable consumers or exceeding account limits? | security | [gh#5044](https://github.com/nats-io/nats-server/discussions/5044) | config | [[subject-permissions]] · [[account]] |
 | 53 | When should I use auth callout, and what does the server validate before calling it? | security | [gh#7505](https://github.com/nats-io/nats-server/discussions/7505) | concept | [[auth-callout]] |
 | 54 | How do I add accounts and reload a running cluster without dropping clients? | security deploy | [gh#5890](https://github.com/nats-io/nats-server/discussions/5890) | ★ runbook | [[reload-server-config]] · [[account]] |
@@ -82,7 +85,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 62 | How do I read and act on JetStream warnings in the server log? | monitoring jetstream | [gh#6490](https://github.com/nats-io/nats-server/discussions/6490) | ★ gotcha | [[stream-has-high-message-lag]] |
 | 63 | How do I roll a cluster onto a new server version safely? | deploy | [gh#3778](https://github.com/nats-io/nats-server/discussions/3778) | ★ runbook | [[upgrade-a-cluster]] |
 | 64 | What are the data-integrity risks when upgrading across minor versions? | deploy | [gh#4781](https://github.com/nats-io/nats-server/discussions/4781) | ★ runbook | [[upgrade-a-cluster]] |
-| 65 | Should JetStream use hostPath or a PVC on Kubernetes? | deploy | [gh#7749](https://github.com/nats-io/nats-server/discussions/7749) | ★ config | |
+| 65 | Should JetStream use hostPath or a PVC on Kubernetes? | deploy | [gh#7749](https://github.com/nats-io/nats-server/discussions/7749) | ★ config | [[kubernetes-storage]] |
 | 66 | How do I grow the JetStream volume on Kubernetes? | deploy | [gh#6601](https://github.com/nats-io/nats-server/discussions/6601) | gotcha runbook | |
 | 67 | LoadBalancer or seed URLs — how should clients reach a cluster on Kubernetes? | deploy clients | [gh#6094](https://github.com/nats-io/nats-server/discussions/6094) | pattern | [[how-clients-reach-a-cluster]] |
 | 68 | Why did throughput drop after moving from Kubernetes to a standalone VM (or back)? | deploy | [gh#6594](https://github.com/nats-io/nats-server/discussions/6594) | sizing gotcha | |
@@ -90,8 +93,8 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 70 | How do I count the keys in a KV bucket without fetching them all? | kv | [gh#7365](https://github.com/nats-io/nats-server/discussions/7365) | gotcha | [[key-value]] |
 | 71 | Does KV support a TTL per key, and since which version? | kv | [gh#7264](https://github.com/nats-io/nats-server/discussions/7264) | config | [[message-ttl]] · [[key-value]] |
 | 72 | Why doesn't deleting or purging keys reclaim disk space in a bucket? | kv | [gh#6015](https://github.com/nats-io/nats-server/discussions/6015) | ★ gotcha | [[key-value]] · [[filestore-layout]] |
-| 73 | When is KV or Object Store the wrong tool — where does Redis or a database win? | kv objectstore | [so#75576454](https://stackoverflow.com/questions/75576454/nats-object-store-or-key-value-store-vs-redis-cache) | concept | |
-| 74 | How do I implement a distributed lock or lease with KV? | kv | [so#79400839](https://stackoverflow.com/questions/79400839/how-to-use-nats-kv-for-distributed-locking) | pattern | |
+| 73 | When is KV or Object Store the wrong tool — where does Redis or a database win? | kv objectstore | [so#75576454](https://stackoverflow.com/questions/75576454/nats-object-store-or-key-value-store-vs-redis-cache) | concept | [[key-value]] |
+| 74 | How do I implement a distributed lock or lease with KV? | kv | [so#79400839](https://stackoverflow.com/questions/79400839/how-to-use-nats-kv-for-distributed-locking) | pattern | [[key-value]] |
 | 75 | Why is listing an object-store bucket slow (or timing out) while uploads run? | objectstore | [gh#6836](https://github.com/nats-io/nats-server/discussions/6836) | gotcha | |
 | 76 | Why is a KV mirror on file storage far slower than on memory storage? | kv | [gh#8417](https://github.com/nats-io/nats-server/discussions/8417) | gotcha internals | |
 | 77 | What does an unexpected `nats: timeout` actually mean, and how do I trace it? | core | [gh#5859](https://github.com/nats-io/nats-server/discussions/5859) | ★ gotcha | [[nats-timeout]] |
@@ -114,13 +117,13 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 94 | Why does `openssl s_client` return nothing against the NATS TLS port? | security monitoring | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | gotcha | [[tls-in-nats]] · [[rotate-tls-certificates]] |
 | 95 | Why does `nsc push` / `nats auth account push` time out with nothing in the server log? | security | [gh#7854](https://github.com/nats-io/nats-server/discussions/7854) | gotcha runbook | [[set-up-operator-mode]] · [[nsc]] |
 | 96 | Can I enable JetStream on the system account to manage all tenants from one place? | security jetstream | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | config | [[cross-account-sharing]] |
-| 97 | Does a config reload actually pick up a renewed certificate file, or do I need a restart? | security deploy | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ gotcha | |
+| 97 | Does a config reload actually pick up a renewed certificate file, or do I need a restart? | security deploy | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ gotcha | [[rotate-tls-certificates]] · [[reload-server-config]] |
 | 98 | Is there a limit on how many accounts one account can import from? | security topology | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | sizing | |
 | 99 | What happens when JetStream runs out of disk, and why does `insufficient storage resources available (10047)` appear on an almost empty volume? | jetstream deploy | [issue#4281](https://github.com/nats-io/nats-server/issues/4281) | ★ gotcha sizing | [[jetstream-out-of-disk]] |
 | 100 | Why does the auto-sized `max_file_store` get smaller every time the server restarts? | jetstream deploy | [issue#8322](https://github.com/nats-io/nats-server/issues/8322) | ★ gotcha config | [[jetstream-out-of-disk]] · [[config-keys]] |
 | 101 | Why does a cluster stop recovering when a thousand clients each open a KV watcher? | kv topology | [gh#5243](https://github.com/nats-io/nats-server/discussions/5243) | ★ gotcha sizing | [[kv-watchers-stall-the-cluster]] |
 | 102 | Does a leafnode need its own JetStream domain, and what does setting one actually change? | jetstream topology | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | concept config | [[jetstream-domain]] |
-| 103 | Can a leaf region later become the hub, or a regular cluster be converted into a leaf cluster without losing data? | topology deploy | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ concept | |
+| 103 | Can a leaf region later become the hub, or a regular cluster be converted into a leaf cluster without losing data? | topology deploy | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ concept no-public-answer | **nobody has published an answer** — scouted 2026-08-31 across the docs, ADRs, GitHub and blogs; the two questions in the thread were never replied to. The finding is stated on [[choosing-a-topology]] |
 | 104 | Why does `nats-server -t` accept a config the server then refuses to start? | deploy | [learn/topologies/putting-it-together](https://docs.nats.io/learn/topologies/putting-it-together) | gotcha config | [[reload-server-config]] · [[build-a-3-node-cluster]] |
 
 ## Thread titles behind the rows

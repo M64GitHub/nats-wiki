@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -96,6 +96,14 @@ throughput.
 
 When you need more throughput the tool is not a replica: add workers to a consumer
 ([[worker-pool]]), or split subjects across streams.
+
+**The independence is a storage property too.** R3 only buys what it costs while the three copies can
+fail separately, which is why the Helm chart gives each replica its own PersistentVolumeClaim rather
+than one shared volume: "In the cloud ideally 3 replicas will run in 3 different availability zones,
+and each replica has exclusive access to a fast block based disk in its availability zone", and
+"JetStream needs fast block based storage. Should not use NFS or other slow file based storage with
+it" (source: [[s-k8s-760-jetstream-pvc-per-replica]]). Three replicas cost three disks and there is
+no supported way to collapse them — see [[kubernetes-storage]].
 
 ## Replicas cost account quota, not just disk
 
@@ -234,4 +242,4 @@ Two constraints to read alongside them:
 
 [[s-docs-surviving-node-loss]] · [[s-docs-replication-and-r3]] · [[s-docs-stream-config]] ·
 [[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-as-dr]] · [[s-docs-jetstream-in-a-cluster]] ·
-[[s-docs-single-server]] · [[s-docs-disaster-recovery]]
+[[s-docs-single-server]] · [[s-docs-disaster-recovery]] · [[s-k8s-760-jetstream-pvc-per-replica]]

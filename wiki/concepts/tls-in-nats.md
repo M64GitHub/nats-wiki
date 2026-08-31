@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, mtls, verify, verify_and_map, handshake_first, tls_timeout, encryption-at-rest, prev_key, tls_cert_not_after]
 aliases: [tls, mtls, mutual tls, verify_and_map, handshake_first, encryption at rest, tls block, certificates]
-sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist]
+sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -99,6 +99,20 @@ level), and each branch logs which field matched — `Using SAN found in cert fo
 `Using DistinguishedNameMatch for auth`, and so on. **That debug line is the fastest way to see why a
 certificate mapped to the wrong user.**
 
+**The user entry is the whole DN, not the CN.** Worth stating plainly because getting it wrong is
+silent in the config and loud only at debug level: a certificate whose subject is `CN=leaf-A` needs
+`user: "CN=leaf-A"`, and `user: "leaf-A"` fails with
+
+```
+[DBG] DistinguishedNameMatch could not be used for auth ["CN=leaf-A"]
+[DBG] User in cert ["CN=leaf-A"], not found
+[ERR] authentication error
+```
+
+Observed at v2.14.6 on a **leafnode** listener, where the trimmed
+`leafnodes { authorization { users } }` parser takes the same entry
+(source: [[s-nats-server-tls-reload]]).
+
 ### TLS-first
 
 `handshake_first: true` puts the TLS handshake before any protocol byte, "the way an HTTPS server
@@ -163,6 +177,11 @@ CPU".
 - **Certificates are read once, at startup.** Overwriting the files changes nothing until a reload,
   and even then "existing connections keep the certificate they handshook with; only new connections
   get the rotated one". An expiry that slips past fails as a handshake rejection, not an auth error.
+  The reload itself does work — measured on the v2.14.6 binary, on a client listener and on a
+  leafnode remote — but it gives **no positive signal**: the log lines and `config_digest` are the
+  same as a reload that changed nothing, and `nats-server --signal reload` exits 0 even when the
+  server refused the new material. Confirm with `/varz`'s `tls_cert_not_after`
+  (source: [[s-nats-server-tls-reload]]; procedure in [[rotate-tls-certificates]]).
 - **`handshake_first: true` locks out every client that has not opted in.** Migrate with a duration
   value first.
 - **A wrong at-rest key hides streams; it does not destroy them.**
@@ -188,4 +207,5 @@ every listener at v2.14.6, and `nats account tls` walks the whole verified chain
 ## Sources
 
 [[s-docs-encryption-and-tls]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] ·
-[[s-docs-hardening]] · [[s-docs-security-checklist]] · [[s-adr-40-nats-connection]]
+[[s-docs-hardening]] · [[s-docs-security-checklist]] · [[s-adr-40-nats-connection]] ·
+[[s-nats-server-tls-reload]]

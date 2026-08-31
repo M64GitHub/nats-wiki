@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -120,6 +120,23 @@ while workers are idle, `max_ack_pending` is your bottleneck.
 - **When consumer count, not worker count, is the problem.** Adding workers to one consumer is cheap;
   adding consumers is not ([[jetstream-slows-as-consumers-grow]]).
 
+## Not a queue group, and not several consumers
+
+Two things a worker pool is regularly confused with, and the distinction is the same one either way —
+**where the load is shared.**
+
+- **A core NATS queue group** splits one *subject's live traffic* across subscribers. Nothing is
+  stored and nothing is replayed.
+- **Several consumers on one stream** do not share load at all: "each consumer gets its own full view
+  of the stored stream, filtered to what it asked for", so two consumers matching the same subject
+  each receive their own copy (source: [[s-docs-filtering]]). That is a fan-out, and on `limits` and
+  `interest` streams it is free of interference — see [[consumer]].
+- **A worker pool** shares load *within one consumer*, which is why the whole pool shares one
+  `max_ack_pending`.
+
+The exception that proves it: on a **`workqueue`** stream the server refuses overlapping consumers
+outright, because there the first ack removes the message for everyone ([[retention-policies]]).
+
 ## Related
 
 [[consumer]] · [[ack-and-redelivery]] · [[stream]] · [[retention-policies]] · [[priority-groups]] ·
@@ -127,4 +144,5 @@ while workers are idle, `max_ack_pending` is your bottleneck.
 
 ## Sources
 
-[[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]]
+[[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
+[[s-docs-filtering]]

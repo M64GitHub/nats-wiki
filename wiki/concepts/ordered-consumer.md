@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ordered-consumer, ephemeral, heartbeats, gap-detection]
 aliases: [ordered consumer, OrderedConsumer]
-sources: [s-gh-5243-kv-watchers-at-scale, s-adr-17-ordered-consumer, s-adr-8-key-value-store]
+sources: [s-gh-5243-kv-watchers-at-scale, s-adr-17-ordered-consumer, s-adr-8-key-value-store, s-docs-reading-back, s-docs-kv-watching]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -84,6 +84,25 @@ replicating because it is rebuilt on failure — see the consumer-replica rules 
   `idle_heartbeat` of 5s and `ack_wait` of ~22h are **client defaults described in the ADR**, not
   server defaults, and individual clients may differ.
 
+## The plain ephemeral it is built on
+
+An ordered consumer is a client construct over an **ephemeral** consumer, and the ephemeral's own
+rule is the one that makes the construct necessary: "an ephemeral consumer keeps no position you can
+return to… it's removed once it goes idle, and a reconnect then starts over from the beginning"
+(source: [[s-docs-reading-back]]). The `nats` CLI builds one whenever `nats sub` is given a JetStream
+flag such as `--all`, which is why a one-off replay costs nothing to clean up — and why it is the
+wrong tool for a reader that must resume ([[consumer]]).
+
+**A KV watch is one of these, and its lifecycle is the watch's.** "Opening the watch creates it, and
+closing the watch removes it" — which is why a watch is live state and never a point read, and why
+using one to fetch a single value "pays for a consumer and a snapshot" that [[direct-get]] would have
+answered outright (source: [[s-docs-kv-watching]]; [[key-value]]).
+
+**Two readers do not share the work.** "Each reader gets its own ordered consumer with its own
+position, so two processes reading this way both read the whole stream — they don't split it." That
+is a fan-out, not a pool; to share work use a named consumer and a [[worker-pool]]
+(`learn/jetstream/ordered-consumer.md`, spot-checked 2026-08-31; that page has not been ingested).
+
 ## Related
 
 [[consumer]] · [[key-value]] · [[ack-and-redelivery]] · [[replicas]] · [[jetstream-sizing]] ·
@@ -91,4 +110,5 @@ replicating because it is rebuilt on failure — see the consumer-replica rules 
 
 ## Sources
 
-[[s-adr-17-ordered-consumer]] · [[s-adr-8-key-value-store]] · [[s-gh-5243-kv-watchers-at-scale]]
+[[s-adr-17-ordered-consumer]] · [[s-adr-8-key-value-store]] · [[s-gh-5243-kv-watchers-at-scale]] ·
+[[s-docs-reading-back]] · [[s-docs-kv-watching]]

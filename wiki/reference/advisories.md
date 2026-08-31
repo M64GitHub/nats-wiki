@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -58,6 +58,13 @@ events. Source: `server/jetstream_api.go` at v2.14.6
 | stream leader elected | `$JS.EVENT.ADVISORY.STREAM.LEADER_ELECTED` | 289 |
 | **stream quorum lost** | `$JS.EVENT.ADVISORY.STREAM.QUORUM_LOST` | 292 |
 | batch abandoned | `$JS.EVENT.ADVISORY.STREAM.BATCH_ABANDONED` | 295 |
+
+**`BATCH_ABANDONED` is the only notice you get for one of the three ways an atomic batch ends.** A
+sequence gap or an over-limit batch comes back to the publisher as an error `PubAck`; a batch that
+goes **ten seconds without a message** is dropped with **no error reply at all**, and this advisory
+is raised instead. So a publisher that only reads `PubAck`s cannot tell a stalled batch from a slow
+one — subscribe to the advisory, or treat the committing `PubAck` as the sole proof
+(source: [[s-docs-advanced-publishing]]; [[publishing]]).
 
 ### Server and API
 
@@ -205,4 +212,5 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-jetstream-resources]] ·
 [[s-nats-server-jetstream-log-warnings]] ·
 [[s-adr-61-meta-quorum-rescue]] ·
-[[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]]
+[[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
+[[s-docs-advanced-publishing]]

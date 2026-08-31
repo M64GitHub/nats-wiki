@@ -26,7 +26,8 @@ exists to answer live in `inbox/question-bank.md`.
 - [[replicas]] — R=1/R=3/R=5, what a `PubAck` promises, `sync_interval`, and why replicas are a
   durability knob rather than a throughput one.
 - [[key-value]] — a KV bucket is the stream `KV_<bucket>`: fixed properties, why a delete grows the
-  bucket, no read-after-write, and what watch and key listing really are.
+  bucket, no read-after-write, and what watch and key listing really are. Plus compare-and-swap, the
+  lock-and-lease it composes into, and when a bucket is the wrong tool.
 - [[object-store]] — a bucket is the stream `OBJ_<bucket>` holding chunks and info in two subject
   spaces; 128k chunks, SHA-256 digests, and the features that do not exist.
 - [[ordered-consumer]] — the ephemeral, memory-backed, R1 client construct that rebuilds itself on a
@@ -37,6 +38,11 @@ exists to answer live in `inbox/question-bank.md`.
   that are documented but unimplemented.
 - [[account]] — the absolute boundary: `$G` and `$SYS`, per-account JetStream, why a cross-account
   request fails as `No responders`, and the three `no_auth_user` traps.
+- [[publishing]] — what a `PubAck` proves and what it does not; `Nats-Msg-Id` and the two-minute
+  duplicate window as the honest limit of "exactly once"; the async order trap; and the four publish
+  modes, including atomic batch (2.12) and fast ingest (2.14).
+- [[subject-transforms]] — rewriting the subject a message is stored under, deterministic sharding
+  with `{{partition(n,1)}}`, and republish with its five headers and its `10052` cycle check.
 - [[direct-get]] — the point read answered by any replica: `allow_direct`, the two subjects, batch
   and `EOB`, and why it can never confirm a write.
 - [[mirrors-and-sources]] — exact read-only copy vs merged aggregate; `Lag` as your RPO, the four
@@ -118,6 +124,8 @@ exists to answer live in `inbox/question-bank.md`.
 - [[how-clients-reach-a-cluster]] — seed URLs versus what the server advertises: the three designs
   (discovery on, one VIP with `no_advertise`, per-node `client_advertise`), and why Kubernetes ships
   with discovery off.
+- [[kubernetes-storage]] — one PVC per replica on block storage, never `hostPath` and never NFS; the
+  chart values that implement it, and the `max_file_store` ceiling the chart sets equal to the volume.
 
 ## Gotchas
 
@@ -265,6 +273,31 @@ exists to answer live in `inbox/question-bank.md`.
   `max_ack_pending` vs batch size.
 - [[s-docs-retention-policies]] — the three retention values, the WorkQueue consumer rules
   (10099 / 10100), Interest filling the disk.
+- [[s-docs-publishing]] — the `PubAck`'s three fields, why a timeout means "unknown" and
+  `no responders` means "nothing stored", and the two-minute duplicate window stated in prose.
+- [[s-docs-advanced-publishing]] — async, atomic batch and fast ingest: the `Nats-Batch-*` headers,
+  the ten-second stall that abandons a batch silently, the `gap: ok` mode that loses data by design,
+  and the `persist_mode: async` incompatibility.
+- [[s-docs-shaping-the-stream]] — the three limits as independent ceilings, `max_age` as the one that
+  never rejects a publish, and the third rejection string.
+- [[s-docs-altering-stream-state]] — `rmm` securely erases where `DeleteMsg` does not, purge does not
+  rewind the counter, and a sequence is a stable address.
+- [[s-docs-subject-mapping]] — the transform language, deterministic partitioning, republish's five
+  headers, and the loops the server cannot always catch.
+- [[s-docs-reading-back]] — stream sequence vs consumer sequence, the metadata that rides on every
+  message, and `replay: original`.
+- [[s-docs-filtering]] — a filter that matches nothing fails silently, and the two meanings of
+  "overlap".
+- [[s-docs-kv-under-the-hood]] — the `KV_<bucket>` stream config as the server prints it, the literal
+  direct-get subject, and the hole `deny_delete` does not close: a raw publish.
+- [[s-docs-kv-watching]] — snapshot-then-live, the end-of-initial-data signal in five client shapes
+  (Rust has none), and why `widget-*` matches nothing.
+- [[s-docs-kv-history-and-revisions]] — the revision counter is **bucket-wide**, and CAS is two
+  operations: `create` against revision 0, `update` against a named one.
+- [[s-docs-kv-ttl-and-limits]] — per-key TTL is create-only and a later `put` silently makes the key
+  permanent; the three bucket limits reject rather than evict.
+- [[s-docs-kv-your-first-bucket]] — `--history 1` is the default, and bucket names have a narrower
+  charset than keys.
 - [[s-docs-policies]] — the nine stream and consumer policies and which five are fixed at creation.
 - [[s-docs-surviving-node-loss]] — R=1/R=3/R=5, odd counts, storage durability, consumer replica
   rules, replicas ≠ throughput.
@@ -318,6 +351,10 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-topology]] — the topology layer: no default port on any of the three listener
   blocks, the system account a composed server must have, geo-affinity as an exclusion list, the
   fast-producer stall and its two counters, and what a leafnode user may carry.
+- [[s-nats-server-tls-reload]] — eight runs on the v2.14.6 binary settling whether a reload picks up
+  a renewed certificate: it does, on a client listener and on a leafnode remote, in both shapes of
+  the change — but the log lines, `config_digest` and the signal's exit status say nothing either
+  way, and a refused reload looks identical to a successful one.
 - [[s-nats-server-defaults-sweep]] — all 216 documented defaults compared with the source at
   v2.14.6: leafnode compression is `s2_auto` and not `accept`, `mqtt.max_ack_pending` is 1024 and
   not 100, `mqtt.port` has no default at all, and why a use-site default is invisible in `/varz`.
@@ -393,6 +430,10 @@ exists to answer live in `inbox/question-bank.md`.
   maintainer's rule, and the bug fix it turned into (**2.10.2**).
 - [[s-gh-7854-jwt-push-timeout]] — an account push that times out with nothing in the log, and a
   maintainer's working `nats auth` sequence.
+- [[s-gh-7749-hostpath-jetstream]] — `hostPath` or a PVC for JetStream on Kubernetes, answered five
+  months later by a community member and never by a maintainer; the provenance is on the page.
+- [[s-k8s-760-jetstream-pvc-per-replica]] — from `nats-io/k8s`: why the chart gives each replica its
+  own PVC, and the one public maintainer statement ruling out NFS for JetStream.
 - [[s-gh-7684-certificate-expiry]] — why `openssl s_client` returns nothing against port 4222, and
   the `/varz` field that was added because of this thread.
 - [[s-gh-7505-auth-callout-nkey]] — no, the server does not verify `connect_opts.nkey`. Treat every
@@ -520,7 +561,9 @@ exists to answer live in `inbox/question-bank.md`.
 **The Helm chart**
 
 - [[s-nats-helm-chart-values-2.14.6]] — the chart's own `values.yaml` at its release tag: lame-duck
-  timing with zero slack, the reloader's `/etc/`-only watch, and `configChecksumAnnotation`.
+  timing with zero slack, the reloader's `/etc/`-only watch, `configChecksumAnnotation`, the
+  JetStream storage block with no `hostPath` value anywhere in it, and `max_file_store` rendered
+  equal to the PVC size.
 
 **GitHub issues — `nats-io/nats-server`**
 

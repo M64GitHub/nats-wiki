@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [reload, SIGHUP, dry-run, include, reloader, configmap, accounts, max_subscriptions]
 aliases: [reload, SIGHUP, "config reload", "reload config", "add an account", "nats-server --signal reload"]
-sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology]
+sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -97,6 +97,18 @@ nats-server -c /etc/nats-server.conf -t && systemctl reload nats-server
 The dry-run parses the file and exits without touching the running server: valid prints
 `nats-server: configuration file ... is valid` and exits zero, broken prints the parse error with the
 offending line and exits non-zero — which is what makes it usable as a gate in a script.
+
+**Gate on the dry-run, not on the signal.** `nats-server --signal reload` **exits 0 even when the
+server refused the reload**. The refusal is in the server's log and nowhere else:
+
+```
+[ERR] Failed to reload server configuration: nats.conf:5:1: error parsing X509 certificate/key pair: tls: private key does not match public key
+```
+
+Observed on the v2.14.6 binary (source: [[s-nats-server-tls-reload]]). The refusal is safe — the
+previous configuration stays active and the server keeps serving — but a script that treats the
+signal's exit status as "applied" will report success for a change that never landed. Nor do the
+`Reloaded:` lines help: a reload that changed nothing prints the same ones.
 
 **What `-t` does not check is whether the server can *start*.** "A JetStream cluster missing
 `server_name` or `routes` passes `-t` yet still fails to boot."
@@ -195,7 +207,8 @@ control; that is the rollback.
 ## Pitfalls
 
 **Never SIGHUP an unvalidated config.** The server would keep the old one anyway, but the failure
-belongs in your terminal, not in the server log at 3am.
+belongs in your terminal, not in the server log at 3am — and it is the *only* place it will appear,
+since the signal command exits 0 regardless (source: [[s-nats-server-tls-reload]]).
 
 **Lowering a store limit does not evict data.** Drop an account's `max_file` below what a stream
 already holds, reload, and the messages stay while **new writes fail** until someone trims the stream
@@ -212,7 +225,10 @@ the per-account `accounts.…max_subscriptions` are different keys with differen
 
 **A certificate that has already expired is not a reload problem.** Rotation *is* a reload — replace
 the file, SIGHUP, and new handshakes present the new certificate while open connections keep their
-session. But once the certificate has expired the server presents a dead one and **every new
+session. That much is measured, not assumed: at v2.14.6 the reload picks up a replaced `cert_file` on
+a client listener and on a leafnode remote alike, but `config_digest` and every log line stay
+identical to a no-op reload's, so `/varz`'s `tls_cert_not_after` is the only confirmation
+(source: [[s-nats-server-tls-reload]]). But once the certificate has expired the server presents a dead one and **every new
 connection and every reconnect fails the handshake** until you drop in a valid file and reload. Track
 expiry; rotate with margin ([[rotate-tls-certificates]]).
 
@@ -230,4 +246,5 @@ confirm the sidecar actually watched the path you changed.
 ## Sources
 
 [[s-docs-config-management]] · [[s-nats-server-signals]] · [[s-nats-helm-chart-values-2.14.6]] ·
-[[s-docs-hardening]] · [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-topology]]
+[[s-docs-hardening]] · [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-topology]] ·
+[[s-nats-server-tls-reload]]

@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -257,6 +257,20 @@ The full procedure, including what the docs cannot tell you and what this wiki c
 [[cross-domain-sourcing]].
 
 
+## Transforming subjects while copying
+
+Each `sources` entry, and a `mirror`, can carry its own **subject transform**, so messages can be
+re-namespaced as they are copied — prefixing every region's orders as they merge into one aggregate,
+for instance. The template language and the two other places it is used are on
+[[subject-transforms]]; the config fields are the per-source `subject_transforms`
+(source: [[s-docs-subject-mapping]], [[s-docs-stream-config]]).
+
+**Two constraints that come from elsewhere and land here.** A mirror **cannot also be a
+batch-publish target** — the server refuses the config with
+`10209 stream mirrors can not also use batch publishing` ([[error-codes]], [[publishing]]). And a
+stream that is a mirror or a source **never gets the default `duplicate_window`** substituted, which
+is why deduplication behaves differently on a copy than on the original ([[stream]]).
+
 ## Related
 
 The promotion procedure that turns a mirror into a writable primary is [[disaster-recovery]];
@@ -273,4 +287,4 @@ what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]
 
 ## Sources
 
-[[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]] · [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-60-reliable-sourcing]]
+[[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]] · [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-60-reliable-sourcing]] · [[s-docs-subject-mapping]]

@@ -3,12 +3,12 @@ title: "nats Helm chart nats-2.14.6 — values.yaml"
 type: summary
 area: [deploy, topology]
 source-url: https://github.com/nats-io/k8s/blob/nats-2.14.6/helm/charts/nats/values.yaml
-source-path: raw/github-repos/nats-io__k8s.values-nats-2.14.6.md, raw/github-repos/nats-io__k8s.values-advertise-nats-2.14.6.md
+source-path: raw/github-repos/nats-io__k8s.values-nats-2.14.6.md, raw/github-repos/nats-io__k8s.values-advertise-nats-2.14.6.md, raw/github-repos/nats-io__k8s.values-jetstream-storage-nats-2.14.6.md
 author: nats-io/k8s maintainers
-article: "helm/charts/nats/values.yaml at chart release nats-2.14.6"
+article: "helm/charts/nats/values.yaml and files/config/jetstream.yaml at chart release nats-2.14.6"
 date: 2026-08-28          # chart release publish date
 version: "2.14.6"
-tags: [helm, lameDuckDuration, terminationGracePeriodSeconds, reloader, configChecksumAnnotation, noAdvertise, service, ClusterIP]
+tags: [helm, lameDuckDuration, terminationGracePeriodSeconds, reloader, configChecksumAnnotation, noAdvertise, service, ClusterIP, fileStore, pvc, max_file_store, hostPath]
 aliases: []
 sources: []
 created: 2026-08-31
@@ -102,6 +102,50 @@ the file is under `websocket`. The word `advertise` appears in the file **only**
 above: the chart defines no `advertise` section itself, so external connectivity is left entirely to
 the operator.
 
+**JetStream storage: one PVC per replica, and no `hostPath` anywhere in the chart.** Read for
+question-bank row **Q65** (extract:
+`raw/github-repos/nats-io__k8s.values-jetstream-storage-nats-2.14.6.md`):
+
+```yaml
+  jetstream:
+    enabled: false
+    fileStore:
+      enabled: true
+      dir: /data
+      pvc:
+        enabled: true
+        size: 10Gi
+        storageClassName:
+      # defaults to the PVC size
+      maxSize:
+    memoryStore:
+      enabled: false
+      maxSize: 1Gi
+```
+
+`grep` for `hostPath` and `emptyDir` across all 741 lines of `values.yaml` returns **nothing**. The
+chart offers a PVC per replica through `volumeClaimTemplates` or `fileStore.pvc.enabled: false`,
+which leaves `store_dir: /data` on whatever the pod's filesystem gives it; anything else has to go
+through the `merge:` / `patch:` escape hatches. `storageClassName` is empty, so the cluster's default
+class is used unless you name one.
+
+**And the chart renders `max_file_store` equal to the PVC size.** From
+`files/config/jetstream.yaml`, complete for the file store:
+
+```
+{{- if .maxSize }}
+max_file_store: << {{ .maxSize }} >>
+{{- else if .pvc.enabled }}
+max_file_store: << {{ .pvc.size }} >>
+{{- end }}
+```
+
+With the defaults that is `max_file_store: 10Gi` on a 10Gi volume — **no margin**, which is the exact
+arrangement `inbox/docs-issues.md` #33 shows to be unsafe, because every JetStream storage figure is
+logical while the directory on disk is larger ([[filestore-layout]]). `fileStore.maxSize` is the
+value to set, and the chart's comment ("defaults to the PVC size") does not say why you would.
+`memoryStore.enabled: false` renders `max_memory_store: 0`.
+
 ## Practical takeaways
 
 - **On Kubernetes, discovery is off unless you turn it on**, and turning it on is wrong while
@@ -114,6 +158,9 @@ the operator.
 - **A certificate mounted outside `/etc/` is invisible to the reloader**, so a rotation lands on disk
   and nothing signals the server — the failure looks like "reload doesn't work", not like a mount
   problem.
+- **Leave the chart's storage layout alone and set `fileStore.maxSize` below the PVC size.** One PVC
+  per replica is the design ([[s-k8s-760-jetstream-pvc-per-replica]]); the default that needs
+  changing is the ceiling, not the volume.
 - **Pin claims to the chart release, not to `main`.** The chart is versioned in step with the server
   (`nats-2.14.6`, published 2026-08-28); quoting `main` dates a claim to a moving target.
 
@@ -125,9 +172,10 @@ The Kubernetes sections of [[upgrade-a-cluster]] and [[reload-server-config]], t
 ## Questions it answers
 
 Contributes to **Q63** (the Kubernetes half of a rolling upgrade), **Q54**, and **Q67**
-(LoadBalancer or seed URLs on Kubernetes), which [[how-clients-reach-a-cluster]] answers.
+(LoadBalancer or seed URLs on Kubernetes), which [[how-clients-reach-a-cluster]] answers. Supplies
+the chart half of **Q65** (`hostPath` or a PVC), answered on [[kubernetes-storage]].
 
 ## Pages touched
 
 [[nats-helm-charts]] · [[upgrade-a-cluster]] · [[reload-server-config]] · [[install-nats-server]] ·
-[[how-clients-reach-a-cluster]]
+[[how-clients-reach-a-cluster]] · [[kubernetes-storage]] · [[jetstream-out-of-disk]]

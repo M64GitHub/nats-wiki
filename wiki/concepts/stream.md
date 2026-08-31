@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -25,10 +25,13 @@ subjects, assigns each one a monotonically increasing sequence number, and keeps
   stream with `sources` may have one (source: [[s-docs-stream-config]]).
 - Publishing into a stream is a **request**: the server answers with a `PubAck` carrying the
   assigned sequence. `nats pub --jetstream` waits for it; a plain `nats pub` is a core NATS publish
-  and does not (source: [[s-docs-replication-and-r3]]).
+  and does not (source: [[s-docs-replication-and-r3]], [[s-docs-publishing]]). What the ack proves,
+  the four publish modes, and duplicate suppression are on [[publishing]].
 - Messages are **immutable and ordered by stream sequence**. A message leaves the stream only when
   a limit removes it, when [[retention-policies|retention]] decides consumers are finished with it,
   or when it is deleted or purged by hand.
+- **The subject a message is stored under is not always the subject it was published to.** A stream
+  subject transform rewrites it on the way in — see [[subject-transforms]].
 - With more than one replica the stream has a **leader** that takes every write; see
   [[replicas]] and [[raft-in-nats]].
 - Reads are independent of writes: each [[consumer]] keeps its own cursor over the one shared copy
@@ -120,6 +123,20 @@ across, but a mirror is read-only and turning it into a publishable replacement 
 - **Limits do not overlap with retention** — they are a second, independent way a message leaves.
   On an `interest` or `workqueue` stream the limits are the backstop that keeps the stream bounded
   when consumers fall behind (source: [[s-docs-retention-policies]]).
+- **The three limits are independent and all active at once; the first one reached wins**
+  (source: [[s-docs-shaping-the-stream]]). So *"a seven-day `max_age` does not guarantee seven days
+  of history"* — a traffic spike can reach `max_bytes` first and discard messages hours old. Size
+  `max_bytes` for peak traffic, not average, whenever the age window is a promise you made.
+- **`max_age` is not a discard-policy choice.** `discard` decides what happens when a **size or
+  count** limit is hit; `max_age` "expires stored messages on its own timer under either policy".
+- **Whole-stream limits do not balance across subjects.** `orders.created` and `orders.shipped` count
+  against one ceiling, so under `discard: old` a flood of one can evict the other. The per-subject
+  ceiling is `max_msgs_per_subject`.
+- **`discard: new` does not make a full *subject* reject.** By default a per-subject limit still
+  rolls, discarding that subject's oldest message. Making it reject takes `discard_new_per_subject`
+  **on top of** `discard: new`, and then a publish past the ceiling fails with
+  `maximum messages per subject exceeded` — the third rejection string alongside the whole-stream
+  `maximum bytes exceeded` and `maximum messages exceeded` ([[maximum-messages-exceeded]]).
 - **A `PubAck` on a replicated stream means a quorum holds the write, not that it is on disk.**
   JetStream batches disk syncs on `sync_interval`, which defaults to `2m`. See [[replicas]] and
   [[raft-in-nats]] (source: [[s-docs-replication-and-r3]]).
@@ -128,6 +145,38 @@ across, but a mirror is read-only and turning it into a publishable replacement 
   a stream's on-disk files, and a memory stream has none, so `nats stream backup` fails with
   `snapshot failed: no impl` (**10064**) — [[backup-and-restore-jetstream]]. Since `storage` is fixed
   at creation, this is decided once and for good.
+
+## Sequences are addresses, and they are never reused
+
+`1`, then `2`, then `3`, "and the server never hands `2` out again to a future message"
+(source: [[s-docs-altering-stream-state]]). Four consequences, and the last two are the ones that
+break code:
+
+- **A delete or a purge leaves a permanent hole.** Delete sequence 2 and 1 and 3 stay exactly where
+  they were; the server does not renumber to close the gap.
+- **A purge does not rewind the counter.** It "sets the stream's first sequence to one past its
+  last", so after emptying a stream the next publish continues from where it stopped, not from `1`.
+- **A stored sequence is a stable external reference.** Save "order `ord_8w2k` is at sequence 2"
+  beside your business record and that pointer "either still points at the same message or points at
+  nothing. It never points at a different message."
+- **A count is not a sequence.** Do not compute "the next message" as `count + 1`, and do not read a
+  message count as the highest sequence. On any stream that has ever lost a message they differ.
+- **A KV revision is one of these numbers.** That is why a bucket's revision counter is bucket-wide
+  rather than per key: writes to any key take the next stream sequence, so one key's revisions are
+  `2`, `5`, `9` and the gaps are other keys (source: [[s-docs-kv-history-and-revisions]];
+  [[key-value]]).
+
+Consumers cope with the gaps without help: a consumer "never blocks waiting for a deleted message,
+and a missing `2` is not redelivered" ([[consumer]]).
+
+**Removing a message by hand has two costs, and the CLI picks the expensive one.**
+`nats stream rmm <stream> <seq>` **securely erases**: the server overwrites the stored bytes so the
+old contents cannot be read back — the right default for data that should never have been stored.
+The client libraries default the other way: `DeleteMsg(seq)` marks the message erased and leaves its
+bytes until they are later overwritten, while `SecureDeleteMsg(seq)` overwrites immediately and is
+slower for it. **The only difference the server sees is a single `no_erase` flag on the delete
+request** (source: [[s-docs-altering-stream-state]]). If you are deleting a message *because* of what
+it contained, make sure you used the erasing form.
 
 ## The API
 
@@ -144,7 +193,13 @@ as `0`, described only as "0 for default" — it does not say what the server su
 The substituted default is **2 minutes** — `StreamDefaultDuplicatesWindow`, `server/stream.go:1658`
 at **v2.14.6** (source: [[s-nats-server-constants-2.14.6]]). Synadia stated the same value in a post
 dated 2025-08-08 (source: [[s-synadia-jetstream-memory-patterns]]); the source read confirms it for
-2.14.
+2.14. **The docs state it too, in prose, in the `learn` chapter** — "the duplicate-tracking window is
+two minutes by default" (source: [[s-docs-publishing]]) — so the gap is narrower than first recorded:
+the value is missing from the generated reference where the field is *defined*, not from the docs as
+a whole. `inbox/docs-issues.md` #5 has been corrected accordingly.
+
+**What a publisher must do to use the window** — a stable `Nats-Msg-Id`, and what the guarantee is
+and is not — is on [[publishing]].
 
 It applies **only** when the stream sets no window of its own **and is neither a mirror nor a
 source** (`stream.go:1750`), and is then clamped down by the account or server `Duplicates` limit if
@@ -158,11 +213,8 @@ JetStream's memory footprint — see [[jetstream-sizing]].
 
 ## To verify
 
-- The interaction between `duplicate_window` and exactly-once publishing (question-bank Q23) is not
-  covered by any source ingested yet. The window's length is now established; what a publisher must
-  do to make use of it is not.
-- **The docs never state this default.** The `StreamConfig` schema says only "0 for default" —
-  recorded as issue 5 in `inbox/docs-issues.md`.
+- The `duplicate_window` clamps in **pedantic mode** are read from the source; no run has confirmed
+  which of the two clamps errors first when both apply.
 
 ## What a stream's reported `bytes` actually counts
 
@@ -199,5 +251,9 @@ and the newest message block is never compacted. See [[filestore-layout]] for th
 [[s-adr-35-filestore-compression]] ·
 [[s-nats-server-snapshot-restore]]
 
+[[s-nats-server-filestore-layout]] · [[s-docs-publishing]] · [[s-docs-advanced-publishing]] ·
+[[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] · [[s-docs-subject-mapping]] ·
+[[s-docs-reading-back]] · [[s-docs-kv-history-and-revisions]]
+
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]]. · [[s-nats-server-filestore-layout]]
+[[nats-server-2.14]].

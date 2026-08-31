@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [permissions, allow, deny, default_permissions, allow_responses, queue-group, _INBOX, "$JS.API"]
 aliases: [permissions, authorization, allow list, deny list, publish permissions, subscribe permissions, default_permissions, allow_responses]
-sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist]
+sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -138,6 +138,24 @@ The second is diagnostic. Three of this wiki's silent-failure gotchas are permis
 other clothes: a JetStream command that times out, a subscriber missing one branch of a wildcard, and
 a request that never gets a responder.
 
+## A KV bucket needs an ACL, not just `deny_delete`
+
+A [[key-value]] bucket is created with `deny_delete: true`, which blocks the JetStream message-delete
+API so nothing removes entries behind the KV API's back. **It does not stop a publish.** A raw
+`nats pub` to `$KV.<bucket>.<key>` lands a bare message with none of the headers the KV API sets — no
+expected-revision header, no `KV-Operation`, no `Nats-Rollup` — so "a watcher can't tell it from a
+real put and a purge you meant never happens" (source: [[s-docs-kv-under-the-hood]]).
+
+The only thing that actually prevents it is a permission. Deny publish on the bucket's subject space
+to everything except the KV clients:
+
+```
+publish: { deny: ["$KV.>"] }
+```
+
+The same reasoning applies to `$O.>` for an [[object-store]] bucket. This is a case where the
+protective-looking stream setting and the protection an operator needs are two different mechanisms.
+
 ## Related
 
 [[account]] · [[operator-mode]] · [[auth-callout]] · [[tls-in-nats]] · [[cross-account-sharing]] ·
@@ -146,4 +164,4 @@ a request that never gets a responder.
 ## Sources
 
 [[s-docs-authorization]] · [[s-docs-authentication-basics]] · [[s-gh-5044-restrict-durable-consumers]] ·
-[[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]]
+[[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] · [[s-docs-kv-under-the-hood]]

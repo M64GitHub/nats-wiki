@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [kv, watch, ephemeral-consumers, consumer-churn, readloop, healthz, meta-layer, unresolved]
 aliases: ["Consumer assignment not cleaned up retrying", "Readloop processing time", "too many KV watchers", "kv watcher misses updates", "1000 watchers"]
-sources: [s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-nats-server-jetstream-log-warnings, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns]
+sources: [s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-nats-server-jetstream-log-warnings, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-docs-kv-watching]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -120,6 +120,20 @@ releases since 2.10.12; an upgrade is a reasonable first move and is untested fo
   mechanism [[ordered-consumer]] describes — a consumer that detects a gap and rebuilds itself — is a
   candidate cause and remains unverified.
 
+## The cheaper thing the watcher was probably standing in for
+
+Two shapes on this page's causes are really the same design mistake: **a watch used where a read
+would do.** The docs are explicit that a watch "is live state, not a point read… Don't open a watch,
+read the first entry, and close it to fake a point read; you pay for a consumer and a snapshot to get
+one value get would have handed you directly" (source: [[s-docs-kv-watching]]). A KV get is a
+[[direct-get]] — one request, one reply, no consumer.
+
+The second cheap substitution is the **filter**. A watch's key filter narrows both the snapshot and
+the live stream, so a filtered watch is genuinely a smaller consumer, not a client-side filter over
+everything. But it only works if the keys were named for it: `*` matches a **whole token**, so
+`widget-*` over flat hyphenated keys matches nothing at all, while `widget.*` over dotted keys
+matches. That naming decision is made once, before the first put ([[key-value]]).
+
 ## Prevention
 
 - Treat a KV watch as a **consumer**, and count them the way you would count consumers.
@@ -145,5 +159,7 @@ releases since 2.10.12; an upgrade is a reasonable first move and is untested fo
 - [[s-gh-5243-kv-watchers-at-scale]] — the thread, its logs and its stream report. Unanswered.
 - [[s-gh-6746-watch-many-keys]] — watching several keys on one watcher.
 - [[s-nats-server-jetstream-log-warnings]] — the `not cleaned up, retrying` format string at v2.14.6.
-- [[s-adr-8-key-value-store]] — a watch is an ordered consumer.
+- [[s-adr-8-key-value-store]]
+- [[s-docs-kv-watching]] — what a watch delivers, and the two cheaper
+  substitutions (a get, and a filter the keys were named for). — a watch is an ordered consumer.
 - [[s-synadia-jetstream-anti-patterns]] — the consumer and filter-subject thresholds.

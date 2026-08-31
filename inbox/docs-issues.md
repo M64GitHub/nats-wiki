@@ -29,7 +29,7 @@ and the docs tree fetched **2026-08-31**. Where a row says *observed*, the behav
 v2.14.6 binary**, not only read from the source at that tag; the configs and output are in
 `raw/nats-server-src/topology-observed-v2.14.6.md` and, for rows 30–31,
 `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`; for row 33,
-`raw/nats-server-src/filestore-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
+`raw/nats-server-src/filestore-observed-v2.14.6.md`. Row 34 was found while working step 1 of `inbox/plan-the-unread-chapters-2026-08-31.md` — the question-bank row **Q97** run on the binary rather than read — and its evidence is in `raw/nats-server-src/tls-reload-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
 the client repository at its current release plus the package registry, not the server — stated per
 row.
 
@@ -39,7 +39,7 @@ row.
 | 2 | Pinned advisory subject is `GROUP_PINNED`; the server publishes `PINNED` | `reference/jetstream/advisory/consumer-group-pinned.md` | wrong-value | ★ high | wiki uses the server value |
 | 3 | Unpinned advisory subject is `GROUP_UNPINNED`; the server publishes `UNPINNED` | `reference/jetstream/advisory/consumer-group-unpinned.md` | wrong-value | ★ high | wiki uses the server value |
 | 4 | Consumer config object is collapsed, so **no consumer default is readable** anywhere in the reference | `reference/jetstream/api/consumer/create.md` | missing | high | wiki reads the server source instead |
-| 5 | `duplicate_window` default documented only as "0 for default" — the substituted value is never stated | `reference/jetstream/api/stream/create.md` | missing | medium | wiki reads the server source instead |
+| 5 | `duplicate_window` default documented only as "0 for default" in the generated reference, where the field is defined — the substituted value **is** stated, in prose, three pages away in the `learn` chapter | `reference/jetstream/api/stream/create.md` | missing | low | wiki states the value and cites both |
 | 6 | `max_payload` "not recommended" over 8MB without saying what actually happens | `reference/config/max_payload.md` | enhancement | low | wiki states the real behaviour |
 | 7 | ADR-42 is tagged `2.11` but describes the `prioritized` policy, which shipped in 2.12 | `nats-architecture-and-design` ADR-42 | wrong-value | medium | wiki corrects the attribution |
 | 8 | `nats.net` is described as ".NET 6+"; the current client **dropped `net6.0`** | `concepts/ecosystem.md` | wrong-value | medium | wiki states the v3 target frameworks |
@@ -68,6 +68,7 @@ row.
 | 31 | The connection spec's **Servers discovery** section is two paragraphs, a truncated sentence and a `TODO`, in an ADR marked *Implemented* — so what a server advertises to clients is stated nowhere public; `max reconnects` also has no readable default (`**default: 3 / none`) | `nats-architecture-and-design` ADR-40 | missing | medium | wiki observes the `INFO` directly and records what the server sends |
 | 32 | Every `unsigned 64 bit integer` field in the generated JetStream reference publishes `Maximum: 18446744073709552000` — **385 more than uint64 can hold**, and a value the server cannot accept. 11 pages, all of them | `reference/jetstream/api/*`, `reference/jetstream/advisory/*`, `reference/jetstream/metric/consumer-ack.md` | wrong-value | low | wiki quotes no maximum from these pages |
 | 33 | The sizing chapter tells operators to pin `max_file_store` to the volume size, and never says that **every JetStream storage figure is logical, not physical** — a server set to `max_file_store: 4MB` was measured holding 3.79 MB on disk while reporting 133,000 bytes used. The per-message record overhead (`30 + len(subject)`) is also stated nowhere in the tree | `learn/deployment/sizing-and-resources.md`, `reference/config/jetstream/max_file_store.md` | missing | ★ high | wiki states the arithmetic and the slack, observed |
+| 34 | Six leafnode-remote TLS keys carry a bug note scoped to "2.11/2.12" and never say whether it still applies; on **2.14.6** `cert_file`, `key_file` and `ca_file` all reload correctly, so the note now reads as a standing warning against the supported rotation procedure | `reference/config/leafnodes/remotes/tls/cert_file.md` + 5 siblings | enhancement | medium | wiki states the observed 2.14.6 behaviour and names the three keys it did not test |
 
 ---
 
@@ -173,11 +174,35 @@ of its own and is neither a mirror nor a source (`stream.go:1750`), clamped down
 `Duplicates` limit and by `max_age` if either is smaller.
 
 **Impact:** deduplication window is both a correctness setting and a **memory** setting — the server
-holds the tracked message IDs in RAM. A reader sizing a high-cardinality publisher cannot find the
-number they are sizing against. The only public statement of "2 minutes" found anywhere was a
-Synadia blog post from 2025-08-08.
+holds the tracked message IDs in RAM.
 
-**Suggested fix:** state the substituted value, and ideally the conditions under which it applies.
+**Corrected 2026-08-31, and the correction narrows this row.** When it was first written, the only
+public statement of "2 minutes" found anywhere was a Synadia blog post from 2025-08-08. Reading the
+`learn/jetstream` chapter for plan step 2 found the value stated plainly, in **three** doc pages:
+
+```
+learn/jetstream/publishing.md
+  "The duplicate-tracking window is two minutes by default, so a retry that arrives after that
+   also stores a second copy."
+learn/jetstream/your-first-stream.md:447   Duplicate Window: 2m0s
+learn/jetstream/your-first-stream.md:499
+  "**Duplicate Window: 2m0s**. For two minutes after a message is stored, the server turns away a
+   second message that carries the same Nats-Msg-Id header."
+learn/jetstream/shaping-the-stream.md      Duplicate Window: 2m0s   (in a `nats stream info` block)
+```
+
+All three agree with the server (`StreamDefaultDuplicatesWindow = 2 * time.Minute`,
+`server/stream.go:1658` at v2.14.6). **So the docs are not wrong and the value is not missing from
+the tree — it is missing from the page where the field is defined**, which is the page a reader
+consults when they want a default. Severity drops from medium to low, and the kind stays `missing`
+because the reference page genuinely never states it.
+
+What remains genuinely undocumented anywhere is the *conditions*: the default applies only when the
+stream sets no window and is neither a mirror nor a source (`stream.go:1750`), and is then clamped
+down by the account `Duplicates` limit and by `max_age` if either is smaller.
+
+**Suggested fix:** state the substituted value on the reference page, and ideally the conditions
+under which it applies.
 
 ---
 
@@ -1575,6 +1600,25 @@ $ find <store> -type f -exec stat -f "%z %N" {} \;
 nothing is wrong with the stream. Scale that to the documented example and a 10 GiB
 `max_file_store` on a 10 GiB volume has no margin at all.
 
+**The Helm chart renders exactly this setting by default.** Found while scouting question-bank row
+Q65 on 2026-08-31. `helm/charts/nats/files/config/jetstream.yaml` at chart release **nats-2.14.6**:
+
+```
+{{- if .maxSize }}
+max_file_store: << {{ .maxSize }} >>
+{{- else if .pvc.enabled }}
+max_file_store: << {{ .pvc.size }} >>
+{{- end }}
+```
+
+`config.jetstream.fileStore.maxSize` is empty in `values.yaml` (its comment reads "defaults to the
+PVC size") and `fileStore.pvc.size` is `10Gi`, so a stock JetStream install comes up with
+`max_file_store: 10Gi` on a 10Gi volume — the docs' example, shipped. Extract:
+`raw/github-repos/nats-io__k8s.values-jetstream-storage-nats-2.14.6.md`. This is a *chart* default
+rather than a doc sentence, so it is not a separate row; it is recorded here because it is what most
+readers will actually be running, and because it means the fix has to be stated as "set
+`fileStore.maxSize`", not only as "pin `max_file_store`".
+
 **The second half: the per-message overhead is nowhere in the tree.** A stored message costs
 `30 + len(subject)` bytes beyond payload and headers (`fileStoreMsgSizeRaw`,
 `filestore.go:9821–9828`), plus `4 + len(headers)` when headers are present. That is **+40% on a
@@ -1606,13 +1650,86 @@ mention that it is also the compaction cadence.
 
 ---
 
+## 34 · Six leafnode-remote TLS keys warn about a bug without saying which releases still have it
+
+**Impact: an operator reading the reference concludes a leaf's certificate cannot be rotated without
+restarting the leaf.** On a hub-and-spoke that is a much larger operation than a reload, and on
+2.14.6 it is unnecessary.
+
+**What the docs say.** Six pages under `reference/config/leafnodes/remotes/tls/` carry a one-line
+caveat directly under `Hot Reloadable`:
+
+| page | the line |
+|---|---|
+| `cert_file.md` | "On 2.11/2.12 the reload succeeds but the old certificate keeps being used." |
+| `ca_file.md` | "On 2.11/2.12 the reload succeeds but nothing changes." |
+| `key_file.md` | "On 2.11/2.12 the reload succeeds but nothing changes." |
+| `cipher_suites.md` | "On 2.11/2.12 the reload succeeds but nothing changes." |
+| `curve_preferences.md` | "On 2.11/2.12 the reload succeeds but nothing changes." |
+| `insecure.md` | "On 2.11/2.12 the reload succeeds but nothing changes." |
+
+Two things are missing and both matter. The note names **2.11/2.12** — two releases back — and never
+says whether 2.14, the release the same tree documents, still behaves that way; and the sibling pages
+one level up say the opposite without qualification, so the tree contradicts itself depending on
+which page you land on:
+
+```
+reference/config/tls/cert_file.md
+  "Applies to new connections only; existing TLS sessions keep the old certificate."
+reference/config/leafnodes/tls/cert_file.md
+  "Applies to newly accepted leafnode connections only; existing connections keep the old
+   certificate until they reconnect."
+```
+
+**Observed, on the v2.14.6 binary** (full run in
+`raw/nats-server-src/tls-reload-observed-v2.14.6.md`, the leafnode section). A hub whose leafnode
+listener accepts exactly one certificate identity, so it reports which certificate the leaf
+presented:
+
+```
+leafnodes {
+  port: 7422
+  authorization { users: [ { user: "CN=leaf-A" } ] }
+  tls { cert_file: "c/hub-cert.pem"  key_file: "c/hub-key.pem"  ca_file: "c/ca1.pem"
+        verify_and_map: true  timeout: 5 }
+}
+```
+
+| what was changed on the leaf | after reload + re-handshake |
+|---|---|
+| `cert_file`+`key_file` **files** replaced in place (`CN=leaf-A` -> `CN=leaf-B`, same CA) | `User in cert ["CN=leaf-B"], not found` — the **new** certificate |
+| `cert_file`+`key_file` **paths** changed in the config | `User in cert ["CN=leaf-B"], not found` |
+| `ca_file` repointed at a CA that did not sign the hub | `tls: failed to verify certificate: x509: certificate signed by unknown authority` |
+
+Both controls are clean: restarting the hub with **no** reload leaves the leaf connected
+(`leafnodes: 1`), and reloading with **no** file change leaves it connected too. So each result above
+is caused by the change, not by the reload or the restart.
+
+**Sweep of the neighbours: 3 of the 6 caveated keys were tested, and all 3 reload.**
+`cipher_suites`, `curve_preferences` and `insecure` were **not** tested and this report claims
+nothing about them. The `deny_exports` / `deny_imports` pages in the same directory carry a
+differently-worded caveat — "on 2.11/2.12 the reload returns success; the new deny_exports take
+effect only after a restart" — which was also not tested.
+
+**Why this is filed as `enhancement` and not `wrong-value`.** The sentence is scoped to 2.11/2.12 and
+this wiki has not run those releases, so it is not demonstrably false — it is *unusable*. A caveat
+with no "fixed in" and no current-release status is read as current, and the reader's only safe
+response is to stop using reload for leafnode certificate rotation entirely.
+
+**Suggested fix:** give each of the six a resolution — "fixed in 2.14" where that is true, or a
+current-release statement where it is not — and align the wording with the sibling pages at
+`reference/config/tls/` and `reference/config/leafnodes/tls/`, which describe the same mechanism with
+no caveat at all.
+
+---
+
 ## Where the wiki records each of these
 
 | # | wiki page |
 |---|---|
 | 1–3 | `wiki/reference/advisories.md` — *A docs error worth knowing* |
 | 4 | `wiki/summaries/s-docs-consumer-config.md`, `wiki/reference/defaults-and-limits.md` |
-| 5 | `wiki/concepts/stream.md` — *The deduplication window* |
+| 5 | `wiki/concepts/stream.md` — *The deduplication window*; `wiki/concepts/publishing.md` — *Exactly-once, honestly* |
 | 6 | `wiki/reference/defaults-and-limits.md` — *The 8 MB question* |
 | 7 | `wiki/concepts/priority-groups.md`, `wiki/entities/nats-server-2.11.md` |
 | 8 | `wiki/entities/nats-net.md` — *What an operator needs to know* |
@@ -1639,4 +1756,5 @@ mention that it is also the compaction cadence.
 | 30 | `wiki/concepts/stream-compression.md` — *Changing it on a live stream does nothing until the store restarts*; `wiki/concepts/stream.md`; `wiki/summaries/s-adr-35-filestore-compression.md` |
 | 31 | `wiki/operations/how-clients-reach-a-cluster.md` — *What the server actually advertises*; `wiki/summaries/s-adr-40-nats-connection.md`; `wiki/operations/build-a-3-node-cluster.md` |
 | 32 | nowhere — the wiki quotes no maximum from these pages; recorded here so the generator bug is reported |
-| 33 | `wiki/internals/filestore-layout.md`; `wiki/operations/jetstream-sizing.md` — *Step 1* and *Step 1b*; `wiki/gotchas/jetstream-out-of-disk.md` — *The volume can fill while every JetStream number says there is room*; `wiki/reference/monitoring-endpoints.md` — *`storage` is a logical figure, not disk* |
+| 33 | `wiki/internals/filestore-layout.md`; `wiki/operations/jetstream-sizing.md` — *Step 1* and *Step 1b*; `wiki/gotchas/jetstream-out-of-disk.md` — *The volume can fill while every JetStream number says there is room*; `wiki/reference/monitoring-endpoints.md` — *`storage` is a logical figure, not disk*; `wiki/operations/kubernetes-storage.md` — *Set `max_file_store` below the volume size*; `wiki/gotchas/jetstream-out-of-disk.md` — *Prevention* |
+| 34 | `wiki/concepts/leafnode.md` — *Rotating a remote's certificate*; `wiki/operations/rotate-tls-certificates.md` — *Settled by running it* and step 4; `wiki/summaries/s-nats-server-tls-reload.md` |

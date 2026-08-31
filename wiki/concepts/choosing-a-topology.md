@@ -96,14 +96,38 @@ domain (source: [[s-gh-7438-multi-region-availability]]) — [[multi-region-jets
   only the log says so (source: [[s-docs-super-clusters]]). It also gives locality only for
   **queue-group** traffic; a plain cross-region subscriber puts your whole publish rate on the WAN
   and slows the local leg too — [[supercluster-slows-when-a-remote-subscriber-joins]].
-- **A leafnode** costs a hub-and-spoke shape whose reversibility nobody has documented. "Is there a
-  way to 'convert' a leaf cluster into a non-leaf cluster in the future?" and "if we already have a
-  regular cluster, is there a way to convert it into a leaf cluster without losing data?" were both
-  asked and **neither was answered** (source: [[s-gh-7438-multi-region-availability]]). It also
-  requires naming a domain on every JetStream operation that leaves the local one.
+- **A leafnode** costs a hub-and-spoke shape that nobody has published a way out of — see
+  *Choosing the hub is a one-way decision* below. It also requires naming a domain on every JetStream
+  operation that leaves the local one.
 - **Composing them on one server** costs a `system_account` you must remember to set, or the server
   will not start — and `nats-server -t` will tell you the config is valid first
   (source: [[s-nats-server-topology]]).
+
+## Choosing the hub is a one-way decision, as far as anyone has said in public
+
+**This wiki cannot answer it, and that is the answer.** Two questions were asked in the same thread
+on 2025-10-20 and **neither was ever replied to**, by a maintainer or anyone else
+(source: [[s-gh-7438-multi-region-availability]]):
+
+> "Is there a way to 'convert' a leaf cluster into a non-leaf cluster in the future, if necessary?
+> What happens if the now-largest cluster is overtaken in size by a leaf cluster in the future?"
+
+> "Similarly, if we already have a regular cluster, is there a way to convert it into a leaf cluster
+> without losing data?"
+
+Searched again on **2026-08-31** across the docs tree, the ADRs, GitHub discussions and issues, and
+the public blogs: **no public source states a procedure, states that one exists, or states that one
+does not.** The neighbouring facts that *are* published only sharpen the question rather than
+answering it — a JetStream domain is a per-server config value and every server in a cluster must
+carry the same one ([[jetstream-domain]]), stream data does not move between domains except as a
+mirror or source with its own lag ([[mirrors-and-sources]]), and a live cluster's `server_name`
+cannot safely be changed in place. Assembling those into a migration would be this wiki inventing a
+runbook, which it will not do.
+
+**What follows for a design decision today:** treat the hub as fixed for the life of the deployment.
+If a region might have to become the hub later, that is an argument for a super-cluster — where no
+region is subordinate — and for accepting its costs instead. Recorded as the open state of
+question-bank row **Q103**.
 
 ## Rules of thumb
 

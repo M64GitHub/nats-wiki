@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10077, discard, DiscardNew, max_msgs, max_bytes, max_msgs_per_subject, purge, workqueue]
 aliases: ["maximum messages exceeded", "maximum bytes exceeded", "maximum messages per subject exceeded", "10077", "stream is full", "DiscardNew full", "stream full discard new"]
-sources: [s-adr-10-extended-purge, s-docs-policies, s-docs-stream-config, s-docs-retention-policies]
+sources: [s-adr-10-extended-purge, s-docs-policies, s-docs-stream-config, s-docs-retention-policies, s-docs-shaping-the-stream]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -136,6 +136,13 @@ this is not the page: see [[jetstream-out-of-disk]].
 
 ## Prevention
 
+**The `learn` chapter confirms all three strings and the `discard_new_per_subject` requirement** from
+a second source: a per-subject limit "still rolls, discarding the subject's oldest message rather than
+rejecting the publish", and making it reject "takes a second setting, `DiscardNewPerSubject`… on top
+of Discard New" (source: [[s-docs-shaping-the-stream]]). It adds one framing worth keeping when
+sizing: **`max_age` never rejects a publish** — it expires stored messages on its own timer under
+either discard policy, so a stream that is "full" is always full on bytes or count.
+
 - **Alert on fullness, not on the error**, because the error never reaches the server's logs or
   metrics. Compare `state` against `config` per stream on `/jsz?streams=1&config=1` —
   `state.messages` and `state.bytes` against `config.max_msgs` and `config.max_bytes`. **`config=1`
@@ -164,5 +171,7 @@ this is not the page: see [[jetstream-out-of-disk]].
 - [[s-docs-policies]] — the `discard` policy and which stream settings can change on a live stream
 - [[s-docs-stream-config]] — `max_msgs`, `max_bytes`, `max_msgs_per_subject`, `discard_new_per_subject`
 - [[s-docs-retention-policies]] — WorkQueue deletion on ack
+- [[s-docs-shaping-the-stream]] — the three rejection strings named together, and `max_age` as the
+  one limit that never rejects a publish
 - `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md` — the `PubAck` above, the
   silent log and the purge behaviour, run on the v2.14.6 binary
