@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -184,6 +184,26 @@ lock: the quorum election can still land elsewhere. Run the stepdown to move lea
 current server, then read `nats stream info` to learn who actually won. Placement cannot name a
 leader at all — see [[stream-placement]].
 
+## The configured peer set, not the live one
+
+The single most consequential property of the meta group for an operator: **quorum is computed from
+the configured peer set, not from the peers that are currently up** (source:
+[[s-adr-61-meta-quorum-rescue]]). A server that is switched off and never `peer-remove`d still counts
+towards the majority it is no longer able to provide.
+
+The failure this produces is ordinary, not exotic: grow a 3-node cluster to 5, switch the two extras
+off without removing them, and the meta group still needs **3 of 5**. Lose one of the three
+survivors and there is no meta leader — and because a peer-remove is itself a meta-group write,
+there is no way to shrink the peer set back either. The meta layer stalls until enough of the
+configured peers return.
+
+On **2.14 the only supported exit** is to bring every configured peer back under its original server
+name, let an election happen, then `nats server cluster peer-remove` the dead ones. **2.15** (preview
+only as of 2026-08-31) adds `$JS.API.META.RESCUE`, which temporarily lowers the effective quorum on
+each survivor for 5 minutes — see [[disaster-recovery]]. Neither is a substitute for removing a peer
+when you retire it.
+
+
 ## Version notes
 
 - `--preferred` on `nats stream cluster step-down` requires **nats-server 2.11 or newer**
@@ -214,4 +234,4 @@ leader at all — see [[stream-placement]].
 
 [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] · [[s-docs-surviving-node-loss]] ·
 [[s-docs-placement]] · [[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] ·
-[[s-docs-upgrade-to-2.12]] · [[s-nats-server-jetstream-log-warnings]]
+[[s-docs-upgrade-to-2.12]] · [[s-nats-server-jetstream-log-warnings]] · [[s-adr-61-meta-quorum-rescue]]

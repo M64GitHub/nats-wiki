@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.14, feature_flags, js_ack_fc_v2]
 aliases: ["2.14", v2.14, v2.14.0, v2.14.6]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -53,7 +53,9 @@ Dates and tags are from the GitHub releases API, mirrored at
   the acknowledgement floor or an arbitrary sequence, **without deleting and recreating** the
   consumer. The resulting state equals a delete-and-recreate at that sequence (ADR-60).
 - New ack policy **`AckFlowControl`**, used by the durable consumers that back WorkQueue/Interest
-  sourcing.
+  sourcing — visible as `JS_MIRROR_<suffix>` / `JS_SRC_<suffix>` on the upstream, and requiring
+  **API level 4** there, so a half-upgraded cluster does not get the reliable path (ADR-60, source:
+  [[s-adr-60-reliable-sourcing]]).
 - **`404 No Messages` is now returned for a `no_wait` pull with no expiry** when nothing is pending.
 - **Invalid or divergent consumer state is reset to match the stream** on startup after an unclean
   shutdown.

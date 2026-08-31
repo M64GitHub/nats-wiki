@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -103,8 +103,31 @@ acknowledgement floor, or to an arbitrary sequence while still respecting start 
 recreate at that sequence would produce (source: [[s-relnotes-2.14.0]]). That matters because
 recreating a durable is otherwise the only way to move its position, and it loses the saved one.
 
+The payload decides how far it goes: **empty** resets the delivery state but leaves the ack floor's
+stream sequence alone, `{"seq":<n>}` moves that floor to one below `<n>`. It is allowed only on
+`deliver_policy` `all`, `by_start_sequence` and `by_start_time` — and for the last two only forward
+of what the start policy already allowed, so a reset cannot smuggle a consumer back past its own
+start. The reply looks like a consumer-create response with the `ResetSeq` actually used, and a
+client must tolerate its delivery sequence restarting at 1, because the caller may be the CLI or the
+server rather than the client itself (source: [[s-adr-60-reliable-sourcing]]).
+
 Related: since 2.14, **invalid or divergent consumer state is reset to match the stream on
 startup**, after an unclean shutdown.
+
+### `AckFlowControl`, and consumers you did not create (2.14)
+
+A fourth ack policy exists that no application sets: **`AckFlowControl`**, used by the durable
+consumers the server creates to mirror or source a WorkQueue or Interest stream. It behaves like
+`AckAll`, but the acknowledgement is carried by flow-control replies (headers `Nats-Last-Stream` and
+`Nats-Last-Consumer`) rather than by ack messages, so the upstream only removes a message once the
+destination has stored it. Such a consumer must have `ack_wait` and `backoff` **unset** and
+`max_deliver: -1`, and the server enforces that.
+
+The practical consequence is in `nats consumer ls`: a stream that is being mirrored or sourced grows
+consumers named **`JS_MIRROR_<suffix>`** or **`JS_SRC_<suffix>`**, carrying metadata
+`_nats.mirror.stream` / `_nats.src.stream` that names the stream which created them. They are not
+yours to delete while the replication exists — and are yours to delete if it no longer does, because
+their removal is best-effort ([[mirrors-and-sources]], source: [[s-adr-60-reliable-sourcing]]).
 
 ### Fixed at creation
 

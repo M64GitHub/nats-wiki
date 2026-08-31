@@ -304,6 +304,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-topology]] — the topology layer: no default port on any of the three listener
   blocks, the system account a composed server must have, geo-affinity as an exclusion list, the
   fast-producer stall and its two counters, and what a leafnode user may carry.
+- [[s-nats-server-defaults-sweep]] — all 216 documented defaults compared with the source at
+  v2.14.6: leafnode compression is `s2_auto` and not `accept`, `mqtt.max_ack_pending` is 1024 and
+  not 100, `mqtt.port` has no default at all, and why a use-site default is invisible in `/varz`.
 
 **The `nats.go` client source**
 
@@ -329,6 +332,19 @@ exists to answer live in `inbox/question-bank.md`.
   codes, and the four `mirror_direct` alignment rules.
 - [[s-adr-42-priority-groups]] — the three priority policies and the pinned-client protocol.
 - [[s-adr-43-per-message-ttl]] — `Nats-TTL`, markers, the clamp, and seven error codes.
+- [[s-adr-48-kv-ttl]] — KV limit markers: one setting, two stream fields, a 1-second floor, and why
+  there is no TTL on `Put`.
+- [[s-adr-54-kv-codecs]] — *Proposed*: keys are subjects, nothing escapes them for you, and what a
+  client-side codec costs you in `nats kv ls` and in a watcher.
+- [[s-adr-57-kv-subject-transforms]] — *Proposed*: why a KV mirror always has `mirror_direct`, the
+  generated `$KV.<src>.>` transform, and how a plain stream becomes a KV source.
+- [[s-adr-59-sourcing-and-mirroring]] — the authoritative sourcing/mirroring spec: the config
+  surface, `10029`/`10045`, `Nats-Stream-Source`, `/jsz?direct-consumers=true`, and why WorkQueue and
+  Interest upstreams were "not recommended".
+- [[s-adr-60-reliable-sourcing]] — 2.14's answer to that: durable `JS_MIRROR_*` / `JS_SRC_*`
+  consumers, `AckFlowControl`, the consumer reset API, and the API level 4 requirement.
+- [[s-adr-61-meta-quorum-rescue]] — 2.15's `$JS.API.META.RESCUE`: quorum is computed from the
+  configured peer set, and what to do when that wedges the meta layer.
 
 **Release notes and upgrade guides**
 

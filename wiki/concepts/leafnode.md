@@ -121,6 +121,36 @@ nats-server: leaf nodes and gateways (both being defined) require a system accou
 `nats-server -t` reports the same file valid (source: [[s-nats-server-topology]];
 `inbox/docs-issues.md` #24).
 
+### Compression is on by default
+
+A leafnode connection compresses unless you say otherwise: `setBaselineOptions` gives both the
+listener and **every remote** the mode `s2_auto` (`opts.go:6082–6089` and `6099–6106`, v2.14.6),
+which picks an S2 level from the measured RTT and sends uncompressed while the link is fast. The
+generated config reference states the default is `accept` — it is not; `accept` is the **cluster**
+default. Recorded as `inbox/docs-issues.md` #27.
+
+You can see it on a link that has nothing configured:
+
+```
+$ curl -s http://127.0.0.1:8222/leafz | grep compression
+      "compression": "s2_uncompressed"
+```
+
+The same pair with `compression: accept` written on both ends reports `"compression": "off"` — so
+the difference is real, not cosmetic. On a fast LAN link this costs CPU for nothing; on a WAN link
+it is usually what you want. Set it explicitly either way:
+
+```
+leafnodes {
+  port: 7422
+  compression: off          # or s2_fast / s2_better / s2_best / accept
+}
+```
+
+`on` is a synonym for `s2_auto`, and `s2_auto`'s ladder is governed by
+`rtt_thresholds` (`[10ms 50ms 100ms]` per the reference) (source:
+[[s-nats-server-defaults-sweep]]).
+
 ## Restricting what crosses
 
 This is the question people actually ask (Q48), and the obvious answer is a trap.

@@ -172,6 +172,13 @@ two — see [[monitoring-endpoints]]. The same arithmetic is what the `Routes` c
 Also `isolate_leafnode_interest` and per-remote `disabled: true`, both **2.12+**
 (source: [[s-docs-upgrade-to-2.12]]).
 
+**Leafnode compression is on by default.** Both the listener and every remote default to
+**`s2_auto`**, not to the `accept` the generated reference publishes — `opts.go:6082–6089` and
+`6099–6106` at v2.14.6, and a hub/leaf pair with no compression key reports
+`"compression": "s2_uncompressed"` on `/leafz`, where two `accept` ends report `"off"`. `accept`
+is the **cluster** default (`opts.go:6061–6070`). Recorded as `inbox/docs-issues.md` #27
+(source: [[s-nats-server-defaults-sweep]]).
+
 ## `gateway { … }`
 
 `name`, `listen`, `gateways` and `reject_unknown_cluster` (default `false`) are all
@@ -226,9 +233,16 @@ trusted operator ([[reload-server-config]]).
 ## `websocket { … }` and `mqtt { … }`
 
 `websocket.port` and `websocket.no_tls` are **restart-only**; there is **no default WebSocket port**.
-`mqtt.port` defaults to **`1883`** (restart-only), `mqtt.ack_wait` to **`30s`** and
-`mqtt.max_ack_pending` to **`100`** (both reloadable\*). Note that MQTT has its **own**
-`ack_wait` and `max_ack_pending`, unrelated to a JetStream [[consumer]]'s.
+`mqtt.port` is **restart-only and has no default either** — the reference publishes `1883`, the
+server applies nothing, and `mqtt { }` with no port starts no MQTT listener and logs nothing
+(`mqtt.go:689–694`; observed on v2.14.6). `mqtt.ack_wait` does default to **`30s`**
+(`mqttDefaultAckWait`, `mqtt.go:147`), but `mqtt.max_ack_pending` defaults to **`1024`**, not the
+`100` the reference states (`mqttDefaultMaxAckPending`, `mqtt.go:151`, applied at `mqtt.go:3336`,
+`5497` and `5633`); both are reloadable\*. Neither value is visible in `/varz`, which omits the
+option because the server leaves it zero and fills it in at the use site. Recorded as
+`inbox/docs-issues.md` #28 and #29. Note that MQTT has its **own** `ack_wait` and
+`max_ack_pending`, unrelated to a JetStream [[consumer]]'s (source:
+[[s-nats-server-defaults-sweep]]).
 
 ## Account JetStream limits
 
@@ -259,24 +273,29 @@ The other ~560 keys. This page covers what an operator sets to run a server; the
 everything, is filterable in the viewer, and carries a `cited by` column that shows how much of the
 surface the wiki actually explains.
 
-## The three listener ports have no default
+## The listener ports have no default
 
-**Corrected 2026-08-31.** The generated reference gives `cluster.port` `6222`, `gateway.port` `7222`
-and `leafnodes.port` `7422` as **defaults**, and this page repeated `6222` above. The server applies
-none of them; what it does instead differs per key
-(source: [[s-nats-server-topology]], reproduced on v2.14.6):
+**Corrected 2026-08-31.** The generated reference gives `cluster.port` `6222`, `gateway.port` `7222`,
+`leafnodes.port` `7422` and `mqtt.port` `1883` as **defaults**, and this page repeated `6222` above.
+The server applies none of them; what it does instead differs per key
+(source: [[s-nats-server-topology]], [[s-nats-server-defaults-sweep]], reproduced on v2.14.6):
 
 | key | reference says | what an omitted value actually does |
 |---|---|---|
 | `cluster.port` | `6222` | **no route listener**, silently |
 | `leafnodes.port` | `7422` | **no leafnode listener**, silently — a `leafnodes { }` block that does nothing |
 | `gateway.port` | `7222` | **the server refuses to start**: `gateway %q has no port specified (select -1 for random port)` |
+| `mqtt.port` | `1883` | **no MQTT listener**, silently — `validateMQTTOptions` returns at `mqtt.go:692` |
 
 `DEFAULT_LEAFNODE_PORT = 7422` does exist (`const.go:206`) and is used in exactly one place: filling
 in a missing port on a **remote's** URL (`opts.go:6096`). The `host` defaults (`0.0.0.0`) are real,
 but only apply once a port is set (`opts.go:6072–6074`, `6140–6142`).
 
-Recorded as `inbox/docs-issues.md` #23. Write the port on all three blocks, every time.
+`websocket.port` has no documented default and none in the server, which is the one page in the
+family that is right.
+
+Recorded as `inbox/docs-issues.md` #23 (the three topology listeners) and #29 (MQTT). Write the
+port on every one of these blocks, every time.
 
 ## Two option checks `nats-server -t` will not catch
 

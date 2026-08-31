@@ -954,3 +954,168 @@ the cross-account half stops where the sources stop, and that residual gap stays
 are `consumer-keeps-redelivering`, `filestore-layout`, `meta-layer`, `stream-leader-keeps-moving`).
 `python3 tools/lint.py`: **200 pages, clean** (180 → 200: 7 wiki pages and 13 summaries) — no broken
 links, no orphans, no frontmatter issues, none missing from the index.
+
+## 2026-08-31 — drift plan step 1: `tools/check-defaults.py`, and the sweep it produced
+
+**Operation:** tool, then *record a docs issue* — not an ingest. Working
+`inbox/plan-drift-and-adrs-2026-08-31.md` step 1: sweep the **generated** config reference against
+the server, mechanically, and verify every disagreement by hand before recording it.
+
+**The tool.** `tools/check-defaults.py` takes `inbox/config-keys-table.md` (621 keys, **216 with a
+stated default**) and a `nats-server` tag, downloads that tag's tarball into `.cache/` (git-ignored;
+`raw/nats-server-src/` keeps only quoted ranges, so a whole tree does not belong there), and resolves
+each documented default against the code that fills the option in. It walks from the `case "<key>"`
+in the parse function that reads the key, to the field that case assigns, to a default site for that
+field — through seven indexes over `server/**/*.go`: constants and package vars, guarded default
+sites, use-site defaults, override defaults (`x := <default>` … `if opts.X > 0 { x = opts.X }`),
+command-line flag defaults, struct-literal constructors, and the `case` blocks themselves. It reports
+**how** each value was found (`assign`, `use-site`, `global`, `flag-default`, `literal`,
+`const-name`, `zero-value`) and links the line, because those are not equally strong.
+
+**Result on v2.14.6** (`inbox/check-defaults-v2.14.6.md`, registered in `wiki.json` as *Defaults
+check*, 216 rows, filterable): **175 agree, 15 disagree, 26 unresolved.** The unresolved list is the
+honest output — each row says what was found and where to look, and none of them was guessed at.
+
+**It re-derived the four hand sweeps with no human input**: all nine `tls.timeout` keys at 2s and all
+six `authorization.timeout` keys at 2s (docs issue #19), `jetstream.max_buffered_msgs` at 100000 and
+`info_queue_limit` at `request_queue_limit` (#22). That is the check on the tool, not on the docs.
+
+**Three new findings, each verified by hand and then run on the v2.14.6 binary** — evidence in
+`raw/nats-server-src/defaults-observed-v2.14.6.md`:
+
+- **#27 ★ leafnode compression defaults to `s2_auto`, not `accept`.** `opts.go:6082–6089` (listener)
+  and `6099–6106` (every remote). `accept` is the *cluster* default, twenty lines earlier. Observed:
+  a hub/leaf pair with nothing configured reports `"compression": "s2_uncompressed"` on `/leafz`; the
+  same pair carrying the documented `accept` on both ends reports `"off"`.
+- **#28 `mqtt.max_ack_pending` is 1024, not 100** — `mqttDefaultMaxAckPending`, `mqtt.go:151`, applied
+  at three use sites. `mqtt.ack_wait`'s documented `30s` is right by the same mechanism.
+- **#29 ★ `mqtt.port` has no default**; `mqtt { }` with no port starts no listener and logs nothing
+  (`mqtt.go:689–694`, observed) — the fourth listener with a published default the server never
+  applies, after #23's three.
+
+**Ripple (5 pages).** New summary [[s-nats-server-defaults-sweep]]; [[config-keys]] — the MQTT
+paragraph corrected (it had been repeating the docs' `1883` and `100`), a leafnode-compression note,
+and *The three listener ports have no default* became *The listener ports have no default* with an
+`mqtt.port` row; [[defaults-and-limits]] — six rows in *Topology*, and *How this was derived* now
+names the sweep and its counts; [[leafnode]] — a *Compression is on by default* section with the
+`/leafz` evidence and the config to set it explicitly; [[index]].
+
+**Question bank: unchanged at 104 rows.** Nobody asks in public what a default is — they discover it
+— so no row was invented to fit; the summary says so explicitly.
+
+`python3 tools/lint.py`: **201 pages, clean.** `python3 tools/build-site.py`: 1141 TOC rows (925 →
+1141, the new report).
+
+## 2026-08-31 — drift plan step 2: `tools/check-staleness.py`, and the wiring that survives an update
+
+**Operation:** tool. `inbox/plan-drift-and-adrs-2026-08-31.md` step 2: make a stale page findable by
+running a script rather than by remembering. All 201 pages currently read `verified-on: 2026-08-31`;
+93 carry `verified-against`, and nothing said which of them would start lying at the next release.
+
+**The tool.** `tools/check-staleness.py` checks each page against **the authority that page names**,
+not against one global version: `nats-server` from the newest non-prerelease tag in
+`raw/release-notes/_tags-and-dates.md` (`--current` to override, `--fetch` to ask GitHub), and every
+tool or client from `raw/github-repos/*.release.json` — the files `tools/fetch-repo-facts.py
+--refresh` already maintains, so a client release is detected by the run that refreshes the entity
+pages. A version stated as a **minor** is compared as a minor, so "since 2.11" does not rot when
+2.14.6 ships; only a pinned patch is compared at patch level.
+
+**What it deliberately does not flag.** A page that states none of the six things `CLAUDE.md`
+requires a version for — a default, a limit, a config key, a CLI flag, an API subject, an error code
+— is left alone: 17 pages, nearly all client and org entities, which do not rot that way. The one
+exception is a page pinned to a **repo's own release**: there the version *is* the claim, so it is
+checked whether or not it states any of the six. Both paths were tested by pretending a release had
+moved: `nats-cli` (natscli v0.4.0) and `nats-go` (nats.go v1.53.1) both appear, the second with
+"claims: none — the version is the claim".
+
+**Today: nothing is stale.** `inbox/staleness.md` is empty in all three sections, which is the honest
+result one release after every page was written. Simulated, the mechanism works: at a hypothetical
+**2.14.7** it lists **46** pages; at **2.15.0**, **64** — the extra 18 being the pages pinned to the
+minor `2.14`. Each row carries the page, what it was verified against, what is current, which of the
+six claim kinds it makes, and the summary pages it was verified *from*, so re-verifying is a re-read
+of one named source.
+
+**Wiring.** `tools/lint.py` now ends with a staleness warning line — never an error, and guarded, so
+lint is unchanged where the script is absent. `tools/lint.py` is a **shared** file from
+`llm-wiki-starter`, and `tools/update-tools.sh` overwrites it, so the same guarded block was added to
+`llm-wiki-starter/template/tools/lint.py`: the wiring now survives a tools update instead of being
+silently wiped. Noticed while checking that: **the starter's `lint.py` is ahead of this wiki's** — it
+also checks *citation drift* and *unlanded ripples*. Running `update-tools.sh` would bring both, and
+would also update `build-site.py` and the theme; not done here, because it is a change to the viewer
+as well as the linter and belongs in its own step.
+
+**`CLAUDE.md` updated** — both new tools in the Map, and *Operation: lint* now says to run them.
+
+`python3 tools/lint.py`: **201 pages, clean**, plus `staleness: 0 behind 2.14.6`.
+
+## 2026-08-31 — drift plan step 3: the six ADRs an open `## To verify` was waiting for
+
+**Operation:** ingest ×6, from `raw/adr/`. Plan step 3, taken "in the order the wiki needs them"
+rather than in number order: the two that [[mirrors-and-sources]] named as its missing spec, then
+the one [[disaster-recovery]] needed, then the three KV refinements.
+
+**ADR-59 — Stream Sourcing and Mirroring** ([[s-adr-59-sourcing-and-mirroring]], *Implemented*,
+documents behaviour up to 2.12.5). The authoritative spec the docs point at and the wiki had never
+read. New to the wiki: the mirror restriction list (why `subject_delete_marker_ttl` on a mirror is
+refused — markers would insert messages and break sequence alignment), the four-field duplicate rule
+for source entries, the transform order, **cycle detection stopping at the account boundary**, error
+codes **10029** and **10045** with their 30s consumer-create timeout, the `Nats-Stream-Source`
+origin header, and `/jsz?direct-consumers=true` for the hidden replication consumers. Two values were
+re-checked against v2.14.6 rather than taken from the ADR: both error codes (HTTP 500, description
+`{err}` — the ADR's friendly labels are not the wire text) and the 10s inactive threshold
+(`sourceHealthCheckInterval`, `stream.go:3121`).
+
+**ADR-60 — reliable sourcing on WQ/Interest streams** ([[s-adr-60-reliable-sourcing]],
+*Implemented*, **2.14**). What the release notes had only summarised: the durable replication
+consumer is **visible** as `JS_MIRROR_<suffix>` / `JS_SRC_<suffix>` with `_nats.mirror.*` /
+`_nats.src.*` metadata naming its owner, **its deletion is best-effort** so leftovers are the
+operator's to remove, `AckFlowControl` is driven by `Nats-Last-Stream` / `Nats-Last-Consumer` and
+forbids `AckWait`/`BackOff`, "durable sourcing" lets you pre-create the consumer (and pause it to
+pause replication), and the whole path needs **API level 4 on the upstream** — verified in the source
+(`Nats-Required-Api-Level: 4`, `stream.go:3679`), which the ADR does not mention.
+
+**ADR-61 — unsafe meta group quorum rescue** ([[s-adr-61-meta-quorum-rescue]], *Implemented*, tagged
+**2.15**, which exists only as a preview). Confirmed absent from v2.14.6: `$JS.API.META.RESCUE`,
+`meta_rescue`, `quorum_needed` and `10224` appear nowhere in the source, and every page says so. The
+part that matters **today** is the trap it describes — Raft computes quorum from the *configured*
+peer set, so a server switched off without a peer-remove still counts, and one further failure wedges
+the meta layer with no way to shrink it.
+
+**ADR-48 — KV TTL** ([[s-adr-48-kv-ttl]], *Implemented*, 2.11): "Limit Markers" is one setting
+writing two stream fields, the floor is **≥ 1 second** (the wiki said "longer than a second"),
+enabling is one-way, and a TTL is accepted on `Create` and `Purge` **only** — never `Put`, because
+an expiring current value could resurrect an older revision.
+
+**ADR-57 — KV subject transforms** ([[s-adr-57-kv-subject-transforms]], *Proposed*): why a KV mirror
+always carries `mirror_direct`, the generated `$KV.<src>.>` → `$KV.<dst>.>` transform, and that
+supplying your own transform turns the automation off — which is how a **plain stream becomes a KV
+source**.
+
+**ADR-54 — KV codecs** ([[s-adr-54-kv-codecs]], *Proposed*, `orbit`): mostly out of scope as a client
+API, ingested for the constraint behind it — **a KV key is a subject and nothing escapes it for
+you** — and for the two operator-visible costs: encoded keys are what `nats kv ls` shows, and a value
+codec makes the server blind to values.
+
+**Ripple (13 pages).** [[mirrors-and-sources]] — two new sections (restrictions and duplicates; the
+WorkQueue/Interest story before and after 2.14) plus a third on reading replication state, and its
+`## To verify` closed; [[retention-policies]] — what the durable replication consumer looks like;
+[[consumer]] — `AckFlowControl` and the consumers you did not create, and the reset payload
+semantics; [[error-codes]] — `10029`, `10045`, and a note that `10224` does not exist yet;
+[[js-api-subjects]] — `$JS.API.META.RESCUE` and the full reset semantics; [[monitoring-endpoints]] —
+`/jsz?direct-consumers=true`; [[disaster-recovery]] — *When the meta group itself is what you lost*,
+with the 2.14 remedy and the 2.15 one; [[raft-in-nats]] — *The configured peer set, not the live
+one*; [[cross-domain-sourcing]] — cycle detection stops at the boundary, and the forgotten `$JS.FC.>`
+import; [[nats-server-2.14]] — API level 4; [[advisories]] — the 2.15 `META_RESCUE` advisory;
+[[key-value]] — three new sections (TTL rules, mirrors and sources of a bucket, keys are subjects)
+and two `## To verify` items closed; [[message-ttl]] — the KV TTL rules and its ADR-48 item closed.
+
+One command was corrected while writing: the meta peer removal is
+`nats server cluster peer-remove <server>`, as [[nats-cli]] already recorded — not the `raft`
+spelling first drafted.
+
+**Question bank: 104 rows, 62 answered.** Q36 (no quorum, stalled cluster) gains
+[[disaster-recovery]] alongside [[raft-in-nats]]. **No rows were added**: an ADR is a specification,
+not someone asking a question in public, and the bank's rule is a real asker with a URL.
+
+`inbox/adr-toc.md`: **14 of 54 ADRs ingested** (was 8); ★ rows read: 9 of 22.
+`python3 tools/lint.py`: **207 pages, clean**, staleness 0.

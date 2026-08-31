@@ -6,7 +6,8 @@
 
 Checks: duplicate slugs, frontmatter (title/type/created/updated, `kind` on kinded types, type matching the folder),
 broken [[links]] (minus the intentional "wanted" red links listed in index.md), orphans, pages missing from index.md,
-and the number of (unverified) markers. Contradictions and staleness are the maintainer's half — read for them.
+the number of (unverified) markers, and — as a warning, via tools/check-staleness.py — pages whose version-bearing
+claims are behind the current release. Contradictions are the maintainer's half; read for them.
 """
 import re, os, glob, sys, json, collections
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -65,5 +66,19 @@ missing_from_index = [s for s in pages if s not in ('index', 'log') and f'[[{s}]
 print('pages missing from index:', missing_from_index or 'none')
 unv = {s: len(re.findall(r'\(unverified', open(f, encoding='utf-8').read())) for s, f in pages.items()}
 print('unverified markers:', sum(unv.values()), 'across', sum(1 for v in unv.values() if v), 'pages')
+# Staleness is a *warning*, never an error: `tools/check-staleness.py` is optional and wiki-specific
+# (it knows which authority a page's `verified-against` names). If it is not there, lint is unchanged.
+stale_tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'check-staleness.py')
+if os.path.exists(stale_tool):
+    try:
+        import importlib.util
+        sys.argv = [sys.argv[0], '--quiet']
+        spec = importlib.util.spec_from_file_location('staleness', stale_tool)
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        mod.main()
+        print('  (run `python3 tools/check-staleness.py` for the table -- and after every release it tracks)')
+    except Exception as e:
+        print('staleness: not checked (%s)' % e)
+
 if strict and (fm_issues or real_broken or missing_from_index):
     sys.exit(1)

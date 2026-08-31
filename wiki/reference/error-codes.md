@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -27,6 +27,11 @@ linked below. This page gives the structure, the lookup, and the codes this wiki
 
 **Any alert, dashboard, log filter or runbook that matches on error text will break on an upgrade.**
 Match the number. See [[js-api]].
+
+**One code this wiki cites does not exist yet**: `10224`,
+`JetStream system rescue not applied: {err}`, HTTP 400 — the rejection from `$JS.API.META.RESCUE`,
+which is **2.15 only** and absent from the v2.14.6 source (source:
+[[s-adr-61-meta-quorum-rescue]], [[disaster-recovery]]).
 
 ## The number ranges
 
@@ -82,7 +87,9 @@ Two structural notes from the table's own appendix:
 | **10021** | `JSStreamExternalApiOverlapErrF` | 400 | stream external api prefix `{prefix}` must not overlap with `{subject}` | [[cross-account-sharing]] |
 | **10022** | `JSStreamExternalDelPrefixOverlapsErrF` | 400 | stream external delivery prefix `{prefix}` overlaps with stream subject `{subject}` | [[cross-account-sharing]] |
 | **10024** | `JSStreamInvalidExternalDeliverySubjErrF` | 400 | stream external delivery prefix `{prefix}` must not contain wildcards | [[cross-account-sharing]] |
+| **10029** | `JSMirrorConsumerSetupFailedErrF` | 500 | `{err}` — the mirror's replication consumer could not be created | [[mirrors-and-sources]] |
 | **10035** | `JSNoAccountErr` | 503 | account not found | [[account]] |
+| **10045** | `JSSourceConsumerSetupFailedErrF` | 500 | `{err}` — a source's replication consumer could not be created | [[mirrors-and-sources]] |
 | **10039** | `JSNotEnabledForAccountErr` | 503 | JetStream not enabled for account | [[account]] |
 | **10052** | `JSStreamInvalidConfigF` | 500 | `{err}` | [[message-ttl]] |
 | **10059** | `JSStreamNotFoundErr` | 404 | stream not found | [[js-api]] |

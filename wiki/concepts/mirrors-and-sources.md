@@ -4,9 +4,9 @@ type: concept
 area: [jetstream, topology, deploy]
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
-tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060]
+tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -105,7 +105,10 @@ ADR-31's own advice: "always set `mirror_direct` to their desired value."
 - **Delete the upstream and the mirror does not die — it freezes.** It "keeps every message it had
   already copied, stops receiving new ones, and records the fault in the **`Error` field** of its
   Mirror Information". Purge a range upstream and the mirror keeps what it already stored, detects
-  the sequence gap and skips the missing messages. Either way you are left with a stale copy frozen
+  the sequence gap and skips the missing messages — reliably **only on a Limits upstream**, because
+  the server distinguishes "the upstream dropped these" from "we missed these" by comparing the
+  upstream sequence with the consumer's delivery sequence (source:
+  [[s-adr-59-sourcing-and-mirroring]]). Either way you are left with a stale copy frozen
   at the break, not a chosen point in time.
 - **Publishing to a mirror fails in a confusing way.** The message lands in the origin stream that
   owns the subject. Force it with `Nats-Expected-Stream: ORDERS-ARCHIVE` and the server rejects it —
@@ -121,6 +124,99 @@ ADR-31's own advice: "always set `mirror_direct` to their desired value."
 - **A mirror's config is fixed at creation.** Changing the upstream, the filter or the transform is a
   delete-and-recreate. That is cheap — the upstream still holds the data — but it is not an edit.
   Sources, by contrast, can be added, dropped and edited in place.
+
+## What a mirror may not be, and what a source may
+
+ADR-59 is the authoritative spec, and its restriction lists are the fastest way to find out why a
+create was rejected (source: [[s-adr-59-sourcing-and-mirroring]]).
+
+A **mirror** cannot be combined with `subjects`, `sources`, `first_seq`, `allow_msg_counter`,
+`allow_atomic`, `allow_msg_schedules` or `subject_delete_marker_ttl` — the last because "delete
+markers would insert new messages and break sequence alignment", and a mirror's whole promise is that
+sequences match. It *can* use the stream-level `subject_transform`, `republish`, `compression` and
+`allow_msg_ttl`.
+
+A **sourced** stream is only barred from `mirror` and `allow_msg_schedules`. It may keep its own
+`subjects` and take direct publishes alongside what it replicates.
+
+Two source entries count as **duplicates** on four fields together — stream name, `filter_subject`,
+`subject_transforms` and the external API prefix — so the same upstream may be sourced twice as long
+as one of those differs:
+
+```
+nats stream add SPLIT --source ORDERS --source ORDERS   # rejected: identical entries
+```
+
+**Transforms apply in a fixed order**: the per-source `filter_subject` or `subject_transforms` as
+messages are selected upstream, then the stream-level `subject_transform` on everything entering the
+stream — including direct publishes.
+
+**Cycle detection stops at the account boundary.** The server prevents A→B→A *within one account*;
+across domains or accounts "it is the operator's responsibility to ensure that cross-domain
+configurations do not create replication cycles". Nothing warns you.
+
+## When the upstream is a WorkQueue or an Interest stream
+
+Before **2.14** the answer was "don't": the internal replication consumer is ephemeral and
+`AckNone`, and on those retentions a delivered message is removed immediately, so anything lost in
+flight is lost for good (source: [[s-adr-59-sourcing-and-mirroring]]). ADR-59 gives both reasons —
+on a WorkQueue the replication consumer is a `Direct` consumer that **bypasses the subject-overlap
+check**, so it can silently coexist with a real worker consumer on the same subjects and break the
+one-consumer-per-partition guarantee; on an Interest stream the replication consumer's inactive
+threshold is **10s** (`sourceHealthCheckInterval`, `stream.go:3121` at 2.14.6), so a link down for
+longer leaves nobody holding interest and new messages are dropped before they can be copied.
+
+**2.14 fixes it by making the replication consumer durable** (source:
+[[s-adr-60-reliable-sourcing]]). What an operator sees change:
+
+- **A visible consumer appears on the upstream**, named `JS_MIRROR_<suffix>` or `JS_SRC_<suffix>`,
+  carrying metadata `_nats.mirror.stream` / `_nats.src.stream` (plus `.acc`, and `.domain` when one
+  is set) naming the stream that created it. Read that metadata before deleting anything.
+- **Removing the source does not reliably remove the consumer.** Deletion is best-effort by design;
+  a leftover `JS_SRC_*` on the upstream is yours to delete.
+- **A new ack policy, `AckFlowControl`**, replaces `AckNone` on these consumers: flow-control
+  messages carrying `Nats-Last-Stream` and `Nats-Last-Consumer` acknowledge what the destination has
+  actually stored, which is what allows a WorkQueue message to be removed only once it is safe.
+  `AckWait` and `BackOff` must be unset on such a consumer and `MaxDeliver` must be `-1`.
+- **It requires API level 4 on the upstream server** — the create request carries
+  `Nats-Required-Api-Level: 4` (`stream.go:3679`, 2.14.6), so a half-upgraded cluster or an older hub
+  will not give you reliable sourcing.
+- **You may bring your own consumer** ("durable sourcing"): `sources[].consumer` takes a `name` and
+  a `deliver_subject`, and then `opt_start_seq`, `opt_start_time` and `filter_subject` must be set on
+  the *consumer*, not on the source. That buys lifecycle control — **pausing the consumer pauses
+  replication** — and two shapes the built-in path cannot express, `DeliverPolicy=last_per_subject`
+  and `ReplayPolicy=original`.
+
+The WorkQueue overlap rule still applies to the durable consumer: it blocks any other consumer with
+an overlapping filter, so a WorkQueue stream that is both worked and mirrored wants to be an Interest
+or Limits stream instead.
+
+## Reading the replication state when `Lag` is not enough
+
+Three things ADR-59 documents that no CLI output shows (source: [[s-adr-59-sourcing-and-mirroring]]):
+
+**The two error codes.** A replication consumer that cannot be created reports `10029` (mirror) or
+`10045` (source) in the `error` field of the mirror/source info — wrapping the real cause: upstream
+missing, permission denied, external domain unreachable, subscription failure, or a **30s** timeout
+waiting for the consumer-create response. It clears itself on reconnection, so an alert must read it
+rather than a human. See [[error-codes]].
+
+**The internal consumers, on demand.** They are hidden from the consumer API by a `Direct` flag, but
+`/jsz` will show them:
+
+```
+curl -s 'http://127.0.0.1:8222/jsz?streams=true&consumers=true&direct-consumers=true&config=true&acc=APP'
+```
+
+`direct_consumer_detail` then carries full `ConsumerInfo` for each `mirror-<id>` / `src-<id>`
+consumer, whose delivered and ack-floor positions can be compared against the upstream's state — the
+detail behind `lag`, `active` and `error`.
+
+**Where a message came from.** Every sourced message carries
+`Nats-Stream-Source: <stream> <sequence> <filter> <dest> <original-subject>`, with `>` meaning
+"none" — for example `ORDERS 42 > > orders.us.new`. When sources are daisy-chained the server
+**replaces** the header, so it always names the immediate upstream, not the origin of the chain.
+
 
 ## Why an operator cares
 
@@ -172,13 +268,9 @@ what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]
 
 ## To verify
 
-- **ADR-59** is named by the docs as the authoritative spec for sourcing and mirroring
-  (`filter_subject`, `subject_transforms`, External streams, replication semantics) and **has not
-  been ingested**; ADR-60 refines it for WorkQueue and Interest streams and is cited by
-  [[nats-server-2.14]] but not read either. Both are local in `raw/adr/`.
 - Whether a **KV mirror on file storage** is materially slower than on memory storage
   (question-bank Q76) is not addressed by any source read here.
 
 ## Sources
 
-[[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]] · [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]]
+[[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]] · [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-60-reliable-sourcing]]

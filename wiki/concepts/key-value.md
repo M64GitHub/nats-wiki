@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [kv, bucket, tombstone, watch, direct-get]
 aliases: [KV, key value, KV bucket, KV_]
-sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream]
+sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -136,9 +136,62 @@ clients receive a **`Nats-Marker-Reason`** header:
 | `Purge` | `PURGE` |
 | `Remove` | `DEL` |
 
-Enabling markers requires `allow_msg_ttl: true` and a `subject_delete_marker_ttl` **longer than a
+Enabling markers requires `allow_msg_ttl: true` and a `subject_delete_marker_ttl` of **at least one
 second**, and a server at **API level 1 or newer (2.11+)**. The spec is specific that clients should
 assert this with **`$JS.API.INFO`, not the connected server's version string**.
+
+### What the TTL spec actually allows
+
+Three rules from ADR-48, the refinement that added per-key TTL (source: [[s-adr-48-kv-ttl]]):
+
+- **"Limit Markers" is one setting that writes two stream fields** — `allow_msg_ttl: true` and
+  `subject_delete_marker_ttl: <duration>`. So `nats stream info KV_<bucket>` tells you whether a
+  bucket has them.
+- **The duration must be ≥ 1 second**, and the setting is **one-way**: it can be enabled on a bucket
+  that lacks it, and the spec deliberately does not offer disabling it.
+- **A TTL is accepted on `Create` and `Purge` only.** Not on `Put`, and the reason is worth knowing:
+  "a TTL on `Put()` might mean older revisions could come back from the dead once the TTL expires".
+  A `Purge` with a TTL is also the supported replacement for compaction — it removes old subjects
+  permanently while still producing something a watcher can see.
+
+## Mirrors and sources of a bucket
+
+A KV bucket is a stream, so it mirrors and sources like one ([[mirrors-and-sources]]) — but a
+conforming client writes a specific stream config, and knowing it makes `nats stream info` readable
+(source: [[s-adr-57-kv-subject-transforms]], **Proposed**, so verify against the client you use):
+
+- **A KV mirror always gets `mirror_direct` enabled**, and its stream name is `KV_`-prefixed. That is
+  what puts a mirrored bucket into the upstream's Direct Get queue group and gives readers the
+  nearest copy — subject to the alignment rules on [[mirrors-and-sources]].
+- **A KV source gets a subject transform generated for it**: `$KV.<source>.>` → `$KV.<bucket>.>`, so
+  keys land in the destination bucket's own subject space. Sourcing `ORDERS` into `NEW_ORDERS` with
+  a key filter `NEW.>` produces `{"src": "$KV.ORDERS.NEW.>", "dest": "$KV.NEW_ORDERS.>"}`.
+- **Supplying your own transform turns the automation off entirely** — including the `KV_` prefix on
+  the source name. That is how an **ordinary stream becomes a KV source**
+  (`events.processed.>` → `$KV.EVENT_CACHE.>`, a bucket as a materialised view) and how keys can be
+  remapped between buckets (`$KV.INVENTORY.warehouse.*.product.>` → `$KV.PRODUCTS.>` turns
+  `warehouse.nyc.product.item123` into `item123`).
+
+## Keys are subjects, and nothing escapes them for you
+
+A key is a subject token path under `$KV.<bucket>.`, so a key containing a space, or a dot meaning
+something other than a separator, cannot be stored as written — and **the server offers no
+escaping** (source: [[s-adr-54-kv-codecs]], **Proposed**). The proposed answer is entirely
+client-side: key and value codecs wrapped around a normal bucket handle, with `Base64Codec`
+(`"Acme Inc.contact"` → `"QWNtZSBJbmMuY29udGFjdA=="`) and `PathCodec`
+(`user/profile/settings` → `user.profile.settings`) as built-ins.
+
+Two consequences an operator meets before the design does:
+
+- **Encoded keys are what `nats kv ls` shows**, not the application's keys — and a watcher written
+  against a raw key matches nothing, because a codec encodes the filter's wildcards too unless it
+  deliberately does not.
+- **A value codec is client-side encryption**: the server stores ciphertext, so compression and any
+  server-side reading of values stop being meaningful. It is not the same thing as JetStream
+  encryption at rest.
+
+**Key naming is decided before the first `Put`.** Changing it later is a rewrite of the bucket.
+
 
 ## Sharing a bucket with another account
 
@@ -179,8 +232,6 @@ over the account's whole JetStream control plane, not one bucket; narrowing it t
   an ordered consumer that rebuilds itself on a detected gap ([[ordered-consumer]]) — remains a
   candidate cause with no report behind it. The KV-watcher failure people **do** report is
   [[kv-watchers-stall-the-cluster]].
-- **KV sources and mirrors** are delegated to ADR-57, **key/value codecs** to ADR-54, and
-  **per-key TTL detail** to ADR-48. None of the three has been ingested.
 - Whether a **mirror on file storage** is materially slower than on memory storage (Q76) is not
   covered.
 
@@ -194,4 +245,4 @@ over the account's whole JetStream control plane, not one bucket; narrowing it t
 
 [[s-adr-8-key-value-store]] · [[s-adr-43-per-message-ttl]] · [[s-adr-17-ordered-consumer]] ·
 [[s-docs-stream-config]] · [[s-gh-7017-kv-across-accounts]] · [[s-gh-5606-cross-account-jetstream]] ·
-[[s-gh-6746-watch-many-keys]] · [[s-gh-5243-kv-watchers-at-scale]]
+[[s-gh-6746-watch-many-keys]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-adr-48-kv-ttl]] · [[s-adr-57-kv-subject-transforms]] · [[s-adr-54-kv-codecs]]

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [external, api-prefix, deliver-prefix, jetstream-domain, sourcing, mirror, service-import, 10021, 10022, 10024]
 aliases: [cross-domain sourcing, cross domain mirror, source from another domain, external stream, api prefix, deliver prefix]
-sources: [s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-gh-5606-cross-account-jetstream, s-docs-cross-account, s-gh-7438-multi-region-availability]
+sources: [s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-gh-5606-cross-account-jetstream, s-docs-cross-account, s-gh-7438-multi-region-availability, s-adr-59-sourcing-and-mirroring]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -203,6 +203,13 @@ added only for this.
   you at create time if it collides with `$JS.API`. Let `nats stream add` compose it.
 - **A mirror is not a backup.** It follows live writes, so a bad write arrives too, and it keeps no
   earlier state — pair it with [[backup-and-restore-jetstream]].
+- **Cycle detection does not cross the domain boundary.** The server refuses A→B→A inside one
+  account; across domains or accounts "it is the operator's responsibility to ensure that
+  cross-domain configurations do not create replication cycles" — there is no warning and no log
+  line, only a stream pair that never settles (source: [[s-adr-59-sourcing-and-mirroring]]).
+- **The third subject is easy to forget.** ADR-59 lists `$JS.API.CONSUMER.>` (service),
+  the delivery subject (stream) **and `$JS.FC.>` (service)** — flow control back to the origin. A
+  mirror that starts and then stalls with no error is the shape of a missing flow-control import.
 
 ## Related
 

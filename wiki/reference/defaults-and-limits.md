@@ -215,10 +215,17 @@ All read from `nats-server` v2.14.6 (source: [[s-nats-server-topology]]).
 | gateway reconnect delay | **1s** | `gateway.go:39` |
 | gateway PING interval cap | **15s**, or `ping_interval` if smaller | `gateway.go:58` |
 | `leafnodes { min_version }` | must be ≥ **`2.8.0`** if set | `reference/config/leafnodes/min_version.md` |
+| `leafnodes { compression }`, and each remote's | **`s2_auto`** — the reference says `accept` | `opts.go:6082–6089`, `6099–6106`; observed on `/leafz` |
+| `cluster { compression }` | `accept` — here the reference is right | `opts.go:6061–6070` |
+| `mqtt { port }` | **no default** — omitted means no MQTT listener, silently | `mqtt.go:689–694` |
+| `mqtt { max_ack_pending }` | **1024** (`mqttDefaultMaxAckPending`) — the reference says `100` | `mqtt.go:151`, applied at `:3336`, `:5497`, `:5633` |
+| `mqtt { ack_wait }` | **30s** (`mqttDefaultAckWait`) — the reference is right | `mqtt.go:147` |
 | `leafnodes { isolate_leafnode_interest }` | `false`, since **2.12** | `reference/config/leafnodes/isolate_leafnode_interest.md` |
 
-The three "no default" rows contradict the generated config reference, which states `6222`, `7422`
-and `7222` — `inbox/docs-issues.md` #23. See [[config-keys]] and [[leafnode]].
+The four "no default" rows contradict the generated config reference, which states `6222`, `7422`,
+`7222` and `1883` — `inbox/docs-issues.md` #23 and #29. The two compression rows are #27, and
+`max_ack_pending` is #28 (source: [[s-nats-server-defaults-sweep]]). See [[config-keys]] and
+[[leafnode]].
 
 ## Fast-producer stall
 
@@ -264,6 +271,11 @@ states neither the version they were measured against nor the method
 - **Docs-only values** (the JetStream storage percentages, `max_subscriptions`, the CPU and FD rules
   of thumb) come from `raw/nats-docs/learn/deployment/sizing-and-resources.md` and
   `raw/nats-docs/reference/config/`.
+- **The whole documented surface was swept once, mechanically**: `python3 tools/check-defaults.py`
+  compares every default in `inbox/config-keys-table.md` with the option parser, the use sites, the
+  flags and the constants at a tag, and writes `inbox/check-defaults-<tag>.md`. On v2.14.6: 175 of
+  the 216 documented defaults agree, 15 disagree and 26 need a human. Re-run it after a release and
+  diff the report; every disagreement is still verified by hand before it is stated here.
 - **A value stated by neither is absent from this page**, not guessed.
 
 ## What is deliberately not here

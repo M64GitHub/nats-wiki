@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ttl, Nats-TTL, subject_delete_marker_ttl, tombstone, markers]
 aliases: [Nats-TTL, per-message TTL, message TTL, subject delete marker, limit marker]
-sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store]
+sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -82,7 +82,11 @@ marker.
 
 **Markers are off by default**; `subject_delete_marker_ttl` is the opt-in.
 
-KV maps the marker reasons onto its own operations — `MaxAge` and `Purge` become `PURGE`, `Remove`
+KV enables both fields through a single "Limit Markers" setting whose duration must be **at least
+1 second**, accepts a TTL on `Create` and `Purge` **only** — never on `Put`, because expiring a
+current value could resurrect an older revision — and can turn markers on for an existing bucket but
+not off again (source: [[s-adr-48-kv-ttl]]). KV maps the marker reasons onto its own operations —
+`MaxAge` and `Purge` become `PURGE`, `Remove`
 becomes `DEL`. See [[key-value]].
 
 ### Two marker kinds do not exist yet
@@ -123,7 +127,6 @@ description field — which is exactly the case ADR-7 warns not to match on as t
 
 ## To verify
 
-- **ADR-48** carries the detailed per-key TTL configuration for KV and has not been ingested.
 - The server-side **default** for `subject_delete_marker_ttl` (as opposed to its 1-second minimum)
   is not stated; the `StreamConfig` schema lists the field with no default
   (source: [[s-docs-stream-config]]).

@@ -48,18 +48,18 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 43 | ADR-43.md | JetStream Per-Message TTL | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 | [[s-adr-43-per-message-ttl]] |
 | 44 | ADR-44.md | Versioning for JetStream Assets | Implemented | core jetstream | jetstream, server, 2.11, 2.12 | ★ implemented 2.11 2.12 |  |
 | 47 | ADR-47.md | Request Many | Partially Implemented | clients | client, spec, orbit | partial |  |
-| 48 | ADR-48.md | TTL Support for Key-Value Buckets | Implemented | clients jetstream kv | jetstream, client, kv, refinement, 2.11 | implemented refinement 2.11 |  |
+| 48 | ADR-48.md | TTL Support for Key-Value Buckets | Implemented | clients jetstream kv | jetstream, client, kv, refinement, 2.11 | implemented refinement 2.11 | [[s-adr-48-kv-ttl]] |
 | 49 | ADR-49.md | JetStream Distributed Counter CRDT | Approved | jetstream | jetstream, spec, 2.12 | approved 2.12 |  |
 | 50 | ADR-50.md | JetStream Batch Publishing | Approved | clients core jetstream | jetstream, server, client, 2.12, 2.14 | approved 2.12 2.14 |  |
 | 51 | ADR-51.md | JetStream Message Scheduler | Approved | jetstream | jetstream, 2.12, 2.14 | approved 2.12 2.14 |  |
 | 52 | ADR-52.md | No Headers support for Direct Get | Deprecated |  | deprecated | deprecated |  |
 | 53 | ADR-53.md | Feature flags | Proposed | core | server | proposed |  |
-| 54 | ADR-54.md | KV Codecs | Proposed | clients jetstream kv | jetstream, client, spec, orbit, kv, refinement | proposed refinement |  |
+| 54 | ADR-54.md | KV Codecs | Proposed | clients jetstream kv | jetstream, client, spec, orbit, kv, refinement | proposed refinement | [[s-adr-54-kv-codecs]] |
 | 55 | ADR-55.md | Trusted Protocol Aware Proxies | Approved | core | server, 2.12 | approved 2.12 |  |
 | 56 | ADR-56.md | JetStream Consistency Models | Approved | core | server, 2.12 | approved 2.12 |  |
-| 57 | ADR-57.md | KV Subject Transforms | Proposed | clients jetstream kv | jetstream, client, spec, kv, refinement | proposed refinement |  |
+| 57 | ADR-57.md | KV Subject Transforms | Proposed | clients jetstream kv | jetstream, client, spec, kv, refinement | proposed refinement | [[s-adr-57-kv-subject-transforms]] |
 | 58 | ADR-58.md | Key-Value Store Roadmap and future considerations | Proposed | clients jetstream kv | jetstream, client, kv | proposed |  |
-| 59 | ADR-59.md | JetStream Stream Sourcing and Mirroring | Implemented | core jetstream | server, jetstream, spec | ★ implemented |  |
-| 60 | ADR-60.md | JetStream reliable stream sourcing/mirroring on WQ/Interest streams | Implemented | clients core jetstream | jetstream, client, server, 2.14, refinement | ★ implemented refinement 2.14 |  |
-| 61 | ADR-61.md | Unsafe meta group quorum rescue for disaster recovery | Implemented | core jetstream | server, jetstream, 2.15 | ★ implemented 2.15 |  |
+| 59 | ADR-59.md | JetStream Stream Sourcing and Mirroring | Implemented | core jetstream | server, jetstream, spec | ★ implemented | [[s-adr-59-sourcing-and-mirroring]] |
+| 60 | ADR-60.md | JetStream reliable stream sourcing/mirroring on WQ/Interest streams | Implemented | clients core jetstream | jetstream, client, server, 2.14, refinement | ★ implemented refinement 2.14 | [[s-adr-60-reliable-sourcing]] |
+| 61 | ADR-61.md | Unsafe meta group quorum rescue for disaster recovery | Implemented | core jetstream | server, jetstream, 2.15 | ★ implemented 2.15 | [[s-adr-61-meta-quorum-rescue]] |
 | 62 | ADR-62.md | JetStream desired state reconciliation | Implemented | core jetstream | server, jetstream, 2.15 | ★ implemented 2.15 |  |

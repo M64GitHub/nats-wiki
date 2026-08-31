@@ -6,84 +6,299 @@
   "search_placeholder": "search pages, cheat sheets, questions, ADRs…",
   "search_help": "config keys, subjects and flags search as typed (<code>max_ack_pending</code>, <code>$JS.API.STREAM.INFO</code>, <code>--replicas</code>)",
   "types": [
-    {"id": "concept", "folder": "concepts", "label": "Concepts", "color": "amber",
-     "description": "what a thing is and how it behaves: stream, consumer, account, leafnode, gateway, placement, replicas, retention, ack"},
-    {"id": "internals", "folder": "internals", "label": "Internals", "color": "violet",
-     "description": "how the server actually does it — raft, filestore layout, meta layer, stream/consumer state — included only where it explains observable behaviour"},
-    {"id": "operation", "folder": "operations", "label": "Operations", "color": "cyan",
-     "description": "things you do: runbooks (install, cluster, upgrade, TLS, auth, backup), sizing procedures, and deployment patterns",
-     "kinds": [
-       {"id": "runbook", "label": "Runbooks"}, {"id": "sizing", "label": "Sizing"}, {"id": "pattern", "label": "Patterns"}]},
-    {"id": "gotcha", "folder": "gotchas", "label": "Gotchas", "color": "orange",
-     "description": "symptom-first pages: the observed symptom, causes ranked by likelihood, how to confirm each, the fix, and the internals page that explains it"},
-    {"id": "reference", "folder": "reference", "label": "Reference", "color": "blue",
-     "description": "lookup tables an agent hits first: config keys, defaults and limits, $JS.API subjects, nats CLI, monitoring endpoints, error codes"},
-    {"id": "entity", "folder": "entities", "label": "Entities", "color": "pink",
-     "description": "the nouns: repos, clients, tools, releases, organisations, commercial products, people",
-     "kinds": [
-       {"id": "repo", "label": "Repos"}, {"id": "client", "label": "Clients"}, {"id": "tool", "label": "Tools"}, {"id": "release", "label": "Releases"}, {"id": "product", "label": "Products"}, {"id": "org", "label": "Organisations"}, {"id": "person", "label": "People"}]},
-    {"id": "summary", "folder": "summaries", "label": "Summaries", "color": "green", "prefix": "s-",
-     "description": "one page per ingested source or article: the citation anchor for every claim"}
+    {
+      "id": "concept",
+      "folder": "concepts",
+      "label": "Concepts",
+      "color": "amber",
+      "description": "what a thing is and how it behaves: stream, consumer, account, leafnode, gateway, placement, replicas, retention, ack"
+    },
+    {
+      "id": "internals",
+      "folder": "internals",
+      "label": "Internals",
+      "color": "violet",
+      "description": "how the server actually does it — raft, filestore layout, meta layer, stream/consumer state — included only where it explains observable behaviour"
+    },
+    {
+      "id": "operation",
+      "folder": "operations",
+      "label": "Operations",
+      "color": "cyan",
+      "description": "things you do: runbooks (install, cluster, upgrade, TLS, auth, backup), sizing procedures, and deployment patterns",
+      "kinds": [
+        {
+          "id": "runbook",
+          "label": "Runbooks"
+        },
+        {
+          "id": "sizing",
+          "label": "Sizing"
+        },
+        {
+          "id": "pattern",
+          "label": "Patterns"
+        }
+      ]
+    },
+    {
+      "id": "gotcha",
+      "folder": "gotchas",
+      "label": "Gotchas",
+      "color": "orange",
+      "description": "symptom-first pages: the observed symptom, causes ranked by likelihood, how to confirm each, the fix, and the internals page that explains it"
+    },
+    {
+      "id": "reference",
+      "folder": "reference",
+      "label": "Reference",
+      "color": "blue",
+      "description": "lookup tables an agent hits first: config keys, defaults and limits, $JS.API subjects, nats CLI, monitoring endpoints, error codes"
+    },
+    {
+      "id": "entity",
+      "folder": "entities",
+      "label": "Entities",
+      "color": "pink",
+      "description": "the nouns: repos, clients, tools, releases, organisations, commercial products, people",
+      "kinds": [
+        {
+          "id": "repo",
+          "label": "Repos"
+        },
+        {
+          "id": "client",
+          "label": "Clients"
+        },
+        {
+          "id": "tool",
+          "label": "Tools"
+        },
+        {
+          "id": "release",
+          "label": "Releases"
+        },
+        {
+          "id": "product",
+          "label": "Products"
+        },
+        {
+          "id": "org",
+          "label": "Organisations"
+        },
+        {
+          "id": "person",
+          "label": "People"
+        }
+      ]
+    },
+    {
+      "id": "summary",
+      "folder": "summaries",
+      "label": "Summaries",
+      "color": "green",
+      "prefix": "s-",
+      "description": "one page per ingested source or article: the citation anchor for every claim"
+    }
   ],
   "facets": [
-    {"key": "area", "label": "Area",
-     "values": {
-       "core": "Core NATS",
-       "jetstream": "JetStream",
-       "kv": "Key-Value",
-       "objectstore": "Object Store",
-       "security": "Security & auth",
-       "topology": "Clustering & topology",
-       "monitoring": "Monitoring",
-       "deploy": "Deployment & k8s",
-       "clients": "Clients",
-       "interop": "MQTT / WebSocket"}},
-    {"key": "since", "label": "Since",
-     "values": {
-       "2.10": "2.10+",
-       "2.11": "2.11+",
-       "2.12": "2.12+",
-       "2.14": "2.14+",
-       "2.15": "2.15 (preview)"}}
+    {
+      "key": "area",
+      "label": "Area",
+      "values": {
+        "core": "Core NATS",
+        "jetstream": "JetStream",
+        "kv": "Key-Value",
+        "objectstore": "Object Store",
+        "security": "Security & auth",
+        "topology": "Clustering & topology",
+        "monitoring": "Monitoring",
+        "deploy": "Deployment & k8s",
+        "clients": "Clients",
+        "interop": "MQTT / WebSocket"
+      }
+    },
+    {
+      "key": "since",
+      "label": "Since",
+      "values": {
+        "2.10": "2.10+",
+        "2.11": "2.11+",
+        "2.12": "2.12+",
+        "2.14": "2.14+",
+        "2.15": "2.15 (preview)"
+      }
+    }
   ],
   "cheatsheets": {
-    "type": "entity", "kind": "tool", "heading": "cheat sheet", "section_type": "operation",
-    "skip_headings": ["related", "sources", "to verify", "history"],
-    "skip_prefixes": ["what it is", "where it fits", "install"],
+    "type": "entity",
+    "kind": "tool",
+    "heading": "cheat sheet",
+    "section_type": "operation",
+    "skip_headings": [
+      "related",
+      "sources",
+      "to verify",
+      "history"
+    ],
+    "skip_prefixes": [
+      "what it is",
+      "where it fits",
+      "install"
+    ],
     "description": "The reference tables from every tool page plus the per-tool ### sections of every operations page, collected by tool. Pick a tool, or open the standalone version to print it. Topic-wide tables (defaults and limits, $JS.API subjects, config keys) live under Reference."
   },
   "tocs": [
-    {"file": "inbox/question-bank.md", "id": "q", "title": "Question bank — what this wiki must answer",
-     "nav": "Questions", "label": "question",
-     "num_column": "#", "title_column": "question",
-     "flags_column": "flags", "summary_column": "answered by", "star": "★",
-     "meta_columns": ["area", "asked at", "flags"],
-     "filters": [{"flag": "★", "label": "★ core question"}, "sizing", "gotcha", "config", "security", "topology"]},
-    {"file": "inbox/adr-toc.md", "id": "adr", "title": "ADRs — nats-architecture-and-design",
-     "nav": "ADRs", "label": "ADR",
-     "collection": "adr", "file_column": "file",
-     "num_column": "#", "title_column": "title",
-     "flags_column": "flags", "summary_column": "summary", "star": "★",
-     "meta_columns": ["#", "status", "area", "flags"],
-     "filters": [{"flag": "★", "label": "★ shipped server behaviour"}, "implemented", "partial", "approved", "proposed", "deprecated", "refinement"]},
-    {"file": "inbox/docs-issues.md", "id": "docs", "title": "Docs issues — errors and gaps found in public NATS docs",
-     "nav": "Docs issues", "label": "issue",
-     "num_column": "#", "title_column": "issue",
-     "flags_column": "severity", "summary_column": "status", "star": "★",
-     "meta_columns": ["where", "kind", "severity"],
-     "filters": [{"flag": "★", "label": "★ confirmed error"}, "wrong-value", "missing", "enhancement"]},
-    {"file": "inbox/config-keys-table.md", "id": "cfg", "title": "Config keys — docs.nats.io reference/config",
-     "nav": "Config keys", "label": "config key",
-     "collection": "nats-docs", "file_column": "file",
-     "num_column": "", "title_column": "key",
-     "flags_column": "reload", "summary_column": "cited by", "star": "",
-     "meta_columns": ["type", "default", "reload"],
-     "filters": [{"flag": "reloadable", "label": "hot reloadable"}, "restart-only"]}
+    {
+      "file": "inbox/question-bank.md",
+      "id": "q",
+      "title": "Question bank — what this wiki must answer",
+      "nav": "Questions",
+      "label": "question",
+      "num_column": "#",
+      "title_column": "question",
+      "flags_column": "flags",
+      "summary_column": "answered by",
+      "star": "★",
+      "meta_columns": [
+        "area",
+        "asked at",
+        "flags"
+      ],
+      "filters": [
+        {
+          "flag": "★",
+          "label": "★ core question"
+        },
+        "sizing",
+        "gotcha",
+        "config",
+        "security",
+        "topology"
+      ]
+    },
+    {
+      "file": "inbox/adr-toc.md",
+      "id": "adr",
+      "title": "ADRs — nats-architecture-and-design",
+      "nav": "ADRs",
+      "label": "ADR",
+      "collection": "adr",
+      "file_column": "file",
+      "num_column": "#",
+      "title_column": "title",
+      "flags_column": "flags",
+      "summary_column": "summary",
+      "star": "★",
+      "meta_columns": [
+        "#",
+        "status",
+        "area",
+        "flags"
+      ],
+      "filters": [
+        {
+          "flag": "★",
+          "label": "★ shipped server behaviour"
+        },
+        "implemented",
+        "partial",
+        "approved",
+        "proposed",
+        "deprecated",
+        "refinement"
+      ]
+    },
+    {
+      "file": "inbox/docs-issues.md",
+      "id": "docs",
+      "title": "Docs issues — errors and gaps found in public NATS docs",
+      "nav": "Docs issues",
+      "label": "issue",
+      "num_column": "#",
+      "title_column": "issue",
+      "flags_column": "severity",
+      "summary_column": "status",
+      "star": "★",
+      "meta_columns": [
+        "where",
+        "kind",
+        "severity"
+      ],
+      "filters": [
+        {
+          "flag": "★",
+          "label": "★ confirmed error"
+        },
+        "wrong-value",
+        "missing",
+        "enhancement"
+      ]
+    },
+    {
+      "file": "inbox/config-keys-table.md",
+      "id": "cfg",
+      "title": "Config keys — docs.nats.io reference/config",
+      "nav": "Config keys",
+      "label": "config key",
+      "collection": "nats-docs",
+      "file_column": "file",
+      "num_column": "",
+      "title_column": "key",
+      "flags_column": "reload",
+      "summary_column": "cited by",
+      "star": "",
+      "meta_columns": [
+        "type",
+        "default",
+        "reload"
+      ],
+      "filters": [
+        {
+          "flag": "reloadable",
+          "label": "hot reloadable"
+        },
+        "restart-only"
+      ]
+    },
+    {
+      "file": "inbox/check-defaults-v2.14.6.md",
+      "id": "def",
+      "title": "Config defaults — docs vs nats-server v2.14.6",
+      "nav": "Defaults check",
+      "label": "default",
+      "num_column": "",
+      "title_column": "key",
+      "flags_column": "verdict",
+      "summary_column": "note",
+      "star": "★",
+      "meta_columns": [
+        "docs",
+        "server",
+        "via"
+      ],
+      "filters": [
+        {
+          "flag": "★",
+          "label": "★ docs and server disagree"
+        },
+        "unresolved",
+        "agrees"
+      ]
+    }
   ],
   "raw_collections": {
-    "adr": {"name_pattern": "ADR-(\\d+)", "title": "ADR-{n}"},
-    "nats-docs": {"title": "docs.nats.io — {name}"},
-    "release-notes": {"name_pattern": "v?(\\d+\\.\\d+\\.\\d+)", "title": "nats-server {name}"}
+    "adr": {
+      "name_pattern": "ADR-(\\d+)",
+      "title": "ADR-{n}"
+    },
+    "nats-docs": {
+      "title": "docs.nats.io — {name}"
+    },
+    "release-notes": {
+      "name_pattern": "v?(\\d+\\.\\d+\\.\\d+)",
+      "title": "nats-server {name}"
+    }
   },
   "stub_words": 180
 }

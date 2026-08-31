@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -119,6 +119,32 @@ Two consequences during a version change:
   but will operate under the less reliable ephemeral consumer mode", and any durable consumers
   created with `AckFlowControl` are **marked "offline" and unusable until upgraded back to 2.14**.
 
+### What the durable replication consumer looks like
+
+ADR-60 is the spec behind that change, and it names things an operator will meet in
+`nats consumer ls` (source: [[s-adr-60-reliable-sourcing]]):
+
+- The consumer is **visible**, named `JS_MIRROR_<suffix>` or `JS_SRC_<suffix>`, and carries metadata
+  `_nats.mirror.stream` / `_nats.src.stream` (plus `.acc`, and `.domain` when set) naming the stream
+  that created it. For a Limits upstream the replication consumer stays hidden instead.
+- **Removing the source removes it only on a best-effort basis** — a leftover `JS_SRC_*` after a
+  config change is yours to delete.
+- `AckFlowControl` behaves like `AckAll`, driven by `Nats-Last-Stream` / `Nats-Last-Consumer`
+  headers on the flow-control replies; such a consumer must have `AckWait` and `BackOff` **unset**
+  and `MaxDeliver: -1`.
+- The upstream server must be at **API level 4** — the request carries
+  `Nats-Required-Api-Level: 4` (`stream.go:3679`, 2.14.6).
+- On a **WorkQueue** upstream the durable consumer still obeys the overlap rule: it blocks any other
+  consumer with an overlapping filter. A queue that must be both worked and replicated should be an
+  `interest` stream instead.
+
+Why it was needed at all, from ADR-59: on a WorkQueue the old replication consumer was a `Direct`
+consumer that **bypassed the subject-overlap check** and could silently double-consume a partition;
+on an `interest` stream its 10s inactive threshold meant a longer outage left nobody holding
+interest, and new messages were removed before they could be copied
+(source: [[s-adr-59-sourcing-and-mirroring]]).
+
+
 ## To verify
 
 - How `interest` and `workqueue` interact with stream **republish** is referenced by the docs but
@@ -132,4 +158,4 @@ Two consequences during a version change:
 ## Sources
 
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
-[[s-docs-acknowledgment]]
+[[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]]

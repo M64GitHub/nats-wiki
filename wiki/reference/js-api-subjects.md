@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -86,7 +86,8 @@ if you are building ACLs from that tree alone:
 |---|---|---|
 | **`$JS.API.DIRECT.GET.<stream>`** | [[direct-get]] — criteria in the request payload (`seq`, `last_by_subj`, `next_by_subj`, `batch`, `multi_last`, …). Queue group **`_sys_`** | [[s-adr-31-direct-get]] |
 | **`$JS.API.DIRECT.GET.<stream>.>`** | **Subject-Appended** Direct Get: the tokens after the stream name *are* the `last_by_subj`. Exists so subject-level permissions and cross-account grants can restrict which subjects are readable. A request payload here is a `408` | [[s-adr-31-direct-get]] |
-| **`$JS.API.CONSUMER.RESET.<stream>.<consumer>`** | consumer delivery-state reset, **added in 2.14** | [[s-relnotes-2.14.0]] |
+| **`$JS.API.META.RESCUE`** | **2.15 only** (not in 2.14.6): broadcast on the **system account**, body `{"quorum_needed": <n>}`, temporarily lowering each surviving server's effective meta quorum for 5 minutes so a leader can be elected and dead peers removed. Rejects with `10224`; a request on any other account is silently ignored — [[disaster-recovery]] | [[s-adr-61-meta-quorum-rescue]] |
+| **`$JS.API.CONSUMER.RESET.<stream>.<consumer>`** | consumer delivery-state reset, **added in 2.14**. Empty payload = reset the delivery state, leaving the ack floor's *stream* sequence where it is; `{"seq":<n>}` = move that floor to one below `<n>`, so the next delivery is `msg.seq >= n`. Allowed only on `DeliverPolicy` `all`, `by_start_sequence` or `by_start_time`, and for the latter two only forward of what the start policy allowed. The reply is shaped like a consumer-create response plus the `ResetSeq` used | [[s-relnotes-2.14.0]] · [[s-adr-60-reliable-sourcing]] |
 
 Both Direct Get subjects exist **only when the stream sets `allow_direct`** — otherwise there is no
 responder and a request times out with no error. Mirrors with `mirror_direct` join the *upstream's*

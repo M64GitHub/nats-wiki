@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -86,6 +86,16 @@ Connect and disconnect are published per account on `$SYS.ACCOUNT.<account>.CONN
 Separately, each server publishes a **`STATSZ` heartbeat on `$SYS.SERVER.<id>.STATSZ`** on a fixed
 interval, carrying the same kind of summary numbers as `/varz` — **pushed instead of polled**, so a
 listener has a steady pulse from every node (source: [[s-docs-monitoring-endpoints]]).
+
+### Coming in 2.15: the meta-rescue advisory
+
+Not in 2.14.6. When a server applies an unsafe meta-quorum rescue it logs a `WARN` **and** publishes
+`$JS.EVENT.ADVISORY.SERVER.META_RESCUE` (`io.nats.jetstream.advisory.v1.meta_rescue`) carrying
+`server`, `server_id`, `prev_quorum`, `new_quorum`, `cluster` and `domain` (the last only when a
+domain is configured). It is worth wiring in advance: an advisory is an ordinary published message
+and "does not depend on the meta leader", so it arrives while the meta layer has no quorum — the one
+moment nothing else about the cluster answers. See [[disaster-recovery]]
+(source: [[s-adr-61-meta-quorum-rescue]]).
 
 ## A docs error worth knowing
 

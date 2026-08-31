@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -259,6 +259,27 @@ docs' own pages are the place for them. The fields above are the ones this wiki 
 explain. `/raftz`'s field set, in particular, is referenced by [[raft-in-nats]] but **has not been
 ingested** — it is the next monitoring source worth taking.
 
+## Seeing the internal replication consumers
+
+The consumers a mirror or source runs on its upstream are hidden from the consumer API by a `Direct`
+flag, so `nats consumer ls` will not show them (for a Limits upstream; 2.14 makes them visible for
+WorkQueue and Interest — [[mirrors-and-sources]]). `/jsz` will, on request:
+
+```
+curl -s 'http://127.0.0.1:8222/jsz?streams=true&consumers=true&direct-consumers=true&config=true&acc=APP'
+```
+
+`direct-consumers` requires `consumers=true`; the result adds `direct_consumer_detail` to each
+`StreamDetail`, a full `ConsumerInfo` per replication consumer whose delivered and ack-floor
+sequences can be compared against the upstream's state. The same `StreamDetail` carries `mirror` and
+`sources` (each a `StreamSourceInfo` with `lag`, `active` and `error`) whenever `streams=true`, and
+the identical data is available over NATS at `$SYS.REQ.SERVER.PING.JSZ`
+(source: [[s-adr-59-sourcing-and-mirroring]]).
+
+Other `/jsz` selectors from the same spec: `acc`, `leader-only`, `stream-leader-only`, `raft`,
+`offset` and `limit`.
+
+
 ## Related
 
 [[slow-consumer-detected]] · [[raft-in-nats]] · [[jetstream-sizing]] · [[js-api]] ·
@@ -267,4 +288,4 @@ ingested** — it is the next monitoring source worth taking.
 
 ## Sources
 
-[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] · [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] · [[s-docs-putting-it-together]]
+[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] · [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] · [[s-docs-putting-it-together]] · [[s-adr-59-sourcing-and-mirroring]]

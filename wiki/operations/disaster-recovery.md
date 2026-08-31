@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [disaster-recovery, promotion, failover, mirror, lag, rpo, 10065, meta-quorum, dr]
 aliases: [DR, failover, "promote a mirror", "site loss", "recover a stream", RPO]
-sources: [s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-docs-stream-backup-restore, s-natscli-backup-restore, s-docs-surviving-node-loss]
+sources: [s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-docs-stream-backup-restore, s-natscli-backup-restore, s-docs-surviving-node-loss, s-adr-61-meta-quorum-rescue]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -163,7 +163,8 @@ the lag first — always.
 
 **Assuming the meta group survived.** If the lost site held the meta majority, every command in this
 runbook fails until quorum returns. This is the failure mode that turns a 5-minute promotion into an
-outage, and it is prevented only at design time.
+outage, and on 2.14 it is prevented at design time and at retirement time — see *When the meta group
+itself is what you lost* below, and peer-remove servers when you switch them off.
 
 **Treating R3 as DR.** It is not on any row of the table.
 
@@ -172,6 +173,46 @@ archive. Rehearse restores on a schedule; quarterly is the docs' minimum.
 
 **Forgetting the identity plane.** A restored stream nobody can authenticate against is not a
 recovery — [[backup-and-restore-identity]].
+
+## When the meta group itself is what you lost
+
+The precondition above — *the metadata group must still hold quorum* — has one shape that catches
+healthy-looking clusters, and on **2.14 there is only one way out of it** (source:
+[[s-adr-61-meta-quorum-rescue]]).
+
+**The trap.** Raft computes quorum from the **configured** peer set, not the live one. Grow a 3-node
+cluster to 5 for a migration, switch the two extras off without `nats server cluster peer-remove`, and
+the meta group still needs 3 votes of 5. One failure among the three survivors leaves two reachable
+peers, no meta leader — and no leader means no peer-remove either, so the meta layer stalls with no
+way to shrink itself. Every command in this runbook fails there.
+
+**On 2.14.6 the only supported remedy** is to bring **every** previously configured peer back at
+once, under the same server names, let a leader be elected, and then peer-remove the dead ones:
+
+```
+nats server cluster peer-remove <server-name>       # system-account credentials, one server at a time
+```
+
+Which assumes the hosts still exist and their names are known — often false in the outage that
+caused this.
+
+**On 2.15 (preview only as of 2026-08-31)** there is an explicitly unsafe rescue:
+`$JS.API.META.RESCUE` on the **system account**, body `{"quorum_needed": <n>}`, broadcast to every
+JetStream server. Each survivor lowers its own effective meta quorum to `<n>` for **5 minutes** if,
+and only if, it is a voting member, sees no meta leader, and its own Raft log is not empty. That is
+enough to elect a leader and run the peer-remove normally. It logs a `WARN`, publishes
+`$JS.EVENT.ADVISORY.SERVER.META_RESCUE`, and rejects with **`10224`** (`JetStream system rescue not
+applied: {err}`) when a check fails. A request on any account other than the system account is
+**silently ignored**, so a missing reply means "not eligible or not there", never "no".
+
+Choose `<n>` from `/jsz` on the survivors: 2.15 populates `meta_cluster.replicas` on **every**
+server rather than only the leader — precisely because there is no leader here — and adds
+`meta_cluster.quorum_needed` and a `meta_cluster.rescue` flag.
+
+**Prevention is one habit**: peer-remove a server when you retire it, not later. The rescue is a
+last resort, and lowering a Raft quorum "weakens the guarantees Raft relies on to prevent divergent
+logs".
+
 
 ## Related
 
@@ -183,4 +224,4 @@ recovery — [[backup-and-restore-identity]].
 ## Sources
 
 [[s-docs-disaster-recovery]] · [[s-docs-mirrors-as-dr]] · [[s-docs-stream-backup-restore]] ·
-[[s-natscli-backup-restore]] · [[s-docs-surviving-node-loss]]
+[[s-natscli-backup-restore]] · [[s-docs-surviving-node-loss]] · [[s-adr-61-meta-quorum-rescue]]

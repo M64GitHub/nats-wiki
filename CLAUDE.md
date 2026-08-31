@@ -69,11 +69,17 @@ nats-wiki/
     question-bank.md   the questions this wiki must answer; the scope test and the scoreboard
     docs-issues.md     errors and gaps found in the public docs, verified against the
                        server source — a report to send upstream, not a wiki page
+    check-defaults-<tag>.md  every documented config default vs the server, generated
+    staleness.md       pages whose version-bearing claims need re-checking, generated
     adr-toc.md         one row per ADR of nats-architecture-and-design
     config-keys-table.md  every documented config key, generated from raw/nats-docs/
     plan-*.md          the step list a session works through (see Operation: plan)
   tools/             build-site.py (viewer), lint.py, html-to-text.py, extract-forum-posts.py,
                      add-section.py (ripple helper), pdf-to-text.swift,
+                     check-defaults.py (every documented config default vs the server at a tag ->
+                       inbox/check-defaults-<tag>.md), check-staleness.py (pages whose
+                       version-bearing claims are behind the release they name -> inbox/staleness.md,
+                       and a warning line in lint.py),
                      fetch-docs.py (a doc site -> raw/, driven by its llms.txt; for this
                        wiki: `python3 tools/fetch-docs.py https://docs.nats.io
                        --collection nats-docs <prefix…>`),
@@ -375,9 +381,15 @@ violates the schema, duplicate pages under different slugs, and **question-bank
 rows with no `answered by`**.
 
 Start with `python3 tools/lint.py` (broken links, orphans, frontmatter, index
-coverage, unverified count), then read for contradictions, staleness and
-version drift. Report findings. Fix mechanical issues (links, index,
-frontmatter) directly. Ask before rewriting or merging major pages.
+coverage, unverified count, and a staleness warning line). Then
+`python3 tools/check-staleness.py` for the table of pages whose `verified-against`
+is behind the release they name — it checks each page against **the authority that
+page names**, and deliberately ignores pages stating none of the six versioned
+things. After a server release, also `python3 tools/check-defaults.py --tag <new
+tag>` and diff its report against the previous one; that diff is the default
+change layer. Then read for the contradictions and drift no tool can see. Report
+findings. Fix mechanical issues (links, index, frontmatter) directly. Ask before
+rewriting or merging major pages.
 
 A contradiction between two **wiki pages** is a wiki bug — fix it. A contradiction
 between a wiki page and its **source**, or between two sources, is a

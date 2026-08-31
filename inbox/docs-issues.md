@@ -15,7 +15,12 @@ factually wrong.
 - `status` is this wiki's handling, not the upstream state.
 
 Rows 1–10 were found while working `inbox/plan-first-ingests-2026-08-31.md`; rows 11–26 while
-working `inbox/plan-runbooks-and-security-2026-08-31.md`. Verified against **nats-server v2.14.6**
+working `inbox/plan-runbooks-and-security-2026-08-31.md`; rows 27–29 by the **mechanical sweep** of
+`inbox/plan-drift-and-adrs-2026-08-31.md` step 1 — `tools/check-defaults.py` compared **all 216
+documented defaults** in `inbox/config-keys-table.md` against the option parser, the use sites, the
+flags and the constants of `nats-server` v2.14.6 (report: `inbox/check-defaults-v2.14.6.md`). That
+sweep re-derived #19, #22 and #23 from the source with no human input, found the three below, and
+left 26 keys it could not resolve — those are listed in the report for a human, not guessed at. Verified against **nats-server v2.14.6**
 and the docs tree fetched **2026-08-31**. Where a row says *observed*, the behaviour was **run on the
 v2.14.6 binary**, not only read from the source at that tag; the configs and output are in
 `raw/nats-server-src/topology-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
@@ -49,6 +54,9 @@ row.
 | 23 | **The three topology listener ports are documented with defaults the server never applies**: `cluster.port` `6222`, `leafnodes.port` `7422` and `gateway.port` `7222`. Omitting `cluster.port` or `leafnodes.port` opens **no listener, silently**; omitting `gateway.port` **stops the server from starting** | `reference/config/cluster.md`, `reference/config/leafnodes.md`, `reference/config/gateway.md` | wrong-value | ★ medium | wiki states "no default" and the per-key consequence |
 | 24 | The chapter's **composed topology config does not start** — `cluster {}` + `gateway {}` + `leafnodes { listen }` with no `system_account` fails validation, and `nats-server -t` reports the same file valid | `learn/topologies/putting-it-together.md`, `learn/deployment/config-management.md` | wrong-value | ★ medium | wiki quotes the error and says `-t` is a syntax check |
 | 25 | The fast-producer stall — the mechanism by which one slow destination throttles a publisher — is **absent from the 861-page tree**, along with both counters that expose it (`/varz` `stalled_clients`, `/connz` `stalls`) and its log line | whole tree; `learn/monitoring/monitoring-endpoints.md`, `learn/topologies/super-clusters.md` | missing | ★ medium | wiki documents both counters, the constants and the geo-affinity caveat |
+| 27 | The **leafnode compression default is `accept`** in the reference; the server defaults both the listener and every remote to **`s2_auto`**. The two behave differently on the wire | `reference/config/leafnodes/compression.md` + `leafnodes/remotes/compression.md` and their `mode` pages | wrong-value | ★ medium | wiki states the server value, observed |
+| 28 | `mqtt.max_ack_pending` is documented as `100`; the server's default is **1024** | `reference/config/mqtt.md` | wrong-value | medium | wiki states the server value |
+| 29 | `mqtt.port` is documented as defaulting to `1883`; the server applies **no default** — `mqtt { }` with no port starts **no MQTT listener**, silently | `reference/config/mqtt.md` | wrong-value | ★ medium | wiki states "no default", as for the other listeners |
 | 26 | Four `leafnodes.remotes` keys are published with a **completely empty description**: `hub`, `deny_imports`, `deny_exports`, `jetstream_cluster_migrate` — including the two keys the only public question on the topic asks about | `reference/config/leafnodes/remotes.md` and the four property pages | missing | medium | wiki states what the two deny keys do, from the source |
 
 ---
@@ -1218,6 +1226,138 @@ reference pages, and in all three cases a **hand-written** page (a learn page, a
 correct value. A generator that cross-checked its output against the server constants it claims to
 describe would have caught all three.
 
+## 27 · The documented leafnode compression default is `accept`; the server uses `s2_auto` ★
+
+**Impact: a leafnode link compresses by default, and the docs say it does not.** Compression is a
+CPU/bandwidth trade, so this is the kind of default an operator sizes against — and the two values
+produce visibly different connections.
+
+`reference/config/leafnodes/compression.md`, *Properties*:
+
+| Name | Type | Default | Reloadable |
+|---|---|---|---|
+| `mode` | `string` | `accept` | Yes |
+
+`reference/config/leafnodes/remotes/compression.md` publishes the same `accept` for the remote side.
+The same page explains what `accept` means, which is why the value matters:
+
+> "The value of `accept` indicates it will inherit the mode of the server it is connecting to. If
+> both have `accept`, no compression will be used."
+
+**Evidence — the server** (`server/opts.go`, `setBaselineOptions()`, v2.14.6), for the listener and
+for every remote, each with the comment stating the intent:
+
+```go
+6082:		// Default to compression "s2_auto".
+6083:		if c := &opts.LeafNode.Compression; c.Mode == _EMPTY_ {
+6087:				c.Mode = CompressionS2Auto
+
+6099:			// Default to compression "s2_auto".
+6100:			if c := &r.Compression; c.Mode == _EMPTY_ {
+6104:					c.Mode = CompressionS2Auto
+```
+
+The `accept` default twenty lines earlier is the **route** (cluster) one, `opts.go:6061–6070` — where
+the reference is right. The docs look like they carried the cluster value across to the leafnode
+pages.
+
+**Evidence — observed on v2.14.6** (`raw/nats-server-src/defaults-observed-v2.14.6.md`). A hub and a
+leaf with nothing but a port and a remote URL:
+
+```
+$ curl -s http://127.0.0.1:8223/leafz | grep compression
+      "compression": "s2_uncompressed"
+```
+
+`s2_uncompressed` is the level `s2_auto` picks while the RTT is under the first threshold
+(`selectS2AutoModeBasedOnRTT`, `server/server.go:625`). Setting the *documented* default explicitly
+on both sides gives a different connection:
+
+```
+$ curl -s http://127.0.0.1:8225/leafz | grep compression
+      "compression": "off"
+```
+
+**Suggested fix:** set the `Default` cell on both leafnode compression pages to `s2_auto`, and check
+whether the generator is copying the route block's defaults into the leafnode block — `gateway`'s
+compression pages are worth the same look.
+
+---
+
+## 28 · `mqtt.max_ack_pending` is documented as 100; the server's default is 1024
+
+`reference/config/mqtt.md`, *Properties*, states `100`. The key's own page
+(`reference/config/mqtt/max_ack_pending.md`) explains the range `[0..65535]` and the 65535 session
+total but states no default, so the parent table is the only place a reader can get one.
+
+**Evidence** (`server/mqtt.go`, v2.14.6):
+
+```go
+149:	// This is the default for the outstanding number of pending QoS 1
+150:	// messages sent to a session with QoS 1 subscriptions.
+151:	mqttDefaultMaxAckPending = 1024
+```
+
+applied wherever the option is read — `mqttSessionCreate` (`mqtt.go:3336–3339`) and the two
+subscription paths (`mqtt.go:5497–5500`, `mqtt.go:5633–5636`), all in the shape
+`if maxAckPending == 0 { maxAckPending = mqttDefaultMaxAckPending }`.
+
+Because the default is applied at the use site, the option itself stays zero, and `/varz` — which
+tags the field `omitempty` — omits it, confirming the server holds no `100`:
+
+```
+$ curl -s http://127.0.0.1:8226/varz | jq .mqtt
+{ "host": "0.0.0.0", "port": 1883, "tls_timeout": 2 }
+```
+
+`mqtt.ack_wait`'s documented `30s` is **correct** by the same mechanism (`mqttDefaultAckWait`,
+`mqtt.go:147`), so this is one wrong cell in a table whose neighbours are right.
+
+**Suggested fix:** `100` → `1024` in the `mqtt.md` properties table.
+
+---
+
+## 29 · `mqtt.port` is documented as `1883`; the server applies no default ★
+
+**Impact: identical to #23 — a config that looks complete opens no listener, and the server says
+nothing.** This is the fourth listener with a published default the server never applies; #23
+covers `cluster.port`, `leafnodes.port` and `gateway.port`.
+
+`reference/config/mqtt.md`, *Properties*, gives `port` the default `1883`. The string `1883` does
+not appear anywhere in the non-test server source at v2.14.6.
+
+**Evidence** (`server/mqtt.go`):
+
+```go
+689:func validateMQTTOptions(o *Options) error {
+690:	mo := &o.MQTT
+691:	// If no port is defined, we don't care about other options
+692:	if mo.Port == 0 {
+693:		return nil
+694:	}
+```
+
+`server/websocket.go:1125` opens `validateWebsocketOptions()` with the same two lines — and the docs
+are right about websocket, where they state no default port.
+
+**Evidence — observed on v2.14.6**, `mqtt { }` with no port, JetStream enabled:
+
+```
+[4152] 2026/08/31 08:07:28.199923 [INF] Starting JetStream
+   … no "Listening for MQTT clients" line …
+$ curl -s http://127.0.0.1:8227/varz | jq .mqtt
+{}
+```
+
+and with `port: 1883` set explicitly, the same binary logs
+`[INF] Listening for MQTT clients on mqtt://0.0.0.0:1883`.
+
+**Suggested fix:** state "no default" and say what omitting it does, as for `cluster.port` and
+`leafnodes.port`. The four listener pages should be fixed together — one generator is producing all
+of them.
+
+---
+
 ## Where the wiki records each of these
 
 | # | wiki page |
@@ -1246,3 +1386,5 @@ describe would have caught all three.
 | 24 | `wiki/operations/reload-server-config.md` — the dry-run section; `wiki/operations/build-a-3-node-cluster.md` — *If this cluster will also carry a gateway or leafnodes*; `wiki/summaries/s-docs-putting-it-together.md` |
 | 25 | `wiki/reference/monitoring-endpoints.md` — *The two stall counters*; `wiki/reference/defaults-and-limits.md` — *Fast-producer stall*; `wiki/gotchas/supercluster-slows-when-a-remote-subscriber-joins.md`; `wiki/concepts/gateway.md` — *Geo-affinity, precisely* |
 | 26 | `wiki/concepts/leafnode.md` — *Restricting what crosses*; `wiki/summaries/s-gh-5941-restrict-leafnode-subjects.md` |
+| 27 | `wiki/concepts/leafnode.md` — *Compression is on by default*; `wiki/reference/defaults-and-limits.md` — *Topology — leafnodes and gateways*; `wiki/reference/config-keys.md` — *`leafnodes { … }`* |
+| 28–29 | `wiki/reference/config-keys.md` — *`websocket { … }` and `mqtt { … }`*; `wiki/reference/defaults-and-limits.md` — *Topology — leafnodes and gateways* |

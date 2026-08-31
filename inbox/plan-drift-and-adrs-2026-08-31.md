@@ -28,7 +28,7 @@ still unread.
 
 ---
 
-## Step 1 — `tools/check-defaults.py`: sweep the generated config reference · status: open
+## Step 1 — `tools/check-defaults.py`: sweep the generated config reference · status: done 2026-08-31 — 216 defaults swept, 3 new docs issues (#27–#29), s-nats-server-defaults-sweep
 
 Not an ingest. A tool, then the findings it produces.
 
@@ -48,7 +48,7 @@ Then run it, verify every disagreement by hand against the source before recordi
 pages and in *"Default" cells that describe a convention rather than what the server does*. Both are
 exactly what a diff finds.
 
-## Step 2 — `tools/check-staleness.py`: which pages are now lying · status: open
+## Step 2 — `tools/check-staleness.py`: which pages are now lying · status: done 2026-08-31 — 0 stale today; 46 at a hypothetical 2.14.7; wired into lint.py and into llm-wiki-starter so it survives update-tools.sh
 
 Also a tool. `tools/fetch-repo-facts.py --refresh` already re-reads all 32 repos; the analogue for
 this wiki's own pages does not exist.
@@ -62,7 +62,7 @@ Output a table an operator can work: page, `verified-against`, what kind of clai
 source it was verified from — so re-verification is a re-read of one named file, not a re-derivation.
 Wire it into `tools/lint.py` as a warning, not an error.
 
-## Step 3 — the ★ ADRs named by open `## To verify` items · status: open
+## Step 3 — the ★ ADRs named by open `## To verify` items · status: done 2026-08-31 — ADR-59, 60, 61, 48, 57, 54 ingested; 13 pages rippled; three `## To verify` items closed
 
 ```
 ingest raw/adr/ADR-48 (KV TTL)
