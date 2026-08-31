@@ -693,6 +693,10 @@ names now have pages — see the Entities section above. People: none yet.)*
   **steps 2, 3, 5–8 still open**. The follow-on queue for unlanded ripples, worked per
   *Operation: consolidate*; say `start the plan` against this file to continue it
 - `inbox/plan-drift-and-adrs-2026-08-31.md` — **finished** 2026-08-31, all 5 steps; kept as the record
-- `inbox/plan-the-unread-chapters-2026-08-31.md` — **finished** 2026-09-01, all 6 steps; its result
-  line proposes the next piece of work, which is **filing the two reports above**
+- `inbox/plan-the-unread-chapters-2026-08-31.md` — **finished** 2026-09-01, all 6 steps; kept as the
+  record
+- `inbox/plan-the-meta-layer-2026-09-01.md` — **proposed**, not started. The last structural hole in
+  the JetStream coverage: `meta-layer` and `stream-leader-keeps-moving`, the two remaining wanted
+  pages, plus Q37 and Q40. **Name the file explicitly** when starting it — a bare `start the plan`
+  takes the newest file
 - `inbox/` also holds scout files and plans; nothing there is a wiki page.

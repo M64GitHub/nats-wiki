@@ -2236,3 +2236,13 @@ lint clean. Nothing was ingested and no wiki page's content changed.
 standing follow-on queue for the unlanded-ripple count, which is why that count has been reported
 before and after every step since — it stands at **202 across 56 pages**, and `concepts/account` is
 still its single biggest debt.
+
+**Proposed, not started:** `inbox/plan-the-meta-layer-2026-09-01.md` — `meta-layer` and
+`stream-leader-keeps-moving`, the two remaining wanted pages, plus Q37 and Q40 and
+[[raft-in-nats]]'s open `## To verify` items. Everything it needs is unfetched:
+`server/jetstream_cluster.go`, gh#7533 and gh#6892. **Filing the two reports stays parked** — the
+current phase is collecting, and both files are shaped to be sent whenever that changes.
+
+**Two plans are now open at once**, which has not happened before, so a bare `start the plan` is
+ambiguous: it takes the *newest* `inbox/plan-*.md`, which is now the meta-layer one. Both should be
+started by naming the file.
