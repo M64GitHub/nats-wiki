@@ -1,0 +1,4363 @@
+# NATS Documentation
+
+> Connective Technology for Adaptive Edge & Distributed Systems — official NATS messaging documentation.
+
+- [NATS Documentation](/index.md)
+
+## concepts
+
+
+### ecosystem
+
+NATS is more than the nats-server binary. Around it sits a set of officially maintained clients, extension libraries, command-line and Kubernetes tooling, identity tools, and integrations.
+
+- [The NATS Ecosystem](/concepts/ecosystem.md): NATS is more than the nats-server binary. Around it sits a set of officially maintained clients, extension libraries, command-line and Kubernetes tooling, identity tools, and integrations.
+
+### getting-started
+
+Get up and running with NATS in minutes. This guide will walk you through installation, basic setup, and your first NATS application.
+
+- [Getting Started with NATS](/concepts/getting-started.md): Get up and running with NATS in minutes. This guide will walk you through installation, basic setup, and your first NATS application.
+
+### intro
+
+Welcome to the official documentation for NATS - a simple, secure and high-performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures.
+
+- [Welcome to NATS Documentation](/concepts/intro.md): Welcome to the official documentation for NATS - a simple, secure and high-performance open source messaging system for cloud native applications, IoT messaging, and microservices architectures.
+
+### jetstream
+
+NATS's built-in persistence and streaming layer
+
+- [JetStream](/concepts/jetstream.md): NATS's built-in persistence and streaming layer
+
+### pub-sub-basics
+
+The foundational messaging pattern in NATS — everything else builds on this
+
+- [Publish-Subscribe](/concepts/pub-sub-basics.md): The foundational messaging pattern in NATS — everything else builds on this
+
+### queue-groups
+
+Built-in load balancing for NATS subscribers
+
+- [Queue Groups](/concepts/queue-groups.md): Built-in load balancing for NATS subscribers
+
+### request-reply
+
+Synchronous communication pattern in NATS
+
+- [Request-Reply](/concepts/request-reply.md): Synchronous communication pattern in NATS
+
+### security
+
+Authentication, authorization, and encryption in NATS
+
+- [Security](/concepts/security.md): Authentication, authorization, and encryption in NATS
+
+### subjects
+
+Understanding NATS subject-based messaging and wildcards
+
+- [Subjects](/concepts/subjects.md): Understanding NATS subject-based messaging and wildcards
+
+### topologies
+
+How NATS servers can be arranged — from a single process to globally distributed deployments
+
+- [Topologies](/concepts/topologies.md): How NATS servers can be arranged — from a single process to globally distributed deployments
+
+### what-is-nats
+
+NATS is an open source messaging system. Applications connect to a NATS server and exchange messages by subject, without knowing each other's network addresses.
+
+- [What is NATS?](/concepts/what-is-nats.md): NATS is an open source messaging system. Applications connect to a NATS server and exchange messages by subject, without knowing each other's network addresses.
+
+## learn
+
+Long-form deep dives into NATS subsystems
+
+- [Learn](/learn.md): Long-form deep dives into NATS subsystems
+
+### backup-recovery
+
+Keep a built NATS platform alive across a node loss, a fat-fingered delete, or a lost laptop full of keys
+
+- [Backup & Recovery Deep Dive](/learn/backup-recovery.md): Keep a built NATS platform alive across a node loss, a fat-fingered delete, or a lost laptop full of keys
+
+#### config-and-jwt-backup
+
+Back up and restore the operator, accounts, keys, and server config off-site so the identity plane survives a clean-room rebuild
+
+- [Config and JWT backup](/learn/backup-recovery/config-and-jwt-backup.md): Back up and restore the operator, accounts, keys, and server config off-site so the identity plane survives a clean-room rebuild
+
+#### disaster-recovery
+
+A runbook that picks restore-from-snapshot or promote-the-mirror per failure class, then promotes ORDERS_DR cleanly
+
+- [Disaster recovery](/learn/backup-recovery/disaster-recovery.md): A runbook that picks restore-from-snapshot or promote-the-mirror per failure class, then promotes ORDERS_DR cleanly
+
+#### mirrors-and-sources
+
+Stand up a cross-site mirror of ORDERS for disaster recovery, read its lag, and learn why a mirror is not a backup
+
+- [Mirrors as a DR tool](/learn/backup-recovery/mirrors-and-sources.md): Stand up a cross-site mirror of ORDERS for disaster recovery, read its lag, and learn why a mirror is not a backup
+
+#### stream-backup-restore
+
+Take a point-in-time snapshot of the ORDERS stream, restore it byte-identical, and verify the counts match
+
+- [Stream backup and restore](/learn/backup-recovery/stream-backup-restore.md): Take a point-in-time snapshot of the ORDERS stream, restore it byte-identical, and verify the counts match
+
+#### where-next
+
+Recap the backup-and-recovery triad and point to what comes after this chapter
+
+- [Where to go next](/learn/backup-recovery/where-next.md): Recap the backup-and-recovery triad and point to what comes after this chapter
+
+### clustering
+
+How a NATS cluster agrees and replicates — routes, RAFT, quorum commits, placement, and peers
+
+- [Clustering & Replication Deep Dive](/learn/clustering.md): How a NATS cluster agrees and replicates — routes, RAFT, quorum commits, placement, and peers
+
+#### forming-a-cluster
+
+How servers find each other — explicit seed routes and the gossip that grows one seed into a full mesh
+
+- [Forming a cluster](/learn/clustering/forming-a-cluster.md): How servers find each other — explicit seed routes and the gossip that grows one seed into a full mesh
+
+#### placement
+
+Constrain where a stream's replicas live using cluster and server tags, and ask a chosen server to take leadership
+
+- [Placement](/learn/clustering/placement.md): Constrain where a stream's replicas live using cluster and server tags, and ask a chosen server to take leadership
+
+#### raft-and-leaders
+
+How a NATS cluster reaches agreement — RAFT groups, leaders and followers, and the election that picks a leader on a quorum of votes
+
+- [Raft and leaders](/learn/clustering/raft-and-leaders.md): How a NATS cluster reaches agreement — RAFT groups, leaders and followers, and the election that picks a leader on a quorum of votes
+
+#### replication-and-r3
+
+How a replicated stream commits a write by quorum, the consistency you get from it, and what quorum does and doesn't guarantee once the write reaches disk
+
+- [Replication and R=3](/learn/clustering/replication-and-r3.md): How a replicated stream commits a write by quorum, the consistency you get from it, and what quorum does and doesn't guarantee once the write reaches disk
+
+#### scaling-and-peers
+
+Add a peer with catchup, remove one safely, and keep quorum while you grow or shrink the ORDERS group
+
+- [Scaling and peer management](/learn/clustering/scaling-and-peers.md): Add a peer with catchup, remove one safely, and keep quorum while you grow or shrink the ORDERS group
+
+#### where-next
+
+Recap the clustering mechanism and point to siblings, Reference, and a production checklist
+
+- [Where to go next](/learn/clustering/where-next.md): Recap the clustering mechanism and point to siblings, Reference, and a production checklist
+
+### core-nats
+
+Publish-subscribe, subjects, request-reply, queue groups, and scatter-gather — from the first connection to debugging delivery, built up step by step
+
+- [Core NATS Deep Dive](/learn/core-nats.md): Publish-subscribe, subjects, request-reply, queue groups, and scatter-gather — from the first connection to debugging delivery, built up step by step
+
+#### connecting
+
+One long-lived TCP connection that carries every publish and subscribe, named at connect time and kept alive with PING/PONG heartbeats
+
+- [Connecting](/learn/core-nats/connecting.md): One long-lived TCP connection that carries every publish and subscribe, named at connect time and kept alive with PING/PONG heartbeats
+
+#### connection-lifecycle
+
+What happens to your client and your in-flight messages when a connection drops, and how to observe the reconnect
+
+- [Connection lifecycle](/learn/core-nats/connection-lifecycle.md): What happens to your client and your in-flight messages when a connection drops, and how to observe the reconnect
+
+#### debugging-delivery
+
+Find out why a published message never arrived, using a wire tap, the subscription list, and message tracing
+
+- [Debugging delivery](/learn/core-nats/debugging-delivery.md): Find out why a published message never arrived, using a wire tap, the subscription list, and message tracing
+
+#### headers
+
+Attach key/value metadata to any message with the NATS/1.0 header format, set and read it, and see the status line the server uses in-band
+
+- [Message headers](/learn/core-nats/headers.md): Attach key/value metadata to any message with the NATS/1.0 header format, set and read it, and see the status line the server uses in-band
+
+#### publish-subscribe
+
+Fire-and-forget publish, the in-memory interest graph, and core NATS at-most-once delivery
+
+- [Publish-subscribe](/learn/core-nats/publish-subscribe.md): Fire-and-forget publish, the in-memory interest graph, and core NATS at-most-once delivery
+
+#### queue-groups
+
+Share one subject across a pool of subscribers, so each message is handled by exactly one of them
+
+- [Queue groups](/learn/core-nats/queue-groups.md): Share one subject across a pool of subscribers, so each message is handled by exactly one of them
+
+#### request-reply
+
+Build a reply on top of pub/sub with a private inbox, a timeout, and the no-responders signal
+
+- [Request-reply](/learn/core-nats/request-reply.md): Build a reply on top of pub/sub with a private inbox, a timeout, and the no-responders signal
+
+#### scatter-gather
+
+Fan one request to many responders and gather every reply by count or deadline
+
+- [Scatter-gather](/learn/core-nats/scatter-gather.md): Fan one request to many responders and gather every reply by count or deadline
+
+#### subject-mapping
+
+How the server rewrites a message's subject from its own config before routing — to rename a subject, split its traffic by weight, or shard it into stable buckets by a hashed token
+
+- [Subject mapping](/learn/core-nats/subject-mapping.md): How the server rewrites a message's subject from its own config before routing — to rename a subject, split its traffic by weight, or shard it into stable buckets by a hashed token
+
+#### subjects-and-wildcards
+
+How NATS addresses messages with dot-delimited subjects, and how subscribers match many of them at once with wildcards
+
+- [Subjects & wildcards](/learn/core-nats/subjects-and-wildcards.md): How NATS addresses messages with dot-delimited subjects, and how subscribers match many of them at once with wildcards
+
+#### where-next
+
+Recap the core NATS mental model and point to what comes after the foundation
+
+- [Where to go next](/learn/core-nats/where-next.md): Recap the core NATS mental model and point to what comes after the foundation
+
+### deployment
+
+Take the Acme ORDERS cluster to production — size it, deploy it, configure it live, upgrade it safely, and harden it
+
+- [Deployment & Upgrades Deep Dive](/learn/deployment.md): Take the Acme ORDERS cluster to production — size it, deploy it, configure it live, upgrade it safely, and harden it
+
+#### config-management
+
+Split the cluster config into includes and reload it live with a SIGHUP — no downtime, no client reconnect
+
+- [Config management](/learn/deployment/config-management.md): Split the cluster config into includes and reload it live with a SIGHUP — no downtime, no client reconnect
+
+#### hardening
+
+Lock down the ORDERS cluster — TLS on every link, mounted credentials, and a sandboxed systemd unit
+
+- [Hardening](/learn/deployment/hardening.md): Lock down the ORDERS cluster — TLS on every link, mounted credentials, and a sandboxed systemd unit
+
+#### kubernetes
+
+Stand the ORDERS cluster up as a StatefulSet with the NATS Helm chart, then declare its streams and consumers as CRDs
+
+- [Kubernetes](/learn/deployment/kubernetes.md): Stand the ORDERS cluster up as a StatefulSet with the NATS Helm chart, then declare its streams and consumers as CRDs
+
+#### rolling-upgrades
+
+Roll a new server version through the ORDERS cluster with lame-duck mode and the right upgrade order, keeping the R3 stream available and clients connected
+
+- [Rolling upgrades](/learn/deployment/rolling-upgrades.md): Roll a new server version through the ORDERS cluster with lame-duck mode and the right upgrade order, keeping the R3 stream available and clients connected
+
+#### sizing-and-resources
+
+The four resources a NATS node spends, the JetStream defaults, and how account limits count R3 replication
+
+- [Sizing & resources](/learn/deployment/sizing-and-resources.md): The four resources a NATS node spends, the JetStream defaults, and how account limits count R3 replication
+
+#### where-next
+
+Recap the deployment runbook and collect every page's production checklist in one place
+
+- [Where to go next](/learn/deployment/where-next.md): Recap the deployment runbook and collect every page's production checklist in one place
+
+### jetstream
+
+Streams, consumers, and the acknowledgment loop, taught step by step
+
+- [JetStream Deep Dive](/learn/jetstream.md): Streams, consumers, and the acknowledgment loop, taught step by step
+
+#### acknowledgment
+
+The four ways a client answers a message, and the server controls that drive redelivery.
+
+- [Ack responses and redelivery](/learn/jetstream/acknowledgment.md): The four ways a client answers a message, and the server controls that drive redelivery.
+
+#### advanced-publishing
+
+Async, atomic-batch, and fast-ingest publishing — what each is for, the order trap in async, and the code for every mode
+
+- [Advanced publishing](/learn/jetstream/advanced-publishing.md): Async, atomic-batch, and fast-ingest publishing — what each is for, the order trap in async, and the code for every mode
+
+#### altering-stream-state
+
+Delete a single message or purge the stream by hand, and what removal does to sequence numbers
+
+- [Altering stream state](/learn/jetstream/altering-stream-state.md): Delete a single message or purge the stream by hand, and what removal does to sequence numbers
+
+#### delivery-and-acknowledgment
+
+How a message is delivered and held in flight, what an ack and a double ack do, and how an unacked message comes back
+
+- [Delivery and acknowledgment](/learn/jetstream/delivery-and-acknowledgment.md): How a message is delivered and held in flight, what an ack and a double ack do, and how an unacked message comes back
+
+#### filtering
+
+Add a second consumer that reads only orders.shipped, and see consumers as independent views
+
+- [Filtering what you consume](/learn/jetstream/filtering.md): Add a second consumer that reads only orders.shipped, and see consumers as independent views
+
+#### get-direct
+
+Get one message or a bounded batch straight from the stream with Direct Get — no consumer, served by any replica
+
+- [Reading messages directly](/learn/jetstream/get-direct.md): Get one message or a bounded batch straight from the stream with Direct Get — no consumer, served by any replica
+
+#### message-ttl
+
+Make a single message expire ahead of the stream's MaxAge
+
+- [Per-message TTL](/learn/jetstream/message-ttl.md): Make a single message expire ahead of the stream's MaxAge
+
+#### mirrors-and-sources
+
+Copy one stream into another, or aggregate many streams into one
+
+- [Mirrors and sources](/learn/jetstream/mirrors-and-sources.md): Copy one stream into another, or aggregate many streams into one
+
+#### ordered-consumer
+
+A fast, in-order read of a stream that cleans up after itself — what the library does for you, and the consumer config underneath
+
+- [Ordered consumers](/learn/jetstream/ordered-consumer.md): A fast, in-order read of a stream that cleans up after itself — what the library does for you, and the consumer config underneath
+
+#### pausing
+
+Stop delivery to a consumer until a deadline, then resume where it left off
+
+- [Pausing a consumer](/learn/jetstream/pausing.md): Stop delivery to a consumer until a deadline, then resume where it left off
+
+#### policies
+
+Every stream and consumer policy in one place, what each decides, and which ones you can still change
+
+- [Stream and consumer policies](/learn/jetstream/policies.md): Every stream and consumer policy in one place, what each decides, and which ones you can still change
+
+#### priority-groups
+
+Steer which client on a pull consumer gets messages, and when
+
+- [Priority groups](/learn/jetstream/priority-groups.md): Steer which client on a pull consumer gets messages, and when
+
+#### publishing
+
+Publish into a stream and understand the PubAck contract
+
+- [Publishing](/learn/jetstream/publishing.md): Publish into a stream and understand the PubAck contract
+
+#### pull-consumers
+
+Fetch a batch versus consume a continuous flow, and the fields that bound each pull
+
+- [Pull consumers in depth](/learn/jetstream/pull-consumers.md): Fetch a batch versus consume a continuous flow, and the fields that bound each pull
+
+#### reading-back
+
+Meet the producer, stream, and consumer; create a durable consumer and read everything the stream holds
+
+- [Reading back the stream](/learn/jetstream/reading-back.md): Meet the producer, stream, and consumer; create a durable consumer and read everything the stream holds
+
+#### retention-policies
+
+The three retention policies, and how to pick one for the kind of work a stream does
+
+- [Retention policies](/learn/jetstream/retention-policies.md): The three retention policies, and how to pick one for the kind of work a stream does
+
+#### shaping-the-stream
+
+Control stream size and age with limits, and decide what happens when a limit is reached
+
+- [Shaping the stream](/learn/jetstream/shaping-the-stream.md): Control stream size and age with limits, and decide what happens when a limit is reached
+
+#### subject-mapping
+
+Rewrite subjects on the way into a stream, and republish stored messages onto new subjects
+
+- [Subject mapping and transforms](/learn/jetstream/subject-mapping.md): Rewrite subjects on the way into a stream, and republish stored messages onto new subjects
+
+#### surviving-node-loss
+
+Why R=1 is a single point of failure, why R=3 is the production floor, and what storage durability means
+
+- [Surviving node loss](/learn/jetstream/surviving-node-loss.md): Why R=1 is a single point of failure, why R=3 is the production floor, and what storage durability means
+
+#### where-next
+
+Recap the JetStream model and point to what comes after this chapter
+
+- [Where to go next](/learn/jetstream/where-next.md): Recap the JetStream model and point to what comes after this chapter
+
+#### worker-pool
+
+Point several workers at one consumer to share the load, and what happens when one crashes mid-message
+
+- [Scaling a consumer](/learn/jetstream/worker-pool.md): Point several workers at one consumer to share the load, and what happens when one crashes mid-message
+
+#### your-first-stream
+
+Why you want a stream, then create the ORDERS stream and look at its configuration
+
+- [Your first stream](/learn/jetstream/your-first-stream.md): Why you want a stream, then create the ORDERS stream and look at its configuration
+
+### key-value
+
+Buckets, keys, watching, revisions, and TTL, built on the stream you already have
+
+- [Key-Value Store](/learn/key-value.md): Buckets, keys, watching, revisions, and TTL, built on the stream you already have
+
+#### history-and-revisions
+
+Track a key's revisions, read its history, and decrement safely with compare-and-swap
+
+- [History and revisions](/learn/key-value/history-and-revisions.md): Track a key's revisions, read its history, and decrement safely with compare-and-swap
+
+#### ttl-and-limits
+
+Expire a single key with a per-key TTL, bound the bucket with limits, and watch a value disappear on its own
+
+- [TTL and limits](/learn/key-value/ttl-and-limits.md): Expire a single key with a per-key TTL, bound the bucket with limits, and watch a value disappear on its own
+
+#### under-the-hood
+
+The KV_INVENTORY stream behind the bucket, the direct read path, and delete versus purge
+
+- [Under the hood](/learn/key-value/under-the-hood.md): The KV_INVENTORY stream behind the bucket, the direct read path, and delete versus purge
+
+#### watching
+
+Watch a bucket for live stock changes — the initial snapshot, the end-of-initial-data signal, and wildcard filters
+
+- [Watching](/learn/key-value/watching.md): Watch a bucket for live stock changes — the initial snapshot, the end-of-initial-data signal, and wildcard filters
+
+#### where-next
+
+Recap the key-value mental model and point to what comes after this chapter
+
+- [Where to go next](/learn/key-value/where-next.md): Recap the key-value mental model and point to what comes after this chapter
+
+#### your-first-bucket
+
+Create the INVENTORY bucket, put a stock count, and get back an entry
+
+- [Your first bucket](/learn/key-value/your-first-bucket.md): Create the INVENTORY bucket, put a stock count, and get back an entry
+
+### monitoring
+
+Watch a running NATS deployment — where the numbers come from, which ones matter, and how to turn them into alerts and dashboards
+
+- [Monitoring & Observability Deep Dive](/learn/monitoring.md): Watch a running NATS deployment — where the numbers come from, which ones matter, and how to turn them into alerts and dashboards
+
+#### advisories-and-events
+
+Subscribe to JetStream advisories and system events to learn about things you never polled for
+
+- [Advisories & events](/learn/monitoring/advisories-and-events.md): Subscribe to JetStream advisories and system events to learn about things you never polled for
+
+#### jetstream-health
+
+Read stream and consumer state, then compute lag, in-flight, and redelivery as numbers
+
+- [JetStream health](/learn/monitoring/jetstream-health.md): Read stream and consumer state, then compute lag, in-flight, and redelivery as numbers
+
+#### monitoring-endpoints
+
+The HTTP monitoring port :8222 and its on-demand JSON — /varz, /connz, /routez, and the /jsz JetStream lens
+
+- [Monitoring endpoints](/learn/monitoring/monitoring-endpoints.md): The HTTP monitoring port :8222 and its on-demand JSON — /varz, /connz, /routez, and the /jsz JetStream lens
+
+#### profiling
+
+Collect CPU and memory profiles from a NATS server when the monitoring numbers say something is wrong but not where
+
+- [Profiling the server](/learn/monitoring/profiling.md): Collect CPU and memory profiles from a NATS server when the monitoring numbers say something is wrong but not where
+
+#### prometheus-and-dashboards
+
+Scrape the monitoring port into Prometheus time series, chart them in Grafana, and alert with nats server check thresholds
+
+- [Prometheus & dashboards](/learn/monitoring/prometheus-and-dashboards.md): Scrape the monitoring port into Prometheus time series, chart them in Grafana, and alert with nats server check thresholds
+
+#### where-next
+
+Recap the four monitoring lenses and point to the Operate siblings and Reference that take watching NATS further
+
+- [Where to go next](/learn/monitoring/where-next.md): Recap the four monitoring lenses and point to the Operate siblings and Reference that take watching NATS further
+
+### mqtt
+
+Run nats-server as the MQTT broker for your devices, so their topics land on the NATS subjects your applications already use
+
+- [Connect MQTT devices to NATS](/learn/mqtt.md): Run nats-server as the MQTT broker for your devices, so their topics land on the NATS subjects your applications already use
+
+#### auth-and-clustering
+
+Restrict a user to MQTT connections, authenticate devices in operator mode, and run MQTT on the east cluster
+
+- [Auth and clustering](/learn/mqtt/auth-and-clustering.md): Restrict a user to MQTT connections, authenticate devices in operator mode, and run MQTT on the east cluster
+
+#### qos-sessions-and-retained
+
+What the server guarantees about delivery, what it stores between connections, and why NATS publishes always arrive as QoS 0
+
+- [QoS, sessions, and retained messages](/learn/mqtt/qos-sessions-and-retained.md): What the server guarantees about delivery, what it stores between connections, and why NATS publishes always arrive as QoS 0
+
+#### topics-and-subjects
+
+How the server converts MQTT topics into NATS subjects, what wildcards become, and which characters have no valid conversion
+
+- [Topics and subjects](/learn/mqtt/topics-and-subjects.md): How the server converts MQTT topics into NATS subjects, what wildcards become, and which characters have no valid conversion
+
+#### where-next
+
+Recap the MQTT model and point to the chapters and Reference that take it further
+
+- [Where to go next](/learn/mqtt/where-next.md): Recap the MQTT model and point to the chapters and Reference that take it further
+
+#### your-first-mqtt-client
+
+Enable the mqtt block on a local server, publish from an MQTT sensor, and receive the reading on the NATS side
+
+- [Your first MQTT client](/learn/mqtt/your-first-mqtt-client.md): Enable the mqtt block on a local server, publish from an MQTT sensor, and receive the reading on the NATS side
+
+### object-store
+
+Buckets, objects, chunks, metadata, and links, built on the stream you already have
+
+- [Object Store](/learn/object-store.md): Buckets, objects, chunks, metadata, and links, built on the stream you already have
+
+#### chunking
+
+How a large invoice is split into chunks, reassembled, and verified by its digest
+
+- [Chunking](/learn/object-store/chunking.md): How a large invoice is split into chunks, reassembled, and verified by its digest
+
+#### metadata-and-links
+
+Attach a description, headers, and a metadata map to an object, then link one object to another
+
+- [Metadata and links](/learn/object-store/metadata-and-links.md): Attach a description, headers, and a metadata map to an object, then link one object to another
+
+#### under-the-hood
+
+See the OBJ_INVOICES stream, the chunk and metadata subjects, and rollup versus soft delete
+
+- [Under the hood](/learn/object-store/under-the-hood.md): See the OBJ_INVOICES stream, the chunk and metadata subjects, and rollup versus soft delete
+
+#### watching-and-listing
+
+List the INVOICES bucket and watch it for new objects with the analytics service
+
+- [Watching and listing](/learn/object-store/watching-and-listing.md): List the INVOICES bucket and watch it for new objects with the analytics service
+
+#### where-next
+
+Recap the object store mental model and point to what comes after this chapter
+
+- [Where to go next](/learn/object-store/where-next.md): Recap the object store mental model and point to what comes after this chapter
+
+#### your-first-object
+
+Put a file into the INVOICES bucket and get it back
+
+- [Your first object](/learn/object-store/your-first-object.md): Put a file into the INVOICES bucket and get it back
+
+### resilient-clients
+
+The client connection as a state machine that detects faults, buffers through them, and recovers
+
+- [Resilient Clients Deep Dive](/learn/resilient-clients.md): The client connection as a state machine that detects faults, buffers through them, and recovers
+
+#### connecting
+
+Open order-svc with a name, a server pool, and a connect timeout, and read the connect handshake
+
+- [Connecting](/learn/resilient-clients/connecting.md): Open order-svc with a name, a server pool, and a connect timeout, and read the connect handshake
+
+#### connection-events
+
+Make the connection state machine observable — wire every connection event and read the state for health checks
+
+- [Connection Events](/learn/resilient-clients/connection-events.md): Make the connection state machine observable — wire every connection event and read the state for health checks
+
+#### drain-and-shutdown
+
+Exit a connection without dropping in-flight work by draining instead of closing
+
+- [Drain & Shutdown](/learn/resilient-clients/drain-and-shutdown.md): Exit a connection without dropping in-flight work by draining instead of closing
+
+#### reconnection
+
+Survive a server going away — reconnect with backoff and jitter across the pool, and buffer publishes through the gap
+
+- [Reconnection](/learn/resilient-clients/reconnection.md): Survive a server going away — reconnect with backoff and jitter across the pool, and buffer publishes through the gap
+
+#### request-reply-resilience
+
+Tell a slow responder apart from an absent one, then retry the request safely with backoff and idempotent IDs
+
+- [Request-Reply Resilience](/learn/resilient-clients/request-reply-resilience.md): Tell a slow responder apart from an absent one, then retry the request safely with backoff and idempotent IDs
+
+#### slow-consumers
+
+Bound a subscription's in-memory buffer so a slow handler surfaces backlog instead of silently exhausting memory
+
+- [Slow Consumers](/learn/resilient-clients/slow-consumers.md): Bound a subscription's in-memory buffer so a slow handler surfaces backlog instead of silently exhausting memory
+
+#### tls-and-auth
+
+Connect order-svc securely by consuming a credentials file and trusting the cluster CA over a TLS handshake
+
+- [TLS & Auth](/learn/resilient-clients/tls-and-auth.md): Connect order-svc securely by consuming a credentials file and trusting the cluster CA over a TLS handshake
+
+#### where-next
+
+Recap the connection lifecycle, point to the sibling deep dives, and collect every page's pitfalls into one production checklist
+
+- [Where Next](/learn/resilient-clients/where-next.md): Recap the connection lifecycle, point to the sibling deep dives, and collect every page's pitfalls into one production checklist
+
+### security
+
+Authentication, authorization, and encryption, scoped per account and built up step by step
+
+- [Security Deep Dive](/learn/security.md): Authentication, authorization, and encryption, scoped per account and built up step by step
+
+#### accounts-and-multitenancy
+
+How an account isolates a tenant's subject space, and the two accounts every server already has
+
+- [Accounts and multitenancy](/learn/security/accounts-and-multitenancy.md): How an account isolates a tenant's subject space, and the two accounts every server already has
+
+#### auth-callout
+
+Delegate the authentication decision to an external service over $SYS.REQ.USER.AUTH, protected by a signed request and response
+
+- [Auth callout](/learn/security/auth-callout.md): Delegate the authentication decision to an external service over $SYS.REQ.USER.AUTH, protected by a signed request and response
+
+#### authentication-basics
+
+Centralized config-based authentication and the three credential types
+
+- [Authentication basics](/learn/security/authentication-basics.md): Centralized config-based authentication and the three credential types
+
+#### authorization
+
+Subject permissions, allow and deny lists, and the rule that an allow-list closes everything else
+
+- [Authorization](/learn/security/authorization.md): Subject permissions, allow and deny lists, and the rule that an allow-list closes everything else
+
+#### cross-account
+
+Open exactly one subject between two isolated accounts with an export/import pair
+
+- [Cross-account](/learn/security/cross-account.md): Open exactly one subject between two isolated accounts with an export/import pair
+
+#### decentralized-auth
+
+What the server verifies in the operator-account-user trust chain, and how scoped signing keys, revocation, and expiry control users
+
+- [Decentralized authentication](/learn/security/decentralized-auth.md): What the server verifies in the operator-account-user trust chain, and how scoped signing keys, revocation, and expiry control users
+
+#### encryption
+
+Secure the wire with TLS and mTLS, then encrypt the JetStream store on disk
+
+- [Encryption & TLS](/learn/security/encryption.md): Secure the wire with TLS and mTLS, then encrypt the JetStream store on disk
+
+#### operator-mode
+
+Build the ACME trust chain with nats auth, point the server at a resolver, and connect with a creds file
+
+- [Operator mode](/learn/security/operator-mode.md): Build the ACME trust chain with nats auth, point the server at a resolver, and connect with a creds file
+
+#### where-next
+
+The whole security model in one picture, and where to read further
+
+- [Where to go next](/learn/security/where-next.md): The whole security model in one picture, and where to read further
+
+### services
+
+The micro framework that turns a request-reply responder into a named, versioned, discoverable service
+
+- [Services](/learn/services.md): The micro framework that turns a request-reply responder into a named, versioned, discoverable service
+
+#### discovery
+
+Learn what services exist and what they answer using the $SRV discovery verbs
+
+- [Discovery](/learn/services/discovery.md): Learn what services exist and what they answer using the $SRV discovery verbs
+
+#### endpoints-and-groups
+
+Give a service more than one endpoint, and organize endpoints under a group subject prefix
+
+- [Endpoints and groups](/learn/services/endpoints-and-groups.md): Give a service more than one endpoint, and organize endpoints under a group subject prefix
+
+#### observability
+
+Read the per-endpoint stats the framework keeps for you, and signal service errors that those stats record
+
+- [Observability](/learn/services/observability.md): Read the per-endpoint stats the framework keeps for you, and signal service errors that those stats record
+
+#### scaling
+
+Run N instances of a service and let the default queue group balance the load, then stop one cleanly
+
+- [Scaling](/learn/services/scaling.md): Run N instances of a service and let the default queue group balance the load, then stop one cleanly
+
+#### where-next
+
+Recap the Services mental model and point to the chapters and Reference that take it further
+
+- [Where to go next](/learn/services/where-next.md): Recap the Services mental model and point to the chapters and Reference that take it further
+
+#### your-first-service
+
+Promote the Core NATS inventory responder into a named, versioned OrderInventory service with one endpoint
+
+- [Your first service](/learn/services/your-first-service.md): Promote the Core NATS inventory responder into a named, versioned OrderInventory service with one endpoint
+
+### topologies
+
+How NATS servers compose into bigger shapes, grown one deployment at a time
+
+- [Topologies Deep Dive](/learn/topologies.md): How NATS servers compose into bigger shapes, grown one deployment at a time
+
+#### jetstream-in-a-cluster
+
+What changes for JetStream once it runs on a cluster — the meta layer and replication
+
+- [JetStream in a cluster](/learn/topologies/jetstream-in-a-cluster.md): What changes for JetStream once it runs on a cluster — the meta layer and replication
+
+#### leaf-nodes
+
+Bridge a factory site to the east cluster with a leaf node that dials out and binds to an account
+
+- [Leaf nodes](/learn/topologies/leaf-nodes.md): Bridge a factory site to the east cluster with a leaf node that dials out and binds to an account
+
+#### putting-it-together
+
+Compose clusters, gateways, and leaf nodes into the full Acme topology, with isolation behind leaves and the same client code everywhere
+
+- [Putting it together](/learn/topologies/putting-it-together.md): Compose clusters, gateways, and leaf nodes into the full Acme topology, with isolation behind leaves and the same client code everywhere
+
+#### single-server
+
+One nats-server process clients connect to directly — when it's enough and where its ceiling is
+
+- [Single server](/learn/topologies/single-server.md): One nats-server process clients connect to directly — when it's enough and where its ceiling is
+
+#### super-clusters
+
+Join the east and west clusters with gateways, and keep order traffic local by default
+
+- [Super-clusters](/learn/topologies/super-clusters.md): Join the east and west clusters with gateways, and keep order traffic local by default
+
+#### where-next
+
+Recap the four composable shapes and point to the mechanics, operations, and protocol references beyond this chapter
+
+- [Where to go next](/learn/topologies/where-next.md): Recap the four composable shapes and point to the mechanics, operations, and protocol references beyond this chapter
+
+#### your-first-cluster
+
+Join three servers into a cluster with routes, then watch a client survive a server loss
+
+- [Your first cluster](/learn/topologies/your-first-cluster.md): Join three servers into a cluster with routes, then watch a client survive a server loss
+
+### websocket
+
+Run the NATS protocol over a WebSocket transport, so browsers and anything behind an HTTP ingress can reach the same server
+
+- [Connect over WebSocket](/learn/websocket.md): Run the NATS protocol over a WebSocket transport, so browsers and anything behind an HTTP ingress can reach the same server
+
+#### browsers-and-origins
+
+Restrict which web pages may connect, and give a browser credentials when it has no credentials file
+
+- [Browsers and origins](/learn/websocket/browsers-and-origins.md): Restrict which web pages may connect, and give a browser credentials when it has no credentials file
+
+#### leaf-nodes-over-websocket
+
+Point a leaf node at a WebSocket listener instead of the leafnode port, and the differences that come with it
+
+- [Leaf nodes over WebSocket](/learn/websocket/leaf-nodes-over-websocket.md): Point a leaf node at a WebSocket listener instead of the leafnode port, and the differences that come with it
+
+#### tls-and-proxies
+
+Put a certificate on the listener or terminate TLS at an ingress, and configure a proxy that won't break a long-lived upgraded connection
+
+- [TLS and proxies](/learn/websocket/tls-and-proxies.md): Put a certificate on the listener or terminate TLS at an ingress, and configure a proxy that won't break a long-lived upgraded connection
+
+#### where-next
+
+Recap the WebSocket model and point to the chapters and Reference that take it further
+
+- [Where to go next](/learn/websocket/where-next.md): Recap the WebSocket model and point to the chapters and Reference that take it further
+
+#### your-first-websocket-connection
+
+Enable the websocket block on a local server, subscribe with the nats CLI over ws, then receive the same subject in a browser
+
+- [Your first WebSocket connection](/learn/websocket/your-first-websocket-connection.md): Enable the websocket block on a local server, subscribe with the nats CLI over ws, then receive the same subject in a browser
+
+## reference
+
+NATS Protocol and API reference documentation.
+
+- [Reference](/reference.md): NATS Protocol and API reference documentation.
+
+### config
+
+While the NATS server has many flags that allow for simple testing of features, the NATS server products provide a flexible configuration format that combines the best of traditional formats and newer styles such as JSON and YAML.
+
+- [Configuration](/reference/config.md): While the NATS server has many flags that allow for simple testing of features, the NATS server products provide a flexible configuration format that combines the best of traditional formats and newer styles such as JSON and YAML.
+
+#### accounts
+
+Static config-defined accounts.
+
+- [accounts](/reference/config/accounts.md): Static config-defined accounts.
+
+##### default_permissions
+
+The default permissions applied to users within this account,
+
+- [default_permissions](/reference/config/accounts/default_permissions.md): The default permissions applied to users within this account,
+
+###### allow_responses
+
+Types
+
+- [allow_responses](/reference/config/accounts/default_permissions/allow_responses.md): Types
+- [expires](/reference/config/accounts/default_permissions/allow_responses/expires.md): The amount of time the permission is valid. Values such
+- [max](/reference/config/accounts/default_permissions/allow_responses/max.md): The maximum number of response messages that can be published.
+
+###### publish
+
+A single subject, list of subjects, or a allow-deny map of
+
+- [publish](/reference/config/accounts/default_permissions/publish.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/accounts/default_permissions/publish/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/accounts/default_permissions/publish/deny.md): List of subjects that are denied to the client.
+
+###### subscribe
+
+A single subject, list of subjects, or a allow-deny map of
+
+- [subscribe](/reference/config/accounts/default_permissions/subscribe.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/accounts/default_permissions/subscribe/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/accounts/default_permissions/subscribe/deny.md): List of subjects that are denied to the client.
+
+##### exports
+
+A list of exports for this account.
+
+- [exports](/reference/config/accounts/exports.md): A list of exports for this account.
+
+###### accounts
+
+A list of account names that can import the stream or service.
+
+- [accounts](/reference/config/accounts/exports/accounts.md): A list of account names that can import the stream or service.
+
+###### response_type
+
+Indicates if a response to a service request consists of a single
+
+- [response_type](/reference/config/accounts/exports/response_type.md): Indicates if a response to a service request consists of a single
+
+###### service
+
+A subject or subject with wildcards that the account will subscribe to.
+
+- [service](/reference/config/accounts/exports/service.md): A subject or subject with wildcards that the account will subscribe to.
+
+###### stream
+
+A subject or subject with wildcards that the account will publish to.
+
+- [stream](/reference/config/accounts/exports/stream.md): A subject or subject with wildcards that the account will publish to.
+
+##### imports
+
+A list of imports for this account.
+
+- [imports](/reference/config/accounts/imports.md): A list of imports for this account.
+
+###### prefix
+
+A local subject prefix mapping for the imported stream.
+
+- [prefix](/reference/config/accounts/imports/prefix.md): A local subject prefix mapping for the imported stream.
+
+###### service
+
+Stream import source configuration.
+
+- [service](/reference/config/accounts/imports/service.md): Stream import source configuration.
+- [account](/reference/config/accounts/imports/service/account.md): Account name owning the export.
+- [subject](/reference/config/accounts/imports/service/subject.md): The subject under which the stream or service is made
+
+###### stream
+
+Stream import source configuration.
+
+- [stream](/reference/config/accounts/imports/stream.md): Stream import source configuration.
+- [account](/reference/config/accounts/imports/stream/account.md): Account name owning the export.
+- [subject](/reference/config/accounts/imports/stream/subject.md): The subject under which the stream or service is made
+
+###### to
+
+A local subject mapping for the imported service.
+
+- [to](/reference/config/accounts/imports/to.md): A local subject mapping for the imported service.
+
+##### jetstream
+
+Types
+
+- [jetstream](/reference/config/accounts/jetstream.md): Types
+
+###### disk_max_stream_bytes
+
+Maximum bytes any given file-based stream is allowed to be allocated.
+
+- [disk_max_stream_bytes](/reference/config/accounts/jetstream/disk_max_stream_bytes.md): Maximum bytes any given file-based stream is allowed to be allocated.
+
+###### max_ack_pending
+
+The maximum ack pending count allowed to be set on any given consumer.
+
+- [max_ack_pending](/reference/config/accounts/jetstream/max_ack_pending.md): The maximum ack pending count allowed to be set on any given consumer.
+
+###### max_bytes_required
+
+If true, requires all streams to have an explicit max bytes defined
+
+- [max_bytes_required](/reference/config/accounts/jetstream/max_bytes_required.md): If true, requires all streams to have an explicit max bytes defined
+
+###### max_consumers
+
+The maximum number of consumers allowed.
+
+- [max_consumers](/reference/config/accounts/jetstream/max_consumers.md): The maximum number of consumers allowed.
+
+###### max_file
+
+The maximum storage allowed across all file-based assets.
+
+- [max_file](/reference/config/accounts/jetstream/max_file.md): The maximum storage allowed across all file-based assets.
+
+###### max_memory
+
+The maximum storage allowed across all memory-based assets.
+
+- [max_memory](/reference/config/accounts/jetstream/max_memory.md): The maximum storage allowed across all memory-based assets.
+
+###### max_streams
+
+The maximum number of streams allowed.
+
+- [max_streams](/reference/config/accounts/jetstream/max_streams.md): The maximum number of streams allowed.
+
+###### memory_max_stream_bytes
+
+Maximum bytes any given memory-based stream is allowed to be allocated.
+
+- [memory_max_stream_bytes](/reference/config/accounts/jetstream/memory_max_stream_bytes.md): Maximum bytes any given memory-based stream is allowed to be allocated.
+
+##### limits
+
+Properties
+
+- [limits](/reference/config/accounts/limits.md): Properties
+
+###### max_connections
+
+The maximum number of concurrent connections for this account.
+
+- [max_connections](/reference/config/accounts/limits/max_connections.md): The maximum number of concurrent connections for this account.
+
+###### max_leafnodes
+
+The maximum number of concurrent leafnode connections allowed.
+
+- [max_leafnodes](/reference/config/accounts/limits/max_leafnodes.md): The maximum number of concurrent leafnode connections allowed.
+
+###### max_payload
+
+The maximum payload size allowed for messages.
+
+- [max_payload](/reference/config/accounts/limits/max_payload.md): The maximum payload size allowed for messages.
+
+###### max_subscriptions
+
+The maximum number of concurrent subscriptions for this account.
+
+- [max_subscriptions](/reference/config/accounts/limits/max_subscriptions.md): The maximum number of concurrent subscriptions for this account.
+
+##### mappings
+
+Types
+
+- [mappings](/reference/config/accounts/mappings.md): Types
+
+###### cluster
+
+If specified, the destination is cluster-scoped. Messages received
+
+- [cluster](/reference/config/accounts/mappings/cluster.md): If specified, the destination is cluster-scoped. Messages received
+
+###### destination
+
+The subject mapping destination for the source subject.
+
+- [destination](/reference/config/accounts/mappings/destination.md): The subject mapping destination for the source subject.
+
+###### weight
+
+A number between 0 and 100 (inclusive). The string form allows for
+
+- [weight](/reference/config/accounts/mappings/weight.md): A number between 0 and 100 (inclusive). The string form allows for
+
+##### msg_trace
+
+Where this account's message traces are delivered, and how often
+
+- [msg_trace](/reference/config/accounts/msg_trace.md): Where this account's message traces are delivered, and how often
+
+###### dest
+
+Subject the trace events are published to.
+
+- [dest](/reference/config/accounts/msg_trace/dest.md): Subject the trace events are published to.
+
+###### sampling
+
+Percentage of traced messages to report, 1 to 100.
+
+- [sampling](/reference/config/accounts/msg_trace/sampling.md): Percentage of traced messages to report, 1 to 100.
+
+##### nkey
+
+Public NKey that identifies this account (an A-prefixed public
+
+- [nkey](/reference/config/accounts/nkey.md): Public NKey that identifies this account (an A-prefixed public
+
+##### users
+
+A list of users under this account.
+
+- [users](/reference/config/accounts/users.md): A list of users under this account.
+
+###### allowed_connection_types
+
+If specified, the user is constrained to the specified connection
+
+- [allowed_connection_types](/reference/config/accounts/users/allowed_connection_types.md): If specified, the user is constrained to the specified connection
+
+###### nkey
+
+Public NKey identifying the user. The value begins with a U
+
+- [nkey](/reference/config/accounts/users/nkey.md): Public NKey identifying the user. The value begins with a U
+
+###### password
+
+Password of the user. This can be a free-text value
+
+- [password](/reference/config/accounts/users/password.md): Password of the user. This can be a free-text value
+
+###### permissions
+
+Properties
+
+- [permissions](/reference/config/accounts/users/permissions.md): Properties
+- [allow_responses](/reference/config/accounts/users/permissions/allow_responses.md): Types
+- [expires](/reference/config/accounts/users/permissions/allow_responses/expires.md): The amount of time the permission is valid. Values such
+- [max](/reference/config/accounts/users/permissions/allow_responses/max.md): The maximum number of response messages that can be published.
+- [publish](/reference/config/accounts/users/permissions/publish.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/accounts/users/permissions/publish/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/accounts/users/permissions/publish/deny.md): List of subjects that are denied to the client.
+- [subscribe](/reference/config/accounts/users/permissions/subscribe.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/accounts/users/permissions/subscribe/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/accounts/users/permissions/subscribe/deny.md): List of subjects that are denied to the client.
+
+###### username
+
+Name of the user.
+
+- [username](/reference/config/accounts/users/username.md): Name of the user.
+
+#### allow_non_tls
+
+Allow mixed TLS and non-TLS on the same port.
+
+- [allow_non_tls](/reference/config/allow_non_tls.md): Allow mixed TLS and non-TLS on the same port.
+
+#### authorization
+
+Static single or multi-user declaration.
+
+- [authorization](/reference/config/authorization.md): Static single or multi-user declaration.
+
+##### auth_callout
+
+Enables the auth callout functionality.
+
+- [auth_callout](/reference/config/authorization/auth_callout.md): Enables the auth callout functionality.
+
+###### account
+
+The name or public NKey of an account of the users which will
+
+- [account](/reference/config/authorization/auth_callout/account.md): The name or public NKey of an account of the users which will
+
+###### issuer
+
+An account public NKey.
+
+- [issuer](/reference/config/authorization/auth_callout/issuer.md): An account public NKey.
+
+###### key
+
+A public XKey that will encrypt server requests to the auth
+
+- [key](/reference/config/authorization/auth_callout/key.md): A public XKey that will encrypt server requests to the auth
+
+###### users
+
+The names or public NKeys of users within the defined account
+
+- [users](/reference/config/authorization/auth_callout/users.md): The names or public NKeys of users within the defined account
+
+##### default_permissions
+
+The default permissions applied to users, if permissions are
+
+- [default_permissions](/reference/config/authorization/default_permissions.md): The default permissions applied to users, if permissions are
+
+###### allow_responses
+
+Types
+
+- [allow_responses](/reference/config/authorization/default_permissions/allow_responses.md): Types
+- [expires](/reference/config/authorization/default_permissions/allow_responses/expires.md): The amount of time the permission is valid. Values such
+- [max](/reference/config/authorization/default_permissions/allow_responses/max.md): The maximum number of response messages that can be published.
+
+###### publish
+
+A single subject, list of subjects, or a allow-deny map of
+
+- [publish](/reference/config/authorization/default_permissions/publish.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/authorization/default_permissions/publish/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/authorization/default_permissions/publish/deny.md): List of subjects that are denied to the client.
+
+###### subscribe
+
+A single subject, list of subjects, or a allow-deny map of
+
+- [subscribe](/reference/config/authorization/default_permissions/subscribe.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/authorization/default_permissions/subscribe/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/authorization/default_permissions/subscribe/deny.md): List of subjects that are denied to the client.
+
+##### password
+
+Specifies a global password that clients can use to authenticate
+
+- [password](/reference/config/authorization/password.md): Specifies a global password that clients can use to authenticate
+
+##### proxy_required
+
+Reject client connections that did not arrive through a PROXY
+
+- [proxy_required](/reference/config/authorization/proxy_required.md): Reject client connections that did not arrive through a PROXY
+
+##### timeout
+
+Maximum number of seconds to wait for a client to authenticate.
+
+- [timeout](/reference/config/authorization/timeout.md): Maximum number of seconds to wait for a client to authenticate.
+
+##### token
+
+Specifies a global token that clients can use to authenticate with
+
+- [token](/reference/config/authorization/token.md): Specifies a global token that clients can use to authenticate with
+
+##### username
+
+Specifies a global user name that clients can use to authenticate
+
+- [username](/reference/config/authorization/username.md): Specifies a global user name that clients can use to authenticate
+
+##### users
+
+A list of multiple users with different credentials.
+
+- [users](/reference/config/authorization/users.md): A list of multiple users with different credentials.
+
+###### allowed_connection_types
+
+If specified, the user is constrained to the specified connection
+
+- [allowed_connection_types](/reference/config/authorization/users/allowed_connection_types.md): If specified, the user is constrained to the specified connection
+
+###### nkey
+
+Public NKey identifying the user. The value begins with a U
+
+- [nkey](/reference/config/authorization/users/nkey.md): Public NKey identifying the user. The value begins with a U
+
+###### password
+
+Password of the user. This can be a free-text value
+
+- [password](/reference/config/authorization/users/password.md): Password of the user. This can be a free-text value
+
+###### permissions
+
+Properties
+
+- [permissions](/reference/config/authorization/users/permissions.md): Properties
+- [allow_responses](/reference/config/authorization/users/permissions/allow_responses.md): Types
+- [expires](/reference/config/authorization/users/permissions/allow_responses/expires.md): The amount of time the permission is valid. Values such
+- [max](/reference/config/authorization/users/permissions/allow_responses/max.md): The maximum number of response messages that can be published.
+- [publish](/reference/config/authorization/users/permissions/publish.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/authorization/users/permissions/publish/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/authorization/users/permissions/publish/deny.md): List of subjects that are denied to the client.
+- [subscribe](/reference/config/authorization/users/permissions/subscribe.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/authorization/users/permissions/subscribe/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/authorization/users/permissions/subscribe/deny.md): List of subjects that are denied to the client.
+
+###### username
+
+Name of the user.
+
+- [username](/reference/config/authorization/users/username.md): Name of the user.
+
+#### client_advertise
+
+Advertised client :. Useful for cluster setups
+
+- [client_advertise](/reference/config/client_advertise.md): Advertised client :. Useful for cluster setups
+
+#### cluster
+
+Configuration for clustering a set of servers.
+
+- [cluster](/reference/config/cluster.md): Configuration for clustering a set of servers.
+
+##### accounts
+
+A list of accounts to pin, each of which will have their own dedicated
+
+- [accounts](/reference/config/cluster/accounts.md): A list of accounts to pin, each of which will have their own dedicated
+
+##### advertise
+
+Advertised cluster :. Useful for cluster setups since
+
+- [advertise](/reference/config/cluster/advertise.md): Advertised cluster :. Useful for cluster setups since
+
+##### authorization
+
+Authorization map for configuring cluster routes. When a single username/password is used, it defines the authentication mechanism
+
+- [authorization](/reference/config/cluster/authorization.md): Authorization map for configuring cluster routes. When a single username/password is used, it defines the authentication mechanism
+
+###### default_permissions
+
+The default permissions applied to users, if permissions are
+
+- [default_permissions](/reference/config/cluster/authorization/default_permissions.md): The default permissions applied to users, if permissions are
+- [allow_responses](/reference/config/cluster/authorization/default_permissions/allow_responses.md): Types
+- [expires](/reference/config/cluster/authorization/default_permissions/allow_responses/expires.md): The amount of time the permission is valid. Values such
+- [max](/reference/config/cluster/authorization/default_permissions/allow_responses/max.md): The maximum number of response messages that can be published.
+- [publish](/reference/config/cluster/authorization/default_permissions/publish.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/cluster/authorization/default_permissions/publish/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/cluster/authorization/default_permissions/publish/deny.md): List of subjects that are denied to the client.
+- [subscribe](/reference/config/cluster/authorization/default_permissions/subscribe.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/cluster/authorization/default_permissions/subscribe/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/cluster/authorization/default_permissions/subscribe/deny.md): List of subjects that are denied to the client.
+
+###### password
+
+Password the connecting server authenticates with
+
+- [password](/reference/config/cluster/authorization/password.md): Password the connecting server authenticates with
+
+###### timeout
+
+Maximum number of seconds to wait for a client to authenticate.
+
+- [timeout](/reference/config/cluster/authorization/timeout.md): Maximum number of seconds to wait for a client to authenticate.
+
+###### username
+
+User name the connecting server authenticates with
+
+- [username](/reference/config/cluster/authorization/username.md): User name the connecting server authenticates with
+
+##### compression
+
+Defines the type compression mode to use between routes.
+
+- [compression](/reference/config/cluster/compression.md): Defines the type compression mode to use between routes.
+
+###### mode
+
+Types
+
+- [mode](/reference/config/cluster/compression/mode.md): Types
+
+###### rtt_thresholds
+
+Applies only when the s2_auto mode is used and defines the round-trip time (RTT)
+
+- [rtt_thresholds](/reference/config/cluster/compression/rtt_thresholds.md): Applies only when the s2_auto mode is used and defines the round-trip time (RTT)
+
+##### connect_backoff
+
+Back off between route reconnect attempts instead of retrying at a
+
+- [connect_backoff](/reference/config/cluster/connect_backoff.md): Back off between route reconnect attempts instead of retrying at a
+
+##### connect_retries
+
+After how many failed connect attempts to give up establishing a connection to a discovered route. Default is 0, do not retry.
+
+- [connect_retries](/reference/config/cluster/connect_retries.md): After how many failed connect attempts to give up establishing a connection to a discovered route. Default is 0, do not retry.
+
+##### host
+
+Host for cluster route connections.
+
+- [host](/reference/config/cluster/host.md): Host for cluster route connections.
+
+##### listen
+
+Types
+
+- [listen](/reference/config/cluster/listen.md): Types
+
+##### name
+
+Name of the cluster.
+
+- [name](/reference/config/cluster/name.md): Name of the cluster.
+
+##### no_advertise
+
+If true, the server will not send or gossip its client URLs to other servers in the cluster, nor
+
+- [no_advertise](/reference/config/cluster/no_advertise.md): If true, the server will not send or gossip its client URLs to other servers in the cluster, nor
+
+##### permissions
+
+Subject permissions applied to routes, limiting what this cluster
+
+- [permissions](/reference/config/cluster/permissions.md): Subject permissions applied to routes, limiting what this cluster
+
+###### allow_responses
+
+Types
+
+- [allow_responses](/reference/config/cluster/permissions/allow_responses.md): Types
+- [expires](/reference/config/cluster/permissions/allow_responses/expires.md): The amount of time the permission is valid. Values such
+- [max](/reference/config/cluster/permissions/allow_responses/max.md): The maximum number of response messages that can be published.
+
+###### publish
+
+A single subject, list of subjects, or a allow-deny map of
+
+- [publish](/reference/config/cluster/permissions/publish.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/cluster/permissions/publish/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/cluster/permissions/publish/deny.md): List of subjects that are denied to the client.
+
+###### subscribe
+
+A single subject, list of subjects, or a allow-deny map of
+
+- [subscribe](/reference/config/cluster/permissions/subscribe.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/cluster/permissions/subscribe/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/cluster/permissions/subscribe/deny.md): List of subjects that are denied to the client.
+
+##### ping_interval
+
+How often the server pings an idle route.
+
+- [ping_interval](/reference/config/cluster/ping_interval.md): How often the server pings an idle route.
+
+##### ping_max
+
+Unanswered pings before the route is closed.
+
+- [ping_max](/reference/config/cluster/ping_max.md): Unanswered pings before the route is closed.
+
+##### pool_size
+
+The size of the connection pool used to distribute load across non-pinned
+
+- [pool_size](/reference/config/cluster/pool_size.md): The size of the connection pool used to distribute load across non-pinned
+
+##### port
+
+Port for cluster route connections.
+
+- [port](/reference/config/cluster/port.md): Port for cluster route connections.
+
+##### routes
+
+A list of server URLs to cluster with. Self-routes are ignored. Should authentication via token or username/password
+
+- [routes](/reference/config/cluster/routes.md): A list of server URLs to cluster with. Self-routes are ignored. Should authentication via token or username/password
+
+##### tls
+
+TLS configuration for securing cluster connections.
+
+- [tls](/reference/config/cluster/tls.md): TLS configuration for securing cluster connections.
+
+###### allow_insecure_cipher_suites
+
+Permit cipher suites Go considers insecure to be named in
+
+- [allow_insecure_cipher_suites](/reference/config/cluster/tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+
+###### ca_file
+
+TLS certificate authority file. Defaults to system trust store.
+
+- [ca_file](/reference/config/cluster/tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+
+###### cert_file
+
+TLS certificate file.
+
+- [cert_file](/reference/config/cluster/tls/cert_file.md): TLS certificate file.
+
+###### cert_store
+
+Load the certificate from an OS certificate store rather than a
+
+- [cert_store](/reference/config/cluster/tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+
+###### certs
+
+Multiple certificate/key pairs to serve, so one listener can
+
+- [certs](/reference/config/cluster/tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+- [cert_file](/reference/config/cluster/tls/certs/cert_file.md): Certificate file for this pair.
+- [key_file](/reference/config/cluster/tls/certs/key_file.md): Key file for this pair.
+
+###### cipher_suites
+
+When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+- [cipher_suites](/reference/config/cluster/tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+###### connection_rate_limit
+
+Types
+
+- [connection_rate_limit](/reference/config/cluster/tls/connection_rate_limit.md): Types
+
+###### curve_preferences
+
+List of TLS cipher curves to use in order.
+
+- [curve_preferences](/reference/config/cluster/tls/curve_preferences.md): List of TLS cipher curves to use in order.
+
+###### handshake_first
+
+Send the TLS handshake before the INFO protocol message rather
+
+- [handshake_first](/reference/config/cluster/tls/handshake_first.md): Send the TLS handshake before the INFO protocol message rather
+
+###### insecure
+
+Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+- [insecure](/reference/config/cluster/tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+###### key_file
+
+TLS certificate key file.
+
+- [key_file](/reference/config/cluster/tls/key_file.md): TLS certificate key file.
+
+###### min_version
+
+Lowest TLS version the server will negotiate.
+
+- [min_version](/reference/config/cluster/tls/min_version.md): Lowest TLS version the server will negotiate.
+
+###### ocsp_peer
+
+Verify the peer's certificate against its OCSP responder and reject
+
+- [ocsp_peer](/reference/config/cluster/tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+- [allowed_clockskew](/reference/config/cluster/tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+- [ca_timeout](/reference/config/cluster/tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+- [cache_ttl_when_next_update_unset](/reference/config/cluster/tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+- [unknown_is_good](/reference/config/cluster/tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+- [verify](/reference/config/cluster/tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+- [warn_only](/reference/config/cluster/tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+
+###### pinned_certs
+
+List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+- [pinned_certs](/reference/config/cluster/tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+###### timeout
+
+TLS handshake timeout.
+
+- [timeout](/reference/config/cluster/tls/timeout.md): TLS handshake timeout.
+
+###### verify
+
+If true, require and verify client certificates. Does not apply to monitoring.
+
+- [verify](/reference/config/cluster/tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+
+###### verify_and_map
+
+If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+- [verify_and_map](/reference/config/cluster/tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+###### verify_cert_and_check_known_urls
+
+Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+- [verify_cert_and_check_known_urls](/reference/config/cluster/tls/verify_cert_and_check_known_urls.md): Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+##### write_deadline
+
+How long a route write may block before the connection is treated
+
+- [write_deadline](/reference/config/cluster/write_deadline.md): How long a route write may block before the connection is treated
+
+##### write_timeout
+
+What to do when a route misses its write_deadline.
+
+- [write_timeout](/reference/config/cluster/write_timeout.md): What to do when a route misses its write_deadline.
+
+#### connect_error_reports
+
+Number of attempts at which a repeated failed route, gateway
+
+- [connect_error_reports](/reference/config/connect_error_reports.md): Number of attempts at which a repeated failed route, gateway
+
+#### debug
+
+If true, enables debug log messages.
+
+- [debug](/reference/config/debug.md): If true, enables debug log messages.
+
+#### default_js_domain
+
+Account to domain name mapping.
+
+- [default_js_domain](/reference/config/default_js_domain.md): Account to domain name mapping.
+
+#### default_sentinel
+
+User name applied to connections that authenticate with a sentinel
+
+- [default_sentinel](/reference/config/default_sentinel.md): User name applied to connections that authenticate with a sentinel
+
+#### disable_sublist_cache
+
+If true, disable subscription caches for all accounts. This saves
+
+- [disable_sublist_cache](/reference/config/disable_sublist_cache.md): If true, disable subscription caches for all accounts. This saves
+
+#### feature_flags
+
+Toggles for features that are not yet on by default. Names are
+
+- [feature_flags](/reference/config/feature_flags.md): Toggles for features that are not yet on by default. Names are
+
+#### gateway
+
+Configuration for setting up gateway connections
+
+- [gateway](/reference/config/gateway.md): Configuration for setting up gateway connections
+
+##### advertise
+
+: to advertise how this server can be contacted by
+
+- [advertise](/reference/config/gateway/advertise.md): : to advertise how this server can be contacted by
+
+##### authorization
+
+Authorization map for gateways. When a single username/password is
+
+- [authorization](/reference/config/gateway/authorization.md): Authorization map for gateways. When a single username/password is
+
+###### default_permissions
+
+The default permissions applied to users, if permissions are
+
+- [default_permissions](/reference/config/gateway/authorization/default_permissions.md): The default permissions applied to users, if permissions are
+- [allow_responses](/reference/config/gateway/authorization/default_permissions/allow_responses.md): Types
+- [expires](/reference/config/gateway/authorization/default_permissions/allow_responses/expires.md): The amount of time the permission is valid. Values such
+- [max](/reference/config/gateway/authorization/default_permissions/allow_responses/max.md): The maximum number of response messages that can be published.
+- [publish](/reference/config/gateway/authorization/default_permissions/publish.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/gateway/authorization/default_permissions/publish/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/gateway/authorization/default_permissions/publish/deny.md): List of subjects that are denied to the client.
+- [subscribe](/reference/config/gateway/authorization/default_permissions/subscribe.md): A single subject, list of subjects, or a allow-deny map of
+- [allow](/reference/config/gateway/authorization/default_permissions/subscribe/allow.md): List of subjects that are allowed to the client.
+- [deny](/reference/config/gateway/authorization/default_permissions/subscribe/deny.md): List of subjects that are denied to the client.
+
+###### password
+
+Password the connecting server authenticates with
+
+- [password](/reference/config/gateway/authorization/password.md): Password the connecting server authenticates with
+
+###### timeout
+
+Maximum number of seconds to wait for a client to authenticate.
+
+- [timeout](/reference/config/gateway/authorization/timeout.md): Maximum number of seconds to wait for a client to authenticate.
+
+###### username
+
+User name the connecting server authenticates with
+
+- [username](/reference/config/gateway/authorization/username.md): User name the connecting server authenticates with
+
+##### connect_backoff
+
+Back off between gateway reconnect attempts instead of retrying at
+
+- [connect_backoff](/reference/config/gateway/connect_backoff.md): Back off between gateway reconnect attempts instead of retrying at
+
+##### connect_retries
+
+After how many failed connect attempts to give up establishing
+
+- [connect_retries](/reference/config/gateway/connect_retries.md): After how many failed connect attempts to give up establishing
+
+##### gateways
+
+List of gateway entries.
+
+- [gateways](/reference/config/gateway/gateways.md): List of gateway entries.
+
+###### name
+
+Name of the gateway being connected to.
+
+- [name](/reference/config/gateway/gateways/name.md): Name of the gateway being connected to.
+
+###### tls
+
+A TLS configuration map for creating a secure gateway connection.
+
+- [tls](/reference/config/gateway/gateways/tls.md): A TLS configuration map for creating a secure gateway connection.
+- [allow_insecure_cipher_suites](/reference/config/gateway/gateways/tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+- [ca_file](/reference/config/gateway/gateways/tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+- [cert_file](/reference/config/gateway/gateways/tls/cert_file.md): TLS certificate file.
+- [cert_store](/reference/config/gateway/gateways/tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+- [certs](/reference/config/gateway/gateways/tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+- [cert_file](/reference/config/gateway/gateways/tls/certs/cert_file.md): Certificate file for this pair.
+- [key_file](/reference/config/gateway/gateways/tls/certs/key_file.md): Key file for this pair.
+- [cipher_suites](/reference/config/gateway/gateways/tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+- [connection_rate_limit](/reference/config/gateway/gateways/tls/connection_rate_limit.md): Types
+- [curve_preferences](/reference/config/gateway/gateways/tls/curve_preferences.md): List of TLS cipher curves to use in order.
+- [handshake_first](/reference/config/gateway/gateways/tls/handshake_first.md): Send the TLS handshake before the INFO protocol message rather
+- [insecure](/reference/config/gateway/gateways/tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+- [key_file](/reference/config/gateway/gateways/tls/key_file.md): TLS certificate key file.
+- [min_version](/reference/config/gateway/gateways/tls/min_version.md): Lowest TLS version the server will negotiate.
+- [ocsp_peer](/reference/config/gateway/gateways/tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+- [allowed_clockskew](/reference/config/gateway/gateways/tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+- [ca_timeout](/reference/config/gateway/gateways/tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+- [cache_ttl_when_next_update_unset](/reference/config/gateway/gateways/tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+- [unknown_is_good](/reference/config/gateway/gateways/tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+- [verify](/reference/config/gateway/gateways/tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+- [warn_only](/reference/config/gateway/gateways/tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+- [pinned_certs](/reference/config/gateway/gateways/tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+- [timeout](/reference/config/gateway/gateways/tls/timeout.md): TLS handshake timeout.
+- [verify](/reference/config/gateway/gateways/tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+- [verify_and_map](/reference/config/gateway/gateways/tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+- [verify_cert_and_check_known_urls](/reference/config/gateway/gateways/tls/verify_cert_and_check_known_urls.md): Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+###### url
+
+A single URL to connect to.
+
+- [url](/reference/config/gateway/gateways/url.md): A single URL to connect to.
+
+###### urls
+
+A list of URLs to connect to (multiple servers in a cluster).
+
+- [urls](/reference/config/gateway/gateways/urls.md): A list of URLs to connect to (multiple servers in a cluster).
+
+##### host
+
+Interface where the gateway will listen for incoming gateway
+
+- [host](/reference/config/gateway/host.md): Interface where the gateway will listen for incoming gateway
+
+##### listen
+
+: format. Alternative to host/port.
+
+- [listen](/reference/config/gateway/listen.md): : format. Alternative to host/port.
+
+##### name
+
+Name of this cluster. All gateway connections belonging to the
+
+- [name](/reference/config/gateway/name.md): Name of this cluster. All gateway connections belonging to the
+
+##### port
+
+Port where the gateway will listen for incoming gateway connections.
+
+- [port](/reference/config/gateway/port.md): Port where the gateway will listen for incoming gateway connections.
+
+##### reject_unknown_cluster
+
+If true, gateway will reject connections from cluster that are
+
+- [reject_unknown_cluster](/reference/config/gateway/reject_unknown_cluster.md): If true, gateway will reject connections from cluster that are
+
+##### tls
+
+A tls configuration map for securing gateway connections. verify
+
+- [tls](/reference/config/gateway/tls.md): A tls configuration map for securing gateway connections. verify
+
+###### allow_insecure_cipher_suites
+
+Permit cipher suites Go considers insecure to be named in
+
+- [allow_insecure_cipher_suites](/reference/config/gateway/tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+
+###### ca_file
+
+TLS certificate authority file. Defaults to system trust store.
+
+- [ca_file](/reference/config/gateway/tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+
+###### cert_file
+
+TLS certificate file.
+
+- [cert_file](/reference/config/gateway/tls/cert_file.md): TLS certificate file.
+
+###### cert_store
+
+Load the certificate from an OS certificate store rather than a
+
+- [cert_store](/reference/config/gateway/tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+
+###### certs
+
+Multiple certificate/key pairs to serve, so one listener can
+
+- [certs](/reference/config/gateway/tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+- [cert_file](/reference/config/gateway/tls/certs/cert_file.md): Certificate file for this pair.
+- [key_file](/reference/config/gateway/tls/certs/key_file.md): Key file for this pair.
+
+###### cipher_suites
+
+When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+- [cipher_suites](/reference/config/gateway/tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+###### connection_rate_limit
+
+Types
+
+- [connection_rate_limit](/reference/config/gateway/tls/connection_rate_limit.md): Types
+
+###### curve_preferences
+
+List of TLS cipher curves to use in order.
+
+- [curve_preferences](/reference/config/gateway/tls/curve_preferences.md): List of TLS cipher curves to use in order.
+
+###### handshake_first
+
+Send the TLS handshake before the INFO protocol message rather
+
+- [handshake_first](/reference/config/gateway/tls/handshake_first.md): Send the TLS handshake before the INFO protocol message rather
+
+###### insecure
+
+Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+- [insecure](/reference/config/gateway/tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+###### key_file
+
+TLS certificate key file.
+
+- [key_file](/reference/config/gateway/tls/key_file.md): TLS certificate key file.
+
+###### min_version
+
+Lowest TLS version the server will negotiate.
+
+- [min_version](/reference/config/gateway/tls/min_version.md): Lowest TLS version the server will negotiate.
+
+###### ocsp_peer
+
+Verify the peer's certificate against its OCSP responder and reject
+
+- [ocsp_peer](/reference/config/gateway/tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+- [allowed_clockskew](/reference/config/gateway/tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+- [ca_timeout](/reference/config/gateway/tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+- [cache_ttl_when_next_update_unset](/reference/config/gateway/tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+- [unknown_is_good](/reference/config/gateway/tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+- [verify](/reference/config/gateway/tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+- [warn_only](/reference/config/gateway/tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+
+###### pinned_certs
+
+List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+- [pinned_certs](/reference/config/gateway/tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+###### timeout
+
+TLS handshake timeout.
+
+- [timeout](/reference/config/gateway/tls/timeout.md): TLS handshake timeout.
+
+###### verify
+
+If true, require and verify client certificates. Does not apply to monitoring.
+
+- [verify](/reference/config/gateway/tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+
+###### verify_and_map
+
+If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+- [verify_and_map](/reference/config/gateway/tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+###### verify_cert_and_check_known_urls
+
+Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+- [verify_cert_and_check_known_urls](/reference/config/gateway/tls/verify_cert_and_check_known_urls.md): Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+##### write_deadline
+
+How long a gateway write may block before the connection is
+
+- [write_deadline](/reference/config/gateway/write_deadline.md): How long a gateway write may block before the connection is
+
+##### write_timeout
+
+What to do when a gateway connection misses its write_deadline.
+
+- [write_timeout](/reference/config/gateway/write_timeout.md): What to do when a gateway connection misses its write_deadline.
+
+#### host
+
+Host for client connections.
+
+- [host](/reference/config/host.md): Host for client connections.
+
+#### http
+
+Listen specification : for server monitoring.
+
+- [http](/reference/config/http.md): Listen specification : for server monitoring.
+
+#### http_base_path
+
+Base path for monitoring endpoints.
+
+- [http_base_path](/reference/config/http_base_path.md): Base path for monitoring endpoints.
+
+#### http_port
+
+HTTP port for server monitoring.
+
+- [http_port](/reference/config/http_port.md): HTTP port for server monitoring.
+
+#### https
+
+Listen specification : for TLS server monitoring.
+
+- [https](/reference/config/https.md): Listen specification : for TLS server monitoring.
+
+#### https_port
+
+HTTPS port for server monitoring.
+
+- [https_port](/reference/config/https_port.md): HTTPS port for server monitoring.
+
+#### jetstream
+
+Types
+
+- [jetstream](/reference/config/jetstream.md): Types
+
+##### cipher
+
+Defines the encryption algorithm to use if an encryption key is defined.
+
+- [cipher](/reference/config/jetstream/cipher.md): Defines the encryption algorithm to use if an encryption key is defined.
+
+##### domain
+
+The JetStream domain the server is part of.
+
+- [domain](/reference/config/jetstream/domain.md): The JetStream domain the server is part of.
+
+##### enabled
+
+If true, enables the JetStream subsystem.
+
+- [enabled](/reference/config/jetstream/enabled.md): If true, enables the JetStream subsystem.
+
+##### encryption_key
+
+If defined, enables JetStream filestore encryption using the
+
+- [encryption_key](/reference/config/jetstream/encryption_key.md): If defined, enables JetStream filestore encryption using the
+
+##### extension_hint
+
+Types
+
+- [extension_hint](/reference/config/jetstream/extension_hint.md): Types
+
+##### info_queue_limit
+
+Queued stream-info requests allowed before new ones are rejected.
+
+- [info_queue_limit](/reference/config/jetstream/info_queue_limit.md): Queued stream-info requests allowed before new ones are rejected.
+
+##### limits
+
+Default cross-account JetStream limits.
+
+- [limits](/reference/config/jetstream/limits.md): Default cross-account JetStream limits.
+
+###### batch
+
+Ceilings on atomic batch publishing.
+
+- [batch](/reference/config/jetstream/limits/batch.md): Ceilings on atomic batch publishing.
+- [max_inflight_per_stream](/reference/config/jetstream/limits/batch/max_inflight_per_stream.md): Batches allowed in flight for one stream.
+- [max_inflight_total](/reference/config/jetstream/limits/batch/max_inflight_total.md): Batches allowed in flight across the server.
+- [max_msgs](/reference/config/jetstream/limits/batch/max_msgs.md): Messages allowed in a single batch.
+- [timeout](/reference/config/jetstream/limits/batch/timeout.md): How long an incomplete batch is held before it is discarded.
+
+###### duplicate_window
+
+The maximum duplication window period allowed to be configured on
+
+- [duplicate_window](/reference/config/jetstream/limits/duplicate_window.md): The maximum duplication window period allowed to be configured on
+
+###### max_ack_pending
+
+Defines the maximum number of in-flight messages allowed to be
+
+- [max_ack_pending](/reference/config/jetstream/limits/max_ack_pending.md): Defines the maximum number of in-flight messages allowed to be
+
+###### max_ha_assets
+
+The maximum number of JetStream assets that can exist at any given
+
+- [max_ha_assets](/reference/config/jetstream/limits/max_ha_assets.md): The maximum number of JetStream assets that can exist at any given
+
+###### max_request_batch
+
+The maximum request batch size allowed to be configured on pull
+
+- [max_request_batch](/reference/config/jetstream/limits/max_request_batch.md): The maximum request batch size allowed to be configured on pull
+
+##### max_buffered_msgs
+
+Messages the server buffers for a stream whose storage is
+
+- [max_buffered_msgs](/reference/config/jetstream/max_buffered_msgs.md): Messages the server buffers for a stream whose storage is
+
+##### max_buffered_size
+
+Byte ceiling for that same buffer.
+
+- [max_buffered_size](/reference/config/jetstream/max_buffered_size.md): Byte ceiling for that same buffer.
+
+##### max_file_store
+
+Maximum size of the file storage.
+
+- [max_file_store](/reference/config/jetstream/max_file_store.md): Maximum size of the file storage.
+
+##### max_memory_store
+
+Maximum size of the memory storage.
+
+- [max_memory_store](/reference/config/jetstream/max_memory_store.md): Maximum size of the memory storage.
+
+##### max_outstanding_catchup
+
+Max in-flight bytes for stream catch-up. This was introduced to
+
+- [max_outstanding_catchup](/reference/config/jetstream/max_outstanding_catchup.md): Max in-flight bytes for stream catch-up. This was introduced to
+
+##### meta_compact
+
+Metalayer Raft entries to accumulate before the log is compacted.
+
+- [meta_compact](/reference/config/jetstream/meta_compact.md): Metalayer Raft entries to accumulate before the log is compacted.
+
+##### meta_compact_size
+
+Metalayer Raft log size that triggers compaction.
+
+- [meta_compact_size](/reference/config/jetstream/meta_compact_size.md): Metalayer Raft log size that triggers compaction.
+
+##### meta_compact_sync
+
+Compact the metalayer Raft log synchronously rather than in the
+
+- [meta_compact_sync](/reference/config/jetstream/meta_compact_sync.md): Compact the metalayer Raft log synchronously rather than in the
+
+##### prev_encryption_key
+
+Previous encryption key, kept so existing filestore data can be
+
+- [prev_encryption_key](/reference/config/jetstream/prev_encryption_key.md): Previous encryption key, kept so existing filestore data can be
+
+##### request_queue_limit
+
+Queued JetStream API requests allowed before new ones are
+
+- [request_queue_limit](/reference/config/jetstream/request_queue_limit.md): Queued JetStream API requests allowed before new ones are
+
+##### store_dir
+
+Directory to use for file-based storage.
+
+- [store_dir](/reference/config/jetstream/store_dir.md): Directory to use for file-based storage.
+
+##### strict
+
+Reject API requests containing unknown fields instead of ignoring
+
+- [strict](/reference/config/jetstream/strict.md): Reject API requests containing unknown fields instead of ignoring
+
+##### sync_interval
+
+Defines the internal to force sync file-based stream and consumer data
+
+- [sync_interval](/reference/config/jetstream/sync_interval.md): Defines the internal to force sync file-based stream and consumer data
+
+##### tpm
+
+Seal the filestore encryption key in the machine's TPM, so it
+
+- [tpm](/reference/config/jetstream/tpm.md): Seal the filestore encryption key in the machine's TPM, so it
+
+###### cipher
+
+Cipher used for the filestore once the key is unsealed.
+
+- [cipher](/reference/config/jetstream/tpm/cipher.md): Cipher used for the filestore once the key is unsealed.
+
+###### encryption_password
+
+Password protecting the sealed key.
+
+- [encryption_password](/reference/config/jetstream/tpm/encryption_password.md): Password protecting the sealed key.
+
+###### keys_file
+
+File the TPM-sealed key is stored in.
+
+- [keys_file](/reference/config/jetstream/tpm/keys_file.md): File the TPM-sealed key is stored in.
+
+###### pcr
+
+Platform Configuration Register the key is sealed against, so it
+
+- [pcr](/reference/config/jetstream/tpm/pcr.md): Platform Configuration Register the key is sealed against, so it
+
+###### srk_password
+
+Password for the TPM storage root key.
+
+- [srk_password](/reference/config/jetstream/tpm/srk_password.md): Password for the TPM storage root key.
+
+##### unique_tag
+
+Defines a tag prefix as a constraint for placement of assets across
+
+- [unique_tag](/reference/config/jetstream/unique_tag.md): Defines a tag prefix as a constraint for placement of assets across
+
+#### lame_duck_duration
+
+Must be at least 30s.
+
+- [lame_duck_duration](/reference/config/lame_duck_duration.md): Must be at least 30s.
+
+#### lame_duck_grace_period
+
+This is the duration the server waits, after entering
+
+- [lame_duck_grace_period](/reference/config/lame_duck_grace_period.md): This is the duration the server waits, after entering
+
+#### leafnodes
+
+Configuration for setting up leaf node connections.
+
+- [leafnodes](/reference/config/leafnodes.md): Configuration for setting up leaf node connections.
+
+##### advertise
+
+Hostport to advertise how this sever be contacted
+
+- [advertise](/reference/config/leafnodes/advertise.md): Hostport to advertise how this sever be contacted
+
+##### authorization
+
+Authorization scoped to accepting leaf node connections.
+
+- [authorization](/reference/config/leafnodes/authorization.md): Authorization scoped to accepting leaf node connections.
+
+###### account
+
+Account that leaf nodes authenticating with these
+
+- [account](/reference/config/leafnodes/authorization/account.md): Account that leaf nodes authenticating with these
+
+###### nkey
+
+Public user nkey a connecting leaf node must sign for.
+
+- [nkey](/reference/config/leafnodes/authorization/nkey.md): Public user nkey a connecting leaf node must sign for.
+
+###### password
+
+Password the connecting server authenticates with
+
+- [password](/reference/config/leafnodes/authorization/password.md): Password the connecting server authenticates with
+
+###### proxy_required
+
+Reject leaf node connections that did not arrive through a
+
+- [proxy_required](/reference/config/leafnodes/authorization/proxy_required.md): Reject leaf node connections that did not arrive through a
+
+###### timeout
+
+Maximum number of seconds to wait for a client to authenticate.
+
+- [timeout](/reference/config/leafnodes/authorization/timeout.md): Maximum number of seconds to wait for a client to authenticate.
+
+###### username
+
+User name the connecting server authenticates with
+
+- [username](/reference/config/leafnodes/authorization/username.md): User name the connecting server authenticates with
+
+###### users
+
+A list of multiple users with different credentials.
+
+- [users](/reference/config/leafnodes/authorization/users.md): A list of multiple users with different credentials.
+- [account](/reference/config/leafnodes/authorization/users/account.md): Account that leaf nodes authenticating as this user are
+- [password](/reference/config/leafnodes/authorization/users/password.md): Password of the user. This can be a free-text value
+- [proxy_required](/reference/config/leafnodes/authorization/users/proxy_required.md): Reject this user's leaf node connections if they did not
+- [username](/reference/config/leafnodes/authorization/users/username.md): Name of the user.
+
+##### compression
+
+on, ->accept) are closed and reconnect." />
+
+- [compression](/reference/config/leafnodes/compression.md): on, ->accept) are closed and reconnect." />
+
+###### mode
+
+Types
+
+- [mode](/reference/config/leafnodes/compression/mode.md): Types
+
+###### rtt_thresholds
+
+Applies only when the s2_auto mode is used and defines the round-trip time (RTT)
+
+- [rtt_thresholds](/reference/config/leafnodes/compression/rtt_thresholds.md): Applies only when the s2_auto mode is used and defines the round-trip time (RTT)
+
+##### host
+
+Host name the server will listen on for incoming
+
+- [host](/reference/config/leafnodes/host.md): Host name the server will listen on for incoming
+
+##### isolate_leafnode_interest
+
+Do not propagate subscription interest learned from one leaf
+
+- [isolate_leafnode_interest](/reference/config/leafnodes/isolate_leafnode_interest.md): Do not propagate subscription interest learned from one leaf
+
+##### listen
+
+Types
+
+- [listen](/reference/config/leafnodes/listen.md): Types
+
+##### min_version
+
+The minimum server version required of the connecting
+
+- [min_version](/reference/config/leafnodes/min_version.md): The minimum server version required of the connecting
+
+##### no_advertise
+
+If true, the server will not be advertised to leaf nodes.
+
+- [no_advertise](/reference/config/leafnodes/no_advertise.md): If true, the server will not be advertised to leaf nodes.
+
+##### port
+
+Port the server will listen for incoming leaf node
+
+- [port](/reference/config/leafnodes/port.md): Port the server will listen for incoming leaf node
+
+##### reconnect
+
+Interval in seconds at which reconnect attempts to a
+
+- [reconnect](/reference/config/leafnodes/reconnect.md): Interval in seconds at which reconnect attempts to a
+
+##### remotes
+
+List of entries specifiying servers where the leaf
+
+- [remotes](/reference/config/leafnodes/remotes.md): List of entries specifiying servers where the leaf
+
+###### account
+
+Account name or public NKey identifying the local account
+
+- [account](/reference/config/leafnodes/remotes/account.md): Account name or public NKey identifying the local account
+
+###### compression
+
+on, ->accept) are closed and reconnect." />
+
+- [compression](/reference/config/leafnodes/remotes/compression.md): on, ->accept) are closed and reconnect." />
+- [mode](/reference/config/leafnodes/remotes/compression/mode.md): Types
+- [rtt_thresholds](/reference/config/leafnodes/remotes/compression/rtt_thresholds.md): Applies only when the s2_auto mode is used and defines the round-trip time (RTT)
+
+###### credentials
+
+Path to a credentials file. This is application when
+
+- [credentials](/reference/config/leafnodes/remotes/credentials.md): Path to a credentials file. This is application when
+
+###### deny_exports
+
+Types
+
+- [deny_exports](/reference/config/leafnodes/remotes/deny_exports.md): Types
+
+###### deny_imports
+
+Types
+
+- [deny_imports](/reference/config/leafnodes/remotes/deny_imports.md): Types
+
+###### disabled
+
+Keep the remote in the configuration without connecting to it.
+
+- [disabled](/reference/config/leafnodes/remotes/disabled.md): Keep the remote in the configuration without connecting to it.
+
+###### first_info_timeout
+
+How long to wait for the remote's INFO message before giving up
+
+- [first_info_timeout](/reference/config/leafnodes/remotes/first_info_timeout.md): How long to wait for the remote's INFO message before giving up
+
+###### hub
+
+Types
+
+- [hub](/reference/config/leafnodes/remotes/hub.md): Types
+
+###### ignore_discovered_servers
+
+Connect only to the URLs listed here, ignoring any additional
+
+- [ignore_discovered_servers](/reference/config/leafnodes/remotes/ignore_discovered_servers.md): Connect only to the URLs listed here, ignoring any additional
+
+###### isolate_leafnode_interest
+
+Do not propagate subscription interest learned from this remote to
+
+- [isolate_leafnode_interest](/reference/config/leafnodes/remotes/isolate_leafnode_interest.md): Do not propagate subscription interest learned from this remote to
+
+###### jetstream_cluster_migrate
+
+Types
+
+- [jetstream_cluster_migrate](/reference/config/leafnodes/remotes/jetstream_cluster_migrate.md): Types
+
+###### nkey
+
+User nkey seed this remote authenticates with.
+
+- [nkey](/reference/config/leafnodes/remotes/nkey.md): User nkey seed this remote authenticates with.
+
+###### no_randomize
+
+If true and more than one URL is specified, the first one
+
+- [no_randomize](/reference/config/leafnodes/remotes/no_randomize.md): If true and more than one URL is specified, the first one
+
+###### proxy
+
+Reach the remote through an HTTP proxy.
+
+- [proxy](/reference/config/leafnodes/remotes/proxy.md): Reach the remote through an HTTP proxy.
+- [password](/reference/config/leafnodes/remotes/proxy/password.md): Password for proxy authentication.
+- [timeout](/reference/config/leafnodes/remotes/proxy/timeout.md): How long to wait for the proxy to establish the tunnel.
+- [url](/reference/config/leafnodes/remotes/proxy/url.md): Proxy URL, e.g. http3128.
+- [username](/reference/config/leafnodes/remotes/proxy/username.md): User name for proxy authentication.
+
+###### request_isolation
+
+Ask the remote to isolate this connection's interest on its side.
+
+- [request_isolation](/reference/config/leafnodes/remotes/request_isolation.md): Ask the remote to isolate this connection's interest on its side.
+
+###### tls
+
+TLS configuration for connecting/authenticating with
+
+- [tls](/reference/config/leafnodes/remotes/tls.md): TLS configuration for connecting/authenticating with
+- [allow_insecure_cipher_suites](/reference/config/leafnodes/remotes/tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+- [ca_file](/reference/config/leafnodes/remotes/tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+- [cert_file](/reference/config/leafnodes/remotes/tls/cert_file.md): TLS certificate file.
+- [cert_store](/reference/config/leafnodes/remotes/tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+- [certs](/reference/config/leafnodes/remotes/tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+- [cert_file](/reference/config/leafnodes/remotes/tls/certs/cert_file.md): Certificate file for this pair.
+- [key_file](/reference/config/leafnodes/remotes/tls/certs/key_file.md): Key file for this pair.
+- [cipher_suites](/reference/config/leafnodes/remotes/tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+- [connection_rate_limit](/reference/config/leafnodes/remotes/tls/connection_rate_limit.md): Types
+- [curve_preferences](/reference/config/leafnodes/remotes/tls/curve_preferences.md): List of TLS cipher curves to use in order.
+- [handshake_first](/reference/config/leafnodes/remotes/tls/handshake_first.md): Force the leafnode connection to use a TLS-first handshake prior
+- [insecure](/reference/config/leafnodes/remotes/tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+- [key_file](/reference/config/leafnodes/remotes/tls/key_file.md): TLS certificate key file.
+- [min_version](/reference/config/leafnodes/remotes/tls/min_version.md): Lowest TLS version the server will negotiate.
+- [ocsp_peer](/reference/config/leafnodes/remotes/tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+- [allowed_clockskew](/reference/config/leafnodes/remotes/tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+- [ca_timeout](/reference/config/leafnodes/remotes/tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+- [cache_ttl_when_next_update_unset](/reference/config/leafnodes/remotes/tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+- [unknown_is_good](/reference/config/leafnodes/remotes/tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+- [verify](/reference/config/leafnodes/remotes/tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+- [warn_only](/reference/config/leafnodes/remotes/tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+- [pinned_certs](/reference/config/leafnodes/remotes/tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+- [timeout](/reference/config/leafnodes/remotes/tls/timeout.md): TLS handshake timeout.
+- [verify](/reference/config/leafnodes/remotes/tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+- [verify_and_map](/reference/config/leafnodes/remotes/tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+###### url
+
+URL or list of URLs of a remote server accepting leaf
+
+- [url](/reference/config/leafnodes/remotes/url.md): URL or list of URLs of a remote server accepting leaf
+
+###### ws_compression
+
+If true, and connecting with the WebSocket protocol,
+
+- [ws_compression](/reference/config/leafnodes/remotes/ws_compression.md): If true, and connecting with the WebSocket protocol,
+
+###### ws_no_masking
+
+If true and connecting with the WebSocket protocol,
+
+- [ws_no_masking](/reference/config/leafnodes/remotes/ws_no_masking.md): If true and connecting with the WebSocket protocol,
+
+##### tls
+
+TLS configuration for securing leaf node connections.
+
+- [tls](/reference/config/leafnodes/tls.md): TLS configuration for securing leaf node connections.
+
+###### allow_insecure_cipher_suites
+
+Permit cipher suites Go considers insecure to be named in
+
+- [allow_insecure_cipher_suites](/reference/config/leafnodes/tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+
+###### ca_file
+
+TLS certificate authority file. Defaults to system trust store.
+
+- [ca_file](/reference/config/leafnodes/tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+
+###### cert_file
+
+TLS certificate file.
+
+- [cert_file](/reference/config/leafnodes/tls/cert_file.md): TLS certificate file.
+
+###### cert_store
+
+Load the certificate from an OS certificate store rather than a
+
+- [cert_store](/reference/config/leafnodes/tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+
+###### certs
+
+Multiple certificate/key pairs to serve, so one listener can
+
+- [certs](/reference/config/leafnodes/tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+- [cert_file](/reference/config/leafnodes/tls/certs/cert_file.md): Certificate file for this pair.
+- [key_file](/reference/config/leafnodes/tls/certs/key_file.md): Key file for this pair.
+
+###### cipher_suites
+
+When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+- [cipher_suites](/reference/config/leafnodes/tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+###### connection_rate_limit
+
+Types
+
+- [connection_rate_limit](/reference/config/leafnodes/tls/connection_rate_limit.md): Types
+
+###### curve_preferences
+
+List of TLS cipher curves to use in order.
+
+- [curve_preferences](/reference/config/leafnodes/tls/curve_preferences.md): List of TLS cipher curves to use in order.
+
+###### handshake_first
+
+Force the leafnode connection to use a TLS-first handshake prior
+
+- [handshake_first](/reference/config/leafnodes/tls/handshake_first.md): Force the leafnode connection to use a TLS-first handshake prior
+
+###### insecure
+
+Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+- [insecure](/reference/config/leafnodes/tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+###### key_file
+
+TLS certificate key file.
+
+- [key_file](/reference/config/leafnodes/tls/key_file.md): TLS certificate key file.
+
+###### min_version
+
+Lowest TLS version the server will negotiate.
+
+- [min_version](/reference/config/leafnodes/tls/min_version.md): Lowest TLS version the server will negotiate.
+
+###### ocsp_peer
+
+Verify the peer's certificate against its OCSP responder and reject
+
+- [ocsp_peer](/reference/config/leafnodes/tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+- [allowed_clockskew](/reference/config/leafnodes/tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+- [ca_timeout](/reference/config/leafnodes/tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+- [cache_ttl_when_next_update_unset](/reference/config/leafnodes/tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+- [unknown_is_good](/reference/config/leafnodes/tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+- [verify](/reference/config/leafnodes/tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+- [warn_only](/reference/config/leafnodes/tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+
+###### pinned_certs
+
+List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+- [pinned_certs](/reference/config/leafnodes/tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+###### timeout
+
+TLS handshake timeout.
+
+- [timeout](/reference/config/leafnodes/tls/timeout.md): TLS handshake timeout.
+
+###### verify
+
+If true, require and verify client certificates. Does not apply to monitoring.
+
+- [verify](/reference/config/leafnodes/tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+
+###### verify_and_map
+
+If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+- [verify_and_map](/reference/config/leafnodes/tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+##### write_deadline
+
+How long a leaf node write may block before the connection is
+
+- [write_deadline](/reference/config/leafnodes/write_deadline.md): How long a leaf node write may block before the connection is
+
+##### write_timeout
+
+What to do when a leaf node connection misses its
+
+- [write_timeout](/reference/config/leafnodes/write_timeout.md): What to do when a leaf node connection misses its
+
+#### listen
+
+: for a client connections.
+
+- [listen](/reference/config/listen.md): : for a client connections.
+
+#### logfile
+
+Log file name.
+
+- [logfile](/reference/config/logfile.md): Log file name.
+
+#### logfile_max_num
+
+Maximum number of rotated log files to keep. Older ones are
+
+- [logfile_max_num](/reference/config/logfile_max_num.md): Maximum number of rotated log files to keep. Older ones are
+
+#### logfile_size_limit
+
+Size in bytes after the log file rolls over to a new one.
+
+- [logfile_size_limit](/reference/config/logfile_size_limit.md): Size in bytes after the log file rolls over to a new one.
+
+#### logtime
+
+If false, log without timestamps.
+
+- [logtime](/reference/config/logtime.md): If false, log without timestamps.
+
+#### logtime_utc
+
+If true, log timestamps with be in UTC rather than the local timezone.
+
+- [logtime_utc](/reference/config/logtime_utc.md): If true, log timestamps with be in UTC rather than the local timezone.
+
+#### mappings
+
+Types
+
+- [mappings](/reference/config/mappings.md): Types
+
+##### cluster
+
+If specified, the destination is cluster-scoped. Messages received
+
+- [cluster](/reference/config/mappings/cluster.md): If specified, the destination is cluster-scoped. Messages received
+
+##### destination
+
+The subject mapping destination for the source subject.
+
+- [destination](/reference/config/mappings/destination.md): The subject mapping destination for the source subject.
+
+##### weight
+
+A number between 0 and 100 (inclusive). The string form allows for
+
+- [weight](/reference/config/mappings/weight.md): A number between 0 and 100 (inclusive). The string form allows for
+
+#### max_closed_clients
+
+How many closed connections the server keeps for /connz
+
+- [max_closed_clients](/reference/config/max_closed_clients.md): How many closed connections the server keeps for /connz
+
+#### max_connections
+
+Maximum number of active client connections.
+
+- [max_connections](/reference/config/max_connections.md): Maximum number of active client connections.
+
+#### max_control_line
+
+Maximum length of a protocol line (including combined length of subject and queue group). Increasing this value may require client changes to be used. Applies to all traffic.
+
+- [max_control_line](/reference/config/max_control_line.md): Maximum length of a protocol line (including combined length of subject and queue group). Increasing this value may require client changes to be used. Applies to all traffic.
+
+#### max_payload
+
+Maximum number of bytes in a message payload. Reducing this size may force you to implement chunking in your clients. Applies to client and leafnode payloads. It is not recommended to use values over 8MB but maxpayload can be set up to 64MB. The max payload must be equal or smaller to the maxpending value.
+
+- [max_payload](/reference/config/max_payload.md): Maximum number of bytes in a message payload. Reducing this size may force you to implement chunking in your clients. Applies to client and leafnode payloads. It is not recommended to use values over 8MB but maxpayload can be set up to 64MB. The max payload must be equal or smaller to the maxpending value.
+
+#### max_pending
+
+Maximum number of bytes buffered for a connection Applies to client connections. Note that applications can also set PendingLimits (number of messages and total size) for their subscriptions.
+
+- [max_pending](/reference/config/max_pending.md): Maximum number of bytes buffered for a connection Applies to client connections. Note that applications can also set PendingLimits (number of messages and total size) for their subscriptions.
+
+#### max_subscription_tokens
+
+Types
+
+- [max_subscription_tokens](/reference/config/max_subscription_tokens.md): Types
+
+#### max_subscriptions
+
+Maximum numbers of subscriptions per client and leafnode accounts connection. A value of 0 means unlimited.
+
+- [max_subscriptions](/reference/config/max_subscriptions.md): Maximum numbers of subscriptions per client and leafnode accounts connection. A value of 0 means unlimited.
+
+#### max_traced_msg_len
+
+Set a limit to the trace of the payload of a message.
+
+- [max_traced_msg_len](/reference/config/max_traced_msg_len.md): Set a limit to the trace of the payload of a message.
+
+#### mqtt
+
+Configuration for enabling the MQTT interface.
+
+- [mqtt](/reference/config/mqtt.md): Configuration for enabling the MQTT interface.
+
+##### ack_wait
+
+This is the amount of time after which a QoS 1 message sent to
+
+- [ack_wait](/reference/config/mqtt/ack_wait.md): This is the amount of time after which a QoS 1 message sent to
+
+##### authorization
+
+Properties
+
+- [authorization](/reference/config/mqtt/authorization.md): Properties
+
+###### password
+
+Specifies a global password that clients can use to authenticate
+
+- [password](/reference/config/mqtt/authorization/password.md): Specifies a global password that clients can use to authenticate
+
+###### timeout
+
+Maximum number of seconds to wait for a client to authenticate.
+
+- [timeout](/reference/config/mqtt/authorization/timeout.md): Maximum number of seconds to wait for a client to authenticate.
+
+###### token
+
+Specifies a global token that clients can use to authenticate with
+
+- [token](/reference/config/mqtt/authorization/token.md): Specifies a global token that clients can use to authenticate with
+
+###### username
+
+Specifies a global user name that clients can use to authenticate
+
+- [username](/reference/config/mqtt/authorization/username.md): Specifies a global user name that clients can use to authenticate
+
+##### consumer_inactive_threshold
+
+Set an explicit default inactive threshold for consumers used by MQTT.
+
+- [consumer_inactive_threshold](/reference/config/mqtt/consumer_inactive_threshold.md): Set an explicit default inactive threshold for consumers used by MQTT.
+
+##### consumer_memory_storage
+
+Hold MQTT consumer state in memory rather than on disk.
+
+- [consumer_memory_storage](/reference/config/mqtt/consumer_memory_storage.md): Hold MQTT consumer state in memory rather than on disk.
+
+##### consumer_replicas
+
+Deprecated. The server logs a warning and ignores the value;
+
+- [consumer_replicas](/reference/config/mqtt/consumer_replicas.md): Deprecated. The server logs a warning and ignores the value;
+
+##### downgrade_qos2_subscribe
+
+Accept a QoS 2 subscription but serve it at QoS 1.
+
+- [downgrade_qos2_subscribe](/reference/config/mqtt/downgrade_qos2_subscribe.md): Accept a QoS 2 subscription but serve it at QoS 1.
+
+##### host
+
+Types
+
+- [host](/reference/config/mqtt/host.md): Types
+
+##### js_api_timeout
+
+How long MQTT waits for a JetStream API call before giving up.
+
+- [js_api_timeout](/reference/config/mqtt/js_api_timeout.md): How long MQTT waits for a JetStream API call before giving up.
+
+##### js_domain
+
+If specified, sets an explicit JetStream domain to be used by MQTT.
+
+- [js_domain](/reference/config/mqtt/js_domain.md): If specified, sets an explicit JetStream domain to be used by MQTT.
+
+##### listen
+
+Types
+
+- [listen](/reference/config/mqtt/listen.md): Types
+
+##### max_ack_pending
+
+This is the amount of QoS 1 messages the server can send to
+
+- [max_ack_pending](/reference/config/mqtt/max_ack_pending.md): This is the amount of QoS 1 messages the server can send to
+
+##### no_auth_user
+
+If no user name is provided when an MQTT client connects, will default
+
+- [no_auth_user](/reference/config/mqtt/no_auth_user.md): If no user name is provided when an MQTT client connects, will default
+
+##### port
+
+Types
+
+- [port](/reference/config/mqtt/port.md): Types
+
+##### reject_qos2_publish
+
+Reject QoS 2 publishes instead of accepting them, for clients that
+
+- [reject_qos2_publish](/reference/config/mqtt/reject_qos2_publish.md): Reject QoS 2 publishes instead of accepting them, for clients that
+
+##### stream_replicas
+
+If specified, sets an explicit number of stream replicas to be used
+
+- [stream_replicas](/reference/config/mqtt/stream_replicas.md): If specified, sets an explicit number of stream replicas to be used
+
+##### tls
+
+Properties
+
+- [tls](/reference/config/mqtt/tls.md): Properties
+
+###### allow_insecure_cipher_suites
+
+Permit cipher suites Go considers insecure to be named in
+
+- [allow_insecure_cipher_suites](/reference/config/mqtt/tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+
+###### ca_file
+
+TLS certificate authority file. Defaults to system trust store.
+
+- [ca_file](/reference/config/mqtt/tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+
+###### cert_file
+
+TLS certificate file.
+
+- [cert_file](/reference/config/mqtt/tls/cert_file.md): TLS certificate file.
+
+###### cert_store
+
+Load the certificate from an OS certificate store rather than a
+
+- [cert_store](/reference/config/mqtt/tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+
+###### certs
+
+Multiple certificate/key pairs to serve, so one listener can
+
+- [certs](/reference/config/mqtt/tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+- [cert_file](/reference/config/mqtt/tls/certs/cert_file.md): Certificate file for this pair.
+- [key_file](/reference/config/mqtt/tls/certs/key_file.md): Key file for this pair.
+
+###### cipher_suites
+
+When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+- [cipher_suites](/reference/config/mqtt/tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+###### connection_rate_limit
+
+Types
+
+- [connection_rate_limit](/reference/config/mqtt/tls/connection_rate_limit.md): Types
+
+###### curve_preferences
+
+List of TLS cipher curves to use in order.
+
+- [curve_preferences](/reference/config/mqtt/tls/curve_preferences.md): List of TLS cipher curves to use in order.
+
+###### handshake_first
+
+Send the TLS handshake before the INFO protocol message rather
+
+- [handshake_first](/reference/config/mqtt/tls/handshake_first.md): Send the TLS handshake before the INFO protocol message rather
+
+###### insecure
+
+Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+- [insecure](/reference/config/mqtt/tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+###### key_file
+
+TLS certificate key file.
+
+- [key_file](/reference/config/mqtt/tls/key_file.md): TLS certificate key file.
+
+###### min_version
+
+Lowest TLS version the server will negotiate.
+
+- [min_version](/reference/config/mqtt/tls/min_version.md): Lowest TLS version the server will negotiate.
+
+###### ocsp_peer
+
+Verify the peer's certificate against its OCSP responder and reject
+
+- [ocsp_peer](/reference/config/mqtt/tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+- [allowed_clockskew](/reference/config/mqtt/tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+- [ca_timeout](/reference/config/mqtt/tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+- [cache_ttl_when_next_update_unset](/reference/config/mqtt/tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+- [unknown_is_good](/reference/config/mqtt/tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+- [verify](/reference/config/mqtt/tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+- [warn_only](/reference/config/mqtt/tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+
+###### pinned_certs
+
+List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+- [pinned_certs](/reference/config/mqtt/tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+###### timeout
+
+TLS handshake timeout.
+
+- [timeout](/reference/config/mqtt/tls/timeout.md): TLS handshake timeout.
+
+###### verify
+
+If true, require and verify client certificates. Does not apply to monitoring.
+
+- [verify](/reference/config/mqtt/tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+
+###### verify_and_map
+
+If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+- [verify_and_map](/reference/config/mqtt/tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+###### verify_cert_and_check_known_urls
+
+Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+- [verify_cert_and_check_known_urls](/reference/config/mqtt/tls/verify_cert_and_check_known_urls.md): Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+#### no_auth_user
+
+Name of the user that non-authenticated clients
+
+- [no_auth_user](/reference/config/no_auth_user.md): Name of the user that non-authenticated clients
+
+#### no_fast_producer_stall
+
+Do not stall a fast producer when a consumer cannot keep up. The
+
+- [no_fast_producer_stall](/reference/config/no_fast_producer_stall.md): Do not stall a fast producer when a consumer cannot keep up. The
+
+#### no_header_support
+
+Disables support for message headers.
+
+- [no_header_support](/reference/config/no_header_support.md): Disables support for message headers.
+
+#### no_system_account
+
+Types
+
+- [no_system_account](/reference/config/no_system_account.md): Types
+
+#### ocsp
+
+OCSP Stapling is honored by default for certificates that have the
+
+- [ocsp](/reference/config/ocsp.md): OCSP Stapling is honored by default for certificates that have the
+
+##### mode
+
+The OCSP stapling mode to adhere to.
+
+- [mode](/reference/config/ocsp/mode.md): The OCSP stapling mode to adhere to.
+
+##### url
+
+An explicit override URL to request staples.
+
+- [url](/reference/config/ocsp/url.md): An explicit override URL to request staples.
+
+##### urls
+
+An explicit list of override URLs to request staples.
+
+- [urls](/reference/config/ocsp/urls.md): An explicit list of override URLs to request staples.
+
+#### ocsp_cache
+
+Cache OCSP responses the server staples, so it does not query the
+
+- [ocsp_cache](/reference/config/ocsp_cache.md): Cache OCSP responses the server staples, so it does not query the
+
+##### local_store
+
+Directory for the local cache.
+
+- [local_store](/reference/config/ocsp_cache/local_store.md): Directory for the local cache.
+
+##### preserve_revoked
+
+Keep revoked responses in the cache rather than evicting them.
+
+- [preserve_revoked](/reference/config/ocsp_cache/preserve_revoked.md): Keep revoked responses in the cache rather than evicting them.
+
+##### type
+
+Where stapled responses are cached. local writes them under the
+
+- [type](/reference/config/ocsp_cache/type.md): Where stapled responses are cached. local writes them under the
+
+#### operator
+
+One or more operator JWTs, either in files or inlined.
+
+- [operator](/reference/config/operator.md): One or more operator JWTs, either in files or inlined.
+
+#### pidfile
+
+Types
+
+- [pidfile](/reference/config/pidfile.md): Types
+
+#### ping_interval
+
+Duration at which pings are sent to clients, leaf nodes and routes.
+
+- [ping_interval](/reference/config/ping_interval.md): Duration at which pings are sent to clients, leaf nodes and routes.
+
+#### ping_max
+
+After how many unanswered pings the server will allow before closing
+
+- [ping_max](/reference/config/ping_max.md): After how many unanswered pings the server will allow before closing
+
+#### port
+
+Port for client connections. Use -1 for a
+
+- [port](/reference/config/port.md): Port for client connections. Use -1 for a
+
+#### ports_file_dir
+
+Types
+
+- [ports_file_dir](/reference/config/ports_file_dir.md): Types
+
+#### prof_block_rate
+
+Go block-profile sampling rate. Set only while profiling; it slows
+
+- [prof_block_rate](/reference/config/prof_block_rate.md): Go block-profile sampling rate. Set only while profiling; it slows
+
+#### prof_port
+
+Types
+
+- [prof_port](/reference/config/prof_port.md): Types
+
+#### proxy_protocol
+
+Accept the PROXY protocol header on client connections, so the
+
+- [proxy_protocol](/reference/config/proxy_protocol.md): Accept the PROXY protocol header on client connections, so the
+
+#### reconnect_error_reports
+
+Number of failed attempt to reconnect a route, gateway or
+
+- [reconnect_error_reports](/reference/config/reconnect_error_reports.md): Number of failed attempt to reconnect a route, gateway or
+
+#### remote_syslog
+
+Remote syslog address.
+
+- [remote_syslog](/reference/config/remote_syslog.md): Remote syslog address.
+
+#### resolver
+
+Takes precedence over the value obtained from
+
+- [resolver](/reference/config/resolver.md): Takes precedence over the value obtained from
+
+##### allow_delete
+
+If true, allows JWTs to be deleted. Note, in full mode, this will
+
+- [allow_delete](/reference/config/resolver/allow_delete.md): If true, allows JWTs to be deleted. Note, in full mode, this will
+
+##### dir
+
+The path to storing account JWT files when pushed to the server.
+
+- [dir](/reference/config/resolver/dir.md): The path to storing account JWT files when pushed to the server.
+
+##### hard_delete
+
+If true, and the resolver is in full mode, deleted account JWTs will
+
+- [hard_delete](/reference/config/resolver/hard_delete.md): If true, and the resolver is in full mode, deleted account JWTs will
+
+##### interval
+
+Defines the interval the resolver will randomly contact another server
+
+- [interval](/reference/config/resolver/interval.md): Defines the interval the resolver will randomly contact another server
+
+##### limit
+
+If set, limit the number of stored JWTs. In full mode, new JWTs
+
+- [limit](/reference/config/resolver/limit.md): If set, limit the number of stored JWTs. In full mode, new JWTs
+
+##### timeout
+
+Defines the request timeout for resolvers interacting with with
+
+- [timeout](/reference/config/resolver/timeout.md): Defines the request timeout for resolvers interacting with with
+
+##### ttl
+
+If cache mode, defines how long an account JWT will be cached
+
+- [ttl](/reference/config/resolver/ttl.md): If cache mode, defines how long an account JWT will be cached
+
+##### type
+
+Defines whether the resolver type. A full resolver stores all
+
+- [type](/reference/config/resolver/type.md): Defines whether the resolver type. A full resolver stores all
+
+#### resolver_pinned_accounts
+
+Types
+
+- [resolver_pinned_accounts](/reference/config/resolver_pinned_accounts.md): Types
+
+#### resolver_preload
+
+Map of account public key to the account JWT.
+
+- [resolver_preload](/reference/config/resolver_preload.md): Map of account public key to the account JWT.
+
+#### resolver_tls
+
+Properties
+
+- [resolver_tls](/reference/config/resolver_tls.md): Properties
+
+##### allow_insecure_cipher_suites
+
+Permit cipher suites Go considers insecure to be named in
+
+- [allow_insecure_cipher_suites](/reference/config/resolver_tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+
+##### ca_file
+
+TLS certificate authority file. Defaults to system trust store.
+
+- [ca_file](/reference/config/resolver_tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+
+##### cert_file
+
+TLS certificate file.
+
+- [cert_file](/reference/config/resolver_tls/cert_file.md): TLS certificate file.
+
+##### cert_store
+
+Load the certificate from an OS certificate store rather than a
+
+- [cert_store](/reference/config/resolver_tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+
+##### certs
+
+Multiple certificate/key pairs to serve, so one listener can
+
+- [certs](/reference/config/resolver_tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+
+###### cert_file
+
+Certificate file for this pair.
+
+- [cert_file](/reference/config/resolver_tls/certs/cert_file.md): Certificate file for this pair.
+
+###### key_file
+
+Key file for this pair.
+
+- [key_file](/reference/config/resolver_tls/certs/key_file.md): Key file for this pair.
+
+##### cipher_suites
+
+When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+- [cipher_suites](/reference/config/resolver_tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+##### connection_rate_limit
+
+Types
+
+- [connection_rate_limit](/reference/config/resolver_tls/connection_rate_limit.md): Types
+
+##### curve_preferences
+
+List of TLS cipher curves to use in order.
+
+- [curve_preferences](/reference/config/resolver_tls/curve_preferences.md): List of TLS cipher curves to use in order.
+
+##### handshake_first
+
+Send the TLS handshake before the INFO protocol message rather
+
+- [handshake_first](/reference/config/resolver_tls/handshake_first.md): Send the TLS handshake before the INFO protocol message rather
+
+##### insecure
+
+Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+- [insecure](/reference/config/resolver_tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+##### key_file
+
+TLS certificate key file.
+
+- [key_file](/reference/config/resolver_tls/key_file.md): TLS certificate key file.
+
+##### min_version
+
+Lowest TLS version the server will negotiate.
+
+- [min_version](/reference/config/resolver_tls/min_version.md): Lowest TLS version the server will negotiate.
+
+##### ocsp_peer
+
+Verify the peer's certificate against its OCSP responder and reject
+
+- [ocsp_peer](/reference/config/resolver_tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+
+###### allowed_clockskew
+
+Clock skew tolerated when checking responder timestamps.
+
+- [allowed_clockskew](/reference/config/resolver_tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+
+###### ca_timeout
+
+How long to wait for the OCSP responder.
+
+- [ca_timeout](/reference/config/resolver_tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+
+###### cache_ttl_when_next_update_unset
+
+How long to cache a response that carries no next-update time.
+
+- [cache_ttl_when_next_update_unset](/reference/config/resolver_tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+
+###### unknown_is_good
+
+Treat an unknown response from the responder as good.
+
+- [unknown_is_good](/reference/config/resolver_tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+
+###### verify
+
+Enable OCSP revocation checking of the peer's certificate.
+
+- [verify](/reference/config/resolver_tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+
+###### warn_only
+
+Log revocation failures instead of rejecting the connection.
+
+- [warn_only](/reference/config/resolver_tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+
+##### pinned_certs
+
+List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+- [pinned_certs](/reference/config/resolver_tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+##### timeout
+
+TLS handshake timeout.
+
+- [timeout](/reference/config/resolver_tls/timeout.md): TLS handshake timeout.
+
+##### verify
+
+If true, require and verify client certificates. Does not apply to monitoring.
+
+- [verify](/reference/config/resolver_tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+
+##### verify_and_map
+
+If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+- [verify_and_map](/reference/config/resolver_tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+##### verify_cert_and_check_known_urls
+
+Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+- [verify_cert_and_check_known_urls](/reference/config/resolver_tls/verify_cert_and_check_known_urls.md): Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+#### server_metadata
+
+Arbitrary key/value pairs reported with this server in monitoring
+
+- [server_metadata](/reference/config/server_metadata.md): Arbitrary key/value pairs reported with this server in monitoring
+
+#### server_name
+
+The servers name, shows up in logging. Defaults to the generated
+
+- [server_name](/reference/config/server_name.md): The servers name, shows up in logging. Defaults to the generated
+
+#### server_tags
+
+One or more tags associated with the server. This is currently
+
+- [server_tags](/reference/config/server_tags.md): One or more tags associated with the server. This is currently
+
+#### store_dir
+
+Directory to use for file-based JetStream storage.
+
+- [store_dir](/reference/config/store_dir.md): Directory to use for file-based JetStream storage.
+
+#### syslog
+
+Log to syslog.
+
+- [syslog](/reference/config/syslog.md): Log to syslog.
+
+#### system_account
+
+Name or public key of the account that will be deemed the
+
+- [system_account](/reference/config/system_account.md): Name or public key of the account that will be deemed the
+
+#### tls
+
+TLS configuration for client and HTTP monitoring.
+
+- [tls](/reference/config/tls.md): TLS configuration for client and HTTP monitoring.
+
+##### allow_insecure_cipher_suites
+
+Permit cipher suites Go considers insecure to be named in
+
+- [allow_insecure_cipher_suites](/reference/config/tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+
+##### ca_file
+
+TLS certificate authority file. Defaults to system trust store.
+
+- [ca_file](/reference/config/tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+
+##### cert_file
+
+TLS certificate file.
+
+- [cert_file](/reference/config/tls/cert_file.md): TLS certificate file.
+
+##### cert_store
+
+Load the certificate from an OS certificate store rather than a
+
+- [cert_store](/reference/config/tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+
+##### certs
+
+Multiple certificate/key pairs to serve, so one listener can
+
+- [certs](/reference/config/tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+
+###### cert_file
+
+Certificate file for this pair.
+
+- [cert_file](/reference/config/tls/certs/cert_file.md): Certificate file for this pair.
+
+###### key_file
+
+Key file for this pair.
+
+- [key_file](/reference/config/tls/certs/key_file.md): Key file for this pair.
+
+##### cipher_suites
+
+When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+- [cipher_suites](/reference/config/tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+##### connection_rate_limit
+
+Types
+
+- [connection_rate_limit](/reference/config/tls/connection_rate_limit.md): Types
+
+##### curve_preferences
+
+List of TLS cipher curves to use in order.
+
+- [curve_preferences](/reference/config/tls/curve_preferences.md): List of TLS cipher curves to use in order.
+
+##### handshake_first
+
+Send the TLS handshake before the INFO protocol message rather
+
+- [handshake_first](/reference/config/tls/handshake_first.md): Send the TLS handshake before the INFO protocol message rather
+
+##### insecure
+
+Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+- [insecure](/reference/config/tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+##### key_file
+
+TLS certificate key file.
+
+- [key_file](/reference/config/tls/key_file.md): TLS certificate key file.
+
+##### min_version
+
+Lowest TLS version the server will negotiate.
+
+- [min_version](/reference/config/tls/min_version.md): Lowest TLS version the server will negotiate.
+
+##### ocsp_peer
+
+Verify the peer's certificate against its OCSP responder and reject
+
+- [ocsp_peer](/reference/config/tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+
+###### allowed_clockskew
+
+Clock skew tolerated when checking responder timestamps.
+
+- [allowed_clockskew](/reference/config/tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+
+###### ca_timeout
+
+How long to wait for the OCSP responder.
+
+- [ca_timeout](/reference/config/tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+
+###### cache_ttl_when_next_update_unset
+
+How long to cache a response that carries no next-update time.
+
+- [cache_ttl_when_next_update_unset](/reference/config/tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+
+###### unknown_is_good
+
+Treat an unknown response from the responder as good.
+
+- [unknown_is_good](/reference/config/tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+
+###### verify
+
+Enable OCSP revocation checking of the peer's certificate.
+
+- [verify](/reference/config/tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+
+###### warn_only
+
+Log revocation failures instead of rejecting the connection.
+
+- [warn_only](/reference/config/tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+
+##### pinned_certs
+
+List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+- [pinned_certs](/reference/config/tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+##### timeout
+
+TLS handshake timeout.
+
+- [timeout](/reference/config/tls/timeout.md): TLS handshake timeout.
+
+##### verify
+
+If true, require and verify client certificates. Does not apply to monitoring.
+
+- [verify](/reference/config/tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+
+##### verify_and_map
+
+If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+- [verify_and_map](/reference/config/tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+##### verify_cert_and_check_known_urls
+
+Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+- [verify_cert_and_check_known_urls](/reference/config/tls/verify_cert_and_check_known_urls.md): Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+#### trace
+
+If true, enables protocol trace log messages,
+
+- [trace](/reference/config/trace.md): If true, enables protocol trace log messages,
+
+#### trace_headers
+
+Trace message headers. Also enables trace.
+
+- [trace_headers](/reference/config/trace_headers.md): Trace message headers. Also enables trace.
+
+#### trace_verbose
+
+If true, enables protocol trace log messages,
+
+- [trace_verbose](/reference/config/trace_verbose.md): If true, enables protocol trace log messages,
+
+#### trusted_keys
+
+One or more operator public keys to trust.
+
+- [trusted_keys](/reference/config/trusted_keys.md): One or more operator public keys to trust.
+
+#### websocket
+
+Configuration for enabling the WebSocket interface.
+
+- [websocket](/reference/config/websocket.md): Configuration for enabling the WebSocket interface.
+
+##### advertise
+
+Advertised client :. Useful for cluster setups
+
+- [advertise](/reference/config/websocket/advertise.md): Advertised client :. Useful for cluster setups
+
+##### allowed_origins
+
+The list of accepted origins. When empty, and same_origin is false,
+
+- [allowed_origins](/reference/config/websocket/allowed_origins.md): The list of accepted origins. When empty, and same_origin is false,
+
+##### authorization
+
+Properties
+
+- [authorization](/reference/config/websocket/authorization.md): Properties
+
+###### password
+
+Specifies a global password that clients can use to authenticate
+
+- [password](/reference/config/websocket/authorization/password.md): Specifies a global password that clients can use to authenticate
+
+###### timeout
+
+Maximum number of seconds to wait for a client to authenticate.
+
+- [timeout](/reference/config/websocket/authorization/timeout.md): Maximum number of seconds to wait for a client to authenticate.
+
+###### token
+
+Specifies a global token that clients can use to authenticate with
+
+- [token](/reference/config/websocket/authorization/token.md): Specifies a global token that clients can use to authenticate with
+
+###### username
+
+Specifies a global user name that clients can use to authenticate
+
+- [username](/reference/config/websocket/authorization/username.md): Specifies a global user name that clients can use to authenticate
+
+##### compress
+
+This enables support for compressed websocket frames
+
+- [compress](/reference/config/websocket/compress.md): This enables support for compressed websocket frames
+
+##### handshake_timeout
+
+This is the total time allowed for the server to
+
+- [handshake_timeout](/reference/config/websocket/handshake_timeout.md): This is the total time allowed for the server to
+
+##### headers
+
+Extra HTTP headers returned on the WebSocket upgrade response.
+
+- [headers](/reference/config/websocket/headers.md): Extra HTTP headers returned on the WebSocket upgrade response.
+
+##### host
+
+Types
+
+- [host](/reference/config/websocket/host.md): Types
+
+##### jwt_cookie
+
+Name of the HTTP cookie, that, if present, will be used as a client JWT.
+
+- [jwt_cookie](/reference/config/websocket/jwt_cookie.md): Name of the HTTP cookie, that, if present, will be used as a client JWT.
+
+##### listen
+
+Types
+
+- [listen](/reference/config/websocket/listen.md): Types
+
+##### no_auth_user
+
+If no user name is provided when a WebSocket client connects, will
+
+- [no_auth_user](/reference/config/websocket/no_auth_user.md): If no user name is provided when a WebSocket client connects, will
+
+##### no_tls
+
+Types
+
+- [no_tls](/reference/config/websocket/no_tls.md): Types
+
+##### pass_cookie
+
+Name of the HTTP cookie holding the password.
+
+- [pass_cookie](/reference/config/websocket/pass_cookie.md): Name of the HTTP cookie holding the password.
+
+##### ping_interval
+
+How often the server sends a WebSocket ping. Set 0 to disable.
+
+- [ping_interval](/reference/config/websocket/ping_interval.md): How often the server sends a WebSocket ping. Set 0 to disable.
+
+##### port
+
+Port to accept WebSocket client connections on. There is no default:
+
+- [port](/reference/config/websocket/port.md): Port to accept WebSocket client connections on. There is no default:
+
+##### same_origin
+
+This option is relevant for clients used within a Web Browser, such
+
+- [same_origin](/reference/config/websocket/same_origin.md): This option is relevant for clients used within a Web Browser, such
+
+##### tls
+
+Properties
+
+- [tls](/reference/config/websocket/tls.md): Properties
+
+###### allow_insecure_cipher_suites
+
+Permit cipher suites Go considers insecure to be named in
+
+- [allow_insecure_cipher_suites](/reference/config/websocket/tls/allow_insecure_cipher_suites.md): Permit cipher suites Go considers insecure to be named in
+
+###### ca_file
+
+TLS certificate authority file. Defaults to system trust store.
+
+- [ca_file](/reference/config/websocket/tls/ca_file.md): TLS certificate authority file. Defaults to system trust store.
+
+###### cert_file
+
+TLS certificate file.
+
+- [cert_file](/reference/config/websocket/tls/cert_file.md): TLS certificate file.
+
+###### cert_store
+
+Load the certificate from an OS certificate store rather than a
+
+- [cert_store](/reference/config/websocket/tls/cert_store.md): Load the certificate from an OS certificate store rather than a
+
+###### certs
+
+Multiple certificate/key pairs to serve, so one listener can
+
+- [certs](/reference/config/websocket/tls/certs.md): Multiple certificate/key pairs to serve, so one listener can
+- [cert_file](/reference/config/websocket/tls/certs/cert_file.md): Certificate file for this pair.
+- [key_file](/reference/config/websocket/tls/certs/key_file.md): Key file for this pair.
+
+###### cipher_suites
+
+When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+- [cipher_suites](/reference/config/websocket/tls/cipher_suites.md): When set, only the specified TLS cipher suites will be allowed. Values must match the golang version used to build the server.
+
+###### connection_rate_limit
+
+Types
+
+- [connection_rate_limit](/reference/config/websocket/tls/connection_rate_limit.md): Types
+
+###### curve_preferences
+
+List of TLS cipher curves to use in order.
+
+- [curve_preferences](/reference/config/websocket/tls/curve_preferences.md): List of TLS cipher curves to use in order.
+
+###### handshake_first
+
+Send the TLS handshake before the INFO protocol message rather
+
+- [handshake_first](/reference/config/websocket/tls/handshake_first.md): Send the TLS handshake before the INFO protocol message rather
+
+###### insecure
+
+Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+- [insecure](/reference/config/websocket/tls/insecure.md): Skip certificate verification. This only applies to outgoing connections, NOT incoming client connections. not recommended.
+
+###### key_file
+
+TLS certificate key file.
+
+- [key_file](/reference/config/websocket/tls/key_file.md): TLS certificate key file.
+
+###### min_version
+
+Lowest TLS version the server will negotiate.
+
+- [min_version](/reference/config/websocket/tls/min_version.md): Lowest TLS version the server will negotiate.
+
+###### ocsp_peer
+
+Verify the peer's certificate against its OCSP responder and reject
+
+- [ocsp_peer](/reference/config/websocket/tls/ocsp_peer.md): Verify the peer's certificate against its OCSP responder and reject
+- [allowed_clockskew](/reference/config/websocket/tls/ocsp_peer/allowed_clockskew.md): Clock skew tolerated when checking responder timestamps.
+- [ca_timeout](/reference/config/websocket/tls/ocsp_peer/ca_timeout.md): How long to wait for the OCSP responder.
+- [cache_ttl_when_next_update_unset](/reference/config/websocket/tls/ocsp_peer/cache_ttl_when_next_update_unset.md): How long to cache a response that carries no next-update time.
+- [unknown_is_good](/reference/config/websocket/tls/ocsp_peer/unknown_is_good.md): Treat an unknown response from the responder as good.
+- [verify](/reference/config/websocket/tls/ocsp_peer/verify.md): Enable OCSP revocation checking of the peer's certificate.
+- [warn_only](/reference/config/websocket/tls/ocsp_peer/warn_only.md): Log revocation failures instead of rejecting the connection.
+
+###### pinned_certs
+
+List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+- [pinned_certs](/reference/config/websocket/tls/pinned_certs.md): List of hex-encoded SHA256 of DER-encoded public key fingerprints. When present, during the TLS handshake, the
+
+###### timeout
+
+TLS handshake timeout.
+
+- [timeout](/reference/config/websocket/tls/timeout.md): TLS handshake timeout.
+
+###### verify
+
+If true, require and verify client certificates. Does not apply to monitoring.
+
+- [verify](/reference/config/websocket/tls/verify.md): If true, require and verify client certificates. Does not apply to monitoring.
+
+###### verify_and_map
+
+If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+- [verify_and_map](/reference/config/websocket/tls/verify_and_map.md): If true, require and verify client certificates and map certificate values for authentication. Does not apply to monitoring.
+
+###### verify_cert_and_check_known_urls
+
+Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+- [verify_cert_and_check_known_urls](/reference/config/websocket/tls/verify_cert_and_check_known_urls.md): Only used in a non-client context where verify is true, such as cluster and gateway configurations.
+
+##### token_cookie
+
+Name of the HTTP cookie holding the auth token.
+
+- [token_cookie](/reference/config/websocket/token_cookie.md): Name of the HTTP cookie holding the auth token.
+
+##### user_cookie
+
+Name of the HTTP cookie holding the user name, for clients that
+
+- [user_cookie](/reference/config/websocket/user_cookie.md): Name of the HTTP cookie holding the user name, for clients that
+
+#### write_deadline
+
+Maximum number of seconds the server will block when writing. Once
+
+- [write_deadline](/reference/config/write_deadline.md): Maximum number of seconds the server will block when writing. Once
+
+#### write_timeout
+
+What the server does when a connection misses its
+
+- [write_timeout](/reference/config/write_timeout.md): What the server does when a connection misses its
+
+### jetstream
+
+JetStream is the persistence layer of NATS, providing message streaming, replay, and at-least-once delivery semantics.
+
+- [JetStream](/reference/jetstream.md): JetStream is the persistence layer of NATS, providing message streaming, replay, and at-least-once delivery semantics.
+
+#### advisory
+
+Advisories are system events published by JetStream servers to notify about important state changes and operational events. These events are published to specific subjects that can be subscribed to for monitoring and observability.
+
+- [JetStream Advisories](/reference/jetstream/advisory.md): Advisories are system events published by JetStream servers to notify about important state changes and operational events. These events are published to specific subjects that can be subscribed to for monitoring and observability.
+
+##### api-audit
+
+JetStream API audit events.
+
+- [API Audit](/reference/jetstream/advisory/api-audit.md): JetStream API audit events.
+
+##### api-limit-reached
+
+API rate limit reached events.
+
+- [API Limit Reached](/reference/jetstream/advisory/api-limit-reached.md): API rate limit reached events.
+
+##### consumer-action
+
+Consumer lifecycle events.
+
+- [Consumer Action](/reference/jetstream/advisory/consumer-action.md): Consumer lifecycle events.
+
+##### consumer-group-pinned
+
+Consumer group pinned to node.
+
+- [Consumer Group Pinned](/reference/jetstream/advisory/consumer-group-pinned.md): Consumer group pinned to node.
+
+##### consumer-group-unpinned
+
+Consumer group unpinned from node.
+
+- [Consumer Group Unpinned](/reference/jetstream/advisory/consumer-group-unpinned.md): Consumer group unpinned from node.
+
+##### consumer-leader-elected
+
+New consumer leader elected.
+
+- [Consumer Leader Elected](/reference/jetstream/advisory/consumer-leader-elected.md): New consumer leader elected.
+
+##### consumer-pause
+
+Consumer paused or resumed.
+
+- [Consumer Pause](/reference/jetstream/advisory/consumer-pause.md): Consumer paused or resumed.
+
+##### consumer-quorum-lost
+
+Consumer lost quorum.
+
+- [Consumer Quorum Lost](/reference/jetstream/advisory/consumer-quorum-lost.md): Consumer lost quorum.
+
+##### domain-leader-elected
+
+New domain leader elected.
+
+- [Domain Leader Elected](/reference/jetstream/advisory/domain-leader-elected.md): New domain leader elected.
+
+##### max-deliver
+
+Message exceeded max delivery attempts.
+
+- [Max Deliveries Exceeded](/reference/jetstream/advisory/max-deliver.md): Message exceeded max delivery attempts.
+
+##### nak
+
+Message negatively acknowledged.
+
+- [Message Negative Acknowledgement](/reference/jetstream/advisory/nak.md): Message negatively acknowledged.
+
+##### restore-complete
+
+Stream restore completed.
+
+- [Restore Complete](/reference/jetstream/advisory/restore-complete.md): Stream restore completed.
+
+##### restore-create
+
+Stream restore initiated.
+
+- [Restore Started](/reference/jetstream/advisory/restore-create.md): Stream restore initiated.
+
+##### server-out-of-space
+
+Server storage exhausted.
+
+- [Server Out of Space](/reference/jetstream/advisory/server-out-of-space.md): Server storage exhausted.
+
+##### server-removed
+
+Server removed from cluster.
+
+- [Server Removed](/reference/jetstream/advisory/server-removed.md): Server removed from cluster.
+
+##### snapshot-complete
+
+Stream snapshot completed.
+
+- [Snapshot Complete](/reference/jetstream/advisory/snapshot-complete.md): Stream snapshot completed.
+
+##### snapshot-create
+
+Stream snapshot initiated.
+
+- [Snapshot Started](/reference/jetstream/advisory/snapshot-create.md): Stream snapshot initiated.
+
+##### stream-action
+
+Stream lifecycle events.
+
+- [Stream Action](/reference/jetstream/advisory/stream-action.md): Stream lifecycle events.
+
+##### stream-batch-abandoned
+
+An advisory sent when a stream abandons a batch.
+
+- [Stream Batch Abandoned](/reference/jetstream/advisory/stream-batch-abandoned.md): An advisory sent when a stream abandons a batch.
+
+##### stream-leader-elected
+
+New stream leader elected.
+
+- [Stream Leader Elected](/reference/jetstream/advisory/stream-leader-elected.md): New stream leader elected.
+
+##### stream-quorum-lost
+
+Stream lost quorum.
+
+- [Stream Quorum Lost](/reference/jetstream/advisory/stream-quorum-lost.md): Stream lost quorum.
+
+##### terminated
+
+Message terminated.
+
+- [Message Terminated](/reference/jetstream/advisory/terminated.md): Message terminated.
+
+#### api
+
+The JetStream API provides programmatic access to manage and interact with NATS JetStream resources. These APIs enable you to create, configure, and manage streams and consumers, as well as perform administrative operations.
+
+- [JetStream API](/reference/jetstream/api.md): The JetStream API provides programmatic access to manage and interact with NATS JetStream resources. These APIs enable you to create, configure, and manage streams and consumers, as well as perform administrative operations.
+
+##### account
+
+| Name            | Subject                  | System Account |
+
+- [Account](/reference/jetstream/api/account.md): | Name            | Subject                  | System Account |
+
+###### info
+
+Retrieves JetStream account information.
+
+- [Account Info](/reference/jetstream/api/account/info.md): Retrieves JetStream account information.
+
+###### purge
+
+Purges all data for an account.
+
+- [Account Purge](/reference/jetstream/api/account/purge.md): Purges all data for an account.
+
+##### consumer
+
+| Name                  | Subject                                           | System Account |
+
+- [Consumer](/reference/jetstream/api/consumer.md): | Name                  | Subject                                           | System Account |
+
+###### create
+
+Creates a new consumer.
+
+- [Create Consumer](/reference/jetstream/api/consumer/create.md): Creates a new consumer.
+
+###### delete
+
+Deletes a consumer.
+
+- [Delete Consumer](/reference/jetstream/api/consumer/delete.md): Deletes a consumer.
+
+###### get-next
+
+Gets next message(s) from a consumer.
+
+- [Get Next Message](/reference/jetstream/api/consumer/get-next.md): Gets next message(s) from a consumer.
+
+###### info
+
+Retrieves consumer information.
+
+- [Consumer Info](/reference/jetstream/api/consumer/info.md): Retrieves consumer information.
+
+###### leader-stepdown
+
+Initiates leader stepdown for a consumer.
+
+- [Leader Stepdown](/reference/jetstream/api/consumer/leader-stepdown.md): Initiates leader stepdown for a consumer.
+
+###### list
+
+Lists consumers for a stream.
+
+- [List Consumers](/reference/jetstream/api/consumer/list.md): Lists consumers for a stream.
+
+###### names
+
+Lists consumer names for a stream.
+
+- [Consumer Names](/reference/jetstream/api/consumer/names.md): Lists consumer names for a stream.
+
+###### pause
+
+Pauses or resumes a consumer.
+
+- [Pause Consumer](/reference/jetstream/api/consumer/pause.md): Pauses or resumes a consumer.
+
+###### unpin
+
+Unpins a consumer group.
+
+- [Unpin Consumer](/reference/jetstream/api/consumer/unpin.md): Unpins a consumer group.
+
+##### headers
+
+This document provides a comprehensive reference for all headers used in JetStream operations. These headers are used for message publishing, delivery, and various JetStream features.
+
+- [JetStream API Headers](/reference/jetstream/api/headers.md): This document provides a comprehensive reference for all headers used in JetStream operations. These headers are used for message publishing, delivery, and various JetStream features.
+
+##### meta
+
+| Name                  | Subject                           | System Account |
+
+- [Meta](/reference/jetstream/api/meta.md): | Name                  | Subject                           | System Account |
+
+###### leader-stepdown
+
+Initiates meta-group leader stepdown.
+
+- [Meta Leader Stepdown](/reference/jetstream/api/meta/leader-stepdown.md): Initiates meta-group leader stepdown.
+
+###### server-remove
+
+Removes a server from the JetStream cluster.
+
+- [Server Remove](/reference/jetstream/api/meta/server-remove.md): Removes a server from the JetStream cluster.
+
+##### stream
+
+| Name                  | Subject                                       | System Account |
+
+- [Stream](/reference/jetstream/api/stream.md): | Name                  | Subject                                       | System Account |
+
+###### create
+
+Creates a new stream with the specified configuration.
+
+- [Create Stream](/reference/jetstream/api/stream/create.md): Creates a new stream with the specified configuration.
+
+###### delete
+
+Deletes an existing stream.
+
+- [Delete Stream](/reference/jetstream/api/stream/delete.md): Deletes an existing stream.
+
+###### info
+
+Retrieves information about a stream.
+
+- [Stream Info](/reference/jetstream/api/stream/info.md): Retrieves information about a stream.
+
+###### leader-stepdown
+
+Initiates leader stepdown for a stream.
+
+- [Leader Stepdown](/reference/jetstream/api/stream/leader-stepdown.md): Initiates leader stepdown for a stream.
+
+###### list
+
+Lists all streams.
+
+- [List Streams](/reference/jetstream/api/stream/list.md): Lists all streams.
+
+###### msg-delete
+
+Deletes a specific message from a stream.
+
+- [Delete Message](/reference/jetstream/api/stream/msg-delete.md): Deletes a specific message from a stream.
+
+###### msg-get
+
+Retrieves a specific message from a stream.
+
+- [Get Message](/reference/jetstream/api/stream/msg-get.md): Retrieves a specific message from a stream.
+
+###### names
+
+Lists stream names.
+
+- [Stream Names](/reference/jetstream/api/stream/names.md): Lists stream names.
+
+###### pub-ack
+
+Publishes a message directly to a stream and receives an acknowledgement.
+
+- [Publish Acknowledgement](/reference/jetstream/api/stream/pub-ack.md): Publishes a message directly to a stream and receives an acknowledgement.
+
+###### purge
+
+Purges messages from a stream.
+
+- [Purge Stream](/reference/jetstream/api/stream/purge.md): Purges messages from a stream.
+
+###### remove-peer
+
+Removes a peer from a stream cluster.
+
+- [Remove Peer](/reference/jetstream/api/stream/remove-peer.md): Removes a peer from a stream cluster.
+
+###### restore
+
+Restores a stream from a snapshot.
+
+- [Restore Stream](/reference/jetstream/api/stream/restore.md): Restores a stream from a snapshot.
+
+###### snapshot
+
+Creates a snapshot of a stream.
+
+- [Snapshot Stream](/reference/jetstream/api/stream/snapshot.md): Creates a snapshot of a stream.
+
+###### update
+
+Updates an existing stream configuration.
+
+- [Update Stream](/reference/jetstream/api/stream/update.md): Updates an existing stream configuration.
+
+#### errors
+
+This page contains a comprehensive list of all JetStream error codes and their descriptions, organized by category.
+
+- [JetStream Errors](/reference/jetstream/errors.md): This page contains a comprehensive list of all JetStream error codes and their descriptions, organized by category.
+
+#### metric
+
+Metrics are operational measurements published by JetStream to provide observability into message processing performance and behavior.
+
+- [JetStream Metrics](/reference/jetstream/metric.md): Metrics are operational measurements published by JetStream to provide observability into message processing performance and behavior.
+
+##### consumer-ack
+
+Consumer acknowledgement metrics.
+
+- [Consumer Acknowledgement Metric](/reference/jetstream/metric/consumer-ack.md): Consumer acknowledgement metrics.
+
+### protocols
+
+NATS uses text-based protocols for all communication between clients, servers, and clusters. These protocols are designed to be simple, efficient, and easy to implement.
+
+- [Protocols](/reference/protocols.md): NATS uses text-based protocols for all communication between clients, servers, and clusters. These protocols are designed to be simple, efficient, and easy to implement.
+
+#### client
+
+The NATS client protocol is used to communicate between the NATS server and clients.
+
+- [Client](/reference/protocols/client.md): The NATS client protocol is used to communicate between the NATS server and clients.
+
+#### gateway
+
+The NATS gateway protocol is used to connect multiple NATS clusters together.
+
+- [Gateway](/reference/protocols/gateway.md): The NATS gateway protocol is used to connect multiple NATS clusters together.
+
+#### leafnode
+
+The NATS leafnode protocol is used to create lightweight, unidirectional connections from edge servers to a central cluster.
+
+- [Leafnode](/reference/protocols/leafnode.md): The NATS leafnode protocol is used to create lightweight, unidirectional connections from edge servers to a central cluster.
+
+#### route
+
+The NATS route protocol is used to form a cluster of NATS servers.
+
+- [Route](/reference/protocols/route.md): The NATS route protocol is used to form a cluster of NATS servers.
+
+### services
+
+The NATS Services API provides a framework for building observable microservices with built-in discovery, health checking, and monitoring.
+
+- [Services API](/reference/services.md): The NATS Services API provides a framework for building observable microservices with built-in discovery, health checking, and monitoring.
+
+#### info-response
+
+Service information and metadata response.
+
+- [Info Response](/reference/services/info-response.md): Service information and metadata response.
+
+#### ping-response
+
+Service health check response.
+
+- [Ping Response](/reference/services/ping-response.md): Service health check response.
+
+#### stats-response
+
+Service statistics and metrics response.
+
+- [Stats Response](/reference/services/stats-response.md): Service statistics and metrics response.
+
+### system
+
+System reference for monitoring, observability, and system management.
+
+- [System Reference](/reference/system.md): System reference for monitoring, observability, and system management.
+
+#### advisory
+
+Server advisory messages are published by the NATS server to notify clients of significant events related to connections, accounts, and system state.
+
+- [Server Advisory](/reference/system/advisory.md): Server advisory messages are published by the NATS server to notify clients of significant events related to connections, accounts, and system state.
+
+##### account-connections
+
+Account connection limit events.
+
+- [Account Connections](/reference/system/advisory/account-connections.md): Account connection limit events.
+
+##### client-connect
+
+Client connection events.
+
+- [Client Connect](/reference/system/advisory/client-connect.md): Client connection events.
+
+##### client-disconnect
+
+Client disconnection events.
+
+- [Client Disconnect](/reference/system/advisory/client-disconnect.md): Client disconnection events.
+
+#### errors
+
+NATS server non-JetStream errors for client, route, gateway, and leafnode connections
+
+- [System Errors](/reference/system/errors.md): NATS server non-JetStream errors for client, route, gateway, and leafnode connections
+
+#### metric
+
+Server metric messages provide telemetry data from the NATS server for monitoring and performance analysis.
+
+- [Server Metrics](/reference/system/metric.md): Server metric messages provide telemetry data from the NATS server for monitoring and performance analysis.
+
+##### service-latency
+
+Service latency metrics.
+
+- [Service Latency](/reference/system/metric/service-latency.md): Service latency metrics.
+
+#### monitor
+
+Server monitoring endpoints provide detailed information about the NATS server state, performance metrics, and operational health.
+
+- [Server Monitoring](/reference/system/monitor.md): Server monitoring endpoints provide detailed information about the NATS server state, performance metrics, and operational health.
+
+##### accountz
+
+Request Schema
+
+- [Accountz](/reference/system/monitor/accountz.md): Request Schema
+
+##### accstatz
+
+Request Schema
+
+- [Accstatz](/reference/system/monitor/accstatz.md): Request Schema
+
+##### connz
+
+Request Schema
+
+- [Connz](/reference/system/monitor/connz.md): Request Schema
+
+##### gatewayz
+
+Request Schema
+
+- [Gatewayz](/reference/system/monitor/gatewayz.md): Request Schema
+
+##### healthz
+
+Request Schema
+
+- [Healthz](/reference/system/monitor/healthz.md): Request Schema
+
+##### idz
+
+Response Schema
+
+- [Idz](/reference/system/monitor/idz.md): Response Schema
+
+##### ipqueuesz
+
+Request Schema
+
+- [IPQueuesz](/reference/system/monitor/ipqueuesz.md): Request Schema
+
+##### jsz
+
+Request Schema
+
+- [JSz](/reference/system/monitor/jsz.md): Request Schema
+
+##### leafz
+
+Request Schema
+
+- [Leafz](/reference/system/monitor/leafz.md): Request Schema
+
+##### profilez
+
+Request Schema
+
+- [Profilez](/reference/system/monitor/profilez.md): Request Schema
+
+##### raftz
+
+Request Schema
+
+- [Raftz](/reference/system/monitor/raftz.md): Request Schema
+
+##### routez
+
+Request Schema
+
+- [Routez](/reference/system/monitor/routez.md): Request Schema
+
+##### statsz
+
+Request Schema
+
+- [Statsz](/reference/system/monitor/statsz.md): Request Schema
+
+##### subsz
+
+Request Schema
+
+- [Subsz](/reference/system/monitor/subsz.md): Request Schema
+
+##### varz
+
+Request Schema
+
+- [Varz](/reference/system/monitor/varz.md): Request Schema
+
+## release-notes
+
+Where NATS server release information lives — upgrade guides, the full changelog, and announcement posts — plus which versions are supported.
+
+- [Find release information](/release-notes.md): Where NATS server release information lives — upgrade guides, the full changelog, and announcement posts — plus which versions are supported.
+
+### upgrade-to-2.12
+
+What changes when you move a NATS deployment from 2.11.x to 2.12 — new features, upgrade considerations, and downgrade steps.
+
+- [Upgrade to NATS 2.12](/release-notes/upgrade-to-2.12.md): What changes when you move a NATS deployment from 2.11.x to 2.12 — new features, upgrade considerations, and downgrade steps.
+
+### upgrade-to-2.14
+
+What changes when you move a NATS deployment from 2.12.x to 2.14 — new features, upgrade considerations, and downgrade steps.
+
+- [Upgrade to NATS 2.14](/release-notes/upgrade-to-2.14.md): What changes when you move a NATS deployment from 2.12.x to 2.14 — new features, upgrade considerations, and downgrade steps.
+
+## search
+
+- [Search the documentation](/search.md)
+
+## tutorials
+
+Hand-held, start-to-finish tutorials that get you a working NATS result fast
+
+- [Tutorials](/tutorials.md): Hand-held, start-to-finish tutorials that get you a working NATS result fast
+
+### build-an-app
+
+Combine publish/subscribe, request/reply, and a stream into one working app
+
+- [7. Capstone: build a small NATS app](/tutorials/build-an-app.md): Combine publish/subscribe, request/reply, and a stream into one working app
+
+### first-stream
+
+Create your first stream, publish to it, and replay stored messages
+
+- [4. Persist messages with JetStream](/tutorials/first-stream.md): Create your first stream, publish to it, and replay stored messages
+
+### hello-nats
+
+Install NATS, then publish and subscribe your first message
+
+- [1. Hello NATS](/tutorials/hello-nats.md): Install NATS, then publish and subscribe your first message
+
+### key-value
+
+Put, get, and watch values in a JetStream Key-Value bucket
+
+- [6. Store state in Key-Value](/tutorials/key-value.md): Put, get, and watch values in a JetStream Key-Value bucket
+
+### request-reply
+
+Build a tiny responder service and call it with a request that gets one answer back
+
+- [2. Request and reply](/tutorials/request-reply.md): Build a tiny responder service and call it with a request that gets one answer back
+
+### stream-consumer
+
+Read a stream with a durable consumer, acknowledge each message, and resume where you left off after a restart
+
+- [5. A consumer that survives restarts](/tutorials/stream-consumer.md): Read a stream with a durable consumer, acknowledge each message, and resume where you left off after a restart
+
+### work-queue
+
+Use a queue group to split a workload across two workers, so each message goes to exactly one of them
+
+- [3. Share work across workers](/tutorials/work-queue.md): Use a queue group to split a workload across two workers, so each message goes to exactly one of them

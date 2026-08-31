@@ -1,0 +1,242 @@
+![NATS](large-logo.png)
+
+# NATS Architecture And Design
+
+This repository captures Architecture, Design Specifications and Feature Guidance for the NATS ecosystem.
+## 2.11
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-31](adr/ADR-31.md)|jetstream, client, server, 2.11|JetStream Direct Get|
+|[ADR-41](adr/ADR-41.md)|observability, server, 2.11|NATS Message Path Tracing|
+|[ADR-42](adr/ADR-42.md)|jetstream, server, 2.11|Pull Consumer Priority Groups|
+|[ADR-43](adr/ADR-43.md)|jetstream, client, server, 2.11|JetStream Per-Message TTL|
+|[ADR-44](adr/ADR-44.md)|jetstream, server, 2.11, 2.12|Versioning for JetStream Assets|
+|[ADR-48](adr/ADR-48.md)|jetstream, client, kv, refinement, 2.11|TTL Support for Key-Value Buckets (updating [ADR-8](adr/ADR-8.md))|
+
+## 2.12
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-44](adr/ADR-44.md)|jetstream, server, 2.11, 2.12|Versioning for JetStream Assets|
+|[ADR-49](adr/ADR-49.md)|jetstream, spec, 2.12|JetStream Distributed Counter CRDT|
+|[ADR-50](adr/ADR-50.md)|jetstream, server, client, 2.12, 2.14|JetStream Batch Publishing|
+|[ADR-51](adr/ADR-51.md)|jetstream, 2.12, 2.14|JetStream Message Scheduler|
+|[ADR-55](adr/ADR-55.md)|server, 2.12|Trusted Protocol Aware Proxies|
+|[ADR-56](adr/ADR-56.md)|server, 2.12|JetStream Consistency Models|
+
+## 2.14
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-50](adr/ADR-50.md)|jetstream, server, client, 2.12, 2.14|JetStream Batch Publishing|
+|[ADR-51](adr/ADR-51.md)|jetstream, 2.12, 2.14|JetStream Message Scheduler|
+|[ADR-60](adr/ADR-60.md)|jetstream, client, server, 2.14, refinement|JetStream reliable stream sourcing/mirroring on WQ/Interest streams (updating [ADR-59](adr/ADR-59.md))|
+
+## 2.15
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-61](adr/ADR-61.md)|server, jetstream, 2.15|Unsafe meta group quorum rescue for disaster recovery|
+|[ADR-62](adr/ADR-62.md)|server, jetstream, 2.15|JetStream desired state reconciliation|
+
+## Client
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-1](adr/ADR-1.md)|jetstream, client, server|JetStream JSON API Design|
+|[ADR-2](adr/ADR-2.md)|jetstream, server, client|NATS Typed Messages|
+|[ADR-4](adr/ADR-4.md)|server, client|NATS Message Headers|
+|[ADR-5](adr/ADR-5.md)|server, client|Lame Duck Notification|
+|[ADR-6](adr/ADR-6.md)|server, client|Naming Rules|
+|[ADR-7](adr/ADR-7.md)|server, client, jetstream|NATS Server Error Codes|
+|[ADR-8](adr/ADR-8.md)|jetstream, client, kv, spec|JetStream based Key-Value Stores|
+|[ADR-9](adr/ADR-9.md)|server, client, jetstream|JetStream Consumer Idle Heartbeats|
+|[ADR-10](adr/ADR-10.md)|server, client, jetstream|JetStream Extended Purge|
+|[ADR-11](adr/ADR-11.md)|client|Hostname resolution|
+|[ADR-13](adr/ADR-13.md)|jetstream, client|Pull Subscribe internals|
+|[ADR-14](adr/ADR-14.md)|client, security|JWT library free jwt user generation|
+|[ADR-17](adr/ADR-17.md)|jetstream, client|Ordered Consumer|
+|[ADR-19](adr/ADR-19.md)|jetstream, client, kv, objectstore|API prefixes for materialized JetStream views|
+|[ADR-20](adr/ADR-20.md)|jetstream, client, objectstore, spec|JetStream based Object Stores|
+|[ADR-21](adr/ADR-21.md)|client|NATS Configuration Contexts|
+|[ADR-22](adr/ADR-22.md)|jetstream, client|JetStream Publish Retries on No Responders|
+|[ADR-31](adr/ADR-31.md)|jetstream, client, server, 2.11|JetStream Direct Get|
+|[ADR-32](adr/ADR-32.md)|client, spec|Service API|
+|[ADR-33](adr/ADR-33.md)|jetstream, client, server|Metadata for Stream and Consumer|
+|[ADR-34](adr/ADR-34.md)|jetstream, client, server|JetStream Consumers Multiple Filters|
+|[ADR-35](adr/ADR-35.md)|jetstream, client, server|JetStream Filestore Compression|
+|[ADR-36](adr/ADR-36.md)|jetstream, client, server|Subject Mapping Transforms in Streams|
+|[ADR-37](adr/ADR-37.md)|jetstream, client, spec|JetStream Simplification|
+|[ADR-40](adr/ADR-40.md)|client, server, spec|NATS Connection|
+|[ADR-43](adr/ADR-43.md)|jetstream, client, server, 2.11|JetStream Per-Message TTL|
+|[ADR-47](adr/ADR-47.md)|client, spec, orbit|Request Many|
+|[ADR-48](adr/ADR-48.md)|jetstream, client, kv, refinement, 2.11|TTL Support for Key-Value Buckets (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-50](adr/ADR-50.md)|jetstream, server, client, 2.12, 2.14|JetStream Batch Publishing|
+|[ADR-54](adr/ADR-54.md)|jetstream, client, spec, orbit, kv, refinement|KV Codecs (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-57](adr/ADR-57.md)|jetstream, client, spec, kv, refinement|KV Subject Transforms (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-58](adr/ADR-58.md)|jetstream, client, kv|Key-Value Store Roadmap and future considerations (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-60](adr/ADR-60.md)|jetstream, client, server, 2.14, refinement|JetStream reliable stream sourcing/mirroring on WQ/Interest streams (updating [ADR-59](adr/ADR-59.md))|
+
+## Jetstream
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-1](adr/ADR-1.md)|jetstream, client, server|JetStream JSON API Design|
+|[ADR-2](adr/ADR-2.md)|jetstream, server, client|NATS Typed Messages|
+|[ADR-7](adr/ADR-7.md)|server, client, jetstream|NATS Server Error Codes|
+|[ADR-8](adr/ADR-8.md)|jetstream, client, kv, spec|JetStream based Key-Value Stores|
+|[ADR-9](adr/ADR-9.md)|server, client, jetstream|JetStream Consumer Idle Heartbeats|
+|[ADR-10](adr/ADR-10.md)|server, client, jetstream|JetStream Extended Purge|
+|[ADR-12](adr/ADR-12.md)|jetstream|JetStream Encryption At Rest|
+|[ADR-13](adr/ADR-13.md)|jetstream, client|Pull Subscribe internals|
+|[ADR-17](adr/ADR-17.md)|jetstream, client|Ordered Consumer|
+|[ADR-19](adr/ADR-19.md)|jetstream, client, kv, objectstore|API prefixes for materialized JetStream views|
+|[ADR-20](adr/ADR-20.md)|jetstream, client, objectstore, spec|JetStream based Object Stores|
+|[ADR-22](adr/ADR-22.md)|jetstream, client|JetStream Publish Retries on No Responders|
+|[ADR-28](adr/ADR-28.md)|jetstream, server|JetStream RePublish|
+|[ADR-31](adr/ADR-31.md)|jetstream, client, server, 2.11|JetStream Direct Get|
+|[ADR-33](adr/ADR-33.md)|jetstream, client, server|Metadata for Stream and Consumer|
+|[ADR-34](adr/ADR-34.md)|jetstream, client, server|JetStream Consumers Multiple Filters|
+|[ADR-35](adr/ADR-35.md)|jetstream, client, server|JetStream Filestore Compression|
+|[ADR-36](adr/ADR-36.md)|jetstream, client, server|Subject Mapping Transforms in Streams|
+|[ADR-37](adr/ADR-37.md)|jetstream, client, spec|JetStream Simplification|
+|[ADR-42](adr/ADR-42.md)|jetstream, server, 2.11|Pull Consumer Priority Groups|
+|[ADR-43](adr/ADR-43.md)|jetstream, client, server, 2.11|JetStream Per-Message TTL|
+|[ADR-44](adr/ADR-44.md)|jetstream, server, 2.11, 2.12|Versioning for JetStream Assets|
+|[ADR-48](adr/ADR-48.md)|jetstream, client, kv, refinement, 2.11|TTL Support for Key-Value Buckets (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-49](adr/ADR-49.md)|jetstream, spec, 2.12|JetStream Distributed Counter CRDT|
+|[ADR-50](adr/ADR-50.md)|jetstream, server, client, 2.12, 2.14|JetStream Batch Publishing|
+|[ADR-51](adr/ADR-51.md)|jetstream, 2.12, 2.14|JetStream Message Scheduler|
+|[ADR-54](adr/ADR-54.md)|jetstream, client, spec, orbit, kv, refinement|KV Codecs (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-57](adr/ADR-57.md)|jetstream, client, spec, kv, refinement|KV Subject Transforms (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-58](adr/ADR-58.md)|jetstream, client, kv|Key-Value Store Roadmap and future considerations (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-59](adr/ADR-59.md)|server, jetstream, spec|JetStream Stream Sourcing and Mirroring|
+|[ADR-60](adr/ADR-60.md)|jetstream, client, server, 2.14, refinement|JetStream reliable stream sourcing/mirroring on WQ/Interest streams (updating [ADR-59](adr/ADR-59.md))|
+|[ADR-61](adr/ADR-61.md)|server, jetstream, 2.15|Unsafe meta group quorum rescue for disaster recovery|
+|[ADR-62](adr/ADR-62.md)|server, jetstream, 2.15|JetStream desired state reconciliation|
+
+## Kv
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-8](adr/ADR-8.md)|jetstream, client, kv, spec|JetStream based Key-Value Stores|
+|[ADR-19](adr/ADR-19.md)|jetstream, client, kv, objectstore|API prefixes for materialized JetStream views|
+|[ADR-48](adr/ADR-48.md)|jetstream, client, kv, refinement, 2.11|TTL Support for Key-Value Buckets (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-54](adr/ADR-54.md)|jetstream, client, spec, orbit, kv, refinement|KV Codecs (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-57](adr/ADR-57.md)|jetstream, client, spec, kv, refinement|KV Subject Transforms (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-58](adr/ADR-58.md)|jetstream, client, kv|Key-Value Store Roadmap and future considerations (updating [ADR-8](adr/ADR-8.md))|
+
+## Objectstore
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-19](adr/ADR-19.md)|jetstream, client, kv, objectstore|API prefixes for materialized JetStream views|
+|[ADR-20](adr/ADR-20.md)|jetstream, client, objectstore, spec|JetStream based Object Stores|
+
+## Observability
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-3](adr/ADR-3.md)|observability, server|NATS Service Latency Distributed Tracing Interoperability|
+|[ADR-41](adr/ADR-41.md)|observability, server, 2.11|NATS Message Path Tracing|
+
+## Orbit
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-47](adr/ADR-47.md)|client, spec, orbit|Request Many|
+|[ADR-54](adr/ADR-54.md)|jetstream, client, spec, orbit, kv, refinement|KV Codecs (updating [ADR-8](adr/ADR-8.md))|
+
+## Refinement
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-48](adr/ADR-48.md)|jetstream, client, kv, refinement, 2.11|TTL Support for Key-Value Buckets (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-54](adr/ADR-54.md)|jetstream, client, spec, orbit, kv, refinement|KV Codecs (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-57](adr/ADR-57.md)|jetstream, client, spec, kv, refinement|KV Subject Transforms (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-60](adr/ADR-60.md)|jetstream, client, server, 2.14, refinement|JetStream reliable stream sourcing/mirroring on WQ/Interest streams (updating [ADR-59](adr/ADR-59.md))|
+
+## Security
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-14](adr/ADR-14.md)|client, security|JWT library free jwt user generation|
+|[ADR-38](adr/ADR-38.md)|server, security|OCSP Peer Verification|
+|[ADR-39](adr/ADR-39.md)|server, security|Certificate Store|
+
+## Server
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-1](adr/ADR-1.md)|jetstream, client, server|JetStream JSON API Design|
+|[ADR-2](adr/ADR-2.md)|jetstream, server, client|NATS Typed Messages|
+|[ADR-3](adr/ADR-3.md)|observability, server|NATS Service Latency Distributed Tracing Interoperability|
+|[ADR-4](adr/ADR-4.md)|server, client|NATS Message Headers|
+|[ADR-5](adr/ADR-5.md)|server, client|Lame Duck Notification|
+|[ADR-6](adr/ADR-6.md)|server, client|Naming Rules|
+|[ADR-7](adr/ADR-7.md)|server, client, jetstream|NATS Server Error Codes|
+|[ADR-9](adr/ADR-9.md)|server, client, jetstream|JetStream Consumer Idle Heartbeats|
+|[ADR-10](adr/ADR-10.md)|server, client, jetstream|JetStream Extended Purge|
+|[ADR-26](adr/ADR-26.md)|server|NATS Authorization Callouts|
+|[ADR-28](adr/ADR-28.md)|jetstream, server|JetStream RePublish|
+|[ADR-30](adr/ADR-30.md)|server|Subject Transform|
+|[ADR-31](adr/ADR-31.md)|jetstream, client, server, 2.11|JetStream Direct Get|
+|[ADR-33](adr/ADR-33.md)|jetstream, client, server|Metadata for Stream and Consumer|
+|[ADR-34](adr/ADR-34.md)|jetstream, client, server|JetStream Consumers Multiple Filters|
+|[ADR-35](adr/ADR-35.md)|jetstream, client, server|JetStream Filestore Compression|
+|[ADR-36](adr/ADR-36.md)|jetstream, client, server|Subject Mapping Transforms in Streams|
+|[ADR-38](adr/ADR-38.md)|server, security|OCSP Peer Verification|
+|[ADR-39](adr/ADR-39.md)|server, security|Certificate Store|
+|[ADR-40](adr/ADR-40.md)|client, server, spec|NATS Connection|
+|[ADR-41](adr/ADR-41.md)|observability, server, 2.11|NATS Message Path Tracing|
+|[ADR-42](adr/ADR-42.md)|jetstream, server, 2.11|Pull Consumer Priority Groups|
+|[ADR-43](adr/ADR-43.md)|jetstream, client, server, 2.11|JetStream Per-Message TTL|
+|[ADR-44](adr/ADR-44.md)|jetstream, server, 2.11, 2.12|Versioning for JetStream Assets|
+|[ADR-50](adr/ADR-50.md)|jetstream, server, client, 2.12, 2.14|JetStream Batch Publishing|
+|[ADR-53](adr/ADR-53.md)|server|Feature flags|
+|[ADR-55](adr/ADR-55.md)|server, 2.12|Trusted Protocol Aware Proxies|
+|[ADR-56](adr/ADR-56.md)|server, 2.12|JetStream Consistency Models|
+|[ADR-59](adr/ADR-59.md)|server, jetstream, spec|JetStream Stream Sourcing and Mirroring|
+|[ADR-60](adr/ADR-60.md)|jetstream, client, server, 2.14, refinement|JetStream reliable stream sourcing/mirroring on WQ/Interest streams (updating [ADR-59](adr/ADR-59.md))|
+|[ADR-61](adr/ADR-61.md)|server, jetstream, 2.15|Unsafe meta group quorum rescue for disaster recovery|
+|[ADR-62](adr/ADR-62.md)|server, jetstream, 2.15|JetStream desired state reconciliation|
+
+## Spec
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-8](adr/ADR-8.md)|jetstream, client, kv, spec|JetStream based Key-Value Stores|
+|[ADR-20](adr/ADR-20.md)|jetstream, client, objectstore, spec|JetStream based Object Stores|
+|[ADR-32](adr/ADR-32.md)|client, spec|Service API|
+|[ADR-37](adr/ADR-37.md)|jetstream, client, spec|JetStream Simplification|
+|[ADR-40](adr/ADR-40.md)|client, server, spec|NATS Connection|
+|[ADR-47](adr/ADR-47.md)|client, spec, orbit|Request Many|
+|[ADR-49](adr/ADR-49.md)|jetstream, spec, 2.12|JetStream Distributed Counter CRDT|
+|[ADR-54](adr/ADR-54.md)|jetstream, client, spec, orbit, kv, refinement|KV Codecs (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-57](adr/ADR-57.md)|jetstream, client, spec, kv, refinement|KV Subject Transforms (updating [ADR-8](adr/ADR-8.md))|
+|[ADR-59](adr/ADR-59.md)|server, jetstream, spec|JetStream Stream Sourcing and Mirroring|
+
+## Deprecated
+
+|Index|Tags|Description|
+|-----|----|-----------|
+|[ADR-15](adr/ADR-15.md)|deprecated|JetStream Subscribe Workflow|
+|[ADR-18](adr/ADR-18.md)|deprecated|URL support for all client options|
+|[ADR-52](adr/ADR-52.md)|deprecated|No Headers support for Direct Get|
+
+## When to write an ADR
+
+We use this repository in a few ways:
+
+ 1. Design specifications where a single document captures everything about a feature, examples are ADR-8, ADR-32, ADR-37 and ADR-40
+ 1. Guidance on conventions and design such as ADR-6 which documents all the valid naming rules
+ 1. Capturing design that might impact many areas of the system such as ADR-2
+
+We want to move away from using these to document individual minor decisions, moving instead to spec like documents that are living documents and can change over time. Each capturing revisions and history.
+
+## Template
+
+Please see the [template](adr-template.md). The template body is a guideline. Feel free to add sections as you feel appropriate. Look at the other ADRs for examples. However, the initial Table of metadata and header format is required to match.
+
+After editing / adding a ADR please run `go run main.go > README.md` to update the embedded index. This will also validate the header part of your ADR.

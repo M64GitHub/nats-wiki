@@ -1,0 +1,504 @@
+<!-- source: https://docs.nats.io/learn/resilient-clients/connecting.md · fetched 2026-08-31 · section: connecting -->
+# Connecting
+
+Every resilient connection starts the same way: a client opens it. So far `order-svc` has connected with nothing but a server URL, a bare default connection. That works on a laptop, but it's the wrong starting point for production. The very first thing a connection does is also the part most likely to fail: the client has to reach a server and pass authentication before anything else works.
+
+This page opens `order-svc`'s connection deliberately. It adds two things to the bare default: a small set of connection options that name the connection and point it at more than one server, and an understanding of the connect handshake, the short exchange between client and server before the first message moves. Once these are correct, every later mechanism in this chapter has a working connection to build on.
+
+## Connection options
+
+A **connection option** is a setting you pass at connect time. It's fixed for the life of the connection: you choose it when you open the connection, not while messages flow. Three of them matter before anything else.
+
+The first is the **connection name**. By default a connection is anonymous: the server sees a client, but can't tell which application it is. Naming the connection `order-svc` makes it identifiable in `nats server report connections` and in the server logs, so when something goes wrong you can find the right connection instead of guessing.
+
+The second is the **server pool**: the list of server URLs the client may connect to. With one URL, a client has one place to go, and if that server is unreachable the connect fails. With several URLs the client has choices. It tries them until one answers, which is failover at connect time, before a single message is sent.
+
+Here's `order-svc` opening a named connection to a single server, the laptop setup from Core NATS:
+
+#### CLI
+
+```
+#!/bin/bash
+
+# Open order-svc's connection to a single server and give it a name.
+
+#
+
+# The --connection-name flag labels the connection so it is identifiable
+
+# in `nats server report connections`. Without it, the CLI connects under
+
+# its default name (`NATS CLI Version <version>`), so you cannot tell
+
+# order-svc apart from any other CLI run.
+
+#
+
+# This publishes the canonical order event once the connection is up.
+
+
+
+nats pub orders.created \
+
+  '{"order_id":"ord_8w2k","customer":"acme-co","total_cents":4200,"ts":"2026-05-22T10:14:22Z"}' \
+
+  --server nats://n1:4222 \
+
+  --connection-name order-svc
+```
+
+#### C
+
+```
+// Name the connection so `nats server report connections` and the
+
+// server logs show order-svc instead of an anonymous client.
+
+if (s == NATS_OK)
+
+    s = natsOptions_SetName(opts, "order-svc");
+
+
+
+if (s == NATS_OK)
+
+    s = natsConnection_Connect(&conn, opts);
+
+
+
+// Publish the canonical order event once the connection is up.
+
+if (s == NATS_OK)
+
+    s = natsConnection_PublishString(conn, "orders.created",
+
+            "{\"order_id\":\"ord_8w2k\",\"customer\":\"acme-co\","
+
+            "\"total_cents\":4200,\"ts\":\"2026-05-22T10:14:22Z\"}");
+```
+
+Every example on this page publishes the same canonical order event:
+
+```
+{"order_id":"ord_8w2k","customer":"acme-co","total_cents":4200,"ts":"2026-05-22T10:14:22Z"}
+```
+
+## The server pool is randomized
+
+Once `order-svc` runs against more than one server, the pool's *order* matters. By default the client **randomizes** the pool before it dials. Give it `n1`, `n2`, and `n3`, and one client may try `n2` first while another tries `n1`. That randomization spreads connections evenly across the servers instead of concentrating every client on whichever URL happens to be first in the list.
+
+You can turn randomization off with a single option (most clients call it some variant of `NoRandomize`; Python calls it `dont_randomize`, Rust `retain_servers_order`) when you deliberately want a preferred-server order. Most applications should leave it on so that a restart of every `order-svc` instance doesn't overload one server.
+
+`order-svc` opens against the `n1`/`n2`/`n3` cluster, used here only as a pool of three URLs the client can reach, not as a thing this chapter explains:
+
+#### CLI
+
+```
+#!/bin/bash
+
+# Open order-svc against a server pool instead of a single server.
+
+#
+
+# Pass every server URL the client may connect to, comma-separated. The
+
+# client picks one at random by default; if the first dial fails it tries
+
+# the next. That is failover at connect time, before a single message is
+
+# sent.
+
+#
+
+# --connection-name labels the connection. The CLI does not expose the
+
+# connect-timeout knob; in a client library, set the timeout that bounds
+
+# how long each dial may block.
+
+
+
+nats pub orders.created \
+
+  '{"order_id":"ord_8w2k","customer":"acme-co","total_cents":4200,"ts":"2026-05-22T10:14:22Z"}' \
+
+  --server "nats://n1:4222,nats://n2:4222,nats://n3:4222" \
+
+  --connection-name order-svc
+```
+
+#### C
+
+```
+// The server pool: every URL order-svc may dial. The client
+
+// randomizes this list before dialing, so a restart of every
+
+// instance spreads across the servers instead of piling onto the
+
+// first URL. natsOptions_SetNoRandomize(opts, true) would keep a
+
+// deliberate preferred order.
+
+const char *servers[] = {"nats://n1:4222", "nats://n2:4222",
+
+                         "nats://n3:4222"};
+
+
+
+if (s == NATS_OK)
+
+    s = natsOptions_SetServers(opts, servers, 3);
+
+if (s == NATS_OK)
+
+    s = natsOptions_SetName(opts, "order-svc");
+
+
+
+// Bound each dial: an unreachable server costs at most 2 seconds
+
+// before the client moves on to the next URL in the pool.
+
+if (s == NATS_OK)
+
+    s = natsOptions_SetTimeout(opts, 2000);
+
+
+
+if (s == NATS_OK)
+
+    s = natsConnection_Connect(&conn, opts);
+
+
+
+if (s == NATS_OK)
+
+    s = natsConnection_PublishString(conn, "orders.created",
+
+            "{\"order_id\":\"ord_8w2k\",\"customer\":\"acme-co\","
+
+            "\"total_cents\":4200,\"ts\":\"2026-05-22T10:14:22Z\"}");
+```
+
+Why the cluster exists, and how those three servers coordinate behind the pool, belongs to [Topologies → Your first cluster](/learn/topologies/your-first-cluster.md). This chapter treats the pool as a fact: three URLs the client may dial.
+
+## Discovered servers
+
+Your configured URLs are one source for the pool; the cluster itself is the other. Each server tells clients about its peers: the `INFO` message it sends when a client connects (the [connect handshake](#the-connect-handshake) below walks through it) carries a `connect_urls` field listing the client addresses of the cluster members, and the server sends a fresh `INFO` whenever that list changes, for as long as the connection lives. This advertising is usually called **gossip**. The client merges each list into its pool, and a pool entry that arrived this way is a **discovered server**.
+
+Discovered URLs behave like configured ones. They follow the same randomization rule as the rest of the pool, and reconnect treats them as candidates, so after a failure `order-svc` can rejoin the cluster on a server no configuration ever named. The difference shows when the cluster shrinks: a configured URL stays in the pool for the life of the connection, while a discovered one can be dropped once the cluster stops advertising it. Give `order-svc` nothing but `n1`, and its pool still holds `n1`/`n2`/`n3` right after the first `INFO`.
+
+Merging is on by default in every client; turning it off is where they differ. Go (`IgnoreDiscoveredServers`), Java (`ignoreDiscoveredServers()`), and Rust (`ignore_discovered_servers`) name the opt-out after discovered servers; JavaScript calls it `ignoreClusterUpdates`. Python and C# have no opt-out — those two always merge. The usual reason to opt out is reachability: the cluster advertises addresses that may not be dialable from the network your client runs in.
+
+Some clients also signal when discovery adds a server to the pool. Go fires the `DiscoveredServersCB` callback, Python `discovered_server_cb`, and Java the `DISCOVERED_SERVERS` connection-listener event; JavaScript reports an `update` status carrying the added and deleted URLs. Rust and C# have no discovered-servers signal. The full set of connection callbacks is the subject of [Connection events](/learn/resilient-clients/connection-events.md) later in this chapter.
+
+The CLI registers Go's callback for you: run any command with `--trace`, and when a server the client hasn't seen before joins the cluster, it logs `>>> Discovered new servers, known servers are now ...` with the whole pool:
+
+#### CLI
+
+```
+#!/bin/bash
+
+# Watch the pool grow beyond what you configured.
+
+#
+
+# Connect to n1 only. The first INFO from n1 already lists the other
+
+# cluster members in connect_urls, so the client's pool holds all three
+
+# servers even though --server names one. That first merge is silent.
+
+#
+
+# --trace makes the CLI log later pool growth: when a server the client
+
+# has not seen before joins the cluster mid-connection, it prints
+
+#
+
+#   >>> Discovered new servers, known servers are now ...
+
+#
+
+# followed by the full pool. The client libraries expose the same
+
+# signal as a callback or event.
+
+
+
+nats sub "orders.>" \
+
+  --server nats://n1:4222 \
+
+  --connection-name order-svc \
+
+  --trace
+```
+
+#### C
+
+```
+static void
+
+printPool(natsConnection *nc)
+
+{
+
+    char    **servers = NULL;
+
+    int     count     = 0;
+
+    int     i;
+
+
+
+    if (natsConnection_GetServers(nc, &servers, &count) != NATS_OK)
+
+        return;
+
+
+
+    for (i = 0; i < count; i++)
+
+    {
+
+        printf("  %s\n", servers[i]);
+
+        free(servers[i]);
+
+    }
+
+    free(servers);
+
+}
+
+
+
+// Fires when gossip adds a server the client has not seen before.
+
+static void
+
+onDiscoveredServers(natsConnection *nc, void *closure)
+
+{
+
+    printf("discovered new servers, known servers are now:\n");
+
+    printPool(nc);
+
+}
+
+    if (s == NATS_OK)
+
+        s = natsOptions_SetName(opts, "order-svc");
+
+
+
+    // Register the discovered-servers callback before connecting.
+
+    if (s == NATS_OK)
+
+        s = natsOptions_SetDiscoveredServersCB(opts, onDiscoveredServers, NULL);
+
+
+
+    if (s == NATS_OK)
+
+        s = natsConnection_Connect(&conn, opts);
+
+
+
+    // The first INFO already merged the rest of the cluster into the
+
+    // pool, silently: one configured URL, three known servers.
+
+    if (s == NATS_OK)
+
+    {
+
+        printf("configured one server, pool after connect:\n");
+
+        printPool(conn);
+
+    }
+```
+
+All of this depends on the operator leaving advertising on: with `no_advertise` set in the cluster configuration, `INFO` carries no `connect_urls` and the pool stays exactly what you configured. That switch, and the cluster behind it, belong to [Topologies → Your first cluster](/learn/topologies/your-first-cluster.md).
+
+## The connect timeout bounds the dial
+
+Dialing a server isn't instant. The client resolves the hostname, opens a TCP socket, and waits for the server to answer. Any of those steps can hang: a wrong DNS entry, a firewall that drops packets, a server that's up but overloaded. Without a bound, the client waits indefinitely.
+
+The **connect timeout** is that bound. It caps how long a single dial may block before the client gives up and tries the next URL in the pool. The default is two seconds in most clients — five in Rust, twenty in JavaScript — so check what yours uses. Two seconds is enough for a healthy network and quick to move past a dead server; set the timeout deliberately when your client's default is longer or your network is slower.
+
+The timeout and a server pool complement each other. A pool gives the client other URLs to try, and the timeout decides how long it waits on one URL before trying the next. One unreachable server in the pool costs you one timeout, then the client moves on to the next URL.
+
+Here we cover only the options that change how a connection behaves under fault; the exact option names and defaults live in your client's API reference, while [Reference](/reference/.md) covers the wire protocol and server configuration.
+
+## The connect handshake
+
+Naming a connection and pointing it at a pool decides which server the client goes to. The **connect handshake** is what happens once it gets there: the short exchange that turns a TCP socket into a working NATS connection.
+
+It runs in four steps, in order:
+
+1. **TCP dial.** The client opens a socket to the chosen server. The connect timeout bounds this step.
+2. **Server INFO.** The server immediately sends an `INFO` message describing itself: its `server_id`, its `max_payload`, whether authentication is required (`auth_required`), whether TLS is required (`tls_required`), and more.
+3. **Client CONNECT.** The client replies with a `CONNECT` message carrying its name, any credentials, and the protocol features it supports, and immediately follows it with a `PING`.
+4. **Server `PONG` or `-ERR`.** If the server accepts the connection it answers the `PING` with a `PONG`, and the connection is **CONNECTED** and messages may flow. If it rejects the connection it sends `-ERR` (for example `Authorization Violation`) and closes the socket. In verbose mode the server also acknowledges the `CONNECT` itself with `+OK`, but clients turn verbose off by default, so the `PONG` is what confirms the connection.
+
+Picture the handshake and the two end states it can reach, CONNECTED or rejected:
+
+**Message flow — Connect handshake (animated):** The NATS client connect handshake, one frame at a time. order-svc opens a TCP connection; the server sends its INFO frame; the client replies with a CONNECT frame carrying its credentials; the server confirms with PONG and the client is connected. The rejected branch shows the same exchange ending in -ERR authorization violation.
+
+* order-svc → server
+* server → order-svc
+
+Two fields in that `INFO` message change how the client behaves, so they're worth naming.
+
+`auth_required` tells the client whether the server demands credentials. If it's true and the client has none, the handshake ends in `-ERR` and the connection never reaches CONNECTED. Supplying those credentials is the job of [TLS & Auth](/learn/resilient-clients/tls-and-auth.md) later in this chapter; here you only need to know the server announces the requirement up front, in the handshake.
+
+`max_payload` is the largest single message the server will accept, one megabyte by default. The client reads it from `INFO` and enforces it locally: a publish larger than `max_payload` fails *before* it leaves the client, rather than being sent and rejected. That's why an oversized `orders.created` event fails fast — the client already knows the limit.
+
+## Pitfalls
+
+Connecting fails in a few predictable ways. Each one happens before a single order moves, so catching it at connect time saves a confusing debugging session later. A failed connect also isn't always a dead socket: the server can accept the TCP connection and then reject it with an `-ERR` — `maximum connections exceeded` when it's at its connection limit, for example — so a retry loop around connect needs a wait between attempts, just like the reconnect backoff on the next page.
+
+**One URL is a single point of failure at connect time.** A connection opened against a single server has nowhere to go if that server is unreachable, and the connect fails. Don't hardcode one URL for a production client. Pass the whole pool (several URLs, or several IPs behind one name) so the client can fail over while it's still connecting.
+
+**A one-URL configuration that depends on discovery fails where discovery is off.** Give a client a single URL against a cluster and it usually still fails over, because the first `INFO` filled its pool with the rest of the cluster. That safety holds only while the operator leaves advertising on and the advertised addresses are reachable from your client's network; with `no_advertise` set, or with addresses your client can't dial, the pool is one URL again — a single point of failure at connect and reconnect time. Configure every server you want the client to rely on, and treat discovered servers as additions.
+
+**A blocked dial with no timeout hangs the startup.** If DNS resolution or the TCP dial stalls and no connect timeout is set short, the client waits far longer than you expect, and a service that hangs on startup looks dead rather than slow. Do set a deliberate connect timeout, and pair it with a pool so a single slow server costs one timeout, not the whole startup.
+
+**An oversized message fails the publish, not the connect.** A message larger than the server's `max_payload` (one megabyte by default) is refused by the client itself, before it's sent. The connection is fine; the publish is the thing that fails. Don't treat that error as a connection problem. Keep messages under `max_payload`, and for large bodies store the blob elsewhere and publish a reference.
+
+Handle the connect failures at the boundary instead of letting them surface deep in the application. The handler branches on whether the client could reach any server in the pool at all:
+
+#### CLI
+
+```
+#!/bin/bash
+
+# Connecting can fail before any message moves. This script handles the case
+
+# the page's pitfalls build up to: no server in the pool is reachable, so the
+
+# connect itself fails.
+
+#
+
+# With the CLI, a failed connect prints the error and exits non-zero, so
+
+# you can branch on it. The client libraries surface the same failures as
+
+# an error you catch at connect time.
+
+
+
+# A pool whose first URL is unreachable: the client tries the next one.
+
+# If every dial fails, the command exits non-zero and prints the reason.
+
+if nats pub orders.created \
+
+  '{"order_id":"ord_8w2k","customer":"acme-co","total_cents":4200,"ts":"2026-05-22T10:14:22Z"}' \
+
+  --server "nats://n1:4222,nats://n2:4222,nats://n3:4222" \
+
+  --connection-name order-svc; then
+
+  echo "connected and published"
+
+else
+
+  echo "could not connect to any server in the pool" >&2
+
+  exit 1
+
+fi
+```
+
+#### C
+
+```
+// A pool whose first pick may be unreachable: the client tries the
+
+// next URL. Connect fails only when every dial failed.
+
+const char *servers[] = {"nats://n1:4222", "nats://n2:4222",
+
+                         "nats://n3:4222"};
+
+
+
+if (s == NATS_OK)
+
+    s = natsOptions_SetServers(opts, servers, 3);
+
+if (s == NATS_OK)
+
+    s = natsOptions_SetName(opts, "order-svc");
+
+
+
+// Handle the failure at the boundary. NATS_NO_SERVER means no
+
+// server in the pool answered; anything else is a rejected connect,
+
+// an -ERR from a server the client did reach.
+
+if (s == NATS_OK)
+
+    s = natsConnection_Connect(&conn, opts);
+
+if (s == NATS_NO_SERVER)
+
+{
+
+    fprintf(stderr, "could not connect to any server in the pool\n");
+
+    natsOptions_Destroy(opts);
+
+    exit(1);
+
+}
+
+
+
+if (s == NATS_OK)
+
+    s = natsConnection_PublishString(conn, "orders.created",
+
+            "{\"order_id\":\"ord_8w2k\",\"customer\":\"acme-co\","
+
+            "\"total_cents\":4200,\"ts\":\"2026-05-22T10:14:22Z\"}");
+
+
+
+if (s == NATS_OK)
+
+    printf("connected and published\n");
+```
+
+## Where you are
+
+`order-svc` now opens its connection deliberately:
+
+* It carries a name (`order-svc`), so the server can identify it.
+* It points at a server pool (`n1`/`n2`/`n3`), randomized by default, so one unreachable server isn't fatal at connect time.
+* Its pool grows with the servers the cluster advertises in `connect_urls`, so reconnect can land on a server you never configured.
+* It bounds each dial with a connect timeout, so a blocked server costs one timeout and no more.
+
+And you can read the connect handshake: TCP, the server's `INFO`, the client's `CONNECT`, and the `PONG` that confirms CONNECTED, plus what `auth_required` and `max_payload` in `INFO` mean for the client.
+
+## What's next
+
+The connection is open. The next fault to survive is the server going away *after* it's open. [Reconnection](/learn/resilient-clients/reconnection.md) makes `order-svc` cycle the same pool with backoff and jitter, and buffer its publishes until it rejoins.
+
+Continue to [Reconnection](/learn/resilient-clients/reconnection.md).
+
+## See also
+
+* [Topologies → Your first cluster](/learn/topologies/your-first-cluster.md) — what the `n1`/`n2`/`n3` pool actually is on the server side.
+* [TLS & Auth](/learn/resilient-clients/tls-and-auth.md) — supplying the credentials the handshake may demand when `auth_required` is set.
