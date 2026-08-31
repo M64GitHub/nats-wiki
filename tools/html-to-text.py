@@ -11,6 +11,8 @@ Typical use (zsh; always pass a browser User-Agent, some sites 403 otherwise):
   curl -sL -A "$UA" -o /tmp/page.html "https://example.org/article"   # add -k for c64.com (bad cert chain)
   python3 tools/html-to-text.py /tmp/page.html raw/<collection>/<slug>.txt
 """
+import sys, re, html
+
 src=open(sys.argv[1],encoding='utf-8',errors='replace').read()
 t=re.sub(r'(?is)<(script|style|noscript|svg|head)\b.*?</\1>','',src)
 t=re.sub(r'(?is)<!--.*?-->','',t)

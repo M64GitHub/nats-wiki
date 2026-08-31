@@ -353,8 +353,13 @@ class Markdown:
         return hid
 
     # -- inline
-    def inline(self, s):
-        ph = []
+    def inline(self, s, nested=False):
+        # `ph` must be shared with nested calls (mdlink re-enters inline for the link
+        # label). A label can already hold a placeholder — `[`code`](url)` is substituted
+        # by CODE before MDLINK — so a nested call with its own list indexes out of range.
+        if not nested:
+            self._ph = []
+        ph = self._ph
         def keep(h):
             ph.append(h); return f'\x00{len(ph) - 1}\x00'
         s = self.CODE.sub(lambda m: keep(f'<code>{esc(code_body(m.group(2)))}</code>'), s)
@@ -366,6 +371,8 @@ class Markdown:
         s = self.ITALIC.sub(r'<em>\1</em>', s)
         s = self.UNV.sub(r'<span class="unv" title="model knowledge, not yet confirmed by a source">(\1)</span>', s)
         s = self.CITE.sub(r'<span class="cite">(\1)</span>', s)
+        if nested:
+            return s  # the top-level call expands the placeholders, including these
         for _ in range(4):
             if '\x00' not in s: break
             s = re.sub(r'\x00(\d+)\x00', lambda m: ph[int(m.group(1))], s)
@@ -373,8 +380,8 @@ class Markdown:
 
     def mdlink(self, label, url):
         if url.startswith(R) or url.startswith('#') or not re.match(r'^[a-z]+:', url):
-            return f'<a href="{esc(url)}">{self.inline(label)}</a>'
-        return f'<a class="ext" href="{esc(url)}">{self.inline(label)}</a>'
+            return f'<a href="{esc(url)}">{self.inline(label, nested=True)}</a>'
+        return f'<a class="ext" href="{esc(url)}">{self.inline(label, nested=True)}</a>'
 
     def wikilink(self, target, anchor, label):
         slug = target.strip()
