@@ -14,7 +14,7 @@ factually wrong.
 - `where` is the doc path; for docs.nats.io prefix `https://docs.nats.io/`.
 - `status` is this wiki's handling, not the upstream state.
 
-Rows 1–10 were found while working `inbox/plan-first-ingests-2026-08-31.md`; rows 11–22 while
+Rows 1–10 were found while working `inbox/plan-first-ingests-2026-08-31.md`; rows 11–26 while
 working `inbox/plan-runbooks-and-security-2026-08-31.md`. Verified against **nats-server v2.14.6**
 and the docs tree fetched **2026-08-31**. Rows 8–10 concern **client** claims, so their authority is
 the client repository at its current release plus the package registry, not the server — stated per
@@ -44,6 +44,10 @@ row.
 | 20 | `/varz` has exposed **`tls_cert_not_after`** per listener since PR #7709, and the whole docs tree never names it — the TLS page says to "monitor validity dates" with no way to do it | `learn/security/encryption.md`, `learn/monitoring/monitoring-endpoints.md` | missing | ★ medium | wiki documents the field and `nats account tls` |
 | 21 | Cross-domain and cross-account replication is said to need "the `external` block", pointing at a reference page that never mentions it; `external`, `api` and `deliver` appear **nowhere** in the 861-page docs tree | `learn/jetstream/mirrors-and-sources.md`, `reference/jetstream/api/stream/create.md` | missing | ★ medium | wiki reads the fields from the server source and says what is still unverified |
 | 22 | **Four defaults in the generated `jetstream` block are wrong**, including the most-quoted number in NATS sizing: `max_file_store` "Defaults to up to 1TB if available" (server: **75% of the space free under `store_dir`**, 1 TB only when `statfs` fails), `max_buffered_msgs` `10000` (**100000**), `max_outstanding_catchup` `32M` (**64MB**), `info_queue_limit` `100000` (**defaults to `request_queue_limit`**). The maintainers' "auto-sizing is for development and testing" appears nowhere in the tree, and `max_file_store: 0` silently means *no storage*, not *unlimited* | `reference/config/jetstream.md`, `reference/config/jetstream/max_file_store.md` + 3 siblings | wrong-value | ★ high | wiki states the server values and the restart hazard |
+| 23 | **The three topology listener ports are documented with defaults the server never applies**: `cluster.port` `6222`, `leafnodes.port` `7422` and `gateway.port` `7222`. Omitting `cluster.port` or `leafnodes.port` opens **no listener, silently**; omitting `gateway.port` **stops the server from starting** | `reference/config/cluster.md`, `reference/config/leafnodes.md`, `reference/config/gateway.md` | wrong-value | ★ medium | wiki states "no default" and the per-key consequence |
+| 24 | The chapter's **composed topology config does not start** — `cluster {}` + `gateway {}` + `leafnodes { listen }` with no `system_account` fails validation, and `nats-server -t` reports the same file valid | `learn/topologies/putting-it-together.md`, `learn/deployment/config-management.md` | wrong-value | ★ medium | wiki quotes the error and says `-t` is a syntax check |
+| 25 | The fast-producer stall — the mechanism by which one slow destination throttles a publisher — is **absent from the 861-page tree**, along with both counters that expose it (`/varz` `stalled_clients`, `/connz` `stalls`) and its log line | whole tree; `learn/monitoring/monitoring-endpoints.md`, `learn/topologies/super-clusters.md` | missing | ★ medium | wiki documents both counters, the constants and the geo-affinity caveat |
+| 26 | Four `leafnodes.remotes` keys are published with a **completely empty description**: `hub`, `deny_imports`, `deny_exports`, `jetstream_cluster_migrate` — including the two keys the only public question on the topic asks about | `reference/config/leafnodes/remotes.md` and the four property pages | missing | medium | wiki states what the two deny keys do, from the source |
 
 ---
 
@@ -899,6 +903,266 @@ report disk size" — correct the three numeric defaults, state that `info_queue
 production guidance to `learn/deployment/sizing-and-resources.md`, which already has the arithmetic
 right.
 
+
+
+
+## 23 · Three topology ports documented with defaults the server does not apply ★
+
+**Impact: two of the three fail silently**, and the third stops the server after `nats-server -t` has
+said the file is fine.
+
+The generated block tables state a `Default` for each listener port:
+
+| page | key | documented default |
+|---|---|---|
+| `reference/config/cluster.md` | `port` | `6222` |
+| `reference/config/leafnodes.md` | `port` | `7422` |
+| `reference/config/gateway.md` | `port` | `7222` |
+
+The server applies none of them, and the three consequences differ.
+
+**Evidence — gateway** (`server/gateway.go`, v2.14.6). `validateGatewayOptions`:
+
+```go
+316:	if o.Gateway.Port == 0 {
+317:		return fmt.Errorf("gateway %q has no port specified (select -1 for random port)", o.Gateway.Name)
+318:	}
+```
+
+**Evidence — leafnodes** (`server/leafnode.go`, v2.14.6). `validateLeafNodeOptions` returns before
+any listener work when the port is zero, and no accept loop is started:
+
+```go
+328:	if o.LeafNode.Port == 0 {
+329:		return nil
+330:	}
+```
+
+**Evidence — the one real use of 7422** (`server/opts.go`, v2.14.6). `DEFAULT_LEAFNODE_PORT`
+(`const.go:206`) fills in a missing port on a **remote's URL**, never a listener:
+
+```go
+6091:	// Set baseline connect port for remotes.
+6092:	for _, r := range opts.LeafNode.Remotes {
+6093:		if r != nil {
+6094:			for _, u := range r.URLs {
+6095:				if u.Port() == _EMPTY_ {
+6096:					u.Host = net.JoinHostPort(u.Host, strconv.Itoa(DEFAULT_LEAFNODE_PORT))
+```
+
+**Evidence — the `host` defaults are real, and gated on the port** (`opts.go:6072–6074`,
+`:6140–6142`): `DEFAULT_HOST` is applied only inside `if opts.LeafNode.Port != 0 {` and
+`if opts.Gateway.Port != 0 {`. The same table is therefore right about `host` and wrong about `port`,
+which is part of what makes the error easy to miss.
+
+**Observed on nats-server v2.14.5.**
+
+```
+$ cat lf.conf
+listen: 127.0.0.1:4222
+leafnodes { }
+$ nats-server -c lf.conf
+[INF] Listening for client connections on 127.0.0.1:4222
+$ lsof -nP -iTCP -sTCP:LISTEN -a -p <pid>
+nats-serv 30905 m64 6u IPv4 … TCP 127.0.0.1:4222 (LISTEN)
+```
+
+One listening socket, 4222. No 7422. `cluster { name: east }` with no port behaves the same way — no
+6222. And the gateway case:
+
+```
+$ nats-server -c gw.conf -t
+nats-server: configuration file gw.conf is valid (sha256:4d532…)
+$ nats-server -c gw.conf
+nats-server: gateway "east" has no port specified (select -1 for random port)
+```
+
+**Suggested fix.** Set the `Default` cell for all three keys to `—` and add a note per key: for
+`cluster` and `leafnodes`, "if unset, the server does not listen for this connection type"; for
+`gateway`, "required whenever a `gateway {}` block is present". 6222 / 7422 / 7222 are real as
+**conventions** and belong in the prose, not in the Default column. `leafnodes/port.md` may also note
+that 7422 *is* the port assumed for a remote URL that omits one.
+
+
+## 24 · The chapter's own composed configuration does not start ★
+
+**Impact: the page's central example — the one demonstrating its central idea — cannot be run**, and
+the docs' recommended pre-flight check passes it.
+
+`learn/topologies/putting-it-together.md` prints `n1-east.conf` under *One server, three roles*, with
+`cluster {}`, `gateway {}`, `leafnodes { listen }` and `jetstream {}`, and calls it "all
+'composition' means". It has no `system_account`, and the page states two sections later that the
+chapter does not set one up: "To *survey* the whole fabric instead… you need the **system account**
+(`$SYS`), which this chapter doesn't set up."
+
+**Evidence** (`server/leafnode.go`, v2.14.6) — `validateLeafNodeOptions`, past its two early returns:
+
+```go
+343:	if o.Gateway.Name == _EMPTY_ && o.Gateway.Port == 0 {
+344:		return nil
+345:	}
+346:	// If we are here we have both leaf nodes and gateways defined, make sure there
+347:	// is a system account defined.
+348:	if o.SystemAccount == _EMPTY_ {
+349:		return fmt.Errorf("leaf nodes and gateways (both being defined) require a system account to also be configured")
+350:	}
+```
+
+`opts.SystemAccount` is set only by `system_account:` (`opts.go:1038`) or a trusted operator
+(`opts.go:1535`). The runtime fallback that creates `$SYS` (`server.go:2371–2373`) runs **after**
+`validateOptions`, which is called inside `NewServer` at `server.go:729` — so it cannot satisfy the
+check.
+
+**Observed on nats-server v2.14.5**, with the page's config typed verbatim:
+
+```
+$ nats-server -c n1-east.conf -t
+nats-server: configuration file n1-east.conf is valid (sha256:ddbe986aa9531262de2a5a88b79818e203cd2ae564edda74fdb1c1e9dd7c4431)
+$ nats-server -c n1-east.conf
+nats-server: leaf nodes and gateways (both being defined) require a system account to also be configured
+```
+
+**The second half of this issue is `-t` itself.** `learn/deployment/config-management.md` presents
+`nats-server -c … -t` as the way to check a config before applying it, and qualifies it with one
+exception: "A JetStream cluster missing `server_name` or `routes` passes `-t` yet still fails to
+boot." That understates the boundary. `-t` parses and exits; **every** `validateOptions` check is
+downstream of it. Another, observed on v2.14.5:
+
+```
+$ cat ld.conf
+listen: 127.0.0.1:4222
+lame_duck_duration: "30s"
+lame_duck_grace_period: "60s"
+$ nats-server -c ld.conf -t
+nats-server: configuration file ld.conf is valid (sha256:bcaec…)
+$ nats-server -c ld.conf
+nats-server: lame duck grace period (1m0s) should be strictly lower than lame duck duration (30s)
+```
+
+**Suggested fix.** Add `system_account` (and the matching `accounts` block) to the composed example,
+or drop the `gateway {}` block from it. And change the `-t` description in `config-management.md`
+from an exception to a rule: `-t` validates syntax, not option semantics, so a config that must
+survive a restart should be started once on a scratch server.
+
+
+## 25 · The fast-producer stall, and both counters that expose it, are absent from the docs ★
+
+**Impact: a mechanism documented nowhere is the answer to a recurring performance question**, and the
+two fields that diagnose it are missing from the monitoring reference.
+
+`grep -r` over the 861-page tree for `stalled_clients`, `"stalls"` and `Producer was stalled` returns
+**nothing**. The only trace of the feature is the config key
+`reference/config/no_fast_producer_stall.md`, whose complete description is: "Do not stall a fast
+producer when a consumer cannot keep up. The server drops messages to the slow consumer instead." It
+never says what the stall it disables *is*, how long it lasts, or how to see it happen.
+
+**Evidence — the mechanism** (`server/client.go`, v2.14.6):
+
+```go
+125:	stallClientMinDuration = 2 * time.Millisecond
+126:	stallClientMaxDuration = 5 * time.Millisecond
+127:	stallTotalAllowed      = 10 * time.Millisecond
+```
+
+```go
+3937:	if c.kind == CLIENT && client.out.stc != nil {
+3938:		if srv.getOpts().NoFastProducerStall {
+3941:			return false
+3942:		}
+3943:		client.stalledWait(c)
+```
+
+**Evidence — the observables** (`server/monitor.go`, v2.14.6):
+
+```go
+133:	Stalls         int64          `json:"stalls,omitempty"`
+597:	ci.Stalls = atomic.LoadInt64(&client.stalls)
+1279:	StalledClients        int64                  `json:"stalled_clients"`                   // StalledClients is the total number of times that clients have been stalled.
+1909:	v.StalledClients = atomic.LoadInt64(&s.stalls)
+```
+
+and the log line (`server/client.go:1451`): `Producer was stalled for a total of %v`.
+
+**Why it matters now.** [gh#7494](https://github.com/nats-io/nats-server/discussions/7494), open and
+unanswered since 2025-10-30, reports a global super-cluster where adding a subscriber in a distant
+cluster drops the **local** rate from 70–80k msg/s to 2k. That is this mechanism, plus the fact that
+geo-affinity covers queue groups only. Neither half is stated in the docs, so the question is
+unanswerable from them.
+
+**The related gap in the same area.** `learn/topologies/super-clusters.md` describes geo-affinity as
+"the message never crosses the gateway, because it doesn't need to". Its own summary line scopes it
+correctly — "geo-affinity keeps queue-group and request traffic in its home region" — but nothing on
+the page says what happens with a **plain** subscriber on the far side, which is the common case and
+the one that produces the surprise. The implementation is an exclusion list over queue-group *names*
+(`client.go:4482–4487`), and the gateway is skipped only when there is no plain-subscriber interest
+either:
+
+```go
+2652:			if !psi && len(queues) == 0 {
+2653:				continue
+```
+
+**Suggested fix.** Add `stalled_clients` to the `/varz` field list and `stalls` to `/connz` in
+`learn/monitoring/monitoring-endpoints.md`, with a sentence on what a rising value means; expand
+`no_fast_producer_stall`'s description to name the stall's 10 ms per-read-loop budget; and add one
+sentence to the geo-affinity section of `super-clusters.md` saying that a plain (non-queue)
+subscriber in a remote cluster receives every message, and geo-affinity does not apply to it.
+
+
+## 26 · Four `leafnodes.remotes` keys are published with no description at all
+
+**Impact: the two keys the only public question on this topic asks about are documented as their own
+names.**
+
+`reference/config/leafnodes/remotes.md` lists 20 properties. Sixteen carry a description. These four
+carry an empty Description cell, and their own property pages contain nothing but a type table:
+
+| key | default | description in the docs |
+|---|---|---|
+| `hub` | – | *(empty)* |
+| `deny_imports` (alias `deny_import`) | – | *(empty)* |
+| `deny_exports` (alias `deny_export`) | – | *(empty)* |
+| `jetstream_cluster_migrate` (alias `js_cluster_migrate`) | `true` | *(empty)* |
+
+[gh#5941](https://github.com/nats-io/nats-server/discussions/5941), "Proper way to configure Leaf
+Nodes to only export some subjects", opens with: "In the docs I see mention of `deny_exports` and
+`deny_imports`, but I can't really find any examples of people using this how I intend."
+
+**Evidence — what the two deny keys are** (`server/leafnode.go`, v2.14.6):
+
+```go
+473:	if len(remote.DenyExports) > 0 || len(remote.DenyImports) > 0 {
+474:		perms := &Permissions{}
+475:		if len(remote.DenyExports) > 0 {
+476:			perms.Publish = &SubjectPermission{Deny: remote.DenyExports}
+477:		}
+478:		if len(remote.DenyImports) > 0 {
+479:			perms.Subscribe = &SubjectPermission{Deny: remote.DenyImports}
+480:		}
+```
+
+`deny_exports` is a **publish** deny and `deny_imports` is a **subscribe** deny, both on the leaf's
+own remote, and **neither has an `allow` counterpart** — which is exactly why the asker's stated goal
+("default to exclude everything, then add an exception for one pattern") is not achievable with them,
+and why the accepted answer redirects to user permissions instead.
+
+**A follow-up in the same thread has been unanswered since 2024-12-18**, because that redirect does
+not work in config mode: `leafnodes.authorization` users accept no `permissions` at all
+(`parseLeafUsers`, `opts.go:3005–3064`, "a trimmed down version of parseUsers", four keys), and a
+same-named entry in the global `authorization.users` block governs client connections, not leafnode
+ones. Both reproduced on v2.14.5; the second is a parse error:
+
+```
+nats-server: hub2.conf:8:9: unknown field "permissions"
+```
+
+**Suggested fix.** Fill the four descriptions. For the deny keys, state the direction of each
+("subjects this leaf will not publish to the remote" / "…will not subscribe for on the remote"), that
+they are deny-only, and that the hub's own permissions for the leaf user are merged with them
+(`leafnode.go:1715–1735`). And add to `learn/security/` a note that permissions on a **leafnode** user
+require operator mode — in config mode the boundary is the account.
+
+
 ## How these were found
 
 Not by looking for them. Each fell out of ingesting a source and cross-checking it against another:
@@ -928,6 +1192,16 @@ Not by looking for them. Each fell out of ingesting a source and cross-checking 
   direction: question-bank Q51 has an unanswered public thread, so the mechanism had to be read from
   `server/stream.go`, and the docs page that names the field turned out to point at a reference page
   that omits it.
+- **23–26**: writing the topology pages meant quoting a `leafnodes {}` and a `gateway {}` block, and
+  `CLAUDE.md` forbids quoting a config this wiki has not read. Typing the docs' own composed example
+  into `nats-server` found #24 — and the `-t` half of it, which then had to be checked against
+  `validateOptions` to see how wide the gap is. That check produced #23, a sweep of the three
+  listener-port defaults. #25 came from the other direction: question-bank Q46 has an unanswered
+  public thread with clean measurements, so the mechanism had to be read from `server/client.go` and
+  `server/gateway.go` — and neither it nor its two counters exists anywhere in the tree. #26 fell out
+  of writing the *what configures it* table for the leafnode page: four cells in the generated table
+  are simply empty, and two of them are the subject of the only public question on leafnode subject
+  restriction.
 - **8–10**: writing one entity page per official client meant reading all twelve READMEs next to the
   docs' client table. Every claim in that table was checked against its repository; three did not
   survive. The two `wrong-value` rows are both **staleness in a hand-maintained table** — the docs
@@ -966,3 +1240,7 @@ describe would have caught all three.
 | 20 | `wiki/operations/rotate-tls-certificates.md` — *Find out what is actually deployed*; `wiki/reference/monitoring-endpoints.md` |
 | 21 | `wiki/concepts/cross-account-sharing.md` — *Sharing JetStream*; `wiki/summaries/s-gh-7017-kv-across-accounts.md` |
 | 22 | `wiki/gotchas/jetstream-out-of-disk.md` — *A docs error worth knowing*; `wiki/reference/defaults-and-limits.md` — *JetStream — server*; `wiki/reference/config-keys.md` — *`jetstream { … }`*; `wiki/operations/jetstream-sizing.md` — *Step 4*; `wiki/summaries/s-nats-server-jetstream-resources.md` |
+| 23 | `wiki/reference/defaults-and-limits.md` — *Topology — leafnodes and gateways*; `wiki/reference/config-keys.md` — *The three listener ports have no default*; `wiki/concepts/leafnode.md`; `wiki/concepts/gateway.md` |
+| 24 | `wiki/operations/reload-server-config.md` — the dry-run section; `wiki/operations/build-a-3-node-cluster.md` — *If this cluster will also carry a gateway or leafnodes*; `wiki/summaries/s-docs-putting-it-together.md` |
+| 25 | `wiki/reference/monitoring-endpoints.md` — *The two stall counters*; `wiki/reference/defaults-and-limits.md` — *Fast-producer stall*; `wiki/gotchas/supercluster-slows-when-a-remote-subscriber-joins.md`; `wiki/concepts/gateway.md` — *Geo-affinity, precisely* |
+| 26 | `wiki/concepts/leafnode.md` — *Restricting what crosses*; `wiki/summaries/s-gh-5941-restrict-leafnode-subjects.md` |

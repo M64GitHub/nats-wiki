@@ -58,14 +58,14 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 38 | Why were my streams marked orphan and deleted when converting a standalone server into a cluster? | topology | [gh#7831](https://github.com/nats-io/nats-server/discussions/7831) | ★ gotcha | [[streams-deleted-when-clustering-a-standalone-server]] |
 | 39 | How do I find out what corrupted a JetStream cluster, and how do I recover it? | topology | [gh#7463](https://github.com/nats-io/nats-server/discussions/7463) | ★ gotcha runbook | [[malformed-or-corrupt-message]] |
 | 40 | How do I evict a sick-but-not-dead node (and its clients) from a cluster during a hardware failure? | topology | [gh#6892](https://github.com/nats-io/nats-server/discussions/6892) | runbook | |
-| 41 | Leafnode, gateway or cluster — when do I use which? | topology | [gh#6328](https://github.com/nats-io/nats-server/discussions/6328) | ★ concept | |
+| 41 | Leafnode, gateway or cluster — when do I use which? | topology | [gh#6328](https://github.com/nats-io/nats-server/discussions/6328) | ★ concept | [[choosing-a-topology]] · [[leafnode]] · [[gateway]] |
 | 42 | Why aren't my streams visible on both ends of a leafnode connection? | topology | [gh#7834](https://github.com/nats-io/nats-server/discussions/7834) | ★ gotcha | [[streams-not-visible-across-a-leafnode]] |
-| 43 | How do I set up cross-domain JetStream sourcing? | topology | [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) | runbook | |
-| 44 | Why do I get duplicate messages on a leafnode cluster connected to a supercluster? | topology | [gh#4823](https://github.com/nats-io/nats-server/discussions/4823) | gotcha | |
-| 45 | How do I get multi-region availability without paying for cross-region latency? | topology | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ pattern | |
-| 46 | What causes performance degradation in a global supercluster? | topology | [gh#7494](https://github.com/nats-io/nats-server/discussions/7494) | gotcha | |
+| 43 | How do I set up cross-domain JetStream sourcing? | topology | [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) | runbook | [[cross-domain-sourcing]] · [[jetstream-domain]] |
+| 44 | Why do I get duplicate messages on a leafnode cluster connected to a supercluster? | topology | [gh#4823](https://github.com/nats-io/nats-server/discussions/4823) | gotcha | [[duplicate-messages-across-a-leafnode]] |
+| 45 | How do I get multi-region availability without paying for cross-region latency? | topology | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ pattern | [[multi-region-jetstream]] · [[choosing-a-topology]] |
+| 46 | What causes performance degradation in a global supercluster? | topology | [gh#7494](https://github.com/nats-io/nats-server/discussions/7494) | gotcha | [[supercluster-slows-when-a-remote-subscriber-joins]] · [[gateway]] |
 | 47 | Why does an asymmetric cluster configuration fail to form? | topology | [gh#7190](https://github.com/nats-io/nats-server/discussions/7190) | gotcha | [[build-a-3-node-cluster]] |
-| 48 | How do I restrict which subjects a leafnode exports and imports? | topology security | [gh#5941](https://github.com/nats-io/nats-server/discussions/5941) | config | |
+| 48 | How do I restrict which subjects a leafnode exports and imports? | topology security | [gh#5941](https://github.com/nats-io/nats-server/discussions/5941) | config | [[leafnode]] · [[cross-account-sharing]] |
 | 49 | How do I set up operator / account / user JWTs correctly? | security | [gh#7854](https://github.com/nats-io/nats-server/discussions/7854) | ★ runbook | [[set-up-operator-mode]] · [[operator-mode]] |
 | 50 | How do I rotate TLS certificates without downtime, and how do I detect expiry? | security | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ runbook | [[rotate-tls-certificates]] · [[tls-in-nats]] |
 | 51 | How do I share a stream or KV bucket between accounts? | security jetstream | [gh#7017](https://github.com/nats-io/nats-server/discussions/7017) | ★ config | |
@@ -106,7 +106,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 86 | Are partitioned consumer groups a server feature, or a client-side construct? | jetstream clients | [gh#7296](https://github.com/nats-io/nats-server/discussions/7296) | concept clients | [[orbit]] |
 | 87 | The Orbit docs show `orbit.go` — is the same module available for my language (C#, Java, Python…)? | clients | [gh#7296](https://github.com/nats-io/nats-server/discussions/7296) | clients | [[orbit]] |
 | 88 | Are there trade-offs to turning on `allow_direct` for a stream? | jetstream | [gh#3984](https://github.com/nats-io/nats-server/discussions/3984) | config | [[direct-get]] |
-| 89 | How do I set up cross-domain JetStream sourcing or mirroring? | jetstream topology security | [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) | ★ config runbook | |
+| 89 | How do I set up cross-domain JetStream sourcing or mirroring? | jetstream topology security | [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) | ★ config runbook | [[cross-domain-sourcing]] |
 | 90 | How do I manage streams and KV buckets across several accounts with one user? | security jetstream | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | config | [[cross-account-sharing]] |
 | 91 | Why does mirror catch-up slow down when a consumer reads the mirror at the same time? | jetstream | [gh#8444](https://github.com/nats-io/nats-server/discussions/8444) | gotcha internals | |
 | 92 | What does `attempted to connect to route port` in the server log mean? | topology core | [gh#3569](https://github.com/nats-io/nats-server/discussions/3569) | gotcha config | [[build-a-3-node-cluster]] |
@@ -119,6 +119,9 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 99 | What happens when JetStream runs out of disk, and why does `insufficient storage resources available (10047)` appear on an almost empty volume? | jetstream deploy | [issue#4281](https://github.com/nats-io/nats-server/issues/4281) | ★ gotcha sizing | [[jetstream-out-of-disk]] |
 | 100 | Why does the auto-sized `max_file_store` get smaller every time the server restarts? | jetstream deploy | [issue#8322](https://github.com/nats-io/nats-server/issues/8322) | ★ gotcha config | [[jetstream-out-of-disk]] |
 | 101 | Why does a cluster stop recovering when a thousand clients each open a KV watcher? | kv topology | [gh#5243](https://github.com/nats-io/nats-server/discussions/5243) | ★ gotcha sizing | [[kv-watchers-stall-the-cluster]] |
+| 102 | Does a leafnode need its own JetStream domain, and what does setting one actually change? | jetstream topology | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | concept config | [[jetstream-domain]] |
+| 103 | Can a leaf region later become the hub, or a regular cluster be converted into a leaf cluster without losing data? | topology deploy | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ concept | |
+| 104 | Why does `nats-server -t` accept a config the server then refuses to start? | deploy | [learn/topologies/putting-it-together](https://docs.nats.io/learn/topologies/putting-it-together) | gotcha config | [[reload-server-config]] · [[build-a-3-node-cluster]] |
 
 ## Thread titles behind the rows
 
@@ -227,11 +230,27 @@ which is why they are worth answering here.
 99. [issue#4281](https://github.com/nats-io/nats-server/issues/4281) — nats: error: could not create Stream: insufficient storage resources available (10047)
 100. [issue#8322](https://github.com/nats-io/nats-server/issues/8322) — JetStream dynamic MaxStore shrinks after restart because it is recomputed from current free disk (Bavail), causing previously valid stream limits to fail
 101. [gh#5243](https://github.com/nats-io/nats-server/discussions/5243) — 1000 nats cli watchers leads to unrecoverable state of servers.
+102. [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) — Multi-Region Without Sacrificing Availability (the JS-domain half of the maintainer's answer)
+103. [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) — Multi-Region Without Sacrificing Availability (the asker's two follow-ups, **both unanswered**)
+104. [learn/topologies/putting-it-together](https://docs.nats.io/learn/topologies/putting-it-together) — the chapter's composed config, which `-t` accepts and the server rejects (`inbox/docs-issues.md` #24). Not a thread: mined from the docs while writing the topology pages, and reproduced.
 
-Rows 89 and 91 are **open on purpose**: [[mirrors-and-sources]] names the three subjects a
-cross-domain `external` block needs and the export type each requires, but no source read so far
-gives the setup itself; and nothing read explains mirror catch-up contention. Both are the most
-valuable kind of row — a question the wiki cannot yet answer, with the thread that asks it.
+**Row 89 was closed in the topology pass, row 91 stays open.** [[cross-domain-sourcing]] now gives
+the procedure for the **same-account, two-domain** case end to end, because the `nats` CLI builds it
+(`$JS.<domain>.API` composed for you, delivery prefix optional) and the server validates it — see
+[[s-natscli-stream-external]]. The **cross-account** half of the same runbook is written as far as
+the sources go and stops there: the export and import entries that authorise it are stated by no
+public source, and the page says so in its `## To verify` rather than inventing them. That residual
+gap is what row 51 tracks. Row 91 is untouched — nothing read explains mirror catch-up contention.
+
+**Row 103 is new and deliberately unanswered.** The asker of
+[gh#7438](https://github.com/nats-io/nats-server/discussions/7438) asked twice whether a leaf region
+can later become the hub, and whether a regular cluster can be converted into a leaf cluster without
+losing data — "This is the information I find missing from the docs / videos, i.e. the cons of each
+architecture." **Neither question has been answered**, and the docs' claim that every topology layer
+"is reversible: the layer below never changed" is about routes and gateways, not about JetStream
+state. [[choosing-a-topology]] and [[multi-region-jetstream]] both record the silence and tell the
+reader to treat the choice of hub as hard to reverse. Filling this row would take a maintainer
+answer or an experiment this wiki has not run.
 
 **Row 51 stays open after the security pass, deliberately.** [[cross-account-sharing]] states both
 routes to a stream or KV bucket in another account — importing the owning account's `$JS.API.>` as a

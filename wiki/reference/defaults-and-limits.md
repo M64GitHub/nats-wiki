@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -195,6 +195,48 @@ Two consequences worth carrying:
 `WebsocketOpts` carries `HandshakeTimeout` for the whole websocket handshake instead.
 
 
+## Topology — leafnodes and gateways
+
+All read from `nats-server` v2.14.6 (source: [[s-nats-server-topology]]).
+
+| key or behaviour | value | source |
+|---|---|---|
+| `cluster { port }` | **no default** — omitted means no route listener | `opts.go:6072` (host default is gated on the port) |
+| `leafnodes { port }` | **no default** — omitted means no leafnode listener | `leafnode.go:328` |
+| `gateway { port }` | **no default** — omitted is a **startup error** | `gateway.go:316–318` |
+| `DEFAULT_LEAFNODE_PORT` | `7422` — used only to fill a missing port on a **remote's URL** | `const.go:206`, applied at `opts.go:6096` |
+| `cluster`/`leafnodes`/`gateway` `host` | `0.0.0.0` (`DEFAULT_HOST`), applied only once a port is set | `opts.go:6072–6074`, `:6140–6142` |
+| `leafnodes { remotes: [ { first_info_timeout } ] }` | **1s** (`DEFAULT_LEAFNODE_INFO_WAIT`) | `const.go:203` |
+| leafnode reconnect interval | **1s** (`DEFAULT_LEAF_NODE_RECONNECT`) | `const.go:162` |
+| `leafnodes`/`gateway` `write_deadline` | `10s` | `reference/config/leafnodes.md`, `gateway.md` |
+| `gateway { connect_retries }` | `0` — no retry for a *discovered* gateway | `reference/config/gateway.md` |
+| `gateway { reject_unknown_cluster }` | `false` | `reference/config/gateway.md` |
+| gateway connect delay / max | **1s** / **30s** | `gateway.go:37–38` |
+| gateway reconnect delay | **1s** | `gateway.go:39` |
+| gateway PING interval cap | **15s**, or `ping_interval` if smaller | `gateway.go:58` |
+| `leafnodes { min_version }` | must be ≥ **`2.8.0`** if set | `reference/config/leafnodes/min_version.md` |
+| `leafnodes { isolate_leafnode_interest }` | `false`, since **2.12** | `reference/config/leafnodes/isolate_leafnode_interest.md` |
+
+The three "no default" rows contradict the generated config reference, which states `6222`, `7422`
+and `7222` — `inbox/docs-issues.md` #23. See [[config-keys]] and [[leafnode]].
+
+## Fast-producer stall
+
+The budget a publisher is slowed by when one of its destinations cannot keep up — including a
+gateway to a distant cluster (source: [[s-nats-server-topology]]).
+
+| constant | value | source |
+|---|---|---|
+| `stallClientMinDuration` | **2ms** | `client.go:125` |
+| `stallClientMaxDuration` | **5ms** — used once pending bytes reach the max | `client.go:126` |
+| `stallTotalAllowed` | **10ms** per read-loop invocation | `client.go:127` |
+| `no_fast_producer_stall` | `false` — `true` drops to the slow consumer instead | `reference/config/no_fast_producer_stall.md` |
+
+Observable as `/varz` → `stalled_clients`, `/connz` → `stalls`, and the log line
+`Producer was stalled for a total of %v` — [[monitoring-endpoints]],
+[[supercluster-slows-when-a-remote-subscriber-joins]].
+
+
 ## Guidance thresholds — not server limits
 
 These are recommendations from Synadia, explicitly **not enforced by the server**, and the source
@@ -245,4 +287,4 @@ states neither the version they were measured against nor the method
 [[s-docs-connection-limits-config]] · [[s-docs-acknowledgment]] · [[s-docs-pull-consumers]] ·
 [[s-docs-policies]] · [[s-docs-raft-and-leaders]] · [[s-docs-upgrade-to-2.12]] ·
 [[s-synadia-jetstream-anti-patterns]] · [[s-docs-consumer-config]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] · [[s-docs-authentication-basics]] ·
-[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]]
+[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]]

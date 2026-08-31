@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -153,13 +153,42 @@ To regenerate: re-read the `## Subject` line of every `*.md` under
 `raw/nats-docs/reference/jetstream/api/`, and the three index tables for the system-account column.
 The three "absent from the index" rows are hand-kept and come from the sources named beside them.
 
+## The domain-prefixed form
+
+When `jetstream { domain: <name> }` is set, the server installs a mapping into **every non-system
+account** that makes the whole API reachable under a second prefix
+(`generateJSMappingTable`, `jetstream_api.go:326–352`; source:
+[[s-nats-server-leafnode-js-domains]]):
+
+| domain-prefixed subject | maps to |
+|---|---|
+| `$JS.<domain>.API.INFO` | `$JS.API.INFO` |
+| `$JS.<domain>.API.STREAM.>` | `$JS.API.STREAM.>` |
+| `$JS.<domain>.API.CONSUMER.>` | `$JS.API.CONSUMER.>` |
+| `$JS.<domain>.API.DIRECT.>` | `$JS.API.DIRECT.>` |
+| `$JS.<domain>.API.META.>` | `$JS.API.META.>` |
+| `$JS.<domain>.API.SERVER.>` | `$JS.API.SERVER.>` |
+| `$JS.<domain>.API.ACCOUNT.>` | `$JS.API.ACCOUNT.>` |
+| `$JS.<domain>.API.$KV.>` | `$KV.>` |
+| `$JS.<domain>.API.$OBJ.>` | `$OBJ.>` |
+
+The last two are the odd ones, and the source says so: `$KV` and `$OBJ` are independent subject
+spaces rather than living under `$JS.API`, which the server's own comment calls "very very very
+ugly".
+
+This prefix is what a client names to address another domain — `nats --js-domain <name> …`, or the
+`api` field of an `external` block, whose value the server parses as `$JS.<domain>.API` and reads the
+domain back out of as the **second token** (`stream.go:432–437`). See [[jetstream-domain]] and
+[[cross-domain-sourcing]].
+
+
 ## Related
 
 [[js-api]] · [[error-codes]] · [[stream]] · [[consumer]] · [[account]] · [[advisories]] ·
 [[direct-get]] · [[raft-in-nats]] · [[subject-permissions]] · [[auth-callout]] ·
-[[operator-mode]] · [[cross-account-sharing]]
+[[operator-mode]] · [[cross-account-sharing]] · [[jetstream-domain]] · [[cross-domain-sourcing]]
 
 ## Sources
 
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
-[[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]]
+[[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]]

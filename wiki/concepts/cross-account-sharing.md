@@ -186,7 +186,7 @@ Three error codes guard the prefixes:
 
 [[account]] · [[subject-permissions]] · [[operator-mode]] · [[key-value]] ·
 [[mirrors-and-sources]] · [[js-api-subjects]] · [[error-codes]] · [[reload-server-config]] ·
-[[nsc]] · [[stream]]
+[[nsc]] · [[stream]] · [[cross-domain-sourcing]] · [[jetstream-domain]] · [[leafnode]]
 
 ## Sources
 

@@ -159,7 +159,8 @@ the connection, that becomes an internals page and this page should link it.
 
 [[consumer]] · [[monitoring-endpoints]] · [[nats-cli]] · [[jetstream-sizing]] ·
 [[config-keys]] · [[defaults-and-limits]] · [[advisories]] · [[nats-timeout]] ·
-[[kv-watchers-stall-the-cluster]]
+[[kv-watchers-stall-the-cluster]] · [[supercluster-slows-when-a-remote-subscriber-joins]] ·
+[[gateway]]
 
 ## Sources
 

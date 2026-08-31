@@ -179,7 +179,7 @@ Three differences bite operationally:
 [[advisories]] · [[nsc]] · [[nk]] · [[nats-cli]] · [[jetstream-sizing]] · [[js-api]] ·
 [[rotate-tls-certificates]] · [[subject-permissions]] · [[operator-mode]] ·
 [[cross-account-sharing]] · [[auth-callout]] · [[tls-in-nats]] ·
-[[unauthenticated-clients-still-connect]]
+[[unauthenticated-clients-still-connect]] · [[leafnode]] · [[choosing-a-topology]]
 
 ## Sources
 

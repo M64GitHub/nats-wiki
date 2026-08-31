@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [reload, SIGHUP, dry-run, include, reloader, configmap, accounts, max_subscriptions]
 aliases: [reload, SIGHUP, "config reload", "reload config", "add an account", "nats-server --signal reload"]
-sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy]
+sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -100,6 +100,25 @@ offending line and exits non-zero — which is what makes it usable as a gate in
 
 **What `-t` does not check is whether the server can *start*.** "A JetStream cluster missing
 `server_name` or `routes` passes `-t` yet still fails to boot."
+
+That is not a gap in coverage — it is the boundary of what `-t` is. `-t` parses; the semantic checks
+live in `validateOptions`, which runs inside `NewServer` (`server.go:729`), long after the parser is
+done. **Every** `validateOptions` failure therefore passes the dry run and kills the server on start.
+Three reproduced on v2.14.5 (source: [[s-nats-server-topology]]):
+
+| config | `-t` says | starting says |
+|---|---|---|
+| `lame_duck_grace_period` ≥ `lame_duck_duration` | valid | `lame duck grace period (1m0s) should be strictly lower than lame duck duration (30s)` |
+| `gateway {}` with no `port` | valid | `gateway "east" has no port specified (select -1 for random port)` |
+| `leafnodes { listen }` + `gateway {}` with no `system_account` | valid | `leaf nodes and gateways (both being defined) require a system account to also be configured` |
+
+The last one is the docs' own composed topology example (`inbox/docs-issues.md` #24).
+
+**So a config gate that only runs `-t` is not a gate.** For a change that touches a topology block,
+`lame_duck_*`, or anything else `validateOptions` covers, verify by **starting a server** on the new
+file — on a scratch host, or with `-p -1 -m -1` and a throwaway `store_dir` — before you reload or
+restart the real one. A reload of an unstartable config is survivable; the **restart** after it is
+not.
 
 The signal itself is **SIGHUP**, wired to `systemctl reload` by the shipped unit
 ([[install-nats-server]]). Equivalent forms:
@@ -205,9 +224,10 @@ confirm the sidecar actually watched the path you changed.
 [[install-nats-server]] · [[upgrade-a-cluster]] · [[rebalance-streams]] · [[config-keys]] ·
 [[account]] · [[nats-helm-charts]] · [[rotate-tls-certificates]] · [[jetstream-sizing]] ·
 [[nats-server-2.14]] · [[nsc]] · [[build-a-3-node-cluster]] · [[tls-in-nats]] ·
-[[cross-account-sharing]] · [[unauthenticated-clients-still-connect]] · [[operator-mode]]
+[[cross-account-sharing]] · [[unauthenticated-clients-still-connect]] · [[operator-mode]] ·
+[[leafnode]] · [[gateway]]
 
 ## Sources
 
 [[s-docs-config-management]] · [[s-nats-server-signals]] · [[s-nats-helm-chart-values-2.14.6]] ·
-[[s-docs-hardening]] · [[s-docs-accounts-and-multitenancy]]
+[[s-docs-hardening]] · [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-topology]]

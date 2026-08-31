@@ -1,5 +1,21 @@
 # Plan — runbooks and security (proposed 2026-08-31)
 
+**Finished 2026-08-31, all 7 steps.** **34 wiki pages and 69 summaries** written across the runbook,
+security, gotcha and topology layers: the wiki went from **97 to 200 pages**, the question bank from
+87 rows / 25 answered to **104 / 62**, wanted pages from 17 to **4**, and `inbox/docs-issues.md` from
+10 findings to **26**. Every ★ row in the runbook, security and topology clusters now has an
+`answered by` page, and no page in `wiki/operations/` states a command that was not read from a
+source — the plan's *Done when*, met.
+
+**The pattern worth carrying forward:** every step ingested more than it was told to, and every extra
+ingest was forced by the same rule — a bank row the docs do not answer, or a value a runbook may not
+quote unverified. Sixteen of the 26 docs issues came out of that, including all six ★ ones found in
+this plan. Reading a source closely enough to write a runbook *is* the docs-issue sweep.
+
+**Next:** `inbox/plan-drift-and-adrs-2026-08-31.md` — two tools (sweep the generated config reference
+against the server; find pages whose `verified-against` has gone stale), then the ★ ADRs that open
+`## To verify` items already name.
+
 Say **`start the plan`** to work this file; `CLAUDE.md` → *Operation: plan* says how. One step at a
 time, `status:` rewritten in place, `wiki/log.md` appended, lint run, question-bank cells filled,
 and each step reported before the next begins.
@@ -116,7 +132,7 @@ warnings in the log), **Q69** (KV watcher misses updates), **Q77** (`nats: timeo
 linked thread with `tools/extract-forum-posts.py`, and write one gotcha page per symptom. A page
 with no confirmed fix is still worth writing; [[slow-consumer-detected]] is the model.
 
-## Step 6 — topology · status: open
+## Step 6 — topology · status: done 2026-08-31 — s-docs-leaf-nodes, s-docs-super-clusters, s-docs-jetstream-in-a-cluster, s-docs-putting-it-together, s-nats-server-topology, s-natscli-stream-external, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-7494-supercluster-degradation → [[leafnode]], [[gateway]], [[jetstream-domain]], [[choosing-a-topology]], [[multi-region-jetstream]], [[cross-domain-sourcing]], [[duplicate-messages-across-a-leafnode]], [[supercluster-slows-when-a-remote-subscriber-joins]]. **Seven pages, not the four the plan named**, and **eight ingests beyond the list** — six GitHub threads (one per open topology row), `nats-server` v2.14.6 across eight files, and `natscli` v0.4.0. [[jetstream-domain]] was promoted out of [[streams-not-visible-across-a-leafnode]] once three new pages needed it. **Five findings no source carries, four of them reproduced on the v2.14.5 binary**: *none of the three topology listener ports has a default* — the reference states `6222`/`7422`/`7222`, but omitting the cluster or leafnode port opens **no listener at all** and omitting `gateway.port` **stops the server from starting**; the docs' own composed topology config (`cluster` + `gateway` + `leafnodes` in one file, the example that demonstrates the chapter's central idea) **does not start**, because that combination requires `system_account`; **`nats-server -t` is a syntax check** that passes every `validateOptions` failure, so a `-t`-only config gate is not a gate; **geo-affinity is an exclusion list over queue-group names**, so a single *plain* subscriber on the far side puts every message on the WAN — which is unanswered gh#7494 exactly, together with the fast-producer stall that then slows the local leg too; and **a leafnode user cannot carry permissions in config mode** (`parseLeafUsers` takes four keys), so gh#5941's accepted answer has no implementation there, its unanswered follow-up reproduces, and the real boundary is the account. **Docs issues #23–#26, three ★** — the phantom port defaults, the unstartable composed config plus `-t`'s real boundary, the fast-producer stall and **both** its counters (`stalled_clients`, `stalls`) missing from the entire 861-page tree, and four `leafnodes.remotes` keys published with **empty descriptions** including the two the only public question asks about. Ripple: [[config-keys]], [[defaults-and-limits]] (17 values), [[monitoring-endpoints]], [[reload-server-config]] (the dry-run section rewritten), [[build-a-3-node-cluster]], [[mirrors-and-sources]], [[js-api-subjects]], [[replicas]], [[rebalance-streams]], [[nats-cli]], plus link-level updates to five more. Answered **Q41, Q43, Q44, Q45, Q46, Q48, Q89**; added Q102–Q104. **104 rows, 62 answered; ★ 34 of 42.** **Q103 is deliberately unanswered** — whether a leaf region can become the hub, or a cluster be converted into a leaf without losing data, was asked twice in gh#7438 and answered neither time; both new topology pages record the silence rather than guess. Wanted pages 6 → 4; lint clean at 200 pages.
 
 ```
 ingest raw/nats-docs/learn/topologies/leaf-nodes.md

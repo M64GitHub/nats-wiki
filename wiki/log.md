@@ -876,3 +876,77 @@ thread), all three answered by pages that state their own limits.
 Wanted pages down from **8 to 6** — [[jetstream-out-of-disk]] written, `kv-watcher-misses-updates`
 retired. `python3 tools/lint.py`: **180 pages, clean** (161 → 180: 7 wiki pages and 12 summaries) —
 no broken links, no orphans, no frontmatter issues, none missing from the index.
+
+---
+
+## 2026-08-31 — plan step 6: topology
+
+**Operation:** ingest ×12 (`inbox/plan-runbooks-and-security-2026-08-31.md`, step 6 — the last step).
+
+**Sources.** The four the plan named — `raw/nats-docs/learn/topologies/leaf-nodes.md`,
+`super-clusters.md`, `jetstream-in-a-cluster.md`, `putting-it-together.md` — plus **eight beyond the
+list**, each forced by a bank row the docs do not answer: six GitHub discussions
+(`gh-6328`, `gh-7438`, `gh-7881`, `gh-5941`, `gh-4823`, `gh-7494`, all new to `raw/gh-discussions/`),
+`nats-server` v2.14.6 across eight files, and `natscli` v0.4.0's `cli/stream_command.go`. New raw
+files: `raw/nats-server-src/topology-v2.14.6.md` and
+`raw/github-repos/nats-io__natscli.stream-external-v0.4.0.md`; `raw/sources.md` updated for both
+collections.
+
+**Created (7 pages).** [[leafnode]] and [[gateway]] — the last two wanted **concepts**, each with the
+full documented key set and the operator-facing failure modes; [[jetstream-domain]] — the
+`$JS.<domain>.API.>` mapping table and the three outcomes across a leafnode, promoted out of
+[[streams-not-visible-across-a-leafnode]] because three other pages now need it;
+[[choosing-a-topology]] (**Q41**) — the four properties that decide route vs gateway vs leafnode, the
+docs' ladder, and the three cases where the ladder is wrong; [[multi-region-jetstream]]
+(`kind: pattern`, **Q45**); [[cross-domain-sourcing]] (`kind: runbook`, **Q43/Q89**); and two gotchas,
+[[duplicate-messages-across-a-leafnode]] (**Q44**) and
+[[supercluster-slows-when-a-remote-subscriber-joins]] (**Q46**).
+
+**Five findings no source carries.** (1) **None of the three topology listener ports has a default**
+— the reference states `6222`/`7422`/`7222`; omitting the cluster or leafnode port opens **no
+listener at all**, and omitting `gateway.port` **stops the server from starting**. (2) The docs' own
+composed topology config — `cluster` + `gateway` + `leafnodes` in one file, the example that
+demonstrates the chapter's central idea — **does not start**, because a server with both a leafnode
+listener and a gateway requires `system_account`. (3) **`nats-server -t` is a syntax check**: it
+passes every `validateOptions` failure, including both of the above and the lame-duck ordering rule,
+which makes a `-t`-only config gate not a gate. (4) **Geo-affinity is an exclusion list over
+queue-group names**, not a routing preference — with any *plain* subscriber on the far side the
+message crosses the gateway regardless, which is the unanswered gh#7494 exactly. (5) A
+**leafnode user cannot carry permissions in config mode** (`parseLeafUsers` takes four keys), so the
+accepted answer in gh#5941 has no implementation there — its unanswered follow-up was reproduced
+locally, and the boundary that does exist is the account. Items 1–3 and 5 were **reproduced on the
+v2.14.5 binary**, with the configs and output kept in the raw extract.
+
+**Docs issues #23–#26**, three of them ★. #23 the three phantom port defaults; #24 the composed
+config that will not start, plus `-t`'s real boundary; #25 the fast-producer stall and **both**
+counters that expose it (`/varz` `stalled_clients`, `/connz` `stalls`) absent from the whole 861-page
+tree — the mechanism behind an unanswered performance thread; #26 four `leafnodes.remotes` keys
+published with **empty descriptions**, including `deny_imports` and `deny_exports`, which are the two
+keys the only public question on the subject asks about.
+
+**Ripple (16 pages).** [[config-keys]] — a *three listener ports have no default* section, the
+`cluster.port` row corrected, and the two option checks `-t` misses; [[defaults-and-limits]] — new
+*Topology* and *Fast-producer stall* tables, 17 values read from source;
+[[monitoring-endpoints]] — the two stall counters and the three `nats server report` commands, with
+the `Account`/`Spoke` columns explained; [[reload-server-config]] — the dry-run section rewritten:
+`-t` parses, `validateOptions` runs in `NewServer`, and three reproduced examples;
+[[build-a-3-node-cluster]] — the three checks to add before a gateway or leafnode layer, and the
+gateway-name log pair; [[mirrors-and-sources]] — the `external` block and the domain-vs-account table;
+[[js-api-subjects]] — the full `$JS.<domain>.API.>` mapping; [[replicas]] and [[rebalance-streams]] —
+`nats stream find --replicas=1` and `nats server check stream --peer-expect`;
+[[nats-cli]] — a topology and cross-domain cheat-sheet block. Link-level updates to
+[[streams-not-visible-across-a-leafnode]], [[account]], [[cross-account-sharing]], [[error-codes]],
+[[slow-consumer-detected]].
+
+**Question bank: 101 rows → 104, 53 answered → 62; ★ 34 of 42.** Filled **Q41, Q43, Q44, Q45, Q46,
+Q48, Q89**; added **Q102–Q104**. **Q103 is deliberately unanswered** — whether a leaf region can
+become the hub, or a cluster be converted into a leaf without losing data, was asked twice in gh#7438
+and answered neither time; both new topology pages record the silence instead of guessing. Row 89's
+"open on purpose" note was rewritten: the same-account two-domain case is now answered end to end,
+the cross-account half stops where the sources stop, and that residual gap stays with row 51.
+
+**Every ★ row in the plan's runbook, security and topology clusters is now answered** — the plan's
+*Done when* condition. Wanted pages **6 → 4** (`leafnode` and `gateway` written; the remaining four
+are `consumer-keeps-redelivering`, `filestore-layout`, `meta-layer`, `stream-leader-keeps-moving`).
+`python3 tools/lint.py`: **200 pages, clean** (180 → 200: 7 wiki pages and 13 summaries) — no broken
+links, no orphans, no frontmatter issues, none missing from the index.

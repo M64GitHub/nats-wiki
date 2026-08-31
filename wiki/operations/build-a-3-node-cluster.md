@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [cluster, routes, gossip, seed, cluster-name, no_advertise, failover, tls, 6222]
 aliases: [cluster, clustering, "form a cluster", "first cluster", routes, "cluster setup"]
-sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes]
+sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -309,6 +309,48 @@ Bind it to a private interface, firewall it, and put TLS or route credentials on
 **An even server count is a trap for JetStream, not for routing.** Two servers lose quorum on one
 failure; four tolerate exactly what three do ([[raft-in-nats]]).
 
+## If this cluster will also carry a gateway or leafnodes
+
+Three checks that belong in the same change, because two of them stop the server from starting and
+`nats-server -c … -t` reports the file valid first (source: [[s-nats-server-topology]], reproduced on
+v2.14.5).
+
+**1 · `gateway.name` must equal `cluster.name`.** A *conflicting* pair fails with
+`cluster name conflicts between cluster and gateway definitions` (`errors.go:192`). An **unset**
+`cluster.name` is different: the gateway name is silently **adopted** as the cluster name
+(`server.go:1118–1124`) — the same adoption trap as the route-side one this page already covers.
+
+**2 · Write `gateway.port`.** There is no default despite the reference stating `7222`:
+
+```
+nats-server: gateway "east" has no port specified (select -1 for random port)
+```
+
+**3 · Set `system_account` if the server both accepts leafnodes and speaks to a gateway**, or it
+refuses to start:
+
+```
+nats-server: leaf nodes and gateways (both being defined) require a system account to also be configured
+```
+
+You want the system account anyway — `nats server list` and the three `nats server report` commands
+need it.
+
+And one thing to verify from the **log**, not from a successful publish: a typo'd remote gateway name
+never connects, but gossip forms the super-cluster through the other cluster's correct outbound
+connection, so the cross-region test passes while the typo retries forever
+(source: [[s-docs-super-clusters]]):
+
+```
+Failing connection to gateway "wset", remote gateway name is "west"
+```
+
+The remote logs the more useful half, naming all three values:
+`Connection from "west" rejected, wanted to connect to "wset", this is "west"`.
+
+See [[gateway]], [[leafnode]] and [[choosing-a-topology]] before adding either layer.
+
+
 ## Related
 
 [[install-nats-server]] · [[replicas]] · [[raft-in-nats]] · [[stream-placement]] ·
@@ -321,4 +363,4 @@ failure; four tolerate exactly what three do ([[raft-in-nats]]).
 
 [[s-docs-your-first-cluster]] · [[s-docs-forming-a-cluster]] ·
 [[s-nats-server-route-cluster-formation]] · [[s-gh-7190-asymmetric-cluster]] ·
-[[s-gh-3569-connect-to-route-port]] · [[s-docs-hardening]] · [[s-docs-kubernetes]]
+[[s-gh-3569-connect-to-route-port]] · [[s-docs-hardening]] · [[s-docs-kubernetes]] · [[s-nats-server-topology]] · [[s-docs-super-clusters]]

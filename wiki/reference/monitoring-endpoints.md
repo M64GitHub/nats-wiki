@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -192,6 +192,54 @@ can leave the server at `GOMAXPROCS=1` on an 8-core host, which is one of the hy
 [[nats-timeout]].
 
 
+## The two stall counters
+
+Neither `stalled_clients` nor the per-connection `stalls` appears anywhere in the 861-page docs tree
+(`inbox/docs-issues.md` #25). They are the counters that explain a publisher slowing down because one
+of its *destinations* is slow — a cross-region gateway, most often.
+
+| endpoint | field | what it counts |
+|---|---|---|
+| `/varz` | **`stalled_clients`** | server-wide: "the total number of times that clients have been stalled" (`monitor.go:1279`) |
+| `/connz` | **`stalls`** | the same count, per connection (`monitor.go:133`, `:597`) |
+
+```
+curl -s localhost:8222/varz | jq .stalled_clients
+curl -s 'localhost:8222/connz?sort=pending' \
+  | jq '.connections[] | {cid, name, stalls, pending_bytes}'
+```
+
+The matching log line is `Producer was stalled for a total of %v` (`client.go:1451`), rate-limited
+and printed only once the total for a read loop reaches `stallClientMaxDuration` (5ms). The stall
+itself is bounded at `stallTotalAllowed` (10ms) per read-loop invocation
+(source: [[s-nats-server-topology]]).
+
+**Read them next to `slow_consumers`, not instead of it.** `slow_consumers` counts clients the server
+gave up on; `stalled_clients` counts the times it slowed a *producer* down to avoid that. A rising
+`stalled_clients` with a flat `slow_consumers` is back-pressure working —
+[[supercluster-slows-when-a-remote-subscriber-joins]] is what it looks like across a gateway, and
+`no_fast_producer_stall: true` is the switch that converts one counter into the other.
+
+## Surveying a topology
+
+Three CLI reports read `/routez`, `/gatewayz` and `/leafz` through the system account, one per layer
+(source: [[s-docs-putting-it-together]]):
+
+```
+nats server list                 # every server, its cluster, and its Routes and GWs counts
+nats server report routes        # the mesh inside each cluster
+nats server report gateways      # the gateways between clusters
+nats server report leafnodes     # the leaves dialed into the hub
+```
+
+The Leafnode Report's two columns worth reading carefully:
+
+- **`Account`** — `$G` means the leaf landed in the global account and there is **no boundary**. This
+  is the isolation audit, not a label — [[leafnode]].
+- **`Spoke`** — a property of *where you ran the command*, not of the link: `false` on the hub that
+  accepted the connection, `true` on the leaf that dialed it.
+
+
 ## How this was derived
 
 - The endpoint list and every query parameter come from `raw/nats-docs/reference/system/monitor/`
@@ -219,4 +267,4 @@ ingested** — it is the next monitoring source worth taking.
 
 ## Sources
 
-[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]]
+[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] · [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] · [[s-docs-putting-it-together]]

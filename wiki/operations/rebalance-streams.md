@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [peer-remove, replicas, catchup, lag, current, quorum, 10075, 10202, retire-a-node]
 aliases: [rebalance, "peer-remove", "peer remove", "move a stream", "retire a node", "add a node", "scale a cluster"]
-sources: [s-docs-scaling-and-peers, s-docs-placement, s-docs-rolling-upgrades, s-docs-surviving-node-loss]
+sources: [s-docs-scaling-and-peers, s-docs-placement, s-docs-rolling-upgrades, s-docs-surviving-node-loss, s-docs-jetstream-in-a-cluster]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -169,6 +169,29 @@ changes; run them one at a time ([[upgrade-a-cluster]], [[reload-server-config]]
 **Consumers have their own replica rules.** Moving a stream's peers is not the whole story for what
 your consumers do afterwards — [[consumer]], [[replicas]].
 
+## Finding what needs rebalancing
+
+Before moving anything, list the streams that have no failover at all — they need a replica
+*increase*, not a move (source: [[s-docs-jetstream-in-a-cluster]]):
+
+```
+nats stream find --replicas=1
+```
+
+And the assertion to run afterwards, per stream, which exits non-zero when the peer count is wrong:
+
+```
+nats server check stream --stream=ORDERS --peer-expect=3
+```
+
+```
+OK ORDERS OK:3 peers OK:0 sources | sources=0
+```
+
+Wiring that check into monitoring is what turns "one change at a time" from a discipline into a gate
+— see [[replicas]].
+
+
 ## Related
 
 [[build-a-3-node-cluster]] · [[upgrade-a-cluster]] · [[reload-server-config]] · [[replicas]] ·
@@ -178,4 +201,4 @@ your consumers do afterwards — [[consumer]], [[replicas]].
 ## Sources
 
 [[s-docs-scaling-and-peers]] · [[s-docs-placement]] · [[s-docs-rolling-upgrades]] ·
-[[s-docs-surviving-node-loss]]
+[[s-docs-surviving-node-loss]] · [[s-docs-jetstream-in-a-cluster]]

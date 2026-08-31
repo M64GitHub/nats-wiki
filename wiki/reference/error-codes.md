@@ -180,7 +180,8 @@ reason to explain.
 [[js-api]] · [[js-api-subjects]] · [[no-suitable-peers-for-placement]] · [[message-ttl]] ·
 [[retention-policies]] · [[stream-placement]] · [[nats-cli]] · [[defaults-and-limits]] ·
 [[install-nats-server]] · [[rebalance-streams]] · [[backup-and-restore-jetstream]] ·
-[[disaster-recovery]] · [[cross-account-sharing]] · [[account]]
+[[disaster-recovery]] · [[cross-account-sharing]] · [[account]] · [[cross-domain-sourcing]] ·
+[[jetstream-domain]]
 
 ## Sources
 

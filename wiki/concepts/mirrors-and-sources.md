@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -131,6 +131,36 @@ ADR-31's own advice: "always set `mirror_direct` to their desired value."
 - **R3 is not a second site.** Replication protects against losing one node in a cluster; a mirror is
   what survives losing the cluster. See [[replicas]].
 
+## Crossing a domain or an account
+
+The `external` block is the field that lets a mirror or a source reach a stream in another
+[[jetstream-domain]] or another [[account]]. Its two fields are two lines of the server
+(`stream.go:425–429`) and appear **nowhere** in the docs tree (`inbox/docs-issues.md` #21):
+
+```go
+type ExternalStream struct {
+	ApiPrefix     string `json:"api"`
+	DeliverPrefix string `json:"deliver"`
+}
+```
+
+The `nats` CLI has built both cases interactively for years, and its two branches are the clearest
+statement of the difference (source: [[s-natscli-stream-external]]):
+
+| | across a **domain** | across an **account** |
+|---|---|---|
+| `api` | `$JS.<domain>.API`, composed by the CLI | **your local prefix** where the foreign JetStream API "has been imported" |
+| `deliver` | optional | required |
+| precondition | the two domains differ and the link is up | the export/import pair already exists |
+
+The server takes the domain back out of the prefix as its **second token**
+(`ExternalStream.Domain()`, `stream.go:432–437`), so `$JS.<domain>.API` is a required shape, not a
+convention. A prefix that overlaps `$JS.API` is rejected at create time — error **10021**.
+
+The full procedure, including what the docs cannot tell you and what this wiki could not verify, is
+[[cross-domain-sourcing]].
+
+
 ## Related
 
 The promotion procedure that turns a mirror into a writable primary is [[disaster-recovery]];
@@ -151,4 +181,4 @@ what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]
 
 ## Sources
 
-[[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]]
+[[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]] · [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]]

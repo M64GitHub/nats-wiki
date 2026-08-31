@@ -7,7 +7,7 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -225,14 +225,43 @@ it drops straight into cron. Its `#   Expiration:` line is emitted for every cer
 `--generate` to invent one) and **refuses anything under 10 characters** (source:
 [[s-docs-authentication-basics]]).
 
+**Topology and cross-domain JetStream**
+
+```
+nats server report routes
+nats server report gateways
+nats server report leafnodes
+nats stream find --replicas=1
+nats server check stream --stream=ORDERS --peer-expect=3
+nats --js-domain hub stream ls
+nats stream add --output orders-eu.json
+nats stream add --config orders-eu.json --validate
+```
+
+The three `server report` commands need the system account and survey one layer each; the Leafnode
+Report's `Account` column is an isolation audit and its `Spoke` column is a property of *where you
+ran the command* (source: [[s-docs-putting-it-together]]). See [[leafnode]] and [[gateway]].
+
+`nats server check stream --peer-expect` **exits non-zero** when a stream is under-replicated, and
+`nats stream find --replicas=1` lists the streams that silently have no failover
+(source: [[s-docs-jetstream-in-a-cluster]]) — [[replicas]].
+
+**Interactive `nats stream add` builds cross-domain and cross-account sources for you.** Answer
+"Import mirror from a different JetStream domain" and give the domain name; the CLI composes
+`$JS.<domain>.API` itself and the delivery prefix is optional. The *different account* branch asks
+for both prefixes and requires both, because those are **your local import subjects** — none of this
+is in the docs (source: [[s-natscli-stream-external]]). See [[cross-domain-sourcing]].
+
 ## Related
 
 [[nsc]] · [[nk]] · [[nats-box]] · [[nats-top]] · [[jsm-go]] · [[monitoring-endpoints]] ·
 [[defaults-and-limits]] · [[prometheus-nats-exporter]] · [[nats-server]] · [[operator-mode]] ·
-[[set-up-operator-mode]] · [[rotate-tls-certificates]] · [[tls-in-nats]] · [[account]]
+[[set-up-operator-mode]] · [[rotate-tls-certificates]] · [[tls-in-nats]] · [[account]] ·
+[[leafnode]] · [[gateway]] · [[cross-domain-sourcing]] · [[jetstream-domain]] · [[replicas]]
 
 ## Sources
 
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] ·
 [[s-docs-prometheus-and-dashboards]] · [[s-natscli-account-tls]] ·
-[[s-docs-authentication-basics]] · [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]]
+[[s-docs-authentication-basics]] · [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]] ·
+[[s-natscli-stream-external]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]]

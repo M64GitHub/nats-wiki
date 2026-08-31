@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -147,7 +147,7 @@ changed without a restart — which is the practical argument for the documented
 | key | type | default | reload |
 |---|---|---|---|
 | `name` | string | — | reloadable |
-| `port` | integer | **`6222`** | **restart** |
+| `port` | integer | **none** — the reference says `6222`; see *The three listener ports have no default* below | **restart** |
 | `listen` | string | — | **restart** — only a listen string with an unchanged host **and** port `-1` survives a reload |
 | `routes` | [string] | — | reloadable\* — self-routes are ignored |
 | `no_advertise` | boolean | — | reloadable |
@@ -259,6 +259,55 @@ The other ~560 keys. This page covers what an operator sets to run a server; the
 everything, is filterable in the viewer, and carries a `cited by` column that shows how much of the
 surface the wiki actually explains.
 
+## The three listener ports have no default
+
+**Corrected 2026-08-31.** The generated reference gives `cluster.port` `6222`, `gateway.port` `7222`
+and `leafnodes.port` `7422` as **defaults**, and this page repeated `6222` above. The server applies
+none of them; what it does instead differs per key
+(source: [[s-nats-server-topology]], reproduced on v2.14.5):
+
+| key | reference says | what an omitted value actually does |
+|---|---|---|
+| `cluster.port` | `6222` | **no route listener**, silently |
+| `leafnodes.port` | `7422` | **no leafnode listener**, silently — a `leafnodes { }` block that does nothing |
+| `gateway.port` | `7222` | **the server refuses to start**: `gateway %q has no port specified (select -1 for random port)` |
+
+`DEFAULT_LEAFNODE_PORT = 7422` does exist (`const.go:206`) and is used in exactly one place: filling
+in a missing port on a **remote's** URL (`opts.go:6096`). The `host` defaults (`0.0.0.0`) are real,
+but only apply once a port is set (`opts.go:6072–6074`, `6140–6142`).
+
+Recorded as `inbox/docs-issues.md` #23. Write the port on all three blocks, every time.
+
+## Two option checks `nats-server -t` will not catch
+
+`-t` parses the file; it does not run `validateOptions`, which happens inside `NewServer`
+(`server.go:729`). Both of these pass the dry run and then stop the server on start:
+
+- **A composed server needs a system account.** A server with both a `leafnodes { listen }` and a
+  `gateway {}` block fails with `leaf nodes and gateways (both being defined) require a system
+  account to also be configured` (`leafnode.go:346–349`) unless `system_account` is set. The docs'
+  own composed example omits it — `inbox/docs-issues.md` #24.
+- **`gateway.name` must equal `cluster.name`** — a *conflicting* pair is
+  `cluster name conflicts between cluster and gateway definitions` (`errors.go:192`). An **unset**
+  `cluster.name` is instead **adopted from `gateway.name`** (`server.go:1118–1124`), the same shape
+  as the route-side adoption in `inbox/docs-issues.md` #11.
+
+See [[reload-server-config]] for what this means for a config-validation gate.
+
+## More `leafnodes` and `gateway` keys
+
+The tables above are the reload-relevant subset. The operator-facing keys and their defaults are on
+[[leafnode]] and [[gateway]]; the two worth naming here because they change behaviour silently:
+
+| key | default | note |
+|---|---|---|
+| `leafnodes.remotes[].deny_exports` | — | a **publish** deny; deny-only, no `allow` counterpart. Reload returns success and takes effect only on restart (2.11/2.12) |
+| `leafnodes.remotes[].deny_imports` | — | a **subscribe** deny, same caveats |
+| `leafnodes.remotes[].jetstream_cluster_migrate` | `true` | the reference gives **no description at all** — `inbox/docs-issues.md` #26 |
+| `gateway.tls` | — | `verify` is **always enabled** on gateway TLS; only certificate material reloads |
+| `no_fast_producer_stall` | `false` | reloadable. `true` drops to the slow consumer instead of stalling the producer — [[supercluster-slows-when-a-remote-subscriber-joins]] |
+
+
 ## Related
 
 [[defaults-and-limits]] · [[jetstream-sizing]] · [[replicas]] · [[stream-placement]] ·
@@ -271,4 +320,4 @@ surface the wiki actually explains.
 [[s-docs-sizing-and-resources]] · [[s-docs-placement]] · [[s-docs-upgrade-to-2.12]] ·
 [[s-docs-replication-and-r3]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] ·
 [[s-docs-operator-mode]] · [[s-docs-auth-callout]] · [[s-nats-server-jetstream-resources]] ·
-[[s-nats-server-jetstream-log-warnings]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] · [[s-docs-leaf-nodes]] · [[s-docs-super-clusters]]

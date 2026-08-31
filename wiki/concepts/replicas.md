@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -191,6 +191,39 @@ the *whole cluster*" — that is what a mirror at a second site is for (source:
 [[s-docs-mirrors-as-dr]]). See [[mirrors-and-sources]].
 
 
+## Auditing replica counts
+
+Two commands, both from the docs' cluster chapter and neither previously on this page
+(source: [[s-docs-jetstream-in-a-cluster]]).
+
+Find every stream that is silently R1 on a cluster — "on a cluster, a single copy means no failover":
+
+```
+nats stream find --replicas=1
+nats stream edit ORDERS --replicas=3
+```
+
+Then assert the count you expect, in a form a health monitor can run. It **exits non-zero** when the
+stream is under-replicated:
+
+```
+nats server check stream --stream=ORDERS --peer-expect=3
+```
+
+```
+OK ORDERS OK:3 peers OK:0 sources | sources=0
+```
+
+Two constraints to read alongside them:
+
+- **Five is the ceiling.** "A stream keeps at most five copies, so more servers add capacity, not
+  more copies of one stream."
+- **R3 across one failure domain is not R3.** "Three copies survive one server loss only if the three
+  servers can fail independently" — steering that is [[stream-placement]].
+- Replicas never leave their cluster. A copy in another region is [[mirrors-and-sources]], not a
+  replica count — [[multi-region-jetstream]].
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[raft-in-nats]] · [[stream-placement]] · [[retention-policies]] ·
@@ -200,4 +233,4 @@ the *whole cluster*" — that is what a mirror at a second site is for (source:
 ## Sources
 
 [[s-docs-surviving-node-loss]] · [[s-docs-replication-and-r3]] · [[s-docs-stream-config]] ·
-[[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-as-dr]]
+[[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-as-dr]] · [[s-docs-jetstream-in-a-cluster]]

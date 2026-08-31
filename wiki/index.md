@@ -51,6 +51,14 @@ exists to answer live in `inbox/question-bank.md`.
   as an identity, TLS-first, and the at-rest key.
 - [[cross-account-sharing]] — exports and imports, the two halves that fail differently, and the two
   undocumented routes to a stream or KV bucket in another account.
+- [[leafnode]] — the server that dials *out* and bridges interest over one connection; the only layer
+  that can draw a boundary, and only with an account behind it.
+- [[gateway]] — cluster to cluster. Interest-based forwarding, the gossip that hides your typo, and
+  geo-affinity as it is actually implemented: an exclusion list over queue-group names.
+- [[jetstream-domain]] — the `$JS.<domain>.API.>` mapping that makes one JetStream separately
+  addressable from another, and the three outcomes across a leafnode.
+- [[choosing-a-topology]] — route, gateway or leafnode: the four properties that decide it, the
+  ladder, and the three cases where the ladder is the wrong answer.
 
 ## Internals
 
@@ -87,6 +95,8 @@ exists to answer live in `inbox/question-bank.md`.
   works; gated at every step, because the failures here produce no error anywhere.
 - [[rotate-tls-certificates]] — replace a certificate before it expires, and find out how long you
   have: `tls_cert_not_after` per listener, and `nats account tls` across the whole chain.
+- [[cross-domain-sourcing]] — copy a stream between JetStream domains: the `external` block, the
+  prefix the CLI builds for you, and the export types that fail silently.
 
 **Sizing**
 
@@ -97,6 +107,8 @@ exists to answer live in `inbox/question-bank.md`.
 
 - [[worker-pool]] — many processes on one consumer: demand-based distribution, `max_ack_pending` as a
   *shared* ceiling, and why this is not a queue group.
+- [[multi-region-jetstream]] — one hub cluster, leaf regions with their own domains. Why a
+  super-cluster couples every region's availability, and what the shape costs you.
 
 ## Gotchas
 
@@ -127,6 +139,10 @@ exists to answer live in `inbox/question-bank.md`.
   confirmed fix**; the thread is unanswered.
 - [[nats-timeout]] — the client's own error, which the server never sends and never logs. Including
   the API queue that drops every pending request without a reply.
+- [[duplicate-messages-across-a-leafnode]] — a window of sequences replayed, not one message. A leaf
+  bridging into a supercluster twice, and why `deny_imports` "fixing" it is the diagnosis.
+- [[supercluster-slows-when-a-remote-subscriber-joins]] — 80,000 msg/s becomes 2,000 in the *local*
+  region. Geo-affinity covers queue groups only, and the producer is stalled by its slowest link.
 
 ## Reference
 
@@ -285,6 +301,9 @@ exists to answer live in `inbox/question-bank.md`.
   `$JS.<domain>.API.>` mapping table, and the server's explicit guard against two identical domains.
 - [[s-nats-server-jetstream-log-warnings]] — every JetStream warning this wiki quotes, with its
   threshold and what the server does next; including the API queue that drains without replying.
+- [[s-nats-server-topology]] — the topology layer: no default port on any of the three listener
+  blocks, the system account a composed server must have, geo-affinity as an exclusion list, the
+  fast-producer stall and its two counters, and what a leafnode user may carry.
 
 **The `nats.go` client source**
 
@@ -361,6 +380,18 @@ exists to answer live in `inbox/question-bank.md`.
   recover. **Unanswered.**
 - [[s-gh-5859-unexpected-nats-timeout]] — two reports of `nats: timeout`, a ping line that is not a
   symptom, one real routes defect and a `GOMAXPROCS` hypothesis. **Unresolved.**
+- [[s-gh-6328-jetstream-behind-gateways]] — "you don't even need a super-cluster": a maintainer
+  routes a regional read replica to leafnodes and sourcing.
+- [[s-gh-7438-multi-region-availability]] — one hub cluster, leaf regions, one JS domain each. The
+  architecture is answered; **both questions about the downsides are not**.
+- [[s-gh-7881-cross-domain-sourcing]] — the exact question the docs cannot answer, **with no
+  maintainer reply**, and the `service import not authorized` error that names the missing export.
+- [[s-gh-5941-restrict-leafnode-subjects]] — deny lists, and an accepted answer that has no
+  implementation in config mode. The follow-up proving it is unanswered.
+- [[s-gh-4823-leafnode-supercluster-duplicates]] — a leaf bridging into a supercluster twice.
+  "A Supercluster is a single system", and reach it by DNS.
+- [[s-gh-7494-supercluster-degradation]] — 80,000 msg/s to 2,000 when a distant subscriber joins.
+  **Unanswered**; the source explains it exactly.
 
 **Synadia blog (continued)**
 
@@ -411,6 +442,14 @@ exists to answer live in `inbox/question-bank.md`.
   and the meta-quorum precondition under all of it.
 - [[s-docs-config-and-jwt-backup]] — the identity plane: which files carry it, sealing the archive,
   and why a restored store still leaves the server rejecting everyone.
+- [[s-docs-leaf-nodes]] — the outbound bridge: hub vs remote, the account as the only real boundary,
+  and the JetStream-domain pitfall.
+- [[s-docs-super-clusters]] — gateways, gossip, and the only prose statement of geo-affinity — which
+  is narrower than it reads.
+- [[s-docs-jetstream-in-a-cluster]] — the meta group named, odd counts argued, and the two runnable
+  commands that audit replica counts.
+- [[s-docs-putting-it-together]] — the three `nats server report` commands, "composition adds reach,
+  not boundaries", and a composed config that **does not start**.
 
 **docs.nats.io — Security (learn)**
 
@@ -439,6 +478,8 @@ exists to answer live in `inbox/question-bank.md`.
   including the three (`--config`, `--cluster`, `--replicas`) that make a cross-site restore possible.
 - [[s-natscli-account-tls]] — `nats account tls`, the certificate check nobody names: the whole
   verified chain, `--expire-warn 1w`, and a non-zero exit. Plus `nats account backup` / `restore`.
+- [[s-natscli-stream-external]] — the CLI has walked people through cross-domain sourcing for years:
+  two branches, `$JS.<domain>.API` composed for you, and what the account branch assumes.
 
 **The Helm chart**
 
@@ -463,7 +504,8 @@ exists to answer live in `inbox/question-bank.md`.
 
 These are deliberately unresolved links; ingest a source to fill them.
 
-Concepts: [[leafnode]] · [[gateway]]
+Concepts: *(none — `leafnode` and `gateway` were written 2026-08-31, together with
+`jetstream-domain` and `choosing-a-topology`; see the Concepts section above)*
 
 Internals: [[filestore-layout]] · [[meta-layer]]
 
@@ -487,9 +529,11 @@ names now have pages — see the Entities section above. People: none yet.)*
 
 - `inbox/question-bank.md` — the questions this wiki must answer, with the page that answers each
 - `inbox/adr-toc.md` — one row per ADR of `nats-architecture-and-design`
-- `inbox/docs-issues.md` — errors and gaps found in the public NATS docs, verified against the
+- `inbox/docs-issues.md` — **26** errors and gaps found in the public NATS docs, verified against the
   server source, kept so they can be sent to the maintainers
 - `inbox/config-keys-table.md` — 621 config keys with type, default and reload behaviour
 - `inbox/plan-first-ingests-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as the record
-- `inbox/plan-runbooks-and-security-2026-08-31.md` — the current plan; say `start the plan`
+- `inbox/plan-runbooks-and-security-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as
+  the record
+- `inbox/plan-drift-and-adrs-2026-08-31.md` — the current plan; say `start the plan`
 - `inbox/` also holds scout files and plans; nothing there is a wiki page.
