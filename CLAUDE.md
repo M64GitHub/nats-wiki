@@ -69,6 +69,9 @@ nats-wiki/
     question-bank.md   the questions this wiki must answer; the scope test and the scoreboard
     docs-issues.md     errors and gaps found in the public docs, verified against the
                        server source — a report to send upstream, not a wiki page
+    server-issues.md   behaviours of nats-server itself that are surprising, inconsistent or
+                       undocumented — observations and questions to ask upstream, never
+                       verdicts, because there is no higher authority to check them against
     check-defaults-<tag>.md  every documented config default vs the server, generated
     staleness.md       pages whose version-bearing claims need re-checking, generated
     adr-toc.md         one row per ADR of nats-architecture-and-design
@@ -342,7 +345,31 @@ the maintainers or filed as an issue upstream).
   how many you checked and how many were wrong.
 - Add the row to the table, a `## <n> · <title>` detail section with evidence and a suggested fix,
   and a line in the *Where the wiki records each of these* table. Register nothing new in
-  `wiki.json` — the file is already a TOC table (`Docs issues` in the nav).
+  `wiki.json` — both files are already TOC tables (`Docs issues` and `Server issues` in the nav).
+- **Fill `destination` and leave `upstream` as `not filed`.** `destination` is the repository the fix
+  belongs in — `nats-docs` for the documentation tree, `ADR repo` for
+  `nats-io/nats-architecture-and-design`. `upstream` is filled only when the finding has actually been
+  sent, with the issue number and what became of it.
+
+### Which file: `docs-issues.md` or `server-issues.md`
+
+**A finding about a *source* goes in `docs-issues.md`; a finding about the *server* goes in
+`inbox/server-issues.md`.** The two are separate on purpose, and the reason is authority, not tidiness:
+
+- `docs-issues.md` runs on "the server is the authority", so every row is **settled** — the docs say X,
+  the server does Y, here is the line and here is the run.
+- A server finding inverts that. There is no higher authority to check it against, so an entry can only
+  be **an observation plus a question**. Putting unsettled entries in the settled file erodes what
+  makes the settled file worth sending.
+
+A `server-issues.md` entry is numbered `SI-<n>`, uses the kinds `unexpected` / `inconsistent` /
+`undocumented` (**never `wrong-value` — nothing there is called an error**), and **must** carry:
+a reproduction that runs with its exact config and output, the release it was run on, **what would
+settle it** (the question actually being asked upstream), what was searched for and not found, and
+what was *not* tested. `★` there marks a **data-integrity or security** consequence, not a surprise.
+
+**One finding may legitimately produce a row in each** — the documentation gap in one, the behaviour in
+the other. When it does, each row must point at the other (see `#35` and `SI-1`).
 
 ## Operation: triage <collection>
 

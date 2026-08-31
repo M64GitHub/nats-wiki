@@ -4,15 +4,40 @@ Errors, gaps and inconsistencies found in **public NATS documentation** while in
 file is **not a wiki page** — it is a report, kept so it can be sent to the docs maintainers or
 turned into issues against `nats-io/nats-docs` and `nats-io/nats-architecture-and-design`.
 
-**Every row is verified against a stated authority**, normally the `nats-server` source at a
-release tag, and gives the exact evidence. Nothing here is a guess or a style opinion. Where the
-docs are merely terse, the row is marked `enhancement` and kept separate from the ones that are
-factually wrong.
+## How to read this, if you maintain the docs
 
-- `★` marks a **confirmed factual error with real impact** — following the docs produces a broken
-  result, silently.
-- `where` is the doc path; for docs.nats.io prefix `https://docs.nats.io/`.
-- `status` is this wiki's handling, not the upstream state.
+**Every row is verified against a stated authority** — normally the `nats-server` source at a release
+tag, quoted with file and line, with the documentation's own wording beside it. Nothing here is a
+guess, an inference, or a style opinion. Where a page is correct but unhelpful, the row is marked
+`enhancement` and kept apart from the ones that are factually wrong; we would rather under-claim than
+send you a list you have to re-verify.
+
+**Nothing here asks you to adopt our wording.** Each detail section ends with a *Suggested fix*, and
+those are suggestions — the point of the report is the finding, not the patch.
+
+| column | what it means to you |
+|---|---|
+| `★` | a **confirmed factual error with real impact** — following the documentation produces a broken result, **silently**. If you triage on one thing, triage on this |
+| `where` | the doc path. For docs.nats.io prefix `https://docs.nats.io/` |
+| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`. Three rows (#7, #30, #31) are ADR errors rather than docs errors |
+| `kind` | `wrong-value` and `missing` are defects; `enhancement` is correct-but-unhelpful |
+| `severity` | our estimate of consequence, not of effort |
+| **`upstream`** | where this was filed and what became of it. `not filed` means we have not sent it yet |
+| `status` | **ours, not yours** — how this wiki handled the finding internally. Safe to ignore |
+
+**Which release.** Unless a row says otherwise, the authority is `nats-server` **v2.14.6** and the docs
+tree as fetched **2026-08-31**. Where a row says *observed*, the behaviour was **run on the binary**,
+not only read from the source.
+
+**Findings about the server itself are not in this file.** They are in `inbox/server-issues.md`,
+because a server finding cannot be settled the way a docs finding can — there is no higher authority to
+check it against, so those entries are observations and questions rather than verdicts. One finding can
+legitimately appear in both: #35 here is the documentation gap, and `SI-1` there is the behaviour
+behind it.
+
+**Paths beginning `raw/`, `wiki/` or `inbox/` are internal to the repository this report was written
+in.** They are cited so the evidence is traceable on our side; nothing in the report depends on being
+able to open them.
 
 Rows 1–10 were found while working `inbox/plan-first-ingests-2026-08-31.md`; rows 11–26 while
 working `inbox/plan-runbooks-and-security-2026-08-31.md`; rows 27–29 by the **mechanical sweep** of
@@ -33,44 +58,44 @@ v2.14.6 binary**, not only read from the source at that tag; the configs and out
 the client repository at its current release plus the package registry, not the server — stated per
 row.
 
-| # | issue | where | kind | severity | status |
-|---|---|---|---|---|---|
-| 1 | Nak advisory subject is `MSG_NAK`; the server publishes `MSG_NAKED` | `reference/jetstream/advisory/nak.md` | wrong-value | ★ high | wiki uses the server value |
-| 2 | Pinned advisory subject is `GROUP_PINNED`; the server publishes `PINNED` | `reference/jetstream/advisory/consumer-group-pinned.md` | wrong-value | ★ high | wiki uses the server value |
-| 3 | Unpinned advisory subject is `GROUP_UNPINNED`; the server publishes `UNPINNED` | `reference/jetstream/advisory/consumer-group-unpinned.md` | wrong-value | ★ high | wiki uses the server value |
-| 4 | Consumer config object is collapsed, so **no consumer default is readable** anywhere in the reference | `reference/jetstream/api/consumer/create.md` | missing | high | wiki reads the server source instead |
-| 5 | `duplicate_window` default documented only as "0 for default" in the generated reference, where the field is defined — the substituted value **is** stated, in prose, three pages away in the `learn` chapter | `reference/jetstream/api/stream/create.md` | missing | low | wiki states the value and cites both |
-| 6 | `max_payload` "not recommended" over 8MB without saying what actually happens | `reference/config/max_payload.md` | enhancement | low | wiki states the real behaviour |
-| 7 | ADR-42 is tagged `2.11` but describes the `prioritized` policy, which shipped in 2.12 | `nats-architecture-and-design` ADR-42 | wrong-value | medium | wiki corrects the attribution |
-| 8 | `nats.net` is described as ".NET 6+"; the current client **dropped `net6.0`** | `concepts/ecosystem.md` | wrong-value | medium | wiki states the v3 target frameworks |
-| 9 | `nats.deno` is listed among "the archived" repos superseded by `nats.js`; it is **not archived** | `concepts/ecosystem.md` | wrong-value | low | wiki says which three are archived |
-| 10 | The Python client's two PyPI distributions are never reconciled: the client map names neither, and `nats-core` appears only on a WebSocket page | `concepts/ecosystem.md`, `concepts/getting-started.md`, `learn/websocket/your-first-websocket-connection.md` | missing | medium | wiki lists both packages and their Python floors |
-| 11 | A cluster-name mismatch is documented as always splitting the cluster; an **unset** `cluster.name` is silently **adopted** from the peer instead | `learn/clustering/forming-a-cluster.md`, `learn/topologies/your-first-cluster.md`, `reference/config/cluster/name.md` | missing | medium | wiki states both branches |
-| 12 | The hardening page's systemd extract drops `User=`/`Group=` and `ExecStop=` from the unit it is quoting | `learn/deployment/hardening.md` | enhancement | low | wiki quotes the shipped unit instead |
-| 13 | `lame_duck_duration` is presented as covering JetStream's leadership move; the server does that work **before** the timer starts, so the documented failure mode cannot occur and the sizing advice tunes the wrong knob | `learn/deployment/rolling-upgrades.md` | wrong-value | ★ medium | wiki states what the duration actually governs |
-| 14 | "grace period" means two different things two paragraphs apart — `lame_duck_grace_period` (must be **shorter** than the duration) and `terminationGracePeriodSeconds` (must be **longer**) | `learn/deployment/rolling-upgrades.md` | enhancement | low | wiki names both keys explicitly |
-| 15 | A memory stream's backup is documented to fail with `memory streams do not support snapshots`; the server returns **`no impl`** | `learn/backup-recovery/stream-backup-restore.md` | wrong-value | ★ medium | wiki states the real error and code |
-| 16 | The restore rename error is quoted as the **server's** and in the singular; it is the **CLI's**, and reads `stream names may not be changed during restore` | `learn/backup-recovery/stream-backup-restore.md` | wrong-value | low | wiki quotes the CLI string and the server's code |
-| 17 | `chunk_size`'s documented maximum is `9223372036854776000`; the server clamps it to **1 MiB**, silently | `reference/jetstream/api/stream/snapshot.md` | wrong-value | low | wiki states the real clamps |
-| 18 | `nats stream restore` accepts `--config`, `--cluster`, `--tag` and `--replicas`; the backup chapter mentions none, and presents a restore as reproducing the original configuration | `learn/backup-recovery/stream-backup-restore.md`, `learn/backup-recovery/disaster-recovery.md` | missing | medium | wiki documents the restore-elsewhere path |
-| 19 | **15 timeout defaults in the generated config reference are wrong**: all 9 `tls.timeout` keys say `500ms` (server: **2s**) and all 6 `authorization.timeout` keys say `1` (server: **2s**, or `tls_timeout + 1` when TLS is configured) | `reference/config/tls/timeout.md` + 8 siblings, `reference/config/authorization.md` + 5 siblings | wrong-value | ★ medium | wiki states the server values and the TLS-dependent rule |
-| 20 | `/varz` has exposed **`tls_cert_not_after`** per listener since PR #7709, and the whole docs tree never names it — the TLS page says to "monitor validity dates" with no way to do it | `learn/security/encryption.md`, `learn/monitoring/monitoring-endpoints.md` | missing | ★ medium | wiki documents the field and `nats account tls` |
-| 21 | Cross-domain and cross-account replication is said to need "the `external` block", pointing at a reference page that never mentions it; `external`, `api` and `deliver` appear **nowhere** in the 861-page docs tree | `learn/jetstream/mirrors-and-sources.md`, `reference/jetstream/api/stream/create.md` | missing | ★ medium | wiki reads the fields from the server source and says what is still unverified |
-| 22 | **Four defaults in the generated `jetstream` block are wrong**, including the most-quoted number in NATS sizing: `max_file_store` "Defaults to up to 1TB if available" (server: **75% of the space free under `store_dir`**, 1 TB only when `statfs` fails), `max_buffered_msgs` `10000` (**100000**), `max_outstanding_catchup` `32M` (**64MB**), `info_queue_limit` `100000` (**defaults to `request_queue_limit`**). The maintainers' "auto-sizing is for development and testing" appears nowhere in the tree, and `max_file_store: 0` silently means *no storage*, not *unlimited* | `reference/config/jetstream.md`, `reference/config/jetstream/max_file_store.md` + 3 siblings | wrong-value | ★ high | wiki states the server values and the restart hazard |
-| 23 | **The three topology listener ports are documented with defaults the server never applies**: `cluster.port` `6222`, `leafnodes.port` `7422` and `gateway.port` `7222`. Omitting `cluster.port` or `leafnodes.port` opens **no listener, silently**; omitting `gateway.port` **stops the server from starting** | `reference/config/cluster.md`, `reference/config/leafnodes.md`, `reference/config/gateway.md` | wrong-value | ★ medium | wiki states "no default" and the per-key consequence |
-| 24 | The chapter's **composed topology config does not start** — `cluster {}` + `gateway {}` + `leafnodes { listen }` with no `system_account` fails validation, and `nats-server -t` reports the same file valid | `learn/topologies/putting-it-together.md`, `learn/deployment/config-management.md` | wrong-value | ★ medium | wiki quotes the error and says `-t` is a syntax check |
-| 25 | The fast-producer stall — the mechanism by which one slow destination throttles a publisher — is **absent from the 861-page tree**, along with both counters that expose it (`/varz` `stalled_clients`, `/connz` `stalls`) and its log line | whole tree; `learn/monitoring/monitoring-endpoints.md`, `learn/topologies/super-clusters.md` | missing | ★ medium | wiki documents both counters, the constants and the geo-affinity caveat |
-| 27 | The **leafnode compression default is `accept`** in the reference; the server defaults both the listener and every remote to **`s2_auto`**. The two behave differently on the wire | `reference/config/leafnodes/compression.md` + `leafnodes/remotes/compression.md` and their `mode` pages | wrong-value | ★ medium | wiki states the server value, observed |
-| 28 | `mqtt.max_ack_pending` is documented as `100`; the server's default is **1024** | `reference/config/mqtt.md` | wrong-value | medium | wiki states the server value |
-| 29 | `mqtt.port` is documented as defaulting to `1883`; the server applies **no default** — `mqtt { }` with no port starts **no MQTT listener**, silently | `reference/config/mqtt.md` | wrong-value | ★ medium | wiki states "no default", as for the other listeners |
-| 26 | Four `leafnodes.remotes` keys are published with a **completely empty description**: `hub`, `deny_imports`, `deny_exports`, `jetstream_cluster_migrate` — including the two keys the only public question on the topic asks about | `reference/config/leafnodes/remotes.md` and the four property pages | missing | medium | wiki states what the two deny keys do, from the source |
-| 30 | ADR-35 says a `compression` change applies to "newly minted blocks"; on a live stream the running store keeps writing with the algorithm it was **created** with, so nothing changes until the store re-opens | `nats-architecture-and-design` ADR-35 | wrong-value | medium | wiki states the observed behaviour and says the docs are right here |
-| 31 | The connection spec's **Servers discovery** section is two paragraphs, a truncated sentence and a `TODO`, in an ADR marked *Implemented* — so what a server advertises to clients is stated nowhere public; `max reconnects` also has no readable default (`**default: 3 / none`) | `nats-architecture-and-design` ADR-40 | missing | medium | wiki observes the `INFO` directly and records what the server sends |
-| 32 | Every `unsigned 64 bit integer` field in the generated JetStream reference publishes `Maximum: 18446744073709552000` — **385 more than uint64 can hold**, and a value the server cannot accept. 11 pages, all of them | `reference/jetstream/api/*`, `reference/jetstream/advisory/*`, `reference/jetstream/metric/consumer-ack.md` | wrong-value | low | wiki quotes no maximum from these pages |
-| 33 | The sizing chapter tells operators to pin `max_file_store` to the volume size, and never says that **every JetStream storage figure is logical, not physical** — a server set to `max_file_store: 4MB` was measured holding 3.79 MB on disk while reporting 133,000 bytes used. The per-message record overhead (`30 + len(subject)`) is also stated nowhere in the tree | `learn/deployment/sizing-and-resources.md`, `reference/config/jetstream/max_file_store.md` | missing | ★ high | wiki states the arithmetic and the slack, observed |
-| 34 | Six leafnode-remote TLS keys carry a bug note scoped to "2.11/2.12" and never say whether it still applies; on **2.14.6** `cert_file`, `key_file` and `ca_file` all reload correctly, so the note now reads as a standing warning against the supported rotation procedure | `reference/config/leafnodes/remotes/tls/cert_file.md` + 5 siblings | enhancement | medium | wiki states the observed 2.14.6 behaviour and names the three keys it did not test |
-| 35 | No page anywhere in the docs states what happens to **KV and Object Store subjects across a JetStream domain boundary** — and the two behave differently: the server's leafnode deny list blocks `$KV.>` but names `$OBJ.>`, which does not match the object store's actual `$O.` prefix, so object data crosses and same-named buckets converge | `learn/topologies/leaf-nodes.md`; `learn/object-store/under-the-hood.md`; `learn/key-value/under-the-hood.md` | missing | high | wiki states the observed 2.14.6 behaviour on four pages and flags the defect question as open |
-| 36 | The advisories chapter's own diagram caption drops `.CONSUMER.` from the max-deliveries advisory subject — `$JS.EVENT.ADVISORY.MAX_DELIVERIES.ORDERS.shipping`, three times — while the prose on the same page has it right; a subscription copied from the caption receives nothing | `learn/monitoring/advisories-and-events.md` | wrong-value | low | wiki states the observed subject and notes the page contradicts itself |
+| # | issue | where | destination | kind | severity | upstream | status |
+|---|---|---|---|---|---|---|---|
+| 1 | Nak advisory subject is `MSG_NAK`; the server publishes `MSG_NAKED` | `reference/jetstream/advisory/nak.md` | nats-docs | wrong-value | ★ high | not filed | wiki uses the server value |
+| 2 | Pinned advisory subject is `GROUP_PINNED`; the server publishes `PINNED` | `reference/jetstream/advisory/consumer-group-pinned.md` | nats-docs | wrong-value | ★ high | not filed | wiki uses the server value |
+| 3 | Unpinned advisory subject is `GROUP_UNPINNED`; the server publishes `UNPINNED` | `reference/jetstream/advisory/consumer-group-unpinned.md` | nats-docs | wrong-value | ★ high | not filed | wiki uses the server value |
+| 4 | Consumer config object is collapsed, so **no consumer default is readable** anywhere in the reference | `reference/jetstream/api/consumer/create.md` | nats-docs | missing | high | not filed | wiki reads the server source instead |
+| 5 | `duplicate_window` default documented only as "0 for default" in the generated reference, where the field is defined — the substituted value **is** stated, in prose, three pages away in the `learn` chapter | `reference/jetstream/api/stream/create.md` | nats-docs | missing | low | not filed | wiki states the value and cites both |
+| 6 | `max_payload` "not recommended" over 8MB without saying what actually happens | `reference/config/max_payload.md` | nats-docs | enhancement | low | not filed | wiki states the real behaviour |
+| 7 | ADR-42 is tagged `2.11` but describes the `prioritized` policy, which shipped in 2.12 | `nats-architecture-and-design` ADR-42 | ADR repo | wrong-value | medium | not filed | wiki corrects the attribution |
+| 8 | `nats.net` is described as ".NET 6+"; the current client **dropped `net6.0`** | `concepts/ecosystem.md` | nats-docs | wrong-value | medium | not filed | wiki states the v3 target frameworks |
+| 9 | `nats.deno` is listed among "the archived" repos superseded by `nats.js`; it is **not archived** | `concepts/ecosystem.md` | nats-docs | wrong-value | low | not filed | wiki says which three are archived |
+| 10 | The Python client's two PyPI distributions are never reconciled: the client map names neither, and `nats-core` appears only on a WebSocket page | `concepts/ecosystem.md`, `concepts/getting-started.md`, `learn/websocket/your-first-websocket-connection.md` | nats-docs | missing | medium | not filed | wiki lists both packages and their Python floors |
+| 11 | A cluster-name mismatch is documented as always splitting the cluster; an **unset** `cluster.name` is silently **adopted** from the peer instead | `learn/clustering/forming-a-cluster.md`, `learn/topologies/your-first-cluster.md`, `reference/config/cluster/name.md` | nats-docs | missing | medium | not filed | wiki states both branches |
+| 12 | The hardening page's systemd extract drops `User=`/`Group=` and `ExecStop=` from the unit it is quoting | `learn/deployment/hardening.md` | nats-docs | enhancement | low | not filed | wiki quotes the shipped unit instead |
+| 13 | `lame_duck_duration` is presented as covering JetStream's leadership move; the server does that work **before** the timer starts, so the documented failure mode cannot occur and the sizing advice tunes the wrong knob | `learn/deployment/rolling-upgrades.md` | nats-docs | wrong-value | ★ medium | not filed | wiki states what the duration actually governs |
+| 14 | "grace period" means two different things two paragraphs apart — `lame_duck_grace_period` (must be **shorter** than the duration) and `terminationGracePeriodSeconds` (must be **longer**) | `learn/deployment/rolling-upgrades.md` | nats-docs | enhancement | low | not filed | wiki names both keys explicitly |
+| 15 | A memory stream's backup is documented to fail with `memory streams do not support snapshots`; the server returns **`no impl`** | `learn/backup-recovery/stream-backup-restore.md` | nats-docs | wrong-value | ★ medium | not filed | wiki states the real error and code |
+| 16 | The restore rename error is quoted as the **server's** and in the singular; it is the **CLI's**, and reads `stream names may not be changed during restore` | `learn/backup-recovery/stream-backup-restore.md` | nats-docs | wrong-value | low | not filed | wiki quotes the CLI string and the server's code |
+| 17 | `chunk_size`'s documented maximum is `9223372036854776000`; the server clamps it to **1 MiB**, silently | `reference/jetstream/api/stream/snapshot.md` | nats-docs | wrong-value | low | not filed | wiki states the real clamps |
+| 18 | `nats stream restore` accepts `--config`, `--cluster`, `--tag` and `--replicas`; the backup chapter mentions none, and presents a restore as reproducing the original configuration | `learn/backup-recovery/stream-backup-restore.md`, `learn/backup-recovery/disaster-recovery.md` | nats-docs | missing | medium | not filed | wiki documents the restore-elsewhere path |
+| 19 | **15 timeout defaults in the generated config reference are wrong**: all 9 `tls.timeout` keys say `500ms` (server: **2s**) and all 6 `authorization.timeout` keys say `1` (server: **2s**, or `tls_timeout + 1` when TLS is configured) | `reference/config/tls/timeout.md` + 8 siblings, `reference/config/authorization.md` + 5 siblings | nats-docs | wrong-value | ★ medium | not filed | wiki states the server values and the TLS-dependent rule |
+| 20 | `/varz` has exposed **`tls_cert_not_after`** per listener since PR #7709, and the whole docs tree never names it — the TLS page says to "monitor validity dates" with no way to do it | `learn/security/encryption.md`, `learn/monitoring/monitoring-endpoints.md` | nats-docs | missing | ★ medium | not filed | wiki documents the field and `nats account tls` |
+| 21 | Cross-domain and cross-account replication is said to need "the `external` block", pointing at a reference page that never mentions it; `external`, `api` and `deliver` appear **nowhere** in the 861-page docs tree | `learn/jetstream/mirrors-and-sources.md`, `reference/jetstream/api/stream/create.md` | nats-docs | missing | ★ medium | not filed | wiki reads the fields from the server source and says what is still unverified |
+| 22 | **Four defaults in the generated `jetstream` block are wrong**, including the most-quoted number in NATS sizing: `max_file_store` "Defaults to up to 1TB if available" (server: **75% of the space free under `store_dir`**, 1 TB only when `statfs` fails), `max_buffered_msgs` `10000` (**100000**), `max_outstanding_catchup` `32M` (**64MB**), `info_queue_limit` `100000` (**defaults to `request_queue_limit`**). The maintainers' "auto-sizing is for development and testing" appears nowhere in the tree, and `max_file_store: 0` silently means *no storage*, not *unlimited* | `reference/config/jetstream.md`, `reference/config/jetstream/max_file_store.md` + 3 siblings | nats-docs | wrong-value | ★ high | not filed | wiki states the server values and the restart hazard |
+| 23 | **The three topology listener ports are documented with defaults the server never applies**: `cluster.port` `6222`, `leafnodes.port` `7422` and `gateway.port` `7222`. Omitting `cluster.port` or `leafnodes.port` opens **no listener, silently**; omitting `gateway.port` **stops the server from starting** | `reference/config/cluster.md`, `reference/config/leafnodes.md`, `reference/config/gateway.md` | nats-docs | wrong-value | ★ medium | not filed | wiki states "no default" and the per-key consequence |
+| 24 | The chapter's **composed topology config does not start** — `cluster {}` + `gateway {}` + `leafnodes { listen }` with no `system_account` fails validation, and `nats-server -t` reports the same file valid | `learn/topologies/putting-it-together.md`, `learn/deployment/config-management.md` | nats-docs | wrong-value | ★ medium | not filed | wiki quotes the error and says `-t` is a syntax check |
+| 25 | The fast-producer stall — the mechanism by which one slow destination throttles a publisher — is **absent from the 861-page tree**, along with both counters that expose it (`/varz` `stalled_clients`, `/connz` `stalls`) and its log line | whole tree; `learn/monitoring/monitoring-endpoints.md`, `learn/topologies/super-clusters.md` | nats-docs | missing | ★ medium | not filed | wiki documents both counters, the constants and the geo-affinity caveat |
+| 27 | The **leafnode compression default is `accept`** in the reference; the server defaults both the listener and every remote to **`s2_auto`**. The two behave differently on the wire | `reference/config/leafnodes/compression.md` + `leafnodes/remotes/compression.md` and their `mode` pages | nats-docs | wrong-value | ★ medium | not filed | wiki states the server value, observed |
+| 28 | `mqtt.max_ack_pending` is documented as `100`; the server's default is **1024** | `reference/config/mqtt.md` | nats-docs | wrong-value | medium | not filed | wiki states the server value |
+| 29 | `mqtt.port` is documented as defaulting to `1883`; the server applies **no default** — `mqtt { }` with no port starts **no MQTT listener**, silently | `reference/config/mqtt.md` | nats-docs | wrong-value | ★ medium | not filed | wiki states "no default", as for the other listeners |
+| 26 | Four `leafnodes.remotes` keys are published with a **completely empty description**: `hub`, `deny_imports`, `deny_exports`, `jetstream_cluster_migrate` — including the two keys the only public question on the topic asks about | `reference/config/leafnodes/remotes.md` and the four property pages | nats-docs | missing | medium | not filed | wiki states what the two deny keys do, from the source |
+| 30 | ADR-35 says a `compression` change applies to "newly minted blocks"; on a live stream the running store keeps writing with the algorithm it was **created** with, so nothing changes until the store re-opens | `nats-architecture-and-design` ADR-35 | ADR repo | wrong-value | medium | not filed | wiki states the observed behaviour and says the docs are right here |
+| 31 | The connection spec's **Servers discovery** section is two paragraphs, a truncated sentence and a `TODO`, in an ADR marked *Implemented* — so what a server advertises to clients is stated nowhere public; `max reconnects` also has no readable default (`**default: 3 / none`) | `nats-architecture-and-design` ADR-40 | ADR repo | missing | medium | not filed | wiki observes the `INFO` directly and records what the server sends |
+| 32 | Every `unsigned 64 bit integer` field in the generated JetStream reference publishes `Maximum: 18446744073709552000` — **385 more than uint64 can hold**, and a value the server cannot accept. 11 pages, all of them | `reference/jetstream/api/*`, `reference/jetstream/advisory/*`, `reference/jetstream/metric/consumer-ack.md` | nats-docs | wrong-value | low | not filed | wiki quotes no maximum from these pages |
+| 33 | The sizing chapter tells operators to pin `max_file_store` to the volume size, and never says that **every JetStream storage figure is logical, not physical** — a server set to `max_file_store: 4MB` was measured holding 3.79 MB on disk while reporting 133,000 bytes used. The per-message record overhead (`30 + len(subject)`) is also stated nowhere in the tree | `learn/deployment/sizing-and-resources.md`, `reference/config/jetstream/max_file_store.md` | nats-docs | missing | ★ high | not filed | wiki states the arithmetic and the slack, observed |
+| 34 | Six leafnode-remote TLS keys carry a bug note scoped to "2.11/2.12" and never say whether it still applies; on **2.14.6** `cert_file`, `key_file` and `ca_file` all reload correctly, so the note now reads as a standing warning against the supported rotation procedure | `reference/config/leafnodes/remotes/tls/cert_file.md` + 5 siblings | nats-docs | enhancement | medium | not filed | wiki states the observed 2.14.6 behaviour and names the three keys it did not test |
+| 35 | No page anywhere in the docs states what happens to **KV and Object Store subjects across a JetStream domain boundary** — and the two behave differently, so a reader who generalises from the KV case is wrong about the Object Store one. (The *behaviour* is `inbox/server-issues.md` **SI-1**; this row is the documentation gap alone) | `learn/topologies/leaf-nodes.md`; `learn/object-store/under-the-hood.md`; `learn/key-value/under-the-hood.md` | nats-docs | missing | high | not filed | wiki states the observed 2.14.6 behaviour on four pages and flags the defect question as open |
+| 36 | The advisories chapter's own diagram caption drops `.CONSUMER.` from the max-deliveries advisory subject — `$JS.EVENT.ADVISORY.MAX_DELIVERIES.ORDERS.shipping`, three times — while the prose on the same page has it right; a subscription copied from the caption receives nothing | `learn/monitoring/advisories-and-events.md` | nats-docs | wrong-value | low | not filed | wiki states the observed subject and notes the page contradicts itself |
 
 ---
 
@@ -1769,9 +1794,14 @@ The KV control, same servers and account: `kv put CONF k1` on the leaf left the 
 **What is not established**, and is deliberately not asserted here: whether the mismatch is a defect
 or an intended asymmetry. No public issue, discussion or ADR read so far mentions `$OBJ` against
 `$O.`. The source comment at `jetstream_api.go:330–337` explains why `$KV` and `$OBJ` were made
-independent subject spaces but never says which prefix the object store uses. **The documentation gap
-is unambiguous and is what this entry reports**; the defect question is worth filing upstream
-separately, with the reproduction above.
+independent subject spaces but never says which prefix the object store uses.
+
+**So this row reports only the documentation gap, which is unambiguous either way.** Whichever answer
+the server maintainers give, `learn/topologies/leaf-nodes.md` should state what a differing JetStream
+domain does to each subject space — and today it says nothing about either store. The **behaviour**,
+and the question of whether it is a defect, is a separate report:
+`inbox/server-issues.md` **SI-1**, which carries the full reproduction and states what would settle
+it.
 
 **Not tested**: the same-domain case, the system-account (`denyAllJs`) case, gateways, and clients
 other than the `nats` CLI.
@@ -1849,7 +1879,12 @@ no caveat at all.
 
 ---
 
-## Where the wiki records each of these
+## Internal — where this wiki records each of these
+
+*Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
+reader here can get from a finding to the prose that uses it. A recipient of the report can ignore it.
+
+### Where the wiki records each of these
 
 | # | wiki page |
 |---|---|

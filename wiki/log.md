@@ -2173,3 +2173,59 @@ not enough handlers"), and the **crashed-worker signature** — `num_pending` cl
 `num_waiting` is 0 and `delivered.stream_seq` is flat. The field table went to [[consumer]].
 [[ack-and-redelivery]] gained the fact that **there is no dead-letter queue**: one advisory, published
 once, stored nowhere.
+
+## 2026-09-01 — the reports made sendable, and server findings split out
+
+**Operation:** not an ingest. Preparing `inbox/docs-issues.md` to actually be sent, after an audit of
+how it reads to someone who did not write it.
+
+**What the audit found.** The evidence layer was already strong — 36 rows, each verified against
+`nats-server` at a release tag with file and line, the doc text quoted beside the code, 33 detail
+sections, most with a *Suggested fix*, and a `kind`/`severity` split that maps onto triage. Six things
+got in the way of sending it:
+
+1. **One file, three recipients** — 33 rows to `nats-docs`, 3 (#7, #30, #31) to the ADR repo, and #35
+   really a server question.
+2. **54 unresolvable path references** (20 `raw/`, 34 `wiki/`) — dead pointers outside this repo.
+3. A **`Where the wiki records each of these`** table: internal bookkeeping presented as report.
+4. The **`status` column is ours**, and reads like one the recipient owns.
+5. **Nowhere to record what happened upstream** once filed.
+6. **#35 misfiled** — a docs gap and a server behaviour in one row.
+
+**Created `inbox/server-issues.md`**, registered in `wiki.json` as its own nav table (`Server issues`).
+The reason for a separate file is **authority, not tidiness**: `docs-issues.md` runs on "the server is
+the authority", so every row there is *settled*; a server finding inverts that, because there is no
+higher authority to check it against, so an entry can only be an observation plus a question. Mixing
+unsettled entries into the settled file erodes what makes the settled file worth sending.
+
+Its discipline differs deliberately: **no `wrong-value`** — the kinds are `unexpected`, `inconsistent`,
+`undocumented` — and every entry **must** carry a runnable reproduction with its config and output, the
+release it ran on, **what would settle it** (the question actually being asked upstream), what was
+searched for and not found, and what was *not* tested.
+
+**`SI-1`** is the first entry: the leafnode JetStream deny list names `$OBJ.>` while the object store
+uses `$O.`, so object data crosses a domain boundary KV data does not and same-named buckets converge.
+Its "what would settle this" is one question — *is `$OBJ.>` intended to be the object store's subject
+space?* — with both answers spelled out, because they lead to different fixes in different repos.
+
+**Reshaped `docs-issues.md`** without touching a single verified row's evidence:
+
+- a **"How to read this, if you maintain the docs"** preamble, including a column-by-column table
+  written for the recipient and an explicit note that internal paths are traceability, not dependencies;
+- a **`destination`** column (`nats-docs` / `ADR repo`) so the three ADR rows are visibly not the docs
+  maintainer's problem;
+- an **`upstream`** column, `not filed` on all 36, to record issue numbers and outcomes as they are
+  sent;
+- **#35 narrowed to its documentation half**, pointing at `SI-1` for the behaviour, and `SI-1` pointing
+  back;
+- the internal table moved under a heading that says *Not part of the report*.
+
+**`CLAUDE.md` updated**: the map gains `server-issues.md`, and *Operation: record a docs issue* gains a
+**"Which file"** rule with the authority reasoning, the `SI-<n>` entry requirements, the
+`destination`/`upstream` fields, and the note that one finding may legitimately produce a row in each.
+
+**Also corrected**: `wiki/index.md`'s inbox section said **26** docs issues (it is 36) and named a
+finished plan as "the current plan". Both fixed, and all five plans now show their finished dates.
+
+**Numbers unchanged** — 260 pages, bank 105/83, ★ 42 of 42, unlanded ripples 202, drift 0, staleness 0,
+lint clean. Nothing was ingested and no wiki page's content changed.

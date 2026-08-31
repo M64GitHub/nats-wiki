@@ -9,7 +9,6 @@
   "touched_heading": "## Pages touched",
   "sources_key": "sources",
   "sources_heading": "## Sources",
-
   "types": [
     {
       "id": "concept",
@@ -227,8 +226,10 @@
       "star": "★",
       "meta_columns": [
         "where",
+        "destination",
         "kind",
-        "severity"
+        "severity",
+        "upstream"
       ],
       "filters": [
         {
@@ -239,6 +240,33 @@
         "missing",
         "enhancement"
       ]
+    },
+    {
+      "file": "inbox/server-issues.md",
+      "filters": [
+        {
+          "flag": "★",
+          "label": "★ data-integrity or security"
+        },
+        "inconsistent",
+        "unexpected",
+        "undocumented"
+      ],
+      "flags_column": "severity",
+      "id": "srv",
+      "label": "finding",
+      "meta_columns": [
+        "kind",
+        "severity",
+        "run on",
+        "upstream"
+      ],
+      "nav": "Server issues",
+      "num_column": "#",
+      "star": "★",
+      "summary_column": "upstream",
+      "title": "Server issues — nats-server behaviours to ask upstream",
+      "title_column": "finding"
     },
     {
       "file": "inbox/config-keys-table.md",

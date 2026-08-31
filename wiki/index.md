@@ -677,11 +677,20 @@ names now have pages — see the Entities section above. People: none yet.)*
 
 - `inbox/question-bank.md` — the questions this wiki must answer, with the page that answers each
 - `inbox/adr-toc.md` — one row per ADR of `nats-architecture-and-design`
-- `inbox/docs-issues.md` — **26** errors and gaps found in the public NATS docs, verified against the
-  server source, kept so they can be sent to the maintainers
+- `inbox/docs-issues.md` — **36** errors and gaps found in **public NATS documentation**, each verified
+  against the server at a release tag with file and line, kept so they can be sent to the maintainers.
+  **None has been filed yet** — every row's `upstream` column reads `not filed`. Routed by a
+  `destination` column: 33 to `nats-docs`, 3 (#7, #30, #31) to the ADR repo.
+- `inbox/server-issues.md` — **1** finding about **`nats-server` itself**, kept separate because a
+  server finding cannot be settled the way a docs finding can: there is no higher authority to check it
+  against, so entries are observations and questions rather than verdicts. `SI-1` is the
+  `$OBJ.>` / `$O.` mismatch that lets object-store data cross a JetStream domain boundary.
 - `inbox/config-keys-table.md` — 621 config keys with type, default and reload behaviour
 - `inbox/plan-first-ingests-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as the record
 - `inbox/plan-runbooks-and-security-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as
   the record
-- `inbox/plan-drift-and-adrs-2026-08-31.md` — the current plan; say `start the plan`
+- `inbox/plan-consolidation-2026-08-31.md` — **finished** 2026-08-31; kept as the record
+- `inbox/plan-drift-and-adrs-2026-08-31.md` — **finished** 2026-08-31, all 5 steps; kept as the record
+- `inbox/plan-the-unread-chapters-2026-08-31.md` — **finished** 2026-09-01, all 6 steps; its result
+  line proposes the next piece of work, which is **filing the two reports above**
 - `inbox/` also holds scout files and plans; nothing there is a wiki page.
