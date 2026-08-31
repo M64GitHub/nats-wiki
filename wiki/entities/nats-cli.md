@@ -7,7 +7,7 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -94,9 +94,13 @@ nats stream find --replicas=1               # every R1 stream in the account
 nats stream purge ORDERS --subject orders.shipped
 nats stream purge ORDERS --keep 50
 nats stream rmm ORDERS 2                    # delete one message by sequence
-nats stream backup  ORDERS ./backups/orders/2026-06-04 --consumers
+nats stream backup  ORDERS ./backups/orders/2026-06-04 --consumers   # --consumers is the default
+nats stream backup  ORDERS ./backups/orders/2026-06-04 --check       # verify checksums first
+nats stream backup  ORDERS ./b --chunk-size 64k --window-size 1m     # for a slow or distant link
 nats stream restore ./backups/orders/2026-06-04
+nats stream restore ./b --cluster west --tag ssd --replicas 1        # restore elsewhere, smaller
 nats stream cluster step-down ORDERS --preferred n2-east
+nats stream cluster peer-remove ORDERS n4-east   # move ONE replica off a server
 ```
 
 **Consumers**
@@ -135,6 +139,7 @@ nats object rm   INVOICES invoice-ord_8w2k.pdf
 **The cluster, through the system account**
 
 ```
+nats server check connection --server nats://localhost:4222   # no system account needed
 nats server list
 nats server info n1-east
 nats server report jetstream
@@ -142,6 +147,7 @@ nats server report routes      # the mesh inside a cluster
 nats server report gateways    # between clusters
 nats server report leafnodes
 nats server cluster step-down                  # move the meta leader
+nats server cluster peer-remove n4-east        # drop a server from the meta group (one at a time)
 nats server request profile heap --name=n1-east ./profiles
 nats account info
 ```
@@ -172,23 +178,61 @@ nats trace orders.us.created
 nats server mappings "orders.created.*" "orders.created.{{partition(3, 1)}}.{{wildcard(1)}}" orders.created.ord_8w2k
 ```
 
-**Identity** — see [[nsc]] for the same operations in the standalone tool.
+**Identity** — see [[nsc]] for the same operations in the standalone tool, and
+[[set-up-operator-mode]] for the order to run them in.
 
 ```
 nats auth operator add ACME
+nats auth operator select ACME
 nats auth account add ORDERS --defaults
-nats auth user add order-svc ORDERS --defaults --credential order-svc.creds
+nats auth account keys add ORDERS order-writer --pub-allow 'orders.>' --sub-allow '_INBOX.>'
+nats auth user add order-svc ORDERS --key order-writer --defaults --credential order-svc.creds
 nats auth user credential order-svc.creds order-svc ORDERS --expire 720h -f
-nats auth account push ORDERS -s nats://127.0.0.1:4222 --creds sys.creds
+nats auth user info order-svc ORDERS
+nats auth user rm order-svc ORDERS --revoke -f
+nats auth account push  ORDERS -s nats://127.0.0.1:4222 --creds sys.creds
+nats auth account query ORDERS -s nats://127.0.0.1:4222 --creds sys.creds
+nats auth account exports add Shipments "orders.shipped" ORDERS
+nats auth account imports add Shipments "orders.shipped" ANALYTICS --source <ORDERS-key> --local orders.shipped
 nats auth operator backup ACME acme-operator.backup --key backup-curve.nk
+nats auth nkey gen account --output issuer.nk
+nats auth nkey show issuer.nk
+nats server generate ./acme-server
 ```
+
+**`push` is not optional and `query` is how you check it.** An `edit`, a `keys add` or a
+`user rm --revoke` changes only the local store; the running server keeps validating against the copy
+its resolver holds ([[operator-mode]]).
+
+**Certificates and account data**
+
+```
+nats account tls --expire-warn 30d
+nats account tls --ocsp --no-pem
+nats account backup ./acct-backup --check --consumers
+nats account restore ./acct-backup --cluster east
+nats server passwd --pass "s3cr3t-rotate-me-later"
+```
+
+`nats account tls` reports **every certificate of every verified chain** on the connection the CLI
+already has — no `handshake_first`, no monitoring port, no `openssl`. `--expire-warn` defaults to
+**`1w`** (`0` disables it) and the command **exits non-zero** when anything is expired or expiring, so
+it drops straight into cron. Its `#   Expiration:` line is emitted for every certificate deliberately,
+"to have a stable grep pattern" (source: [[s-natscli-account-tls]]). See
+[[rotate-tls-certificates]].
+
+`nats server passwd` hashes a password with bcrypt at **cost 11** by default (`--cost` to raise it,
+`--generate` to invent one) and **refuses anything under 10 characters** (source:
+[[s-docs-authentication-basics]]).
 
 ## Related
 
 [[nsc]] · [[nk]] · [[nats-box]] · [[nats-top]] · [[jsm-go]] · [[monitoring-endpoints]] ·
-[[defaults-and-limits]] · [[prometheus-nats-exporter]] · [[nats-server]]
+[[defaults-and-limits]] · [[prometheus-nats-exporter]] · [[nats-server]] · [[operator-mode]] ·
+[[set-up-operator-mode]] · [[rotate-tls-certificates]] · [[tls-in-nats]] · [[account]]
 
 ## Sources
 
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] ·
-[[s-docs-prometheus-and-dashboards]]
+[[s-docs-prometheus-and-dashboards]] · [[s-natscli-account-tls]] ·
+[[s-docs-authentication-basics]] · [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]]

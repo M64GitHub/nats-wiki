@@ -43,50 +43,50 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 23 | Does JetStream give exactly-once delivery, and how does the dedup window work? | jetstream | [so#72814502](https://stackoverflow.com/questions/72814502/nats-jetstream-exactly-once-delivery) | ★ concept | |
 | 24 | What ordering does JetStream guarantee, and per what — stream, subject, key? | jetstream | [so#68984906](https://stackoverflow.com/questions/68984906/does-nats-jetstream-provide-message-ordering-by-a-key) | concept | |
 | 25 | What ordering guarantees does core NATS give? | core | [gh#7577](https://github.com/nats-io/nats-server/discussions/7577) | concept | |
-| 26 | What happens when JetStream runs out of disk? | jetstream | [gh#5924](https://github.com/nats-io/nats-server/discussions/5924) | ★ gotcha | |
+| 26 | Why do stream directories disappear from `store_dir` while `nats stream info` still lists the streams? | jetstream deploy | [gh#5924](https://github.com/nats-io/nats-server/discussions/5924) | ★ gotcha | [[stream-directories-disappear]] |
 | 27 | How do I recover a stream that is full under a DiscardNew policy? | jetstream | [gh#2794](https://github.com/nats-io/nats-server/discussions/2794) | gotcha runbook | |
 | 28 | How do per-message TTLs and subject delete markers behave? | jetstream | [gh#7227](https://github.com/nats-io/nats-server/discussions/7227) | config | [[message-ttl]] |
 | 29 | Can the server schedule a message for later, with cron-style patterns? | jetstream | [gh#7672](https://github.com/nats-io/nats-server/discussions/7672) | config | |
 | 30 | Message scheduler vs NAK-with-delay for scheduled work at scale — which one? | jetstream | [gh#7628](https://github.com/nats-io/nats-server/discussions/7628) | pattern | |
 | 31 | How does JetStream filestore compression work and what does it cost? | jetstream | [gh#5259](https://github.com/nats-io/nats-server/discussions/5259) | sizing internals | |
-| 32 | How do I back up and restore JetStream, including memory streams? | jetstream | [gh#4342](https://github.com/nats-io/nats-server/discussions/4342) | ★ runbook | |
+| 32 | How do I back up and restore JetStream, including memory streams? | jetstream | [gh#4342](https://github.com/nats-io/nats-server/discussions/4342) | ★ runbook | [[backup-and-restore-jetstream]] · [[disaster-recovery]] |
 | 33 | Can I change the replica count of a live stream, and why does it fail with "no suitable peers for placement"? | jetstream topology | [gh#7982](https://github.com/nats-io/nats-server/discussions/7982) | ★ gotcha | [[stream-placement]] · [[replicas]] · [[no-suitable-peers-for-placement]] |
-| 34 | How do I rebalance streams after adding nodes to a cluster? | topology | [gh#7215](https://github.com/nats-io/nats-server/discussions/7215) | ★ runbook | |
+| 34 | How do I rebalance streams after adding nodes to a cluster? | topology | [gh#7215](https://github.com/nats-io/nats-server/discussions/7215) | ★ runbook | [[rebalance-streams]] |
 | 35 | How do I move a stream to a different set of peers? | topology | [gh#2730](https://github.com/nats-io/nats-server/discussions/2730) | runbook | [[stream-placement]] |
 | 36 | Why does the cluster report no quorum and stall on JetStream consumers? | topology | [gh#3210](https://github.com/nats-io/nats-server/discussions/3210) | ★ gotcha | [[raft-in-nats]] |
 | 37 | What causes unexpected quorum loss after days of stable operation? | topology | [gh#7533](https://github.com/nats-io/nats-server/discussions/7533) | gotcha | |
 | 38 | Why were my streams marked orphan and deleted when converting a standalone server into a cluster? | topology | [gh#7831](https://github.com/nats-io/nats-server/discussions/7831) | ★ gotcha | [[streams-deleted-when-clustering-a-standalone-server]] |
-| 39 | How do I find out what corrupted a JetStream cluster, and how do I recover it? | topology | [gh#7463](https://github.com/nats-io/nats-server/discussions/7463) | ★ gotcha runbook | |
-| 40 | How should a cluster survive hardware failure of one or more nodes? | topology | [gh#6892](https://github.com/nats-io/nats-server/discussions/6892) | runbook | |
+| 39 | How do I find out what corrupted a JetStream cluster, and how do I recover it? | topology | [gh#7463](https://github.com/nats-io/nats-server/discussions/7463) | ★ gotcha runbook | [[malformed-or-corrupt-message]] |
+| 40 | How do I evict a sick-but-not-dead node (and its clients) from a cluster during a hardware failure? | topology | [gh#6892](https://github.com/nats-io/nats-server/discussions/6892) | runbook | |
 | 41 | Leafnode, gateway or cluster — when do I use which? | topology | [gh#6328](https://github.com/nats-io/nats-server/discussions/6328) | ★ concept | |
-| 42 | Why aren't my streams visible on both ends of a leafnode connection? | topology | [gh#7834](https://github.com/nats-io/nats-server/discussions/7834) | ★ gotcha | |
+| 42 | Why aren't my streams visible on both ends of a leafnode connection? | topology | [gh#7834](https://github.com/nats-io/nats-server/discussions/7834) | ★ gotcha | [[streams-not-visible-across-a-leafnode]] |
 | 43 | How do I set up cross-domain JetStream sourcing? | topology | [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) | runbook | |
 | 44 | Why do I get duplicate messages on a leafnode cluster connected to a supercluster? | topology | [gh#4823](https://github.com/nats-io/nats-server/discussions/4823) | gotcha | |
 | 45 | How do I get multi-region availability without paying for cross-region latency? | topology | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ pattern | |
 | 46 | What causes performance degradation in a global supercluster? | topology | [gh#7494](https://github.com/nats-io/nats-server/discussions/7494) | gotcha | |
-| 47 | Why does an asymmetric cluster configuration fail to form? | topology | [gh#7190](https://github.com/nats-io/nats-server/discussions/7190) | gotcha | |
+| 47 | Why does an asymmetric cluster configuration fail to form? | topology | [gh#7190](https://github.com/nats-io/nats-server/discussions/7190) | gotcha | [[build-a-3-node-cluster]] |
 | 48 | How do I restrict which subjects a leafnode exports and imports? | topology security | [gh#5941](https://github.com/nats-io/nats-server/discussions/5941) | config | |
-| 49 | How do I set up operator / account / user JWTs correctly? | security | [gh#7854](https://github.com/nats-io/nats-server/discussions/7854) | ★ runbook | |
-| 50 | How do I rotate TLS certificates without downtime, and how do I detect expiry? | security | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ runbook | |
+| 49 | How do I set up operator / account / user JWTs correctly? | security | [gh#7854](https://github.com/nats-io/nats-server/discussions/7854) | ★ runbook | [[set-up-operator-mode]] · [[operator-mode]] |
+| 50 | How do I rotate TLS certificates without downtime, and how do I detect expiry? | security | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ runbook | [[rotate-tls-certificates]] · [[tls-in-nats]] |
 | 51 | How do I share a stream or KV bucket between accounts? | security jetstream | [gh#7017](https://github.com/nats-io/nats-server/discussions/7017) | ★ config | |
-| 52 | How do I prevent a user from creating durable consumers or exceeding account limits? | security | [gh#5044](https://github.com/nats-io/nats-server/discussions/5044) | config | |
-| 53 | When should I use auth callout, and what does the server validate before calling it? | security | [gh#7505](https://github.com/nats-io/nats-server/discussions/7505) | concept | |
-| 54 | How do I add accounts and reload a running cluster without dropping clients? | security deploy | [gh#5890](https://github.com/nats-io/nats-server/discussions/5890) | ★ runbook | |
-| 55 | Which configuration changes actually take effect on reload, and which need a restart? | deploy | [gh#7126](https://github.com/nats-io/nats-server/discussions/7126) | ★ config gotcha | |
-| 56 | How do I deny unauthenticated connections without breaking system users? | security | [gh#4535](https://github.com/nats-io/nats-server/discussions/4535) | gotcha | |
+| 52 | How do I prevent a user from creating durable consumers or exceeding account limits? | security | [gh#5044](https://github.com/nats-io/nats-server/discussions/5044) | config | [[subject-permissions]] · [[account]] |
+| 53 | When should I use auth callout, and what does the server validate before calling it? | security | [gh#7505](https://github.com/nats-io/nats-server/discussions/7505) | concept | [[auth-callout]] |
+| 54 | How do I add accounts and reload a running cluster without dropping clients? | security deploy | [gh#5890](https://github.com/nats-io/nats-server/discussions/5890) | ★ runbook | [[reload-server-config]] · [[account]] |
+| 55 | Which configuration changes actually take effect on reload, and which need a restart? | deploy | [gh#7126](https://github.com/nats-io/nats-server/discussions/7126) | ★ config gotcha | [[reload-server-config]] · [[config-keys]] |
+| 56 | How do I deny unauthenticated connections without breaking system users? | security | [gh#4535](https://github.com/nats-io/nats-server/discussions/4535) | gotcha | [[unauthenticated-clients-still-connect]] · [[account]] |
 | 57 | Which endpoints and metrics should I actually alert on for a JetStream cluster? | monitoring | [gh#6182](https://github.com/nats-io/nats-server/discussions/6182) | ★ runbook | [[monitoring-endpoints]] · [[advisories]] |
 | 58 | How do I find which consumer the server has flagged as slow? | monitoring | [gh#6605](https://github.com/nats-io/nats-server/discussions/6605) | ★ gotcha | |
 | 59 | Are there metrics for acked, naked, terminated and redelivered messages? | monitoring jetstream | [gh#6962](https://github.com/nats-io/nats-server/discussions/6962) | monitoring | [[advisories]] · [[consumer]] |
 | 60 | How is CPU % in /varz measured, and why does it look wrong in containers? | monitoring | [gh#7483](https://github.com/nats-io/nats-server/discussions/7483) | gotcha | |
 | 61 | How are the RTT values in /routez and /connz measured? | monitoring | [gh#7362](https://github.com/nats-io/nats-server/discussions/7362) | monitoring | |
-| 62 | How do I read and act on JetStream warnings in the server log? | monitoring jetstream | [gh#6490](https://github.com/nats-io/nats-server/discussions/6490) | ★ gotcha | |
-| 63 | How do I roll a cluster onto a new server version safely? | deploy | [gh#3778](https://github.com/nats-io/nats-server/discussions/3778) | ★ runbook | |
-| 64 | What are the data-integrity risks when upgrading across minor versions? | deploy | [gh#4781](https://github.com/nats-io/nats-server/discussions/4781) | ★ runbook | |
+| 62 | How do I read and act on JetStream warnings in the server log? | monitoring jetstream | [gh#6490](https://github.com/nats-io/nats-server/discussions/6490) | ★ gotcha | [[stream-has-high-message-lag]] |
+| 63 | How do I roll a cluster onto a new server version safely? | deploy | [gh#3778](https://github.com/nats-io/nats-server/discussions/3778) | ★ runbook | [[upgrade-a-cluster]] |
+| 64 | What are the data-integrity risks when upgrading across minor versions? | deploy | [gh#4781](https://github.com/nats-io/nats-server/discussions/4781) | ★ runbook | [[upgrade-a-cluster]] |
 | 65 | Should JetStream use hostPath or a PVC on Kubernetes? | deploy | [gh#7749](https://github.com/nats-io/nats-server/discussions/7749) | ★ config | |
 | 66 | How do I grow the JetStream volume on Kubernetes? | deploy | [gh#6601](https://github.com/nats-io/nats-server/discussions/6601) | gotcha runbook | |
 | 67 | LoadBalancer or seed URLs — how should clients reach a cluster on Kubernetes? | deploy clients | [gh#6094](https://github.com/nats-io/nats-server/discussions/6094) | pattern | |
 | 68 | Why did throughput drop after moving from Kubernetes to a standalone VM (or back)? | deploy | [gh#6594](https://github.com/nats-io/nats-server/discussions/6594) | sizing gotcha | |
-| 69 | Why does my KV watcher miss updates, and how do I watch many keys at once? | kv | [gh#6746](https://github.com/nats-io/nats-server/discussions/6746) | ★ gotcha | |
+| 69 | How do I watch many KV keys at once without creating a watcher for each one? | kv | [gh#6746](https://github.com/nats-io/nats-server/discussions/6746) | ★ gotcha | [[key-value]] · [[kv-watchers-stall-the-cluster]] |
 | 70 | How do I count the keys in a KV bucket without fetching them all? | kv | [gh#7365](https://github.com/nats-io/nats-server/discussions/7365) | gotcha | [[key-value]] |
 | 71 | Does KV support a TTL per key, and since which version? | kv | [gh#7264](https://github.com/nats-io/nats-server/discussions/7264) | config | [[message-ttl]] · [[key-value]] |
 | 72 | Why doesn't deleting or purging keys reclaim disk space in a bucket? | kv | [gh#6015](https://github.com/nats-io/nats-server/discussions/6015) | ★ gotcha | [[key-value]] |
@@ -94,7 +94,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 74 | How do I implement a distributed lock or lease with KV? | kv | [so#79400839](https://stackoverflow.com/questions/79400839/how-to-use-nats-kv-for-distributed-locking) | pattern | |
 | 75 | Why is listing an object-store bucket slow (or timing out) while uploads run? | objectstore | [gh#6836](https://github.com/nats-io/nats-server/discussions/6836) | gotcha | |
 | 76 | Why is a KV mirror on file storage far slower than on memory storage? | kv | [gh#8417](https://github.com/nats-io/nats-server/discussions/8417) | gotcha internals | |
-| 77 | What does an unexpected `nats: timeout` actually mean, and how do I trace it? | core | [gh#5859](https://github.com/nats-io/nats-server/discussions/5859) | ★ gotcha | |
+| 77 | What does an unexpected `nats: timeout` actually mean, and how do I trace it? | core | [gh#5859](https://github.com/nats-io/nats-server/discussions/5859) | ★ gotcha | [[nats-timeout]] |
 | 78 | How many WebSocket connections can a single server sustain? | interop | [gh#2770](https://github.com/nats-io/nats-server/discussions/2770) | sizing | |
 | 79 | How do I run NATS WebSocket behind nginx or another proxy? | interop deploy | [gh#7375](https://github.com/nats-io/nats-server/discussions/7375) | runbook | |
 | 80 | How does MQTT QoS 1/2 map onto JetStream, and what does it cost? | interop | [gh#7641](https://github.com/nats-io/nats-server/discussions/7641) | concept | |
@@ -107,8 +107,18 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 87 | The Orbit docs show `orbit.go` — is the same module available for my language (C#, Java, Python…)? | clients | [gh#7296](https://github.com/nats-io/nats-server/discussions/7296) | clients | [[orbit]] |
 | 88 | Are there trade-offs to turning on `allow_direct` for a stream? | jetstream | [gh#3984](https://github.com/nats-io/nats-server/discussions/3984) | config | [[direct-get]] |
 | 89 | How do I set up cross-domain JetStream sourcing or mirroring? | jetstream topology security | [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) | ★ config runbook | |
-| 90 | How do I manage streams and KV buckets across several accounts with one user? | security jetstream | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | config | |
+| 90 | How do I manage streams and KV buckets across several accounts with one user? | security jetstream | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | config | [[cross-account-sharing]] |
 | 91 | Why does mirror catch-up slow down when a consumer reads the mirror at the same time? | jetstream | [gh#8444](https://github.com/nats-io/nats-server/discussions/8444) | gotcha internals | |
+| 92 | What does `attempted to connect to route port` in the server log mean? | topology core | [gh#3569](https://github.com/nats-io/nats-server/discussions/3569) | gotcha config | [[build-a-3-node-cluster]] |
+| 93 | Why doesn't lame-duck mode shut the server down gracefully under systemd? | deploy | [gh#6070](https://github.com/nats-io/nats-server/discussions/6070) | ★ runbook gotcha | [[install-nats-server]] · [[upgrade-a-cluster]] |
+| 94 | Why does `openssl s_client` return nothing against the NATS TLS port? | security monitoring | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | gotcha | [[tls-in-nats]] · [[rotate-tls-certificates]] |
+| 95 | Why does `nsc push` / `nats auth account push` time out with nothing in the server log? | security | [gh#7854](https://github.com/nats-io/nats-server/discussions/7854) | gotcha runbook | [[set-up-operator-mode]] · [[nsc]] |
+| 96 | Can I enable JetStream on the system account to manage all tenants from one place? | security jetstream | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | config | [[cross-account-sharing]] |
+| 97 | Does a config reload actually pick up a renewed certificate file, or do I need a restart? | security deploy | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ gotcha | |
+| 98 | Is there a limit on how many accounts one account can import from? | security topology | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | sizing | |
+| 99 | What happens when JetStream runs out of disk, and why does `insufficient storage resources available (10047)` appear on an almost empty volume? | jetstream deploy | [issue#4281](https://github.com/nats-io/nats-server/issues/4281) | ★ gotcha sizing | [[jetstream-out-of-disk]] |
+| 100 | Why does the auto-sized `max_file_store` get smaller every time the server restarts? | jetstream deploy | [issue#8322](https://github.com/nats-io/nats-server/issues/8322) | ★ gotcha config | [[jetstream-out-of-disk]] |
+| 101 | Why does a cluster stop recovering when a thousand clients each open a KV watcher? | kv topology | [gh#5243](https://github.com/nats-io/nats-server/discussions/5243) | ★ gotcha sizing | [[kv-watchers-stall-the-cluster]] |
 
 ## Thread titles behind the rows
 
@@ -207,8 +217,64 @@ which is why they are worth answering here.
 89. [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) — Cross-domain JetStream sourcing, how do I set that up?
 90. [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) — Manage streams / KVs across multiplea accounts with one user
 91. [gh#8444](https://github.com/nats-io/nats-server/discussions/8444) — Mirror Stream sync is ~2.9× slower when a Consumer cold-scans the mirror during catch-up
+92. [gh#3569](https://github.com/nats-io/nats-server/discussions/3569) — ERR Log "attempted to connect to route port"
+93. [gh#6070](https://github.com/nats-io/nats-server/discussions/6070) — Lame Duck Mode
+94. [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) — How to detect when the certificates used by nats-server will expire? *(sub-question in the accepted answer)*
+95. [gh#7854](https://github.com/nats-io/nats-server/discussions/7854) — Example JWT setup from the docs is not working.. at all.
+96. [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) — Manage streams / KVs across multiplea accounts with one user *(sub-question: `[FTL] Not allowed to enable JetStream on the system account`)*
+97. [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) — same thread, opening report: "the Let's Encrypt certificate was renewed correctly, but `nats-server --signal reload=1` failed to reload the certificate"
+98. [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) — same thread: "is there a theoretical maximum number of imports for a single account?" 
+99. [issue#4281](https://github.com/nats-io/nats-server/issues/4281) — nats: error: could not create Stream: insufficient storage resources available (10047)
+100. [issue#8322](https://github.com/nats-io/nats-server/issues/8322) — JetStream dynamic MaxStore shrinks after restart because it is recomputed from current free disk (Bavail), causing previously valid stream limits to fail
+101. [gh#5243](https://github.com/nats-io/nats-server/discussions/5243) — 1000 nats cli watchers leads to unrecoverable state of servers.
 
 Rows 89 and 91 are **open on purpose**: [[mirrors-and-sources]] names the three subjects a
 cross-domain `external` block needs and the export type each requires, but no source read so far
 gives the setup itself; and nothing read explains mirror catch-up contention. Both are the most
 valuable kind of row — a question the wiki cannot yet answer, with the thread that asks it.
+
+**Row 51 stays open after the security pass, deliberately.** [[cross-account-sharing]] states both
+routes to a stream or KV bucket in another account — importing the owning account's `$JS.API.>` as a
+service export, and mirroring or sourcing with an `external` block — and names the fields from the
+server source. What no public source gives is the **configuration**: the exact export and import
+entries, and whether the export can be narrowed below the account's whole JetStream API. The thread
+it was mined from ([gh#7017](https://github.com/nats-io/nats-server/discussions/7017)) has had **no
+reply since 2025-06-29**, and the fields appear nowhere in the docs (`inbox/docs-issues.md` #21).
+Marking it answered would be the kind of "a page touches the topic" claim this bank exists to
+prevent.
+
+**Rows 97 and 98 are new and open.** 97 is a reported reload failure nobody diagnosed — the server's
+reload path looks sound on inspection, so [[rotate-tls-certificates]] carries it as `(unverified)`
+rather than either confirming or dismissing it. 98 was asked in public and never answered; this wiki
+states no number.
+
+**Row 52 is answered with its limit stated.** [[subject-permissions]] gives the subject-level lever
+and then says plainly why it cannot separate a durable consumer from an ephemeral one — the durable
+name is in the request payload — and points at per-account limits as the enforceable control. That is
+the answer; there is no cleaner one in public.
+
+**Rows 26 and 69 were corrected, not filled.** Both were mined from thread *titles* and both titles
+mislead. gh#5924 is titled around an "out of disk"-shaped error and is actually about filestore
+directories being reaped off a tmpfs `store_dir`, so row 26 now asks that and the genuine
+out-of-disk question moved to new rows **99** and **100**, sourced to the two GitHub *issues* that
+ask it. gh#6746 asks how to watch several KV keys on one watcher and says nothing about missed
+updates, so row 69 lost the "why does my watcher miss updates" half — a search of
+`nats-io/nats-server` discussions on 2026-08-31 found **nobody publicly reporting a missed KV
+update**, so no row was invented for it and the wanted page `kv-watcher-misses-updates` was retired
+(see [[key-value]] → *To verify*).
+
+**Rows 99–101 are new and answered by the pages they produced.** 99 and 100 come from
+`nats-io/nats-server` **issues** rather than discussions — the first `gh-issues` sources this wiki
+has taken — because the question "what happens when JetStream runs out of disk" is asked there and
+nowhere in the discussion tree. Issue #4281 is **still open**, so [[jetstream-out-of-disk]] states
+the mechanism and then says which case nobody has explained. 101 is [[kv-watchers-stall-the-cluster]],
+a page with **no confirmed fix**: the thread is unanswered, and the page says so in its first
+paragraph.
+
+**Row 62 is answered with a caveat worth stating.** The thread asks a broad question ("how do I read
+JetStream warnings") and got a narrow answer about one warning.
+[[stream-has-high-message-lag]] answers the narrow case from the maintainer's reply and then carries
+a table of the **thirteen** neighbouring JetStream warnings read from `nats-server` v2.14.6, each
+with what it measures — which is the general answer, built from the server rather than claimed from
+the thread. The first reporter's own question, why it happened under no load and why only a restart
+cleared it, remains **unanswered upstream** and the page says so.

@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [account, multitenancy, "$G", "$SYS", system_account, no_auth_user, 10039, isolation]
 aliases: [account, accounts, tenant, multitenancy, "$G", "$SYS", system account, global account]
-sources: [s-docs-accounts-and-multitenancy]
+sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -99,6 +99,12 @@ subject cross the boundary.
   "When a request that 'should' work reports no responders, check which account each side is in."
   This is the diagnostic to remember; it looks like an application bug and is a topology fact.
 
+- **The server can create a `no_auth_user` you never wrote.** When the only declared account is the
+  system account, and there is no top-level `authorization` block, `nats-server` fabricates a user in
+  `$G` and points `no_auth_user` at it — while still advertising `auth_required: true`. This is the
+  most common cause of "I added authentication and anonymous clients still connect"; the four exact
+  conditions and the fix are in [[unauthenticated-clients-still-connect]].
+
 - **`no_auth_user` can silently reopen what you just closed.** It admits unauthenticated clients as
   the named user, in that user's account — point it at a user in `$G` and every anonymous client is
   back in the global account. Three operational traps come with it:
@@ -141,24 +147,41 @@ nats subscribe '$SYS.SERVER.>' --user sys-admin --password syspass
             System Account: false
 ```
 
+## The two configuration models
+
+This page describes accounts as **config blocks**. The same concept has a second form: in
+[[operator-mode]] an account is a **signed JWT**, created with `nats auth account add`, delivered to
+the server's resolver with `nats auth account push`, and carrying its users' permissions, its limits
+and its imports and exports inside the token. The runtime model is identical — an authenticated user,
+scoped to an account, bound by [[subject-permissions]] — and everything on this page about isolation,
+`$G`, `$SYS` and per-account JetStream holds in both.
+
+Three differences bite operationally:
+
+- **`no_auth_user` does not exist in operator mode**; the server rejects it alongside a trusted
+  operator.
+- **Nothing takes effect until the account is pushed**, and no error tells you that you forgot.
+- **Config mode validates imports at startup and operator mode does not** — see
+  [[cross-account-sharing]].
+
 ## To verify
 
-- **Cross-account exports and imports** — the deliberate way to share one subject, and the answer to
-  question-bank Q51 — are covered by `learn/security/cross-account.md`, which is **local but not yet
-  ingested** (step 4 of the current plan).
-- **Operator mode / JWT accounts** (`nsc`, `nats auth`, account push and resolvers) are a different
-  configuration model for the same concept; `learn/security/operator-mode.md` and
-  `decentralized-auth.md` are local and unread. This page describes accounts in **config mode** only.
 - Per-account **limits** are named but not enumerated by the source read here; the field list is in
   `raw/nats-docs/reference/config/accounts/limits/` and is already indexed in
   `inbox/config-keys-table.md`.
+- Whether **`nats account backup` / `nats account restore`** is the supported way to move JetStream
+  assets between accounts. A maintainer says so in [[s-gh-4535-unauthenticated-connections]] and the
+  commands exist at natscli v0.4.0 ([[s-natscli-account-tls]]); no docs page describes the use.
 
 ## Related
 
 [[nats-server]] · [[stream]] · [[error-codes]] · [[config-keys]] · [[monitoring-endpoints]] ·
 [[advisories]] · [[nsc]] · [[nk]] · [[nats-cli]] · [[jetstream-sizing]] · [[js-api]] ·
-[[rotate-tls-certificates]]
+[[rotate-tls-certificates]] · [[subject-permissions]] · [[operator-mode]] ·
+[[cross-account-sharing]] · [[auth-callout]] · [[tls-in-nats]] ·
+[[unauthenticated-clients-still-connect]]
 
 ## Sources
 
-[[s-docs-accounts-and-multitenancy]]
+[[s-docs-accounts-and-multitenancy]] · [[s-docs-cross-account]] · [[s-docs-operator-mode]] ·
+[[s-gh-4535-unauthenticated-connections]] · [[s-nats-server-auth-and-tls]]

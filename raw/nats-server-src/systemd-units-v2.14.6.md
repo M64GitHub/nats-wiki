@@ -1,0 +1,135 @@
+<!-- source: https://github.com/nats-io/nats-server at tag v2.14.6, util/nats-server.service and util/nats-server-hardened.service fetched from raw.githubusercontent.com · fetched 2026-08-31 -->
+# nats-server v2.14.6 — the two systemd units the repo ships
+
+Both files verbatim from `util/` at tag **v2.14.6**. `learn/deployment/hardening.md` names
+`nats-server-hardened.service` and shows an adapted extract of it; this is the file itself, which is
+the authority for what the unit actually sets — including the `ExecStop` line the docs page does not
+show.
+
+Links: `https://github.com/nats-io/nats-server/blob/v2.14.6/util/nats-server.service` and
+`https://github.com/nats-io/nats-server/blob/v2.14.6/util/nats-server-hardened.service`.
+
+## util/nats-server.service
+
+```ini
+[Unit]
+Description=NATS Server
+After=network-online.target ntp.service
+
+[Service]
+PrivateTmp=true
+Type=simple
+ExecStart=/usr/sbin/nats-server -c /etc/nats-server.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# The nats-server uses SIGUSR2 to trigger Lame Duck Mode (LDM) shutdown
+# https://docs.nats.io/running-a-nats-service/nats_admin/lame_duck_mode
+ExecStop=/bin/kill -s SIGUSR2  $MAINPID
+
+# This should be `lame_duck_duration` + some buffer to finish the shutdown.
+# By default, `lame_duck_duration` is 2 mins.
+TimeoutStopSec=150
+
+Restart=on-failure
+
+User=nats
+Group=nats
+
+[Install]
+WantedBy=multi-user.target
+```
+
+## util/nats-server-hardened.service
+
+```ini
+[Unit]
+Description=NATS Server
+After=network-online.target ntp.service
+
+# If you use a dedicated filesystem for JetStream data, then you might use something like:
+# ConditionPathIsMountPoint=/srv/jetstream
+# See also Service.ReadWritePaths
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/nats-server
+ExecStart=/usr/sbin/nats-server -c /etc/nats-server.conf
+ExecReload=/bin/kill -s HUP $MAINPID
+
+# The nats-server uses SIGUSR2 to trigger Lame Duck Mode (LDM) shutdown
+# https://docs.nats.io/running-a-nats-service/nats_admin/lame_duck_mode
+ExecStop=/bin/kill -s SIGUSR2  $MAINPID
+
+User=nats
+Group=nats
+
+Restart=on-failure
+RestartSec=5
+
+# This should be `lame_duck_duration` + some buffer to finish the shutdown.
+# By default, `lame_duck_duration` is 2 mins.
+TimeoutStopSec=150
+
+# Capacity Limits
+# JetStream requires 2 FDs open per stream.
+LimitNOFILE=800000
+# Environment=GOMEMLIMIT=12GiB
+# You might find it better to set GOMEMLIMIT via /etc/default/nats-server,
+# so that you can change limits without needing a systemd daemon-reload.
+
+# Hardening
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryDenyWriteExecute=true
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+PrivateUsers=true
+ProcSubset=pid
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHome=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+ReadOnlyPaths=
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+SystemCallFilter=@system-service ~@privileged ~@resources
+UMask=0077
+
+# Consider locking down all areas of /etc which hold machine identity keys, etc
+InaccessiblePaths=/etc/ssh
+
+# If you have systemd >= 247
+ProtectProc=invisible
+
+# If you have systemd >= 248
+PrivateIPC=true
+
+# Optional: writable directory for JetStream.
+# See also: Unit.ConditionPathIsMountPoint
+ReadWritePaths=/var/lib/nats
+
+# Optional: resource control.
+# Replace weights by values that make sense for your situation.
+# For a list of all options see:
+# https://www.freedesktop.org/software/systemd/man/systemd.resource-control.html
+#CPUAccounting=true
+#CPUWeight=100 # of 10000
+#IOAccounting=true
+#IOWeight=100 # of 10000
+#MemoryAccounting=true
+#MemoryMax=1GB
+#IPAccounting=true
+
+[Install]
+WantedBy=multi-user.target
+# If you install this service as nats-server.service and want 'nats'
+# to work as an alias, then uncomment this next line:
+#Alias=nats.service
+```

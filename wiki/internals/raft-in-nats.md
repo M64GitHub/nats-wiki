@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -136,6 +136,22 @@ Cluster Information:
 `/raftz` gives a live view of a group's RAFT state: the current term, who the leader is, and each
 peer's status. It takes `account` and `group` query parameters — see [[monitoring-endpoints]].
 
+**When an entry cannot be applied, the server tries to rebuild the group itself.** The apply loop
+calls `resetClusteredState` (`jetstream_cluster.go:3912`), which steps the node down and either stops
+or deletes the Raft state, logging
+
+```
+Resetting stream cluster state for '<account> > <stream>'
+```
+
+Messages are **preserved** unless the error is `errFirstSequenceMismatch`, which is the one case that
+deletes them (`jetstream_cluster.go:3974`). It declines in four cases, each with its own warning —
+the stream is closed, the group was already replaced, or **server / account resources are exceeded**.
+The last two mean a capacity problem is blocking the repair; fix that and the reset proceeds
+(source: [[s-nats-server-jetstream-log-warnings]]). A `Critical write error` with **no** subsequent
+`Resetting stream cluster state` is a group that did not heal — see
+[[malformed-or-corrupt-message]].
+
 Two advisories make leadership changes observable without polling ([[advisories]]):
 `$JS.EVENT.ADVISORY.STREAM.LEADER_ELECTED` and `$JS.EVENT.ADVISORY.STREAM.QUORUM_LOST`, with
 `CONSUMER.` equivalents. **Quorum-lost is the one to alert on**; leader-elected is normal and
@@ -144,6 +160,12 @@ belongs in a log.
 ## Why an operator cares
 
 Three observable behaviours come straight out of the mechanics above.
+
+**Which election you are waiting out decides the blast radius.** A *stream's* election blocks writes to
+that stream; a **meta** election blocks stream and consumer *operations* — create, update, leadership
+moves — cluster-wide, for about **5 to 10 seconds** if the leader was killed outright, or **roughly a
+second** if it drained first and handed leadership off. That difference is the whole reason
+[[upgrade-a-cluster]] takes the meta-leader last and drains it (source: [[s-docs-rolling-upgrades]]).
 
 **An election takes seconds, not milliseconds.** Kill a leader and expect a window of roughly four
 to nine seconds — the election timer — plus the election itself, in which `nats stream info` shows
@@ -184,10 +206,12 @@ leader at all — see [[stream-placement]].
 ## Related
 
 [[replicas]] · [[stream-placement]] · [[stream]] · [[consumer]] · [[monitoring-endpoints]] ·
-[[stream-leader-keeps-moving]] · [[meta-layer]]
+[[stream-leader-keeps-moving]] · [[meta-layer]] · [[upgrade-a-cluster]] · [[rebalance-streams]] ·
+[[build-a-3-node-cluster]] ·
+[[malformed-or-corrupt-message]] · [[stream-has-high-message-lag]]
 
 ## Sources
 
 [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] · [[s-docs-surviving-node-loss]] ·
 [[s-docs-placement]] · [[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] ·
-[[s-docs-upgrade-to-2.12]]
+[[s-docs-upgrade-to-2.12]] · [[s-nats-server-jetstream-log-warnings]]

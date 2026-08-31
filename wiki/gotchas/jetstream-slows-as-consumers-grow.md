@@ -169,7 +169,8 @@ not make the info call cheap.
 ## Related
 
 [[jetstream-sizing]] · [[consumer]] · [[direct-get]] · [[key-value]] · [[js-api]] ·
-[[ordered-consumer]] · [[stream]]
+[[ordered-consumer]] · [[stream]] · [[kv-watchers-stall-the-cluster]] · [[nats-timeout]] ·
+[[stream-has-high-message-lag]]
 
 ## Sources
 

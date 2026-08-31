@@ -158,7 +158,8 @@ the connection, that becomes an internals page and this page should link it.
 ## Related
 
 [[consumer]] · [[monitoring-endpoints]] · [[nats-cli]] · [[jetstream-sizing]] ·
-[[config-keys]] · [[defaults-and-limits]] · [[advisories]]
+[[config-keys]] · [[defaults-and-limits]] · [[advisories]] · [[nats-timeout]] ·
+[[kv-watchers-stall-the-cluster]]
 
 ## Sources
 

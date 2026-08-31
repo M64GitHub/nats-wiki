@@ -33,20 +33,31 @@ def cells(line):
 
 
 def table(text, heading):
-    """Rows of the table under `## <heading>` as dicts keyed by the header cells (lowercased)."""
+    """Rows of every table under `## <heading>`, as dicts keyed by that table's header cells.
+
+    A section may hold more than one table, split by `###` subheadings — the root
+    `reference/config.md` groups its Properties under Connectivity, Clustering, Logging and so
+    on. Each block carries its own header row, so they are read separately and concatenated.
+    """
     m = re.search(rf'^## {heading}\s*$', text, re.M)
     if not m:
         return []
-    lines = text[m.end():].lstrip('\n').splitlines()
-    if not lines or not lines[0].startswith('|'):
-        return []
-    head = [h.lower() for h in cells(lines[0])]
-    out = []
-    for line in lines[2:]:
-        if not line.startswith('|'):
-            break
-        c = cells(line)
-        out.append(dict(zip(head, c + [''] * (len(head) - len(c)))))
+    rest = text[m.end():]
+    end = re.search(r'^## ', rest, re.M)
+    lines = rest[:end.start() if end else len(rest)].splitlines()
+    out, head, i = [], None, 0
+    while i < len(lines):
+        line = lines[i]
+        if line.startswith('|'):
+            if head is None:                      # first row of a block is its header
+                head = [h.lower() for h in cells(line)]
+                i += 2                            # skip the |---|---| separator
+                continue
+            c = cells(line)
+            out.append(dict(zip(head, c + [''] * (len(head) - len(c)))))
+        elif line.strip():
+            head = None                           # prose or a `###` heading ends the block
+        i += 1
     return out
 
 
@@ -104,9 +115,15 @@ def main():
     if not os.path.isdir(CONF):
         sys.exit(f'{os.path.relpath(CONF, ROOT)} not found — run:\n  python3 tools/fetch-docs.py https://docs.nats.io --collection nats-docs reference/config')
     pages = {}
-    for path in sorted(glob.glob(os.path.join(CONF, '**', '*.md'), recursive=True)):
+    # The root index `reference/config.md` sits *outside* `reference/config/`, and it is the
+    # Properties table that states every top-level key's default. Without it, ~100 keys
+    # (`port`, `write_deadline`, `lame_duck_duration`, …) lose defaults the docs do state.
+    paths = sorted(glob.glob(os.path.join(CONF, '**', '*.md'), recursive=True))
+    if os.path.exists(CONF + '.md'):
+        paths.insert(0, CONF + '.md')
+    for path in paths:
         rel = os.path.relpath(path, CONF).replace(os.sep, '/')
-        key = rel[:-3].replace('/', '.')
+        key = 'config' if rel == '../config.md' else rel[:-3].replace('/', '.')
         text = open(path, encoding='utf-8').read()
         types = table(text, 'Types')
         pages[key] = {

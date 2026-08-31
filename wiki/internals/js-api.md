@@ -240,7 +240,8 @@ done with subject permissions on `$JS.API.*.<stream>`, not with a JetStream-spec
 ## Related
 
 [[stream]] · [[consumer]] · [[error-codes]] · [[js-api-subjects]] · [[message-ttl]] ·
-[[stream-placement]] · [[retention-policies]] · [[account]] · [[nats-cli]]
+[[stream-placement]] · [[retention-policies]] · [[account]] · [[nats-cli]] · [[nats-timeout]] ·
+[[advisories]]
 
 ## Sources
 

@@ -451,3 +451,428 @@ real improvement available.
   with [[worker-pool]]. **89 and 91 are deliberately left unanswered** — cross-domain sourcing setup
   and mirror catch-up contention are not in any source read. **91 rows, 26 answered.**
 - Wanted pages down from **17 to 13**. `python3 tools/lint.py`: **107 pages, clean.**
+
+## 2026-08-31 — plan step 1: the install and cluster runbooks
+
+**Operation:** plan → step 1 of `inbox/plan-runbooks-and-security-2026-08-31.md`
+(*the install and cluster runbooks*).
+
+**Sources ingested (9).** The four the plan listed —
+`raw/nats-docs/learn/topologies/single-server.md`, `learn/topologies/your-first-cluster.md`,
+`learn/clustering/forming-a-cluster.md`, `learn/deployment/hardening.md` — and **five more that the
+work forced**, because a runbook may not state a command this wiki has not read:
+
+- `util/nats-server-hardened.service` and `util/nats-server.service` at **v2.14.6**
+  ([[s-nats-server-systemd-units]]). The hardening page shows an *extract* of the first, and the
+  extract omits `User=`, `Group=`, `ExecStop=` and `TimeoutStopSec=`. The runbook quotes the file.
+- `server/route.go` at v2.14.6 ([[s-nats-server-route-cluster-formation]]), read to check one log
+  line and worth far more than that — see the docs issue below.
+- **gh#7190** ([[s-gh-7190-asymmetric-cluster]]) — a three-node cluster with route counts 8 + 6 + 6
+  and partitioned clients, from a single multi-value DNS name as the route address. Unanswered;
+  @wallyqs names the cause.
+- **gh#3569** ([[s-gh-3569-connect-to-route-port]]) — `attempted to connect to route port`, answered
+  by @Jarema. The mirror image of the docs' own "half of cluster-formation bugs" pitfall.
+- **gh#6070** ([[s-gh-6070-lame-duck-under-systemd]]) — a unit whose `ExecStop` sends **SIGINT**, so
+  lame-duck mode never runs. Unanswered, but both maintainer replies agree: with systemd, drain
+  through `systemctl`.
+
+New raw files: `raw/nats-server-src/systemd-units-v2.14.6.md`, `route-v2.14.6.md`,
+`const-lame-duck-v2.14.6.md`, `raw/gh-discussions/gh-7190.md`, `gh-3569.md`, `gh-6070.md`;
+`raw/sources.md` updated for both collections.
+
+**Two pages written.**
+
+- [[install-nats-server]] (`kind: runbook`) — the config that earns its four lines, the systemd unit
+  **as the repo ships it**, Docker, Helm, five verification commands, and a rollback that says
+  plainly that stopping the service does not remove the data. Its three-line table of what
+  `ExecReload` / `ExecStop` / `TimeoutStopSec` buy is the part the docs do not have.
+- [[build-a-3-node-cluster]] (`kind: runbook`) — seed and joiners, gossip, TLS on the route block,
+  firewall, Helm; then five checks in order, starting with `Cluster name is east` in the server's own
+  log because it needs no credentials. Six pitfalls, three of them from the GitHub threads.
+
+**Ripple (9 pages).** [[defaults-and-limits]] — `lame_duck_duration` `2m` and
+`lame_duck_grace_period` `10s` with their `const.go` lines and why a service unit cares.
+[[error-codes]] — `10074 JSStreamReplicasNotSupportedErr`. [[config-keys]] — the two lame-duck keys,
+`cluster.port` `6222`, and **corrected counts** (below). [[monitoring-endpoints]] — the
+`http: "127.0.0.1:8222"` bind that is right on a VM and an outage on Kubernetes.
+[[replicas]] — R>1 on a standalone server is refused, not degraded. [[jetstream-sizing]] — the FD
+limit now quoted from the shipped unit. [[nats-server]] — the four ports and the two units in
+`util/`. [[nats-cli]] — `nats server check connection` in the cheat sheet.
+[[streams-deleted-when-clustering-a-standalone-server]] — its prevention section now names both
+runbooks.
+
+**A wiki tool bug, found and fixed.** `tools/build-config-table.py` globbed
+`raw/nats-docs/reference/config/**` and so never read the **root** `reference/config.md`, which is
+where the docs state every top-level key's default and reload marking. `lame_duck_duration` looked
+undocumented when the docs give `2m`. Fixed by loading the root page and by teaching `table()` to
+read a `## Properties` section split across `###` subheadings. Result: **179 → 216 keys with a stated
+default**, and the reload split corrected from 285/126/134/76 to **261/150/174/36**.
+[[config-keys]] carried the old counts and now carries the new ones. *No wiki page had a wrong value
+because of this — but [[defaults-and-limits]] would have grown one had the table not been fixed
+first.*
+
+**Two docs issues recorded** (`inbox/docs-issues.md` #11–12):
+
+- **#11 · `missing`, medium** — both learn pages state that a cluster-name mismatch splits the
+  cluster. True for two *configured* names; a server whose `cluster.name` is **unset** adopts the
+  peer's name and drops its other routes (`route.go:3056–3070`, and `:576` on the soliciting side).
+  The server warns — `Cluster name was dynamically generated, consider setting one` — and no doc page
+  mentions it.
+- **#12 · `enhancement`, low** — the hardening page's systemd extract drops `User=`/`Group=` (so the
+  block as shown runs the server as root, on a hardening page), `ExecStop=`, `TimeoutStopSec=` and
+  `Restart=`. The page does tell you to copy the real file, which is why this is not a defect.
+
+**One invented fact caught before it shipped.** A question-bank row was first written citing
+`gh#2543` for "is there a recommended systemd unit" — a thread number that does not exist. Checked
+against the API, removed, and replaced with two threads that do (gh#3569, gh#6070) after reading
+them. Recorded here because the failure was mine, not a source's, and the fix was a check rather
+than luck.
+
+**`inbox/question-bank.md`**: **Q47** answered by [[build-a-3-node-cluster]] (gh#7190 gives the
+cause, not a fix, and the page says so); rows **92–93** added, each with a thread read in full.
+**93 rows, 29 answered.**
+
+Wanted pages down from **13 to 11**. `python3 tools/lint.py`: **118 pages, clean.**
+
+## 2026-08-31 — plan step 2: upgrade, reload and rebalance
+
+**Operation:** plan → step 2 of `inbox/plan-runbooks-and-security-2026-08-31.md`.
+
+**Sources ingested (6).** The three the plan listed —
+`raw/nats-docs/learn/deployment/rolling-upgrades.md`, `learn/deployment/config-management.md`,
+`learn/clustering/scaling-and-peers.md` — and three more that verification turned into sources:
+
+- `server/signal.go` + the `Command` constants ([[s-nats-server-signals]]). Confirms the docs' claim
+  that a draining server **ignores SIGTERM**, and adds three facts the docs never state:
+  `nats-server --signal stop` sends **SIGKILL**, `SIGUSR1` re-opens the log file (log rotation), and
+  every signal is logged as `Trapped "…" signal` before it acts.
+- The Helm chart's `values.yaml` **at chart release nats-2.14.6**
+  ([[s-nats-helm-chart-values-2.14.6]]) — read from the tag rather than `main`, so the numbers are
+  pinned. The lame-duck defaults satisfy the chart's own rule **exactly** (10 + 30 + 20 = 60), so
+  there is no slack; the reloader only watches volumes under `/etc/`.
+- `Server.lameDuckMode()` ([[s-nats-server-lame-duck]]) — read to check one sentence of sizing
+  advice, and it did not survive. See the docs issue below.
+
+New raw files: `raw/nats-server-src/signal-v2.14.6.md`, `lame-duck-v2.14.6.md`,
+`raw/github-repos/nats-io__k8s.values-nats-2.14.6.md`; `raw/sources.md` updated.
+
+**Three pages written, where the plan named one.** Reload and rebalance are different operations
+answering different questions (Q54/Q55 versus Q34); merging them would have produced a page that
+answers neither cleanly.
+
+- [[upgrade-a-cluster]] (`kind: runbook`) — the drain, the order rule (non-leaders first, meta-leader
+  last), the `current` gate between nodes, a signal table, the Kubernetes lifecycle, and a
+  **version-hazard table** with the downgrade floors that make Q64 answerable: **v2.11.9** for
+  2.12 → 2.11, `feature_flags` removed before 2.14 → 2.12, and `$JS.ACK` v2 becoming the default in
+  2.15.
+- [[reload-server-config]] (`kind: runbook`) — validate with `-t`, SIGHUP, verify
+  `Reloaded server configuration`. Built on the docs' own rule: a reload changes **policy**, never
+  **identity**.
+- [[rebalance-streams]] (`kind: runbook`) — adding a node moves nothing. `--replicas` versus
+  `peer-remove`, catchup and lag, and the discipline that matters: one change at a time, gated on a
+  named leader and zero lag.
+
+**Ripple (8 pages).** [[error-codes]] — `10075 JSPeerRemapErr` and
+`10202 JSClusterServerMemberChangeInflightErr`. [[config-keys]] — the reload procedure, the
+atomicity guarantee, and the `-t` blind spot. [[defaults-and-limits]] — what the lame-duck keys
+actually bound. [[raft-in-nats]] — a new paragraph on **meta election versus stream election**, which
+is the reason the upgrade order rule exists. [[nats-helm-charts]] — three facts read from the chart
+rather than from a docs page. [[nats-cli]] — both `peer-remove` commands.
+[[install-nats-server]] — the signal table. [[build-a-3-node-cluster]] — its rollback now points at
+[[rebalance-streams]] rather than describing the move in prose.
+
+**Two docs issues recorded** (`inbox/docs-issues.md` #13–14):
+
+- **#13 · `wrong-value`, ★ medium.** `learn/deployment/rolling-upgrades.md` says to size
+  `lame_duck_duration` to cover "how long JetStream needs to move leadership off this node", and its
+  pitfall describes a node that "kicks its clients and exits while the stream is still catching up".
+  `Server.lameDuckMode()` (v2.14.6, `server.go:4439–4565`) orders the work the other way: Raft
+  stepdown (`transferRaftLeaders()`, fixed **one-second** wait) and JetStream shutdown complete
+  **before** the close schedule is computed at `:4496`. The duration governs client disconnects only —
+  and then it is `duration − grace_period`, with the per-client interval **capped at one second**
+  (`:4514–4518`), so ten clients drain in about ten seconds whatever the duration says.
+- **#14 · `enhancement`, low.** The same page uses "grace period" for `lame_duck_grace_period`
+  (must be **shorter** than the duration — enforced at startup, `server.go:1152`) and for
+  `terminationGracePeriodSeconds` (must be **longer**), two paragraphs apart. Applying the second
+  sentence to the first key gives a server that refuses to start.
+
+**A correction to this wiki's own page, made before publishing it.** The first draft of
+[[upgrade-a-cluster]] repeated the docs' sizing advice verbatim. It was rewritten once the source was
+read, and the page now says explicitly what the duration does not cover and points at the `current`
+gate as the thing that protects the stream. The rule in `CLAUDE.md` — prefer the server, say the
+sources disagree, record the finding — is what caught it.
+
+**`inbox/question-bank.md`**: **Q34, Q54, Q55, Q63, Q64** answered, Q93 completed with the upgrade
+page. **93 rows, 34 answered** (was 29).
+
+Wanted pages down from **11 to 10**. `python3 tools/lint.py`: **127 pages, clean.**
+
+## 2026-08-31 — plan step 3: backup, restore and disaster recovery
+
+**Operation:** plan → step 3 of `inbox/plan-runbooks-and-security-2026-08-31.md`.
+
+**Sources ingested (6).** Two of the plan's five ingests were **already done in step 0** (both
+mirrors pages), so the three remaining docs pages —
+`raw/nats-docs/learn/backup-recovery/stream-backup-restore.md`, `disaster-recovery.md`,
+`config-and-jwt-backup.md` — plus three the work forced:
+
+- the snapshot/restore path across `server/memstore.go`, `server/stream.go` and
+  `server/jetstream_api.go` at v2.14.6 ([[s-nats-server-snapshot-restore]]);
+- `natscli` **v0.4.0** `cli/stream_command.go` ([[s-natscli-backup-restore]]) — every flag the two
+  commands take;
+- **gh#4342** ([[s-gh-4342-memory-stream-backup]]), the thread question-bank Q32 was mined from,
+  with an accepted maintainer answer.
+
+New raw files: `raw/nats-server-src/snapshot-restore-v2.14.6.md`,
+`raw/github-repos/nats-io__natscli.stream-backup-v0.4.0.md`, `raw/gh-discussions/gh-4342.md`.
+
+**Three pages written.**
+
+- [[backup-and-restore-jetstream]] (`kind: runbook`) — the snapshot's two files, `--check`, the two
+  enforced restore rules, **restoring somewhere else at a different size**, the verification that is
+  the actual deliverable, and a *Memory streams* section that states the real error.
+- [[disaster-recovery]] (`kind: runbook`) — the failure-to-tool table, the five-step mirror
+  promotion with `Lag` as the RPO, and the two preconditions (**meta quorum must survive the site
+  loss**; the DR mirror belongs in its own domain or cluster) that are decided at design time.
+- [[backup-and-restore-identity]] (`kind: runbook`) — the three file groups, sealing with a curve
+  key, and step 4: **re-pushing accounts into the server's resolver**, without which every user still
+  gets `Authorization Violation` while every local listing looks correct.
+
+**Four docs issues recorded** (`inbox/docs-issues.md` #15–18), all from checking Q32's own subject:
+
+- **#15 · `wrong-value`, ★.** A memory stream's backup is documented to fail with
+  `memory streams do not support snapshots`. `memStore.Snapshot` returns **`no impl`**
+  (`memstore.go:2425`), surfacing as **10064** `snapshot failed: no impl`. The string in the docs
+  exists nowhere in the server, and the CLI does not pre-check storage type either. This is the
+  question operators actually ask, and the documented message is unsearchable.
+- **#16 · `wrong-value`, low.** The restore rename error is quoted as the server's and in the
+  singular; it is the **CLI's** (`stream_command.go:1308`) and reads `stream names may not be changed
+  during restore`. The server's own rejection is **10060**.
+- **#17 · `wrong-value`, low.** The snapshot schema gives `chunk_size` a maximum of
+  `9223372036854776000`; the server clamps to **1 MiB** silently (`jetstream_api.go:4277`).
+  `window_size`'s documented 32 MiB is exactly right — same page, same generator, one field wrong.
+- **#18 · `missing`, medium.** `nats stream restore` takes `--config`, `--cluster`, `--tag` and
+  `--replicas`; neither the backup page nor the DR page mentions any of them, so "restore the
+  production R3 snapshot into the DR cluster as R1" — one command — is invisible.
+
+**Ripple (5 pages).** [[error-codes]] — `10064`, `10065`, `10130`, and a note that 10064's whole
+description is `{err}`. [[stream]] — `storage: memory` gives up **backup**, not only durability, and
+storage is fixed at creation. [[replicas]] — a new first bullet: **replication is not a backup**.
+[[mirrors-and-sources]] — points at the promotion runbook. [[nats-cli]] — the backup/restore flags.
+
+**Two question-bank rows corrected rather than filled**, both by reading the linked thread:
+
+- **Q40** cited gh#6892, which turns out to ask how to *evict a sick-but-not-dead node and its
+  clients by IP* during a hardware failure — a question no page here answers. The row's wording was
+  corrected to match the thread and **left open**; the previous wording invited a wrong tick.
+- A row for identity backup, added citing gh#4342, was **removed** after reading that thread: it is
+  about memory streams, and is Q32's own source.
+
+**[[backup-and-restore-identity]] therefore has no question-bank row.** Searches of
+`nats-io/nats-server` discussions and `nats-io/nsc` issues found no public thread asking about
+identity backup. The page stays — a restored stream nobody can authenticate against is not a
+recovery, and the plan named the source — and the gap is recorded here rather than filled with an
+invented citation. It is also a finding in its own right: the most unrecoverable loss in a NATS
+deployment is the one nobody asks about in public.
+
+**`inbox/question-bank.md`**: **Q32** answered, Q40 rewritten and left open. **93 rows, 35
+answered.**
+
+Wanted pages down from **10 to 9**. `python3 tools/lint.py`: **136 pages, clean.**
+
+## 2026-08-31 — plan step 4: security and multi-tenancy
+
+**Operation:** ingest ×17 (the whole `learn/security/` chapter, seven GitHub threads, and two source
+readings) · **Plan:** `inbox/plan-runbooks-and-security-2026-08-31.md`, step 4.
+
+The plan called this "the biggest gap in the wiki" and it was: the `security` facet held one page.
+It now holds five concepts, two runbooks and a gotcha, and the facet is the second-largest in the
+wiki.
+
+**Sources ingested.** The plan listed eight docs pages; one ([[s-docs-accounts-and-multitenancy]])
+was already done in step 0, so seven were read, plus the chapter's closing page:
+[[s-docs-authentication-basics]], [[s-docs-authorization]], [[s-docs-cross-account]],
+[[s-docs-operator-mode]], [[s-docs-decentralized-auth]], [[s-docs-auth-callout]],
+[[s-docs-encryption-and-tls]], [[s-docs-security-checklist]].
+
+**Nine ingests beyond the list**, every one forced by a question the docs do not answer:
+
+- **seven GitHub threads**, one per open ★ or unanswered bank row —
+  [[s-gh-7854-jwt-push-timeout]] (Q49), [[s-gh-7684-certificate-expiry]] (Q50),
+  [[s-gh-7017-kv-across-accounts]] (Q51, **no replies since 2025-06-29**),
+  [[s-gh-5044-restrict-durable-consumers]] (Q52, unresolved),
+  [[s-gh-7505-auth-callout-nkey]] (Q53), [[s-gh-4535-unauthenticated-connections]] (Q56),
+  [[s-gh-5606-cross-account-jetstream]] (Q90);
+- **`nats-server` at v2.14.6** across eight files ([[s-nats-server-auth-and-tls]]) — the docs state
+  the auth-callout deadline and the TLS handshake budget as flat numbers, and `CLAUDE.md` forbids
+  repeating a default this wiki has not checked;
+- **`natscli` at v0.4.0** ([[s-natscli-account-tls]]) — because Q50 asks how to *detect* expiry and
+  neither the docs nor the thread names the command that does it.
+
+**Pages created (8).** Concepts [[subject-permissions]], [[operator-mode]], [[auth-callout]],
+[[tls-in-nats]], [[cross-account-sharing]]; runbooks [[set-up-operator-mode]] and
+[[rotate-tls-certificates]] (a wanted page since step 0); gotcha
+[[unauthenticated-clients-still-connect]].
+
+**Three findings the sources do not carry:**
+
+- **`nats account tls`** — a certificate-chain check with `--expire-warn` (default `1w`), a non-zero
+  exit and a deliberately stable grep pattern, reading the chain off the CLI's own connection so no
+  `handshake_first` is needed. Nobody in gh#7684 mentions it and no docs page names it. It is the
+  real answer to Q50's second half.
+- **The server verifies nothing the client presented before an auth callout.** `fillConnectOpts`
+  copies `Nkey`, `SignedNonce`, `Token`, `Username` and `Password` verbatim — so
+  `connect_opts.nkey` is a claim, not a fact. The thread says the same in one sentence; the source
+  says it in code, and also shows the way out: the server fills `client_info.nonce` when a signature
+  was supplied, so a callout service can do the challenge-response itself.
+- **The `$G` user the server invents.** `server.go:1445` fabricates a user in the global account and
+  points `no_auth_user` at it under four exact conditions — and `server.go:3290` deliberately leaves
+  `auth_required: true` for it. That is the mechanism behind gh#4535, and it explains why the docs'
+  rule of thumb ("only the system account declared") is now too broad: the 2.10.2 fix added the
+  `!opts.authBlockDefined` condition.
+
+**Docs issues #19–#21, all ★.** #19 is the largest sweep so far: **15 timeout defaults** in the
+generated config reference, of which **10 are verified wrong** (all `tls.timeout` keys say `500ms`,
+the server says `2s`; all `authorization.timeout` keys say `1`, the server says `2s` or
+`tls_timeout + 1`), **1 documents an option the server does not have** (`websocket.tls.timeout`) and
+4 were not checked. #20: `/varz` has carried `tls_cert_not_after` per listener since PR #7709 and the
+861-page docs tree never names it, while telling operators to "monitor validity dates". #21: the
+`external` block is required for cross-account replication, is pointed at a reference page that omits
+it, and appears **nowhere** in the docs — which is why gh#7017 has gone unanswered for over a year.
+
+**A wiki bug fixed, not just recorded.** [[config-keys]] carried the docs' `500ms` and `1` and had
+*rationalised* the discrepancy ("They are different things and both are real"). Both sections are
+rewritten against the server, with the correction stated on the page, and the derivation section now
+says explicitly that where the generated table and the server disagree, the page states the server.
+
+**Ripple (13 pages).** [[account]] — its three `## To verify` items resolved, a new *two
+configuration models* section, and the fabricated-`$G`-user failure mode; [[config-keys]] (corrected,
+plus an operator-mode key table); [[defaults-and-limits]] (*Authentication and TLS handshake
+budgets*); [[monitoring-endpoints]] (`tls_cert_not_after`, with the three caveats);
+[[error-codes]] (10021, 10022, 10024); [[js-api-subjects]] (a `$SYS` table — the claims subjects and
+`$SYS.REQ.USER.AUTH`); [[key-value]] (*Sharing a bucket with another account*); [[nats-cli]] (the
+identity cheat sheet extended, plus certificates and account data); [[nsc]] (*When a push fails*);
+[[install-nats-server]], [[build-a-3-node-cluster]], [[reload-server-config]],
+[[backup-and-restore-identity]] (links).
+
+**Question bank: 93 rows → 98, 35 answered → 44.** Filled Q49, Q50, Q52, Q53, Q56, Q90. Added Q94–Q98,
+two of them deliberately unanswered. **Q51 stays open on purpose** and the bank now says why: the
+wiki can name both routes and their fields but no public source gives the configuration, so marking
+it answered would be exactly the "a page touches the topic" claim the bank exists to prevent.
+
+Wanted pages down from **9 to 8** ([[rotate-tls-certificates]] written). `python3 tools/lint.py`:
+**161 pages, clean** (136 → 161: 8 wiki pages and 17 summaries) — no broken links, no orphans, no frontmatter issues, none missing from the
+index.
+
+## 2026-08-31 — plan step 5: the second gotcha pass
+
+**Operation: ingest ×12**, worked from `inbox/plan-runbooks-and-security-2026-08-31.md` step 5. The
+step said: take the ★ symptom rows still blank after steps 1–4 — **Q26, Q39, Q42, Q62, Q69, Q77** —
+open the linked thread, and write one gotcha page per symptom. Do not crawl.
+
+**Two of the six rows turned out to be wrong, and reading the threads first is what found it.**
+
+- **Q26** ("what happens when JetStream runs out of disk") pointed at
+  [gh#5924](https://github.com/nats-io/nats-server/discussions/5924), which is not about capacity at
+  all: 45 of 50 stream directories had vanished from a `store_dir` on **tmpfs**, and the maintainer's
+  answer is that `tmpwatch`/`tmpreaper`/`tmpfiles.d` reap tmpfs by age — *"pointing the file store to
+  tmpfs is not a supported/endorsed configuration"* (@neilalexander). The row was **corrected** to
+  the question the thread asks.
+- **Q69** ("why does my KV watcher miss updates, and how do I watch many keys at once")  pointed at
+  [gh#6746](https://github.com/nats-io/nats-server/discussions/6746), which asks only the second half
+  and was **self-answered in an hour**. A search of `nats-io/nats-server` discussions found **nobody
+  publicly reporting a missed KV update**, so the row lost that half and the wanted page
+  `kv-watcher-misses-updates` was **retired rather than written**. Recorded in [[key-value]]'s
+  `## To verify` and in `wiki/index.md`.
+
+**Sources ingested (12).** Seven `nats-io/nats-server` **discussions** — gh#5924, gh#7463, gh#7834,
+gh#6490, gh#6746, gh#5243, gh#5859 — plus **three GitHub issues** and **two server-source extracts**.
+
+- **A new `raw/gh-issues/` collection.** The genuine out-of-disk question is asked in the *issue*
+  tracker, not the discussion tree: [#4281](https://github.com/nats-io/nats-server/issues/4281)
+  (`insufficient storage resources available (10047)`, **open since 2023-06-29**, six reporters),
+  [#8322](https://github.com/nats-io/nats-server/issues/8322) and
+  [#5871](https://github.com/nats-io/nats-server/issues/5871) (the same defect reported two years
+  apart). Kept separate from `gh-discussions` because an issue carries a state, a closing PR and a fix
+  version that a discussion does not — which is exactly what settled the version floor below.
+- **`nats-server` v2.14.6 across ten files** and **`nats.go` v1.53.1**, saved as
+  `raw/nats-server-src/jetstream-resources-v2.14.6.md`, `leafnode-js-domains-v2.14.6.md`,
+  `jetstream-log-warnings-v2.14.6.md` and `raw/nats-go-src/errors-v1.53.1.md`.
+
+**Summaries created (12):** [[s-gh-5924-filestore-dirs-vanished]], [[s-gh-7463-jetstream-corruption]],
+[[s-gh-7834-leafnode-same-js-domain]], [[s-gh-6490-high-message-lag]], [[s-gh-6746-watch-many-keys]],
+[[s-gh-5243-kv-watchers-at-scale]], [[s-gh-5859-unexpected-nats-timeout]],
+[[s-issue-4281-insufficient-storage]], [[s-issue-8322-dynamic-maxstore-shrinks]],
+[[s-nats-server-jetstream-resources]], [[s-nats-server-leafnode-js-domains]],
+[[s-nats-server-jetstream-log-warnings]].
+
+**Pages created (7), all `wiki/gotchas/`:**
+
+- [[jetstream-out-of-disk]] — the most-cited wanted gotcha in the wiki (linked from three pages).
+  Three failures wear the same words and only one is a full disk.
+- [[stream-directories-disappear]] — the corrected Q26.
+- [[malformed-or-corrupt-message]] — Q39, with a confirmed fix (upgrade) and the reason a fresh volume
+  re-corrupts.
+- [[streams-not-visible-across-a-leafnode]] — Q42.
+- [[stream-has-high-message-lag]] — Q62, including a table of the **thirteen** neighbouring JetStream
+  warnings read from source.
+- [[kv-watchers-stall-the-cluster]] — the real KV-watcher failure. **No confirmed fix**; the thread is
+  unanswered and the page opens by saying so.
+- [[nats-timeout]] — Q77. Both reports in the thread are **unresolved**, and the page's strongest
+  cause comes from the source, not the thread.
+
+**Four findings no public source states.**
+
+1. **`10047` and `10028` compare reservations, never usage.** `reserveStreamResources` adds a stream's
+   `max_bytes` and returns early when it is `<= 0`; `checkBytesLimits` then compares that sum against
+   the server and account limits (`jetstream.go:2523–2553`, `:2686–2700`). A `/varz` dump in #4281
+   reads **4 MB stored beside 35 GiB reserved**. `reserved_storage` is therefore the field that
+   decides the error, and no docs page names it in that role.
+2. **The 2.14.6 version floor for the dynamic-limit fix.** PR
+   [#8503](https://github.com/nats-io/nats-server/pull/8503) merged 2026-08-24 adding
+   `finalizeDynamicMaxStore`; the function is **absent from v2.14.5 and v2.14.4 and present in
+   v2.14.6**, checked tag by tag. The release notes do not mention it.
+3. **The server has an explicit guard against two identical JetStream domains** across a leafnode —
+   it denies publishing `$JS.<domain>.API.>` outward, with a comment saying the guard "will only cover
+   some forms of this issue" (`leafnode.go:2122–2131`). That, plus the `generateJSMappingTable`
+   prefix, explains **every one** of gh#7834's four observations including (e), the one the reporter
+   called "really weird".
+4. **The JetStream API queue drains entirely when it fills** — `queue.drain()` discards every pending
+   request with **no reply of any kind**, logging one rate-limited line and one advisory
+   (`jetstream_api.go:876–890`). It is the sharpest server-side producer of a client-side
+   `nats: timeout`, and nothing documents it.
+
+**Docs issue #22 ★ — the highest-impact sweep so far.** The generated `reference/config/jetstream`
+block states ten defaults; **four are wrong**. The headline is `max_file_store`, documented as
+*"Defaults to up to 1TB if available"* when 1 TB is the `statfs`-failure fallback and the real default
+is **75% of the space *free* under `store_dir`, recomputed at every startup**. That description is
+what makes operators leave the key unset, and leaving it unset is what made servers fail to restart
+for two years. Also wrong: `max_buffered_msgs` (`10000` vs **100000**), `max_outstanding_catchup`
+(`32M` vs **64MB**), `info_queue_limit` (`100000` vs **whatever `request_queue_limit` is**). Two more
+gaps recorded in the same entry: the maintainers' *"auto-sizing is for development and testing"*
+appears **nowhere** in the 861-page tree even though a reporter asked directly, and
+`max_file_store: 0` silently means *no storage*, not *unlimited*. Same generated-vs-hand-written split
+as #1–3 and #19 — `learn/deployment/sizing-and-resources.md` has it right.
+
+**Ripple (18 pages).** [[jetstream-sizing]] — step 4 rewritten with the restart hazard and the
+maintainers' quote, two new rules of thumb, `reserved_storage` added to the measurement commands, and
+*What runs out first* re-ranked to put the reservation ceiling above the disk;
+[[defaults-and-limits]] — the whole JetStream block re-read from source, six values added, the two
+75% figures separated (total RAM vs *free* disk); [[config-keys]] — four values corrected with the
+docs' number kept alongside; [[error-codes]] — 10028 and 10047 added with the reservation rule;
+[[monitoring-endpoints]] — a `reserved_storage` section; [[advisories]] — `SERVER.OUT_OF_STORAGE`
+fires once and after the shutdown, and `API.LIMIT_REACHED`'s `Dropped` count;
+[[raft-in-nats]] — `resetClusteredState`, its four refusals and the one case that deletes messages;
+[[key-value]] — the multi-key watcher and the churn cost; [[ordered-consumer]];
+[[install-nats-server]] — both halves of the `store_dir` / `max_file_store` line;
+[[nats-server-2.14]] — the 2.14.6 fix. Link-level updates to [[stream]], [[replicas]], [[js-api]],
+[[slow-consumer-detected]], [[jetstream-slows-as-consumers-grow]], [[disaster-recovery]],
+[[upgrade-a-cluster]], [[backup-and-restore-jetstream]].
+
+**Question bank: 98 rows → 101, 44 answered → 53; ★ 31 of 41.** Filled Q39, Q42, Q62, Q77; corrected
+and filled Q26 and Q69; added **Q99–Q101** (the two out-of-disk issues and the KV-watcher scale
+thread), all three answered by pages that state their own limits.
+
+Wanted pages down from **8 to 6** — [[jetstream-out-of-disk]] written, `kv-watcher-misses-updates`
+retired. `python3 tools/lint.py`: **180 pages, clean** (161 → 180: 7 wiki pages and 12 summaries) —
+no broken links, no orphans, no frontmatter issues, none missing from the index.

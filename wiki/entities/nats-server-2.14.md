@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.14, feature_flags, js_ack_fc_v2]
 aliases: ["2.14", v2.14, v2.14.0, v2.14.6]
-sources: [s-relnotes-2.14.0, s-docs-upgrade-to-2.14]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -116,6 +116,22 @@ A Raft node **will no longer start if its snapshot is missing or corrupt, or if 
 not align with the remaining log on disk** — deliberately, "avoiding potential data loss". A node
 that fails to come back after an unclean shutdown may be doing this on purpose.
 
+### v2.14.6 stops the dynamic `max_file_store` shrinking at every restart
+
+Read from the source rather than from a release note. Before 2.14.6, an unset `max_file_store` was
+recomputed at every startup as 75% of what was *free* under `store_dir`, so the ceiling fell as
+JetStream filled the volume until a stream that had been legal could no longer be restored —
+`insufficient storage resources available (10047)` on a restart with no configuration change.
+
+**PR [#8503](https://github.com/nats-io/nats-server/pull/8503)** (merged 2026-08-24, closing issue
+#8322) adds `finalizeDynamicMaxStore`, which waits for file-based streams to recover and then adds
+the recovered bytes back into the limit, scaled the same way; the limit is marked provisional until
+then. The function is **absent from v2.14.5 and every earlier release and present in v2.14.6**
+(sources: [[s-issue-8322-dynamic-maxstore-shrinks]], [[s-nats-server-jetstream-resources]]).
+
+It does not change the advice: the maintainers say to pin `max_file_store` explicitly in production,
+and the value is still computed only at startup. See [[jetstream-out-of-disk]].
+
 ### Rolling upgrade and downgrade
 
 This warning is **expected** while a cluster is mixed-version, and clears once every server is on
@@ -136,8 +152,10 @@ reliable ephemeral consumer mode, and **durable consumers created with `AckFlowC
 ## Related
 
 [[nats-server-2.12]] · [[nats-server-2.15-preview]] · [[raft-in-nats]] · [[retention-policies]] ·
-[[js-api]] · [[consumer]] · [[upgrade-a-cluster]] · [[nats-server]]
+[[js-api]] · [[consumer]] · [[upgrade-a-cluster]] · [[nats-server]] · [[jetstream-out-of-disk]] ·
+[[malformed-or-corrupt-message]] · [[jetstream-sizing]]
 
 ## Sources
 
-[[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]]
+[[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
+[[s-nats-server-jetstream-resources]]

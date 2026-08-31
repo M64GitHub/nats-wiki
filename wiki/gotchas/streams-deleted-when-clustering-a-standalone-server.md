@@ -115,6 +115,8 @@ merged.** Do not plan around it.
 - **Back up before any topology change**, not just this one.
 - If HA is a possibility for a deployment, **stand it up as a cluster from the start** — even a
   three-node cluster on one host for a proof of concept — so the migration never has to happen.
+  [[build-a-3-node-cluster]] is that procedure; [[install-nats-server]] says the same thing in its
+  preconditions, because the cheapest moment to decide is before any data exists.
 
 ## Explained by
 

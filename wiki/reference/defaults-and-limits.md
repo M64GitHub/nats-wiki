@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -40,6 +40,18 @@ From `server/const.go` at **v2.14.6** (source: [[s-nats-server-constants-2.14.6]
 | max pings outstanding | `2` | `const.go:123` | — |
 | **`write_deadline`** | **`10s`** (`DEFAULT_FLUSH_DEADLINE`) | `const.go:132` | [[slow-consumer-detected]] |
 | max closed clients retained | `10000` | `const.go:192` | — |
+| **`lame_duck_duration`** | **`2m`** | `const.go:196`† | [[install-nats-server]] |
+| `lame_duck_grace_period` | `10s` | `const.go:200`† | [[install-nats-server]] |
+
+† Quoted from `raw/nats-server-src/const-lame-duck-v2.14.6.md`, the range
+`constants-v2.14.6.md` stops short of; the docs agree (`reference/config.md` gives `2m` and `10s`).
+Both matter to a service unit: `TimeoutStopSec` must exceed `lame_duck_duration` or systemd kills the
+drain half-finished (source: [[s-nats-server-systemd-units]], [[install-nats-server]]). Both are also
+**enforced**: a duration under `30s` is rejected at parse time, and a grace period **≥** the duration
+stops the server at startup. The duration is the window over which *client connections* are closed —
+minus the grace period, and with the per-client interval capped at one second — and it does **not**
+bound the Raft stepdown or JetStream shutdown that precede it (source:
+[[s-nats-server-lame-duck]], [[upgrade-a-cluster]]).
 
 ### The 8 MB question
 
@@ -68,15 +80,29 @@ reloadable**, so raising the payload ceiling past 64 MB is a two-stage change.
 | setting | default | source | explained by |
 |---|---|---|---|
 | **`jetstream.sync_interval`** | **`2m`** | `filestore.go:333`; docs agree | [[replicas]] |
-| `jetstream.max_memory_store` | **75% of system RAM**, capped by `GOMEMLIMIT`; falls back to `256MB` only when system memory cannot be read | [[s-docs-sizing-and-resources]] | [[jetstream-sizing]] |
-| `jetstream.max_file_store` | **75% of disk available under `store_dir`**; falls back to `1TB` only when the platform cannot report disk size | [[s-docs-sizing-and-resources]] | [[jetstream-sizing]] |
-| `jetstream.store_dir` | `/tmp/nats/jetstream` | docs config reference | — |
+| `jetstream.max_memory_store` | **75% of *total* system RAM** (`sysMem / 4 * 3`), capped by `GOMEMLIMIT`; falls back to `256MB` only when system memory cannot be read | `jetstream.go:2769–2781`, `jetstream.go:2735` | [[jetstream-sizing]] |
+| `jetstream.max_file_store` | **75% of the space *free* under `store_dir` at startup** (`Bavail * Bsize / 4 * 3`); falls back to `1TB` only when `statfs` fails or the platform cannot report | `disk_avail.go:31`, `jetstream.go:2733` | [[jetstream-sizing]] · [[jetstream-out-of-disk]] |
+| `jetstream.store_dir` | `os.TempDir()/nats/jetstream` — `/tmp/nats/jetstream` on Linux, logged with `Temporary storage directory used, data could be lost on system reboot` | `jetstream.go:2746–2749` | [[stream-directories-disappear]] |
+| `jetstream.max_buffered_msgs` | **`100000`** — the docs say `10000` | `stream.go:441` | [[config-keys]] |
+| `jetstream.max_buffered_size` | `128MB` | `stream.go:442` | [[config-keys]] |
+| `jetstream.max_outstanding_catchup` | **`64MB`** — the docs say `32M` | `jetstream_cluster.go:11158` | [[config-keys]] |
+| `jetstream.request_queue_limit` | `10000` | `jetstream_api.go:367` | [[nats-timeout]] |
+| `jetstream.info_queue_limit` | **whatever `request_queue_limit` is** (so `10000`) — the docs say `100000` | `opts.go:6183–6185` | [[nats-timeout]] |
+| stream lag warning threshold | **10,000** accepted-but-unapplied proposals; not configurable | `jetstream_cluster.go:10213` | [[stream-has-high-message-lag]] |
 | `jetstream.strict` | **`true` since 2.12** — invalid API requests are rejected, not just logged | [[s-docs-upgrade-to-2.12]] | [[js-api]] |
 | filestore cache buffer expiration | `10s` | `filestore.go:331` | — |
 | filestore idle FD close | `30s` | `filestore.go:335` | — |
 
 **`256MB` and `1TB` are fallbacks, not defaults.** They apply only when the server cannot read the
-system's memory or disk size. This is the most commonly mis-stated pair of numbers in NATS sizing.
+system's memory or disk size. This is the most commonly mis-stated pair of numbers in NATS sizing —
+and the generated `reference/config/jetstream/max_file_store.md` states the fallback as the default,
+which is **docs issue #22**. Every value in this block is now read from the server at **v2.14.6**
+rather than from a docs page (source: [[s-nats-server-jetstream-resources]]).
+
+**The two 75% figures are not the same kind of number.** Memory is 75% of the machine's *total* RAM;
+file storage is 75% of what is *free* under `store_dir` at the moment the server starts, so it falls
+as JetStream fills the volume. Before 2.14.6 that made the limit shrink at every restart — see
+[[jetstream-out-of-disk]].
 
 ## Stream configuration
 
@@ -142,6 +168,33 @@ In **pedantic mode**, a `max_deliver` below `-1` is an error rather than being c
 | quorum | `(N+1)/2` | [[s-docs-raft-and-leaders]] |
 | `connect_backoff` (routes/gateways, 2.12+) | when `true`: **1s growing to 30s** | [[s-docs-upgrade-to-2.12]] |
 
+## Authentication and TLS handshake budgets
+
+Read from `server/const.go` and `server/opts.go` at **v2.14.6**
+(source: [[s-nats-server-auth-and-tls]]). **The generated config reference states different values
+for every key in this table** — see `inbox/docs-issues.md` #19.
+
+| setting | default | source |
+|---|---|---|
+| `tls { timeout }` — client, cluster, leafnode, gateway, MQTT | **2s** | `TLS_TIMEOUT`, `const.go:108`; applied at `opts.go:6021`, `:6031`, `:6076`, `:6144`, `:6166` |
+| `leafnodes { remotes: [ { tls { timeout } } ] }` | **2s** | `DEFAULT_LEAF_TLS_TIMEOUT`, `const.go:165`; `opts.go:3155` |
+| `authorization { timeout }` — **no TLS on that listener** | **2s** | `AUTH_TIMEOUT`, `const.go:117` |
+| `authorization { timeout }` — **TLS configured** | **`tls_timeout + 1`**, so 3s at stock settings | `getDefaultAuthTimeout`, `opts.go:6191–6199` |
+| `tls { handshake_first }` fallback delay, when set to `"auto"` | **50ms** | `DEFAULT_TLS_HANDSHAKE_FIRST_FALLBACK_DELAY`, `const.go:114` |
+
+Two consequences worth carrying:
+
+- **`authorization { timeout }` is also the auth callout deadline.** The server uses it both as the
+  authorization request's expiry and as the wait for a reply (`auth_callout.go:371`, `:447`), so an
+  auth service's latency budget is this key — 3 seconds on a TLS-enabled server, not the 2 the docs
+  state. See [[auth-callout]].
+- **`tls { timeout }` accepts a float in seconds *or* a duration string** (`opts.go:5222–5232`);
+  `timeout: 2` and `timeout: "2s"` are the same value. The reference's type says `duration` only.
+
+`websocket { tls { timeout } }` is documented but **has no corresponding server option**:
+`WebsocketOpts` carries `HandshakeTimeout` for the whole websocket handshake instead.
+
+
 ## Guidance thresholds — not server limits
 
 These are recommendations from Synadia, explicitly **not enforced by the server**, and the source
@@ -191,4 +244,5 @@ states neither the version they were measured against nor the method
 [[s-nats-server-constants-2.14.6]] · [[s-docs-stream-config]] · [[s-docs-sizing-and-resources]] ·
 [[s-docs-connection-limits-config]] · [[s-docs-acknowledgment]] · [[s-docs-pull-consumers]] ·
 [[s-docs-policies]] · [[s-docs-raft-and-leaders]] · [[s-docs-upgrade-to-2.12]] ·
-[[s-synadia-jetstream-anti-patterns]] · [[s-docs-consumer-config]]
+[[s-synadia-jetstream-anti-patterns]] · [[s-docs-consumer-config]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] · [[s-docs-authentication-basics]] ·
+[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]]

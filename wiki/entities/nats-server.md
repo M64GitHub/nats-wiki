@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [repo, server, cncf, apache-2.0, security-audit, docker, single-binary]
 aliases: [nats-server, "nats-io/nats-server", the server, nats server]
-sources: [s-nats-server-readme, s-github-repo-facts, s-docs-ecosystem, s-docs-getting-started, s-nats-server-constants-2.14.6]
+sources: [s-nats-server-systemd-units, s-docs-hardening, s-nats-server-readme, s-github-repo-facts, s-docs-ecosystem, s-docs-getting-started, s-nats-server-constants-2.14.6]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -61,8 +61,15 @@ nats-server -c server.conf -DV   # a config file, with debug and trace logging
 docker run -p 4222:4222 -p 8222:8222 nats:latest
 ```
 
-Ports: **4222** clients, **8222** HTTP monitoring (source: [[s-docs-getting-started]]). JetStream is
-off until you turn it on.
+Ports, all four of which have a documented default and none of which listens unless configured
+(beyond 4222): **4222** clients, **6222** cluster routes, **7222** gateways, **8222** HTTP monitoring
+(source: [[s-docs-getting-started]], [[s-docs-hardening]]). JetStream is off until you turn it on, and
+so is the monitoring port.
+
+**The repo ships its own systemd units** — `util/nats-server.service` and
+`util/nats-server-hardened.service` — and they, not the docs' extract, are what
+[[install-nats-server]] quotes. Both wire `SIGHUP` to reload and **`SIGUSR2` to a lame-duck drain**
+(source: [[s-nats-server-systemd-units]]).
 
 ## What an operator needs to know
 

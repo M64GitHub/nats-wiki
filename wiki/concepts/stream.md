@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -122,7 +122,10 @@ across, but a mirror is read-only and turning it into a publishable replacement 
   JetStream batches disk syncs on `sync_interval`, which defaults to `2m`. See [[replicas]] and
   [[raft-in-nats]] (source: [[s-docs-replication-and-r3]]).
 - Choosing `storage: memory` gives up durability across a restart for the whole stream — storage is
-  a stream-wide property and cannot be mixed per replica (source: [[s-docs-surviving-node-loss]]).
+  a stream-wide property and cannot be mixed per replica (source: [[s-docs-surviving-node-loss]]). It also gives up **backup**: a snapshot copies
+  a stream's on-disk files, and a memory stream has none, so `nats stream backup` fails with
+  `snapshot failed: no impl` (**10064**) — [[backup-and-restore-jetstream]]. Since `storage` is fixed
+  at creation, this is decided once and for good.
 
 ## The API
 
@@ -162,7 +165,8 @@ JetStream's memory footprint — see [[jetstream-sizing]].
 ## Related
 
 [[consumer]] · [[retention-policies]] · [[replicas]] · [[stream-placement]] · [[raft-in-nats]] ·
-[[ack-and-redelivery]] · [[jetstream-sizing]]
+[[ack-and-redelivery]] · [[jetstream-sizing]] · [[jetstream-out-of-disk]] ·
+[[stream-directories-disappear]] · [[stream-has-high-message-lag]]
 
 ## Sources
 

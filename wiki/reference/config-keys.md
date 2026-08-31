@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -19,7 +19,9 @@ and lives in `inbox/config-keys-table.md` (the *Config keys* tab in the viewer);
 curated subset.
 
 Values here are as the docs state them; where the docs state nothing, the default is either absent
-or read from the source and marked — see [[defaults-and-limits]].
+or read from the source and marked — see [[defaults-and-limits]]. **216 of the 621 keys state a
+default** in the docs; the other 405 state none, which is why [[defaults-and-limits]] reads the
+server source.
 
 ## Reload or restart
 
@@ -27,13 +29,24 @@ Of the 621 keys the docs mark:
 
 | marking | count | meaning |
 |---|---:|---|
-| **reloadable** | 285 | takes effect on `nats-server --signal reload` |
-| **reloadable\*** | 126 | reloadable, but **the key's own doc page carries caveats** on what the reload actually does |
-| **restart-only** | 134 | requires a restart |
-| *(unmarked)* | 76 | the docs say nothing — **do not assume either way** |
+| **reloadable** | 261 | takes effect on `nats-server --signal reload` |
+| **reloadable\*** | 150 | reloadable, but **the key's own doc page carries caveats** on what the reload actually does |
+| **restart-only** | 174 | requires a restart |
+| *(unmarked)* | 36 | the docs say nothing — **do not assume either way** |
+
+**The procedure is [[reload-server-config]]** — validate with `nats-server -c … -t`, send SIGHUP, and
+read `Reloaded server configuration` in the log. The rule behind the table: a reload changes *policy*
+(who connects, what they may do, how much they may store) but never *identity* (the addresses the
+server and its cluster bind, or where JetStream keeps its data) — an identity change is a
+[[upgrade-a-cluster]] (source: [[s-docs-config-management]]).
 
 The asterisk is not decoration. `cluster.routes` is `reloadable*`, `tls.cert_file` is
 `reloadable*` — for both, read the key's page before relying on a reload in production.
+
+**A failed reload cannot break a running server.** The server validates the new config and, on a parse
+or validation failure, keeps the old one — the reload is atomic. What the dry-run does *not* prove is
+that the server could **start** from the file: a JetStream cluster missing `server_name` or `routes`
+passes `-t` and still fails to boot (source: [[s-docs-config-management]]).
 
 **Two traps this wiki has already hit:**
 
@@ -71,9 +84,17 @@ move them, and **a reload or restart will not** (source: [[s-docs-sizing-and-res
 | `debug` | boolean | — | reloadable |
 | `trace` | boolean | — | reloadable |
 | `logfile` | string | — | reloadable |
+| **`lame_duck_duration`** | duration | **`2m`** (min `30s`) | **restart** |
+| `lame_duck_grace_period` | duration | `10s` | **restart** |
 
 **`debug` is reloadable**, which is what makes the diagnostic on
 [[no-suitable-peers-for-placement]] usable on a running cluster.
+
+**The two lame-duck keys are restart-only, and a service unit depends on them.** The shipped
+systemd unit sets `TimeoutStopSec=150` — `lame_duck_duration` plus buffer — so raising one without the
+other means systemd kills the drain partway ([[install-nats-server]]). Both are validated: `< 30s` is a
+parse error, and a grace period not **strictly** lower than the duration stops the server at startup.
+The duration governs **client disconnects only** — see [[upgrade-a-cluster]].
 
 ## `jetstream { … }`
 
@@ -88,15 +109,34 @@ move them, and **a reload or restart will not** (source: [[s-docs-sizing-and-res
 | `domain` | string | — | restart |
 | `unique_tag` | string | — | restart |
 | `cipher` / `encryption_key` / `prev_encryption_key` | string | — | restart |
-| `max_buffered_msgs` | integer | `10000` | restart |
+| **`max_buffered_msgs`** | integer | **`100000`** (docs say `10000`) | restart |
 | `max_buffered_size` | storage | `128MB` | restart |
-| `max_outstanding_catchup` | storage | `32M` | restart |
+| **`max_outstanding_catchup`** | storage | **`64MB`** (docs say `32M`) | restart |
 | `request_queue_limit` | integer | `10000` | restart |
-| `info_queue_limit` | integer | `100000` | restart |
+| **`info_queue_limit`** | integer | **defaults to `request_queue_limit`**, so `10000` (docs say `100000`) | restart |
 | `meta_compact` / `meta_compact_size` | integer / storage | — | reloadable |
 | `meta_compact_sync` | boolean | `false` | reloadable |
 | `limits` | block | — | restart |
 | `tpm` | block | — | restart |
+
+**Four of the values above were wrong in the docs and are corrected here from the server at
+v2.14.6** (source: [[s-nats-server-jetstream-resources]], recorded as **docs issue #22**):
+`max_file_store`'s generated page calls `1TB` the default rather than the `statfs`-failure fallback;
+`max_buffered_msgs` is `streamDefaultMaxQueueMsgs = 100_000` (`stream.go:441`);
+`max_outstanding_catchup` is `defaultMaxTotalCatchupOutBytes = 64 * 1024 * 1024`
+(`jetstream_cluster.go:11158`); and `info_queue_limit` has no default of its own — `opts.go:6183–6185`
+sets it to `JetStreamRequestQueueLimit`. `max_buffered_size`, `request_queue_limit`, `sync_interval`,
+`strict` and `store_dir` were checked at the same time and are correct.
+
+**`max_file_store: 0` is not "unlimited".** An explicitly configured `0` is honoured as zero
+(`jetstream.go:2760`), and no stream can then be created. Leaving the key **unset** is what gives you
+the dynamic value — and that value shrinks at every restart before 2.14.6; see
+[[jetstream-out-of-disk]].
+
+**`request_queue_limit` and `info_queue_limit` are the two that lose requests silently.** When either
+queue fills, the server **drains it entirely** — every queued JetStream API request is discarded with
+no reply of any kind, which the client sees as a plain timeout
+(`jetstream_api.go:876–890`, source: [[s-nats-server-jetstream-log-warnings]]). See [[nats-timeout]].
 
 **`sync_interval` is restart-only**, so the durability/throughput trade on [[replicas]] cannot be
 changed without a restart — which is the practical argument for the documented pattern of a
@@ -107,6 +147,7 @@ changed without a restart — which is the practical argument for the documented
 | key | type | default | reload |
 |---|---|---|---|
 | `name` | string | — | reloadable |
+| `port` | integer | **`6222`** | **restart** |
 | `listen` | string | — | **restart** — only a listen string with an unchanged host **and** port `-1` survives a reload |
 | `routes` | [string] | — | reloadable\* — self-routes are ignored |
 | `no_advertise` | boolean | — | reloadable |
@@ -115,7 +156,8 @@ changed without a restart — which is the practical argument for the documented
 | `connect_backoff` | boolean | `false` | reloadable — **2.12+**; when `true`, 1s growing to 30s |
 
 **`pool_size: 3`** is why a three-node cluster shows eight `/routez` entries per node rather than
-two — see [[monitoring-endpoints]].
+two — see [[monitoring-endpoints]]. The same arithmetic is what the `Routes` column of
+`nats server list` counts — [[build-a-3-node-cluster]] reads it.
 
 ## `leafnodes { … }`
 
@@ -137,19 +179,49 @@ Also `isolate_leafnode_interest` and per-remote `disabled: true`, both **2.12+**
 
 ## `tls { … }`
 
+One block per connection type, and they do not inherit — see [[tls-in-nats]].
+
 | key | default | reload |
 |---|---|---|
 | `cert_file`, `key_file`, `ca_file` | — (`ca_file` defaults to the system trust store) | reloadable\* |
 | `verify` | `false` | reloadable\* |
-| `timeout` | **`500ms`** | reloadable |
+| `verify_and_map` | `false` | reloadable\* |
+| `timeout` | **`2s`** — *the docs say `500ms`* | reloadable |
+| `handshake_first` | `false`; also takes `"auto"` / `"auto_fallback"` (50ms) or a duration | reloadable |
 | `insecure` | — | reloadable\* — outgoing connections only |
 
-`tls.timeout` (`500ms`) is the config key; the compiled-in `TLS_TIMEOUT` constant is `2s`
-(`const.go:108`). They are different things and both are real — see [[defaults-and-limits]].
+**Corrected 2026-08-31.** `tls.timeout`'s default is the compiled-in `TLS_TIMEOUT`, **2 seconds**
+(`const.go:108`, applied at `opts.go:6021` and on every other listener). This page previously
+repeated the reference's `500ms` and treated the two as separate values; they are the same value, and
+`500ms` is wrong on all nine documented `tls.timeout` keys — `inbox/docs-issues.md` #19. The key
+accepts a float in seconds or a duration string.
 
 ## `authorization { … }`
 
-`token` (reloadable\*), `users` (reloadable), `timeout` (default **`1`** second, reloadable\*).
+`token` (reloadable\*), `users` (reloadable), `auth_callout` (see [[auth-callout]]), and `timeout`
+(reloadable\*).
+
+**`timeout` has two defaults, not one**: **2 seconds** when the listener has no TLS, and
+**`tls_timeout + 1`** — 3 seconds at stock settings — when it does (`getDefaultAuthTimeout`,
+`opts.go:6191–6199`). The reference states `1`, which is neither. It is also the auth callout
+deadline. See [[defaults-and-limits]].
+
+The `auth_callout { … }` sub-block is exactly five keys — `issuer`, `account`, `auth_users`, `xkey`,
+`allowed_accounts` (`opts.go:394–407`); none is reloadable in a way this wiki has checked.
+
+## Operator mode keys
+
+Set together, and all **restart-only** in practice — a config reload cannot introduce or change a
+trusted operator ([[reload-server-config]]).
+
+| key | what it takes |
+|---|---|
+| `operator` | the operator **JWT**, not a bare key |
+| `system_account` | the system account's public key or name — the nats resolver refuses to start without one |
+| `resolver { type: full, dir, allow_delete, interval, limit }` | the account-JWT store; `full` is the only type `nats auth account push` can write to |
+| `resolver_preload { <account-key>: <jwt> }` | bakes account JWTs into the config; in practice the system account only |
+
+`no_auth_user` is **rejected alongside a trusted operator** — see [[account]] and [[operator-mode]].
 
 ## `websocket { … }` and `mqtt { … }`
 
@@ -176,6 +248,10 @@ reloadable\*, none with a documented default. **On an un-tiered account an R3 st
   **v2.14.6** — see [[defaults-and-limits]] for the file and line of each.
 - Version attributions (`server_metadata`, `connect_backoff`, leafnode remote reload) come from the
   upgrade guides, not the config table, which is unversioned.
+- **Where the table and the server disagree, this page states the server** and says so on the line.
+  That applies to `tls.timeout` and `authorization.timeout`, whose documented defaults are wrong on
+  all 15 keys of those two families — `inbox/docs-issues.md` #19. The generated table still carries
+  the docs' values, because it is a faithful rendering of the docs and is diffed against them.
 
 ## What is deliberately not here
 
@@ -186,10 +262,13 @@ surface the wiki actually explains.
 ## Related
 
 [[defaults-and-limits]] · [[jetstream-sizing]] · [[replicas]] · [[stream-placement]] ·
-[[monitoring-endpoints]] · [[js-api]] · [[slow-consumer-detected]] · [[nats-server-2.12]]
+[[monitoring-endpoints]] · [[js-api]] · [[slow-consumer-detected]] · [[nats-server-2.12]] ·
+[[tls-in-nats]] · [[account]] · [[operator-mode]] · [[auth-callout]] · [[subject-permissions]]
 
 ## Sources
 
 [[s-docs-connection-limits-config]] · [[s-nats-server-constants-2.14.6]] ·
 [[s-docs-sizing-and-resources]] · [[s-docs-placement]] · [[s-docs-upgrade-to-2.12]] ·
-[[s-docs-replication-and-r3]]
+[[s-docs-replication-and-r3]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] ·
+[[s-docs-operator-mode]] · [[s-docs-auth-callout]] · [[s-nats-server-jetstream-resources]] ·
+[[s-nats-server-jetstream-log-warnings]]

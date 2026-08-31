@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-relnotes-2.14.0]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -23,6 +23,12 @@ The monitoring port is **separate from the client port and off until you enable 
 `http_port: 8222` in the config, or pass `-m 8222`. `8222` is the conventional choice and the
 server's compiled-in `DEFAULT_HTTP_PORT` (`const.go:135`, source:
 [[s-nats-server-constants-2.14.6]]), but the port is whatever you set.
+
+**Bind it to localhost on a host, but never on Kubernetes.** `http: "127.0.0.1:8222"` keeps `/varz`
+off the network on a VM; under the Helm chart it fails every probe, because the kubelet's startup,
+readiness and liveness probes connect to the **pod IP**, not to loopback — so no pod ever goes ready.
+There, keep the chart's bind and restrict the port with a NetworkPolicy (source: [[s-docs-hardening]];
+see [[install-nats-server]] and [[nats-helm-charts]]).
 
 It is **plain HTTP, request-response, nothing pushed**: a `GET` returns a JSON snapshot of state at
 that instant and the connection closes.
@@ -139,6 +145,53 @@ Since **2.14** a filestore I/O error **freezes the affected stream and reports u
 with the error text containing `write error`; the server keeps serving core traffic and needs a
 restart to recover (source: [[nats-server-2.14]]).
 
+### `/varz` — certificate expiry, per listener
+
+`tls_cert_not_after` carries the certificate's expiry date, at the top level and on the `cluster`,
+`gateway`, `leafnode`, `mqtt` and `websocket` objects (`monitor.go:1838–1845` at **v2.14.6**,
+source: [[s-nats-server-auth-and-tls]]):
+
+```
+curl -s http://127.0.0.1:8222/varz | jq '{client: .tls_cert_not_after, cluster: .cluster.tls_cert_not_after, leaf: .leafnode.tls_cert_not_after}'
+```
+
+Three things to know before alerting on it:
+
+- **The field is omitted when that listener has no TLS** (`omitzero`). An absent key means "no
+  certificate configured here", not "no expiry".
+- **It is the leaf certificate only** — specifically the `NotAfter` of the leaf of the *first*
+  configured certificate (`tlsCertNotAfter`, `monitor.go:1485–1498`). An expiring intermediate or CA
+  breaks the handshake identically and does not appear. `nats account tls` walks the whole verified
+  chain and is the companion check (source: [[s-natscli-account-tls]]).
+- **No docs page names this field**, which is why the public answer to "how do I see the expiry?"
+  is still an `openssl` pipeline (source: [[s-gh-7684-certificate-expiry]]; `inbox/docs-issues.md`
+  #20). It shipped in [PR #7709](https://github.com/nats-io/nats-server/pull/7709).
+
+Do not reach for `openssl s_client` against the client port: the first bytes there are the plaintext
+`INFO` line, so it fails with `wrong version number` unless `handshake_first` is on. See
+[[rotate-tls-certificates]].
+
+### `/varz` — `reserved_storage` is the number that decides `10047`
+
+`jetstream.stats` carries **four** storage numbers, and the pair people read is the wrong pair:
+
+```
+curl -s http://127.0.0.1:8222/varz | jq '.jetstream.stats | {storage, reserved_storage, memory, reserved_memory}'
+```
+
+`storage` and `memory` are what is actually held. `reserved_storage` and `reserved_memory` are the sum
+of every stream's `max_bytes`, counted as used from the moment the stream exists — and it is the
+*reserved* pair that `insufficient storage resources available (10047)` compares against the limit
+(`jetstream.go:2523–2553`, source: [[s-nats-server-jetstream-resources]]). A real dump in
+[[s-issue-4281-insufficient-storage]] reads `"storage": 4022205` beside
+`"reserved_storage": 37580963840` — 4 MB held, 35 GiB reserved. Alert on the **gap**, not on
+`storage`. See [[jetstream-out-of-disk]].
+
+`gomaxprocs` and `cores` are worth reading at the same time: a container with a fractional CPU limit
+can leave the server at `GOMAXPROCS=1` on an 8-core host, which is one of the hypotheses on
+[[nats-timeout]].
+
+
 ## How this was derived
 
 - The endpoint list and every query parameter come from `raw/nats-docs/reference/system/monitor/`
@@ -161,8 +214,9 @@ ingested** — it is the next monitoring source worth taking.
 ## Related
 
 [[slow-consumer-detected]] · [[raft-in-nats]] · [[jetstream-sizing]] · [[js-api]] ·
-[[jetstream-slows-as-consumers-grow]] · [[advisories]] · [[config-keys]] · [[nats-server-2.14]]
+[[jetstream-slows-as-consumers-grow]] · [[advisories]] · [[config-keys]] · [[nats-server-2.14]] ·
+[[jetstream-out-of-disk]] · [[nats-timeout]] · [[kv-watchers-stall-the-cluster]]
 
 ## Sources
 
-[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]]
+[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]]

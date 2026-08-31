@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -134,9 +134,16 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 2. **`STREAM.QUORUM_LOST` / `CONSUMER.QUORUM_LOST`** — the group has no majority and cannot elect a
    leader; writes are blocked. See [[raft-in-nats]] and [[replicas]].
 3. **`SERVER.OUT_OF_STORAGE`** — the condition [[jetstream-sizing]] says arrives as a publish error
-   mid-stream rather than a startup warning.
+   mid-stream rather than a startup warning. It fires **once**, guarded, and JetStream on that server
+   is already shutting down by the time it is published (`jetstream.go:652–678`, source:
+   [[s-nats-server-jetstream-resources]]) — so the alert must be on the event, not on a threshold.
+   Note that the same handler is reached from the Raft critical-write-error path, so the advisory can
+   fire with the disk nearly empty: [[jetstream-out-of-disk]] and [[malformed-or-corrupt-message]].
 4. **`API.LIMIT_REACHED`** — the API queue is saturated, which is what
-   [[jetstream-slows-as-consumers-grow]] describes from the client side.
+   [[jetstream-slows-as-consumers-grow]] describes from the client side. Its `Dropped` field is the
+   count of requests the server **discarded without any reply at all**, which is the sharpest
+   server-side cause of [[nats-timeout]] (`jetstream_api.go:876–890`, source:
+   [[s-nats-server-jetstream-log-warnings]]).
 
 `LEADER_ELECTED` is worth **logging** rather than alerting: elections are normal
 ([[raft-in-nats]]), but a stream whose leader keeps moving is a symptom
@@ -163,9 +170,11 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 ## Related
 
 [[ack-and-redelivery]] · [[monitoring-endpoints]] · [[raft-in-nats]] · [[priority-groups]] ·
-[[jetstream-sizing]] · [[jetstream-out-of-disk]] · [[js-api-subjects]] · [[error-codes]]
+[[jetstream-sizing]] · [[jetstream-out-of-disk]] · [[js-api-subjects]] · [[error-codes]] ·
+[[malformed-or-corrupt-message]] · [[nats-timeout]] · [[stream-has-high-message-lag]]
 
 ## Sources
 
 [[s-nats-server-constants-2.14.6]] · [[s-adr-42-priority-groups]] · [[s-docs-acknowledgment]] ·
-[[s-docs-monitoring-endpoints]]
+[[s-docs-monitoring-endpoints]] · [[s-nats-server-jetstream-resources]] ·
+[[s-nats-server-jetstream-log-warnings]]

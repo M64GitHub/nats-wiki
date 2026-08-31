@@ -7,7 +7,7 @@ verified-against: nats-io/k8s chart nats-2.14.6
 verified-on: 2026-08-31
 tags: [tool, helm, kubernetes, statefulset, probes, config-reloader, artifacthub]
 aliases: [k8s, "nats-io/k8s", helm chart, nats helm chart, nats-helm-charts]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-kubernetes]
+sources: [s-nats-helm-chart-values-2.14.6, s-docs-rolling-upgrades, s-docs-ecosystem, s-github-repo-facts, s-docs-kubernetes]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -65,6 +65,19 @@ helm install nats nats/nats -f values.yaml
 - **A pod stuck `Pending` is almost always an unbound volume**, not a NATS problem — the chart
   provisions through `volumeClaimTemplates`, so check for a default storage class rather than
   deleting the pod.
+- **The lame-duck defaults leave zero slack, by construction.** The chart sets
+  `config.lameDuckGracePeriod: 10s`, `config.lameDuckDuration: 30s` and
+  `podTemplate.terminationGracePeriodSeconds: 60` — and its own comment says the last "should be at
+  least `lameDuckGracePeriod` + `lameDuckDuration` + 20s shutdown overhead", which 10 + 30 + 20
+  satisfies **exactly**. Raise the duration without raising the termination grace period and the
+  kubelet's SIGKILL lands inside the drain. Note `30s` is the server's documented *minimum* and a
+  third of its own `2m` default (source: [[s-nats-helm-chart-values-2.14.6]]).
+- **The reloader only watches volumes mounted under `/etc/`** (`reloader.natsVolumeMountPrefixes`).
+  A certificate or config mounted elsewhere never triggers a SIGHUP, and the symptom is
+  "reload doesn't work" rather than anything mount-shaped ([[reload-server-config]]).
+- **`podTemplate.configChecksumAnnotation: true` is the other door**: it hashes the ConfigMap into a
+  pod annotation so a config change **rolls the StatefulSet** instead of hot-reloading. Right for a
+  change that is not reloadable at all, wrong for a routine policy edit ([[upgrade-a-cluster]]).
 
 ## Cheat sheet
 
@@ -89,6 +102,24 @@ kubectl get pods -l app.kubernetes.io/name=nats
 kubectl exec -it deploy/nats-box -- sh          # then: nats stream info ORDERS
 ```
 
+```yaml
+# the drain, and the budget that keeps a roll from taking two nodes at once
+config:
+  lameDuckGracePeriod: 10s
+  lameDuckDuration: 30s
+podTemplate:
+  terminationGracePeriodSeconds: 60   # >= grace + duration + 20s
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: { name: nats }
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nats
+```
+
 **The probes the chart renders** (for reference — you do not write these):
 
 ```yaml
@@ -100,7 +131,8 @@ livenessProbe:  { httpGet: { path: "/healthz?js-enabled-only=true", port: 8222 }
 ## Related
 
 [[nack]] · [[nats-box]] · [[nats-surveyor]] · [[monitoring-endpoints]] · [[replicas]] ·
-[[jetstream-sizing]] · [[nats-server]] · [[build-a-3-node-cluster]]
+[[jetstream-sizing]] · [[nats-server]] · [[build-a-3-node-cluster]] · [[upgrade-a-cluster]] ·
+[[reload-server-config]] · [[install-nats-server]]
 
 ## Sources
 

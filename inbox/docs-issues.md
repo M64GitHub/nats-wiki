@@ -14,10 +14,11 @@ factually wrong.
 - `where` is the doc path; for docs.nats.io prefix `https://docs.nats.io/`.
 - `status` is this wiki's handling, not the upstream state.
 
-Found while working `inbox/plan-first-ingests-2026-08-31.md`. Verified against **nats-server
-v2.14.6** and the docs tree fetched **2026-08-31**. Rows 8–10 concern **client** claims, so their
-authority is the client repository at its current release plus the package registry, not the server
-— stated per row.
+Rows 1–10 were found while working `inbox/plan-first-ingests-2026-08-31.md`; rows 11–22 while
+working `inbox/plan-runbooks-and-security-2026-08-31.md`. Verified against **nats-server v2.14.6**
+and the docs tree fetched **2026-08-31**. Rows 8–10 concern **client** claims, so their authority is
+the client repository at its current release plus the package registry, not the server — stated per
+row.
 
 | # | issue | where | kind | severity | status |
 |---|---|---|---|---|---|
@@ -31,6 +32,18 @@ authority is the client repository at its current release plus the package regis
 | 8 | `nats.net` is described as ".NET 6+"; the current client **dropped `net6.0`** | `concepts/ecosystem.md` | wrong-value | medium | wiki states the v3 target frameworks |
 | 9 | `nats.deno` is listed among "the archived" repos superseded by `nats.js`; it is **not archived** | `concepts/ecosystem.md` | wrong-value | low | wiki says which three are archived |
 | 10 | The Python client's two PyPI distributions are never reconciled: the client map names neither, and `nats-core` appears only on a WebSocket page | `concepts/ecosystem.md`, `concepts/getting-started.md`, `learn/websocket/your-first-websocket-connection.md` | missing | medium | wiki lists both packages and their Python floors |
+| 11 | A cluster-name mismatch is documented as always splitting the cluster; an **unset** `cluster.name` is silently **adopted** from the peer instead | `learn/clustering/forming-a-cluster.md`, `learn/topologies/your-first-cluster.md`, `reference/config/cluster/name.md` | missing | medium | wiki states both branches |
+| 12 | The hardening page's systemd extract drops `User=`/`Group=` and `ExecStop=` from the unit it is quoting | `learn/deployment/hardening.md` | enhancement | low | wiki quotes the shipped unit instead |
+| 13 | `lame_duck_duration` is presented as covering JetStream's leadership move; the server does that work **before** the timer starts, so the documented failure mode cannot occur and the sizing advice tunes the wrong knob | `learn/deployment/rolling-upgrades.md` | wrong-value | ★ medium | wiki states what the duration actually governs |
+| 14 | "grace period" means two different things two paragraphs apart — `lame_duck_grace_period` (must be **shorter** than the duration) and `terminationGracePeriodSeconds` (must be **longer**) | `learn/deployment/rolling-upgrades.md` | enhancement | low | wiki names both keys explicitly |
+| 15 | A memory stream's backup is documented to fail with `memory streams do not support snapshots`; the server returns **`no impl`** | `learn/backup-recovery/stream-backup-restore.md` | wrong-value | ★ medium | wiki states the real error and code |
+| 16 | The restore rename error is quoted as the **server's** and in the singular; it is the **CLI's**, and reads `stream names may not be changed during restore` | `learn/backup-recovery/stream-backup-restore.md` | wrong-value | low | wiki quotes the CLI string and the server's code |
+| 17 | `chunk_size`'s documented maximum is `9223372036854776000`; the server clamps it to **1 MiB**, silently | `reference/jetstream/api/stream/snapshot.md` | wrong-value | low | wiki states the real clamps |
+| 18 | `nats stream restore` accepts `--config`, `--cluster`, `--tag` and `--replicas`; the backup chapter mentions none, and presents a restore as reproducing the original configuration | `learn/backup-recovery/stream-backup-restore.md`, `learn/backup-recovery/disaster-recovery.md` | missing | medium | wiki documents the restore-elsewhere path |
+| 19 | **15 timeout defaults in the generated config reference are wrong**: all 9 `tls.timeout` keys say `500ms` (server: **2s**) and all 6 `authorization.timeout` keys say `1` (server: **2s**, or `tls_timeout + 1` when TLS is configured) | `reference/config/tls/timeout.md` + 8 siblings, `reference/config/authorization.md` + 5 siblings | wrong-value | ★ medium | wiki states the server values and the TLS-dependent rule |
+| 20 | `/varz` has exposed **`tls_cert_not_after`** per listener since PR #7709, and the whole docs tree never names it — the TLS page says to "monitor validity dates" with no way to do it | `learn/security/encryption.md`, `learn/monitoring/monitoring-endpoints.md` | missing | ★ medium | wiki documents the field and `nats account tls` |
+| 21 | Cross-domain and cross-account replication is said to need "the `external` block", pointing at a reference page that never mentions it; `external`, `api` and `deliver` appear **nowhere** in the 861-page docs tree | `learn/jetstream/mirrors-and-sources.md`, `reference/jetstream/api/stream/create.md` | missing | ★ medium | wiki reads the fields from the server source and says what is still unverified |
+| 22 | **Four defaults in the generated `jetstream` block are wrong**, including the most-quoted number in NATS sizing: `max_file_store` "Defaults to up to 1TB if available" (server: **75% of the space free under `store_dir`**, 1 TB only when `statfs` fails), `max_buffered_msgs` `10000` (**100000**), `max_outstanding_catchup` `32M` (**64MB**), `info_queue_limit` `100000` (**defaults to `request_queue_limit`**). The maintainers' "auto-sizing is for development and testing" appears nowhere in the tree, and `max_file_store: 0` silently means *no storage*, not *unlimited* | `reference/config/jetstream.md`, `reference/config/jetstream/max_file_store.md` + 3 siblings | wrong-value | ★ high | wiki states the server values and the restart hazard |
 
 ---
 
@@ -298,6 +311,594 @@ and say in `concepts/ecosystem.md` that the Python client publishes `nats-py` to
 
 ---
 
+## 11 · An unset `cluster.name` is adopted from the peer, not rejected
+
+Two learn pages state the cluster-name rule as an absolute, and it is not one.
+
+`learn/clustering/forming-a-cluster.md`:
+
+> "`name` is the cluster identifier, `east`. Every server that should join must set the exact same
+> name. A route to a server whose name differs is rejected the moment the names are compared … so the
+> odd server forms a separate cluster of its own."
+
+`learn/topologies/your-first-cluster.md`:
+
+> "A typo in `name` doesn't raise an error. The server with the odd name forms its own cluster and
+> never joins `east`."
+
+Both describe the **configured-name** case correctly, including the log line. Neither states what
+happens when a server has **no** `cluster { name }` at all — which is the default, since
+`reference/config/cluster/name.md` gives the key no default and says only "Name of the cluster."
+
+**Evidence** — `server/route.go` at **v2.14.6**, the check when accepting a route
+(`processRouteConnect`, lines 3052–3078), quoted in `raw/nats-server-src/route-v2.14.6.md`:
+
+```go
+3052:	// If we have a cluster name set, make sure it matches ours.
+3053:	if proto.Cluster != clusterName {
+3054:		shouldReject := true
+3055:		// If we have a dynamic name we will do additional checks.
+3056:		if srv.isClusterNameDynamic() {
+3057:			if !proto.Dynamic || strings.Compare(clusterName, proto.Cluster) < 0 {
+3058:				// We will take on their name since theirs is configured or higher then ours.
+3059:				srv.setClusterName(proto.Cluster)
+…
+3068:				srv.removeAllRoutesExcept(remoteID)
+3069:				shouldReject = false
+3070:			}
+3071:		}
+3072:		if shouldReject {
+3073:			errTxt := fmt.Sprintf("Rejecting connection, cluster name %q does not match %q", proto.Cluster, clusterName)
+…
+3076:			c.closeConnection(ClusterNameConflict)
+```
+
+The same branch exists on the soliciting side, on an async INFO (`processRouteInfo`,
+`route.go:571–584`, `s.isClusterNameDynamic()` at `:576`), where the adoption likewise calls
+`s.removeAllRoutesExcept(…)` — the joiner drops every other route it holds at that moment.
+
+So the real rule has two branches:
+
+| this server's `cluster.name` | peer's name differs | outcome |
+|---|---|---|
+| **configured** | configured | route rejected, `ClusterNameConflict`, two clusters |
+| **unset** (dynamic) | configured | **this server takes the peer's name** and drops its other routes |
+| **unset** (dynamic) | also unset | the lexicographically higher name wins |
+
+The server itself warns about it, and neither page mentions the warning
+(`server/route.go:2718–2720`):
+
+```go
+s.Noticef("Cluster name is %s", clusterName)
+if s.isClusterNameDynamic() {
+	s.Warnf("Cluster name was dynamically generated, consider setting one")
+}
+```
+
+**Impact.** An operator who omits `name` on one node does not get the documented symptom (a split
+cluster). They get a node that joins — possibly the *wrong* cluster, if two clusters share a route
+network — under a name nobody configured, having dropped its existing routes to do so. The
+documented advice ("set the identical name on every server") happens to prevent it, which is why
+this is `missing` rather than `wrong-value`.
+
+**Suggested fix.** On `reference/config/cluster/name.md`, state that an unset name is generated and
+that the server will adopt a peer's configured name. On both learn pages' pitfall sections, add one
+sentence: *a mismatch splits the cluster only when both names are configured; an unset name is
+adopted from the peer* — and name the two log lines
+(`Cluster name is …`, `Cluster name was dynamically generated, consider setting one`), which are the
+only local, credential-free way to check.
+
+---
+
+## 12 · The hardening page's systemd extract drops the two lines that make it a service · enhancement
+
+`learn/deployment/hardening.md` says "The NATS distribution ships a hardened unit
+(`nats-server-hardened.service`) … you adapt it rather than write it from scratch", and then shows an
+extract of it. The file it names exists at `util/nats-server-hardened.service` (checked at
+**v2.14.6**, saved verbatim in `raw/nats-server-src/systemd-units-v2.14.6.md`), and the page's
+extract is accurate as far as it goes. What it omits, from a page whose whole subject is running the
+server safely:
+
+| in the shipped unit | in the docs extract | why it matters |
+|---|---|---|
+| `User=nats` / `Group=nats` | absent | the extract, run as shown, starts the server **as root** — on a hardening page |
+| `ExecStop=/bin/kill -s SIGUSR2 $MAINPID` | absent | without it `systemctl stop` is SIGTERM: clients are dropped rather than drained through lame-duck mode |
+| `TimeoutStopSec=150` | absent | systemd's default stop timeout is shorter than `lame_duck_duration` (`2m`), so a drain gets killed partway |
+| `Restart=on-failure`, `RestartSec=5` | absent | the unit does not come back |
+| `EnvironmentFile=-/etc/default/nats-server` | absent; the page puts `GOMEMLIMIT` in the unit | the shipped file recommends the environment file so a limit change needs no `daemon-reload` |
+
+The page's own pitfall about `MemoryMax` is good advice that the shipped unit already encodes by
+leaving every resource cap commented out.
+
+**Why this is `enhancement` and not a defect:** the page tells you to copy the real file and adjust
+three fields, so a reader who follows the instruction gets all of the above. Only a reader who copies
+the code block — the thing code blocks invite — loses them.
+
+**Suggested fix.** Add `User=`, `Group=`, `ExecStop=` and `TimeoutStopSec=` to the extract (four
+lines), or label the block explicitly as a partial extract with a link to the file. The `ExecStop`
+line is also the missing connection to `learn/deployment/rolling-upgrades.md`, which teaches the same
+drain as `kill -SIGUSR2 $(cat /var/run/nats/nats.pid)` and never mentions that a systemd deployment
+already has it wired to `systemctl stop`.
+
+---
+
+## 13 · `lame_duck_duration` does not bound JetStream's work ★
+
+`learn/deployment/rolling-upgrades.md` makes two claims about what the duration covers:
+
+> "Set the duration to comfortably cover how long your clients take to reconnect *and* how long
+> JetStream needs to move leadership off this node. A duration shorter than the rebalance drops
+> clients before the stream has caught up."
+
+and, in Pitfalls:
+
+> "**A `lame_duck_duration` shorter than the rebalance drops clients early.** If you set the duration
+> to `30s` but JetStream needs `45s` to move the `ORDERS` leadership and resync replicas off the
+> node, the node kicks its clients and exits while the stream is still catching up."
+
+**The ordering in the code excludes that race.** `Server.lameDuckMode()` at **v2.14.6**
+(`server/server.go:4439–4565`, quoted in `raw/nats-server-src/lame-duck-v2.14.6.md`) does the
+JetStream work first and only then computes the client-close schedule:
+
+```go
+4465:	// If we are running any raftNodes transfer leaders.
+4466:	if hadTransfers := s.transferRaftLeaders(); hadTransfers {
+4467:		// They will transfer leadership quickly, but wait here for a second.
+4468:		select {
+4469:		case <-time.After(time.Second):
+…
+4474:	// Now check and shutdown jetstream.
+4475:	s.shutdownJetStream()
+4477:	// Now shutdown the nodes
+4478:	s.shutdownRaftNodes()
+…
+4496:	dur := int64(opts.LameDuckDuration)
+4497:	dur -= int64(gp)
+```
+
+`transferRaftLeaders()` (`server/raft.go:883–906`) calls `StepDown()` on every Raft node the server
+holds and marks each an observer; the only wait it gets is the **fixed one second** at line 4469.
+Nothing between lines 4465 and 4478 consults `LameDuckDuration`.
+
+**Two further numbers the page does not give**, both from the same range:
+
+| the page implies | the code does |
+|---|---|
+| clients are spread over `lame_duck_duration` | over **`lame_duck_duration` − `lame_duck_grace_period`** (`:4496–4497`) |
+| a larger duration spreads them further | the per-client interval is **capped at one second** (`:4514–4518`), so 10 clients drain in ~10s at any duration |
+
+**Impact.** An operator following the page raises `lame_duck_duration` — and on Kubernetes must then
+raise `terminationGracePeriodSeconds` with it, per the chart's own rule — to buy time for work that
+the timer never waited for. The knob that actually protects the stream is the page's own `current`
+gate between nodes, which the page states correctly.
+
+**Suggested fix.** Say that `lame_duck_duration` is the window over which **client connections** are
+closed, minus the grace period and capped at one second per client; that Raft stepdown and JetStream
+shutdown complete before it starts, with their own fixed one-second wait; and that the protection
+against taking down a still-syncing node is the `current` gate, not the duration. The Pitfalls entry
+can then be re-aimed at the real failure — starting the next node before the previous one is
+`current`.
+
+---
+
+## 14 · Two different "grace periods" two paragraphs apart · enhancement
+
+Same page. First, about the NATS key:
+
+> "`lame_duck_grace_period` (default `10s`) is how long the node waits before it starts kicking
+> clients … **The grace period must be shorter than the duration.**"
+
+Then, about Kubernetes:
+
+> "The chart defaults `lame_duck_duration` to `30s` and `terminationGracePeriodSeconds` to `60s`. If
+> you raise the duration, **raise the grace period above `lame_duck_duration`** plus shutdown
+> overhead too, or the kubelet SIGKILLs the node mid-drain."
+
+The same words carry **opposite** requirements: `lame_duck_grace_period` must be *below* the
+duration (enforced at startup — `server/server.go:1152`), while `terminationGracePeriodSeconds` must
+be *above* it. A reader who applies the second sentence to the first key gets a server that refuses
+to start:
+
+```
+lame duck grace period (60s) should be strictly lower than lame duck duration (30s)
+```
+
+**Suggested fix.** Name the key in the second sentence: "raise `terminationGracePeriodSeconds`".
+The chart's own comment already does this correctly — `podTemplate.terminationGracePeriodSeconds`
+"should be at least `lameDuckGracePeriod` + `lameDuckDuration` + 20s shutdown overhead"
+(`helm/charts/nats/values.yaml` at chart release `nats-2.14.6`).
+
+---
+
+## 15 · A memory stream fails with `no impl`, not the documented message ★
+
+`learn/backup-recovery/stream-backup-restore.md`, Pitfalls:
+
+> "**Memory streams cannot be snapshotted.** A snapshot reads a stream's on-disk files, so a stream
+> with `Storage: Memory` has nothing to read. The backup fails with
+> `memory streams do not support snapshots`."
+
+The behaviour is right. The message is not — that string does not exist in `nats-server` at
+**v2.14.6**. What a memory stream's store returns is (`server/memstore.go:2424–2426`, quoted in
+`raw/nats-server-src/snapshot-restore-v2.14.6.md`):
+
+```go
+func (ms *memStore) Snapshot(_ time.Duration, _, _ bool) (*SnapshotResult, error) {
+	return nil, fmt.Errorf("no impl")
+}
+```
+
+`mset.snapshot()` passes the store's error straight up (`server/stream.go:9086–9092`) and the API
+handler wraps it (`server/jetstream_api.go:4206–4209`):
+
+```go
+		sr, err := mset.snapshot(0, req.CheckMsgs, !req.NoConsumers)
+		if err != nil {
+			s.Warnf("Snapshot of stream '%s > %s' failed: %v", mset.jsa.account.Name, mset.name(), err)
+			resp.Error = NewJSStreamSnapshotError(err, Unless(err))
+```
+
+`JSStreamSnapshotErrF` is error **10064**, whose description is the template `snapshot failed:
+{err}` (`reference/jetstream/errors.md:170`). So the operator sees:
+
+```
+snapshot failed: no impl (10064)
+```
+
+and the server logs `Snapshot of stream '<account> > <stream>' failed: no impl`.
+
+**The `nats` CLI does not soften it either.** `nats stream backup` at natscli **v0.4.0** has no
+storage-type branch (`cli/stream_command.go:417–425`, `:1465`), so nothing produces a friendlier
+message before the request goes out.
+
+**Impact.** This is the exact question operators ask
+([question-bank Q32](https://github.com/nats-io/nats-server/discussions/4342)), and `no impl` is
+unsearchable: it appears in no documentation, matches no error page, and does not name the cause. A
+reader who searches the documented string finds a page that says the failure will look nothing like
+what they are seeing.
+
+**Suggested fix.** Two options, and the first is cheap: quote the real error on the page
+(`snapshot failed: no impl (10064)`) and explain it. Better, give `memStore.Snapshot` a real message
+— `fmt.Errorf("memory streams do not support snapshots")` — which would make the documentation
+correct as written.
+
+---
+
+## 16 · The restore rename error is the CLI's, and is quoted in the singular
+
+Same page:
+
+> "the server rejects a restore that would rename the stream with
+> `stream name may not be changed during restore`"
+
+Two corrections, both from `natscli` **v0.4.0** (`cli/stream_command.go:1296–1312`, quoted in
+`raw/github-repos/nats-io__natscli.stream-backup-v0.4.0.md`):
+
+```go
+		// we need to confirm this new config has the same stream
+		// name as the snapshot else the server state can get confused
+		// see https://github.com/nats-io/nats-server/issues/2850
+		if bm.Config.Name != cfg.Name {
+			return fmt.Errorf("stream names may not be changed during restore")
+		}
+```
+
+1. It is the **client** that produces this message, not the server — and only when `--config` is
+   passed, because that is the only way the CLI can be handed a differing name.
+2. The text is `stream names` (**plural**), so the documented string does not match.
+
+The **server's** own rejection is different: a name that does not match the restore subject returns
+`NewJSStreamMismatchError()` — error **10060** `JSStreamNotMatchErr`, "expected stream does not
+match" (`server/jetstream_api.go:3832–3835`).
+
+**Impact.** Low, but it is an error string, and error strings get grepped, alerted on and pasted into
+search engines.
+
+**Suggested fix.** Quote the CLI message verbatim and say it is the CLI's, or quote the server's
+10060 for the API path.
+
+---
+
+## 17 · The snapshot schema's `chunk_size` maximum is off by ~9 quintillion
+
+`reference/jetstream/api/stream/snapshot.md` documents the request fields:
+
+| field | documented range |
+|---|---|
+| `chunk_size` | Minimum `1024`, **Maximum `9223372036854776000`** |
+| `window_size` | Minimum `1024`, Maximum `33554432` |
+
+The server clamps both (`server/jetstream_api.go:4277–4280`, v2.14.6):
+
+```go
+	chunkSize = min(max(1024, chunkSize), 1024*1024) // Clamp within 1KiB to 1MiB
+	wndSize = min(max(1024, wndSize), 32*1024*1024)  // Clamp within 1KiB to 32MiB
+```
+
+`window_size`'s documented 32 MiB maximum is exactly right. **`chunk_size`'s is not**: the real
+ceiling is **1 MiB**, and a larger request is silently clamped rather than rejected — so a client
+asking for 8 MiB chunks gets 1 MiB chunks and no indication that anything was ignored.
+
+This is the same shape as issues #1–3: a **generated** reference page carrying a value the server
+contradicts, where the generator has emitted the field's type bound in place of its validated range.
+
+**Suggested fix.** Emit `1048576` as `chunk_size`'s maximum, the way `window_size`'s is emitted.
+
+---
+
+## 18 · A restore can change everything but the name, and the chapter never says so
+
+`learn/backup-recovery/stream-backup-restore.md` presents restore as reproducing the original:
+
+> "Restore … recreates the stream from it: same messages, same sequence numbers, same
+> configuration."
+
+and the only escape it offers is:
+
+> "If you do need a second copy under a new name, restore to `ORDERS` first and then mirror or source
+> it."
+
+`nats stream restore` at natscli **v0.4.0** takes four flags neither that page nor
+`learn/backup-recovery/disaster-recovery.md` mentions
+(`cli/stream_command.go:427–434`):
+
+| flag | help text |
+|---|---|
+| `--config <file>` | "Load a different configuration when restoring the stream" |
+| `--cluster <name>` | "Place the stream in a specific cluster" |
+| `--tag <tag>` | "Place the stream on servers that has specific tags (pass multiple times)" |
+| `--replicas <n>` | "Override how many replicas of the data to create" |
+
+`--cluster` and `--tag` become the restored stream's `Placement` (`:1313–1318`).
+
+**Impact.** These are exactly the flags a disaster-recovery reader needs — "restore the production
+R3 snapshot into the DR cluster as R1" is one command, and the chapter's own DR page never offers
+it, framing cross-site recovery solely as mirror promotion. The name is the one thing that genuinely
+cannot change, and the reason is linked in the CLI source (`nats-server` issue #2850).
+
+**Suggested fix.** Add the four flags to the restore section, and a line to the DR page's restore
+path: a snapshot can be restored into another cluster, on tagged servers, at a different replica
+count.
+
+---
+
+## 19 · Fifteen timeout defaults in the generated config reference ★
+
+**Impact: every documented default for a TLS handshake or authentication budget is wrong**, and one
+of them is wrong in a way that matters operationally — auth callout's deadline is
+`authorization { timeout }`, so anyone sizing an auth service against the documented `1` is planning
+against a third of the real budget.
+
+Authority: `nats-io/nats-server` at **v2.14.6**, quoted in
+`raw/nats-server-src/auth-tls-v2.14.6.md`.
+
+```go
+TLS_TIMEOUT              = 2 * time.Second   // const.go:108
+AUTH_TIMEOUT             = 2 * time.Second   // const.go:117
+DEFAULT_LEAF_TLS_TIMEOUT = 2 * time.Second   // const.go:165
+```
+
+```go
+func getDefaultAuthTimeout(tls *tls.Config, tlsTimeout float64) float64 {   // opts.go:6191
+	var authTimeout float64
+	if tls != nil {
+		authTimeout = tlsTimeout + 1.0
+	} else {
+		authTimeout = float64(AUTH_TIMEOUT / time.Second)
+	}
+	return authTimeout
+}
+```
+
+**The sweep.** Every `timeout` key of both families in `inbox/config-keys-table.md` was checked
+against `setDefaults` in `opts.go`:
+
+| documented key | docs say | server | evidence |
+|---|---|---|---|
+| `tls.timeout` | `500ms` | **2s** | `opts.go:6021–6023` |
+| `cluster.tls.timeout` | `500ms` | **2s** | `opts.go:6031–6033` |
+| `leafnodes.tls.timeout` | `500ms` | **2s** | `opts.go:6076–6078` |
+| `gateway.tls.timeout` | `500ms` | **2s** | `opts.go:6144–6146` |
+| `mqtt.tls.timeout` | `500ms` | **2s** | `opts.go:6166–6168` |
+| `leafnodes.remotes.tls.timeout` | `500ms` | **2s** | `opts.go:3155`, `DEFAULT_LEAF_TLS_TIMEOUT` |
+| `websocket.tls.timeout` | `500ms` | **no such option** | `WebsocketOpts` has no `TLSTimeout` field; it carries `HandshakeTimeout` for the whole websocket handshake |
+| `gateway.gateways.tls.timeout`, `resolver_tls.timeout` | `500ms` | *not checked* | the per-remote parse takes `tlsopts.Timeout` (`opts.go:3335`) with no default assignment found |
+| `authorization.timeout` | `1` | **2s**, or `tls_timeout + 1` | `opts.go:6024–6026` |
+| `cluster.authorization.timeout` | `1` | same rule | `opts.go:6034–6036` |
+| `leafnodes.authorization.timeout` | `1` | same rule | `opts.go:6079–6081` |
+| `gateway.authorization.timeout` | `1` | same rule | `opts.go:6147–6149` |
+| `mqtt.authorization.timeout`, `websocket.authorization.timeout` | `1` | *not checked* | both blocks parse `auth.timeout` (`opts.go:5666`, `:5574`) |
+
+**Of 15 keys, 10 are verified wrong, 1 documents an option that does not exist, and 4 were not
+checked.** No key of either family was found where `500ms` or `1` is correct.
+
+**Two further problems in the same pages.** The generated reference gives
+`authorization.timeout` **no default at all** on its own property page
+(`reference/config/authorization/timeout.md`) while the parent table states `1` — so the two
+generated pages disagree with each other. And `tls.timeout`'s documented type is `duration`, while
+the parser accepts "a float in seconds **or** a duration string" (`opts.go:5222–5232`); the
+hand-written learn page uses the float form (`timeout: 2`) that the reference's type forbids.
+
+**The hand-written pages are closer to right than the generated ones**, again: `learn/security/
+encryption.md` says the TLS handshake default "is `2`", which matches the server.
+
+**Suggested fix.** Emit `2s` for every `tls.timeout` and drop the `websocket.tls.timeout` page.
+For the auth family, state the rule rather than a number: *2 seconds, or `tls_timeout + 1` when TLS
+is configured on the same listener.*
+
+## 20 · Certificate expiry is on `/varz` and the docs never say so ★
+
+**Impact: the docs tell operators to do something they give them no way to do.**
+`learn/security/encryption.md` closes its rotation pitfall with "A certificate that expires unnoticed
+fails as a handshake rejection, not an auth error — **monitor validity dates** and pair renewal with
+the reload signal", and names no mechanism. The public thread that asked for one
+([gh#7684](https://github.com/nats-io/nats-server/discussions/7684)) ends with a maintainer pointing
+at [PR #7709](https://github.com/nats-io/nats-server/pull/7709), which shipped the field.
+
+**It is in the server this docs tree describes.** At v2.14.6:
+
+```go
+TLSCertNotAfter time.Time `json:"tls_cert_not_after,omitzero"`   // monitor.go:1296
+```
+
+filled for the client listener and for `cluster`, `gateway`, `leafnode`, `mqtt` and `websocket`
+(`monitor.go:1838–1845`), from the leaf certificate of the first configured certificate
+(`tlsCertNotAfter`, `monitor.go:1485–1498`).
+
+**The docs' evidence.** `grep -r tls_cert_not_after` over the 861-page tree fetched 2026-08-31
+returns **nothing** — not in `learn/security/encryption.md`, not in
+`learn/monitoring/monitoring-endpoints.md`, not in `learn/deployment/hardening.md`, which is the page
+that tells you to rotate ahead of expiry.
+
+**Also unmentioned: `nats account tls`**, in the CLI the docs recommend (natscli **v0.4.0**,
+`cli/account_tls_command.go`), which does exactly this job across the whole verified chain, with
+`--expire-warn` defaulting to `1w` and a non-zero exit for a monitoring pipeline. It appears on no
+docs page either.
+
+**Suggested fix.** Add `tls_cert_not_after` to the monitoring endpoint page's `/varz` field list, and
+replace "monitor validity dates" on the TLS page with the two concrete checks.
+
+## 21 · The `external` block is required, undocumented, and pointed at the wrong page ★
+
+**Impact: cross-account and cross-domain replication is unbuildable from the docs**, and the failure
+is silent — "Get a type wrong and replication doesn't fail with an error; the mirror never catches
+up", by the docs' own admission.
+
+`learn/jetstream/mirrors-and-sources.md` says:
+
+> "Reaching a stream in another account or JetStream domain needs the `external` block plus matching
+> exports and imports on both sides… Check each import type against
+> [Reference → Stream Configuration](/reference/jetstream/api/stream/create.md)."
+
+**That reference page does not mention `external`.** Neither does any other. `grep -r` over the tree
+for `api_prefix`, `deliver_prefix`, `"external"` and `external:` returns **nothing**.
+
+The fields exist and are two lines long (`stream.go:425–429` at v2.14.6):
+
+```go
+// ExternalStream allows you to qualify access to a stream source in another account or domain.
+type ExternalStream struct {
+	ApiPrefix     string `json:"api"`
+	DeliverPrefix string `json:"deliver"`
+}
+```
+
+They are a field of `mirror` and of every entry of `sources` (`stream.go:397`, `:412`), validated by
+three error codes the docs do not connect to them — **10021**, **10022** and **10024** — and applied
+by substitution on the API subject (`stream.go:2818`).
+
+**The same gap is visible from the other side.** `learn/security/cross-account.md` builds the whole
+export/import model and never mentions JetStream;
+[gh#7017](https://github.com/nats-io/nats-server/discussions/7017), "Sharing a KV Store with Multiple
+Accounts – Is It Supported?", says "I looked for documentation about this but wasn't successful" and
+**has had no reply since 2025-06-29**. The only public answer is one line in
+[gh#5606](https://github.com/nats-io/nats-server/discussions/5606): "You should be able to import the
+foreign account jetstream API and manage it using the API prefix options in clients and CLI."
+
+**Suggested fix.** Document `external.api` and `external.deliver` on the stream configuration
+reference, and add a cross-account JetStream section to `learn/security/cross-account.md` with the
+three subject types and their required export kinds.
+
+
+## 22 · Four defaults in the generated `jetstream` block, including the one everyone quotes ★
+
+**Impact: production servers left on the auto-sized storage limit fail to restart.** This is not a
+cosmetic wrong number — the docs' description of `max_file_store` is what makes operators leave it
+unset, and leaving it unset is what breaks the restart.
+
+### The headline: `max_file_store`
+
+`reference/config/jetstream/max_file_store.md`, and the same sentence in the parent table
+`reference/config/jetstream.md`:
+
+> "Maximum size of the *file* storage. Defaults to up to 1TB if available."
+
+The server (`server/jetstream.go:2760–2764` at v2.14.6):
+
+```go
+	if maxStore > 0 || (opts.maxStoreSet && maxStore == 0) {
+		jsc.MaxStore = maxStore
+	} else {
+		jsc.MaxStore = diskAvailable(jsc.StoreDir)
+		jsc.maxStorePending = true
+	}
+```
+
+and `server/disk_avail.go:28–35`:
+
+```go
+	var fs syscall.Statfs_t
+	if err := syscall.Statfs(storeDir, &fs); err == nil {
+		// Estimate 75% of available storage.
+		ba = int64(uint64(fs.Bavail) * uint64(fs.Bsize) / 4 * 3)
+	} else {
+		// Used 1TB default as a guess if all else fails.
+		ba = JetStreamMaxStoreDefault
+	}
+```
+
+**1 TB is the `statfs`-failure fallback**, named `JetStreamMaxStoreDefault` and reached only in the
+`else`. The default is **75% of the space free under `store_dir` at startup**.
+
+Three things follow that the docs never say:
+
+1. **It is 75% of *free* space, not of the volume**, so it falls as JetStream fills the disk. Before
+   nats-server **2.14.6** the ceiling ratcheted downwards at every restart until the server could no
+   longer restore its own streams —
+   [issue #8322](https://github.com/nats-io/nats-server/issues/8322),
+   [issue #5871](https://github.com/nats-io/nats-server/issues/5871) — with the reproduction being
+   four lines: 512 MB volume → limit 338 MB → 300 MB stream → fill 250 MB → restart → limit 196 MB →
+   `insufficient storage resources available (10047)`. Fixed by PR
+   [#8503](https://github.com/nats-io/nats-server/pull/8503) (merged 2026-08-24, first in v2.14.6;
+   `finalizeDynamicMaxStore` is absent from v2.14.5).
+2. **The maintainers say not to use it in production, twice, and neither statement is in the docs.**
+   @derekcollison, 2024-09-10: *"We do not recommend auto-sizing for real world production uses…
+   Auto detection is for development and testing."* @MauriceVanVeen, 2026-06-18: *"Production-grade
+   systems… shouldn't rely on these dynamic values."* The reporter asked directly — *"Is this
+   recommendation to avoid the default value mentioned anywhere in the docs?"* — and was answered
+   *"Not sure about the docs"*.
+3. **`max_file_store: 0` means zero, not unlimited.** The condition above takes an explicitly set `0`
+   literally, so no stream can be created. A reporter hit exactly this: *"It also no longer seems to
+   be possible to specify there should be no limit, as setting the value to 0 (as mentioned in the
+   docs) prevents the creation of any stream."*
+
+The **hand-written** page has it right — `learn/deployment/sizing-and-resources.md` says "**File
+storage** defaults to 75% of the disk space actually available under `store_dir`, falling back to
+**1 TB** only when the platform can't report disk size". This is the same generated-vs-hand-written
+split as #1–3 and #19.
+
+### The sweep: every value in the block, checked
+
+`reference/config/jetstream.md` states ten defaults. All ten were checked against v2.14.6; **four are
+wrong**.
+
+| key | docs | server | evidence |
+|---|---|---|---|
+| `max_file_store` | "up to 1TB if available" | **75% of free space under `store_dir`** | `jetstream.go:2763`, `disk_avail.go:31` |
+| `max_buffered_msgs` | `10000` | **100000** | `streamDefaultMaxQueueMsgs`, `stream.go:441`; applied `stream.go:900–904` |
+| `max_outstanding_catchup` | `32M` | **64MB** | `defaultMaxTotalCatchupOutBytes`, `jetstream_cluster.go:11158`; applied `jetstream.go:424–425` |
+| `info_queue_limit` | `100000` | **`request_queue_limit`**, so 10000 unless set | `opts.go:6183–6185` |
+| `max_buffered_size` | `128MB` | 128MB ✓ | `stream.go:442` |
+| `request_queue_limit` | `10000` | 10000 ✓ | `JSDefaultRequestQueueLimit`, `jetstream_api.go:367` |
+| `sync_interval` | `2m` | 2m ✓ | `defaultSyncInterval`, `filestore.go:333` |
+| `strict` | `true` | true ✓ | `jetstream.go:2754` |
+| `store_dir` | `/tmp/nats/jetstream` | `os.TempDir()/nats/jetstream` ✓ | `jetstream.go:2747` |
+| `max_memory_store` | "75% of available memory" | 75% of **total** memory, or `GOMEMLIMIT`; 256MB fallback | `jetstream.go:2769–2781` |
+
+The last row is terse rather than wrong — the server's own comment says "Estimate to 75% of **total**
+memory" and the 256 MB fallback and `GOMEMLIMIT` cap are simply absent from the page.
+
+**The two siblings are described inconsistently with each other**, which is the tell:
+`max_memory_store` says "75% of available memory" and `max_file_store` says "up to 1TB". They are the
+same mechanism, ten lines apart in the same function.
+
+**Suggested fix.** Change `max_file_store`'s description to match its sibling — "Defaults to 75% of
+the disk space free under `store_dir` at startup; falls back to 1 TB only when the platform cannot
+report disk size" — correct the three numeric defaults, state that `info_queue_limit` inherits
+`request_queue_limit`, note that an explicit `0` disables the storage class, and add the maintainers'
+production guidance to `learn/deployment/sizing-and-resources.md`, which already has the arithmetic
+right.
+
 ## How these were found
 
 Not by looking for them. Each fell out of ingesting a source and cross-checking it against another:
@@ -309,12 +910,34 @@ Not by looking for them. Each fell out of ingesting a source and cross-checking 
 - **6**: answering "what breaks above 8MB" (question-bank Q12) required knowing whether the boundary
   is enforced.
 - **7**: writing the release entity pages put ADR dates and shipping versions side by side.
+- **15–18**: writing the backup runbook meant answering question-bank Q32, which asks about
+  **memory** streams specifically. Checking the documented error against `memstore.go` found #15;
+  reading the CLI to confirm its flags found #16 and #18; and comparing the snapshot request's
+  documented ranges against the server's clamps found #17.
+- **13–14**: writing the upgrade runbook meant stating what `lame_duck_duration` is for. The docs
+  give it two jobs; reading `Server.lameDuckMode()` showed it has one, and reading the same page
+  twice showed "grace period" naming two different keys with opposite requirements.
+- **11–12**: writing the install and cluster runbooks meant quoting commands and a unit file, and
+  `CLAUDE.md` forbids quoting one this wiki has not read. Fetching `server/route.go` to check a log
+  line found the dynamic-name branch; fetching `util/nats-server-hardened.service` to check the unit
+  found what the page's extract leaves out.
+- **19–21**: writing the TLS runbook meant naming a way to see a certificate's expiry, which the
+  docs do not give — reading `server/monitor.go` for one found `tls_cert_not_after` (#20), and
+  reading `opts.go` for the reload story found `getDefaultAuthTimeout`, which then justified a sweep
+  of every timeout default in `inbox/config-keys-table.md` (#19). #21 came from the opposite
+  direction: question-bank Q51 has an unanswered public thread, so the mechanism had to be read from
+  `server/stream.go`, and the docs page that names the field turned out to point at a reference page
+  that omits it.
 - **8–10**: writing one entity page per official client meant reading all twelve READMEs next to the
   docs' client table. Every claim in that table was checked against its repository; three did not
   survive. The two `wrong-value` rows are both **staleness in a hand-maintained table** — the docs
   page is correct as written for an earlier release of the thing it describes.
 
-**The generalisable lesson for the docs:** the three factual errors are all in **generated**
+**The generalisable lesson for the docs:** the errors cluster in two places — **generated**
+reference pages, and **quoted error strings in hand-written pages** (#15, #16), where the prose was
+written from intent rather than from a run. Both are mechanically checkable against the server.
+
+**The original observation still holds:** three of the first factual errors are all in **generated**
 reference pages, and in all three cases a **hand-written** page (a learn page, an ADR) had the
 correct value. A generator that cross-checked its output against the server constants it claims to
 describe would have caught all three.
@@ -331,3 +954,15 @@ describe would have caught all three.
 | 8 | `wiki/entities/nats-net.md` — *What an operator needs to know* |
 | 9 | `wiki/entities/nats-js.md` — *What an operator needs to know* |
 | 10 | `wiki/entities/nats-py.md` — *What an operator needs to know* |
+| 11 | `wiki/operations/build-a-3-node-cluster.md` — *Pitfalls*; `wiki/summaries/s-nats-server-route-cluster-formation.md` |
+| 12 | `wiki/operations/install-nats-server.md` — *Run it under systemd*; `wiki/summaries/s-nats-server-systemd-units.md` |
+| 13 | `wiki/operations/upgrade-a-cluster.md` — *Per node: drain, restart, wait* and *Pitfalls*; `wiki/summaries/s-nats-server-lame-duck.md` |
+| 14 | `wiki/operations/upgrade-a-cluster.md` — *Kubernetes*; `wiki/entities/nats-helm-charts.md` |
+| 15 | `wiki/operations/backup-and-restore-jetstream.md` — *Memory streams*; `wiki/concepts/stream.md`; `wiki/reference/error-codes.md` |
+| 16 | `wiki/operations/backup-and-restore-jetstream.md` — *Restore it* |
+| 17 | `wiki/operations/backup-and-restore-jetstream.md` — *Tuning a slow or distant link* |
+| 18 | `wiki/operations/backup-and-restore-jetstream.md` — *Restore somewhere else, at a different size*; `wiki/entities/nats-cli.md` |
+| 19 | `wiki/reference/defaults-and-limits.md` — *Authentication and TLS handshake budgets*; `wiki/concepts/tls-in-nats.md`; `wiki/concepts/auth-callout.md` |
+| 20 | `wiki/operations/rotate-tls-certificates.md` — *Find out what is actually deployed*; `wiki/reference/monitoring-endpoints.md` |
+| 21 | `wiki/concepts/cross-account-sharing.md` — *Sharing JetStream*; `wiki/summaries/s-gh-7017-kv-across-accounts.md` |
+| 22 | `wiki/gotchas/jetstream-out-of-disk.md` — *A docs error worth knowing*; `wiki/reference/defaults-and-limits.md` — *JetStream — server*; `wiki/reference/config-keys.md` — *`jetstream { … }`*; `wiki/operations/jetstream-sizing.md` — *Step 4*; `wiki/summaries/s-nats-server-jetstream-resources.md` |

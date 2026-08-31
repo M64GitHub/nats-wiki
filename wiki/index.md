@@ -41,6 +41,16 @@ exists to answer live in `inbox/question-bank.md`.
   and `EOB`, and why it can never confirm a write.
 - [[mirrors-and-sources]] — exact read-only copy vs merged aggregate; `Lag` as your RPO, the four
   `mirror_direct` rules, and the two failures that are completely silent.
+- [[subject-permissions]] — the two rules that govern every grant: an `allow` list closes everything
+  else, and deny beats allow. Plus the three denials that are completely silent.
+- [[operator-mode]] — the operator → account → user trust chain: three signature checks per
+  connection, scoped signing keys, revocation windows, and why nothing takes effect until you push.
+- [[auth-callout]] — authentication delegated to a service you run. What the server signs, what it
+  pins, and the fact that it verifies **nothing** the client presented.
+- [[tls-in-nats]] — one `tls {}` block per connection type and none of them inherit; `verify_and_map`
+  as an identity, TLS-first, and the at-rest key.
+- [[cross-account-sharing]] — exports and imports, the two halves that fail differently, and the two
+  undocumented routes to a stream or KV bucket in another account.
 
 ## Internals
 
@@ -56,6 +66,27 @@ exists to answer live in `inbox/question-bank.md`.
 ## Operations
 
 **Runbooks**
+
+- [[install-nats-server]] — one server as a service you can reload, drain and monitor: the config
+  that earns its lines, the unit the repo actually ships, Docker and Helm, and what to verify.
+- [[build-a-3-node-cluster]] — routes, gossip and one seed; the two ways a cluster silently fails to
+  form, TLS on the route port, and the five checks that prove it worked.
+- [[upgrade-a-cluster]] — the rolling upgrade: lame-duck drain, non-leaders first and the meta-leader
+  last, the gate on every replica reading `current`, and the per-version hazards and downgrade floors.
+- [[reload-server-config]] — change policy without a reconnect: validate, SIGHUP, verify. What a
+  reload can and cannot change, and the Kubernetes sidecar that does the signalling.
+- [[rebalance-streams]] — adding a node moves nothing. Grow a peer set, move a replica off a server,
+  retire one — **one change at a time**, gated on a named leader and zero lag.
+- [[backup-and-restore-jetstream]] — the snapshot: what it holds, how to restore it somewhere else at
+  a different size, and why a **memory stream fails with `snapshot failed: no impl`**.
+- [[disaster-recovery]] — which copy to reach for, and the five-step promotion of a mirror into a
+  writable primary. `Lag` is the RPO; the meta-quorum precondition is decided at design time.
+- [[backup-and-restore-identity]] — the operator, accounts, seeds and `server.conf`. Sealed with a
+  curve key, and the re-push into the server's resolver that a naive restore forgets.
+- [[set-up-operator-mode]] — operator, accounts, scoped keys, creds and a resolver, in the order that
+  works; gated at every step, because the failures here produce no error anywhere.
+- [[rotate-tls-certificates]] — replace a certificate before it expires, and find out how long you
+  have: `tls_cert_not_after` per listener, and `nats account tls` across the whole chain.
 
 **Sizing**
 
@@ -79,6 +110,23 @@ exists to answer live in `inbox/question-bank.md`.
   `consumer info` control loop, and how to design consumers away.
 - [[slow-consumer-detected]] — what the log line does *not* tell you. **No confirmed fix**; the
   public thread is unanswered.
+- [[unauthenticated-clients-still-connect]] — you added a system account and the door is still open.
+  The server fabricates a `$G` user and advertises `auth_required: true` anyway.
+- [[jetstream-out-of-disk]] — `10047` / `10028` compare **reservations**, not usage. Three failures
+  wear the same words, and two of them happen with the volume nearly empty.
+- [[stream-directories-disappear]] — every stream still listed, most directories gone. `store_dir` on
+  tmpfs, and a distribution reaper doing its job.
+- [[malformed-or-corrupt-message]] — a corrupt Raft WAL, a fresh volume that re-corrupts, and why
+  `JetStream out of resources` appears with 94% of the disk free.
+- [[streams-not-visible-across-a-leafnode]] — extending JetStream needs the system account **and**
+  matching domains. Different domains is the other supported answer, and the server guards the
+  middle case.
+- [[stream-has-high-message-lag]] — 10,000 accepted-but-unapplied proposals on the leader, plus the
+  table of neighbouring JetStream warnings and what each one measures.
+- [[kv-watchers-stall-the-cluster]] — 1000 watchers on a 118-byte bucket. Churn, not count. **No
+  confirmed fix**; the thread is unanswered.
+- [[nats-timeout]] — the client's own error, which the server never sends and never logs. Including
+  the API queue that drops every pending request without a reply.
 
 ## Reference
 
@@ -217,6 +265,32 @@ exists to answer live in `inbox/question-bank.md`.
 
 - [[s-nats-server-constants-2.14.6]] — the defaults the docs do not state, read from the tagged
   source with file and line.
+- [[s-nats-server-systemd-units]] — the two units in `util/`: `ExecStop` is a **SIGUSR2 lame-duck
+  drain**, `TimeoutStopSec=150` is `lame_duck_duration` plus buffer, `LimitNOFILE=800000`.
+- [[s-nats-server-route-cluster-formation]] — the cluster-name check on both sides of a route, and
+  the dynamic-name case the docs omit: an unset name is **adopted**, not rejected.
+- [[s-nats-server-signals]] — what each signal does, including `SIGTERM` during a drain, and the
+  `--signal` name that sends **SIGKILL**.
+- [[s-nats-server-lame-duck]] — the drain as implemented: the JetStream work happens **before** the
+  timer, the spread is `duration − grace`, and the per-client interval is capped at one second.
+- [[s-nats-server-snapshot-restore]] — the snapshot clamps, the two restore checks, and the `no impl`
+  a **memory** stream returns instead of the documented message.
+- [[s-nats-server-auth-and-tls]] — the real auth and TLS timeout defaults, `tls_cert_not_after`, the
+  certificate-to-user mapping order, the credentials auth callout does **not** check, and the `$G`
+  user the server invents.
+- [[s-nats-server-jetstream-resources]] — what "out of storage" actually means: the 75%-of-**free**
+  disk default, `finalizeDynamicMaxStore` (new in 2.14.6), what `10047` compares, and the
+  out-of-space handler's two callers.
+- [[s-nats-server-leafnode-js-domains]] — the three outcomes of a leafnode carrying JetStream, the
+  `$JS.<domain>.API.>` mapping table, and the server's explicit guard against two identical domains.
+- [[s-nats-server-jetstream-log-warnings]] — every JetStream warning this wiki quotes, with its
+  threshold and what the server does next; including the API queue that drains without replying.
+
+**The `nats.go` client source**
+
+- [[s-nats-server-jetstream-log-warnings|(see above)]] for the server side; the client error strings
+  `nats: timeout` and `nats: no responders available for request` are quoted from
+  `raw/nats-go-src/errors-v1.53.1.md` on [[nats-timeout]].
 
 **Synadia blog**
 
@@ -252,6 +326,41 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-gh-7831-standalone-to-cluster]] — maintainers on why standalone cannot become a cluster
   in place.
 - [[s-gh-6605-which-consumer-is-slow]] — an unanswered thread, recorded as unanswered.
+- [[s-gh-7190-asymmetric-cluster]] — one DNS name as the route address: nodes with **unequal route
+  counts** and clients partitioned. Unanswered; the maintainer names the cause.
+- [[s-gh-3569-connect-to-route-port]] — `attempted to connect to route port`: the client-port /
+  route-port confusion, answered by a maintainer.
+- [[s-gh-6070-lame-duck-under-systemd]] — a unit with `ExecStop=… SIGINT` that never drains, and the
+  rule that follows: with systemd, stop through `systemctl`.
+- [[s-gh-4342-memory-stream-backup]] — "Not currently": the accepted answer on backing up a memory
+  stream, plus the file-backed-mirror workaround and the temporarily-R3 restart trick.
+- [[s-gh-4535-unauthenticated-connections]] — a system account that reopened the server, the
+  maintainer's rule, and the bug fix it turned into (**2.10.2**).
+- [[s-gh-7854-jwt-push-timeout]] — an account push that times out with nothing in the log, and a
+  maintainer's working `nats auth` sequence.
+- [[s-gh-7684-certificate-expiry]] — why `openssl s_client` returns nothing against port 4222, and
+  the `/varz` field that was added because of this thread.
+- [[s-gh-7505-auth-callout-nkey]] — no, the server does not verify `connect_opts.nkey`. Treat every
+  field of it as a claim.
+- [[s-gh-5606-cross-account-jetstream]] — four maintainers, four answers: no cross-account user, no
+  JetStream on the system account, and the API-prefix route nothing documents.
+- [[s-gh-7017-kv-across-accounts]] — sharing a KV bucket across accounts. **Unanswered since
+  2025-06-29**; recorded as evidence about the docs.
+- [[s-gh-5044-restrict-durable-consumers]] — why subject permissions cannot forbid durable consumers:
+  the durable name is in the payload. **Unresolved.**
+- [[s-gh-5924-filestore-dirs-vanished]] — 45 of 50 stream directories gone. `store_dir` on a RAM
+  disk, and `tmpwatch` doing exactly what it is for.
+- [[s-gh-7463-jetstream-corruption]] — a corrupt Raft WAL on 2.9.8 that "spread back" from healthy
+  replicas. One-sentence answer, confirmed fix: upgrade.
+- [[s-gh-7834-leafnode-same-js-domain]] — the same JetStream domain on both ends of a leafnode.
+  **Unanswered**; the source explains all four observations.
+- [[s-gh-6490-high-message-lag]] — `has high message lag`: publishing faster than the system can
+  store, with the two named causes.
+- [[s-gh-6746-watch-many-keys]] — several KV keys on one watcher; self-answered in an hour.
+- [[s-gh-5243-kv-watchers-at-scale]] — 1000 watchers, a 118-byte bucket and a cluster that does not
+  recover. **Unanswered.**
+- [[s-gh-5859-unexpected-nats-timeout]] — two reports of `nats: timeout`, a ping line that is not a
+  symptom, one real routes defect and a `GOMAXPROCS` hypothesis. **Unresolved.**
 
 **Synadia blog (continued)**
 
@@ -280,10 +389,68 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-docs-mirrors-as-dr]] — `Lag` as RPO, what an upstream delete really does to a mirror, and why a
   mirror is not a backup.
 
+**docs.nats.io — Topologies, clustering and hardening (learn)**
+
+- [[s-docs-single-server]] — the smallest config worth deploying, the three jobs one server is right
+  for, and `replicas > 1 not supported in non-clustered mode`.
+- [[s-docs-your-first-cluster]] — the `cluster {}` block as a deployment shape: routes, INFO-driven
+  client failover, and the three pitfalls.
+- [[s-docs-forming-a-cluster]] — explicit vs implicit routes, gossip as INFO redistribution, and what
+  the `Routes` column of `nats server list` actually counts.
+- [[s-docs-hardening]] — three independent TLS blocks, the sandboxed systemd unit, and why
+  `http: "127.0.0.1:8222"` is right on a VM and an outage on Kubernetes.
+- [[s-docs-rolling-upgrades]] — lame-duck mode step by step, the upgrade **order** rule, the
+  `current` gate, and the PodDisruptionBudget that enforces it.
+- [[s-docs-config-management]] — includes, the `-t` dry-run, SIGHUP, and the policy-versus-identity
+  rule behind the reload/restart split.
+- [[s-docs-scaling-and-peers]] — grow a Raft group and watch catchup; `peer-remove` vs `--replicas`;
+  why one membership change at a time is the whole discipline.
+- [[s-docs-stream-backup-restore]] — `backup.json` + `stream.tar.s2`, the chunked/windowed transfer,
+  and the two rules on restore.
+- [[s-docs-disaster-recovery]] — the failure-to-tool decision table, the five-step mirror promotion,
+  and the meta-quorum precondition under all of it.
+- [[s-docs-config-and-jwt-backup]] — the identity plane: which files carry it, sealing the archive,
+  and why a restored store still leaves the server rejecting everyone.
+
 **docs.nats.io — Security (learn)**
 
 - [[s-docs-accounts-and-multitenancy]] — accounts as isolated subject spaces, `$G` and `$SYS`,
   per-account JetStream, and the `no_auth_user` traps.
+- [[s-docs-authentication-basics]] — the config user list, the three credential styles, bcrypt, and
+  the one error string every authentication failure produces.
+- [[s-docs-authorization]] — permissions as subjects; the allow/deny rules and the four ways they
+  fail silently.
+- [[s-docs-cross-account]] — export and import, stream vs service, and the asymmetric failure: an
+  unmatched import stops the server, an unmatched export moves nothing.
+- [[s-docs-operator-mode]] — the build: `nats auth`, the store, the creds file, the resolver, and the
+  push.
+- [[s-docs-decentralized-auth]] — what the server verifies, scoped signing keys, the revocation
+  window, expiry and bearer tokens.
+- [[s-docs-auth-callout]] — `$SYS.REQ.USER.AUTH`, the signing and replay rules, and the credentials
+  that cross it in the clear.
+- [[s-docs-encryption-and-tls]] — TLS per connection type, `verify_and_map`, TLS-first, and the
+  at-rest key.
+- [[s-docs-security-checklist]] — the chapter's four questions and the only consolidated security
+  checklist the docs publish.
+
+**The `nats` CLI**
+
+- [[s-natscli-backup-restore]] — every flag `nats stream backup` / `restore` takes at v0.4.0,
+  including the three (`--config`, `--cluster`, `--replicas`) that make a cross-site restore possible.
+- [[s-natscli-account-tls]] — `nats account tls`, the certificate check nobody names: the whole
+  verified chain, `--expire-warn 1w`, and a non-zero exit. Plus `nats account backup` / `restore`.
+
+**The Helm chart**
+
+- [[s-nats-helm-chart-values-2.14.6]] — the chart's own `values.yaml` at its release tag: lame-duck
+  timing with zero slack, the reloader's `/etc/`-only watch, and `configChecksumAnnotation`.
+
+**GitHub issues — `nats-io/nats-server`**
+
+- [[s-issue-4281-insufficient-storage]] — `10047` with an almost empty disk. `max_bytes` is a
+  reservation; **open since 2023-06-29** with an unanswered counter-example.
+- [[s-issue-8322-dynamic-maxstore-shrinks]] — the auto-sized `max_file_store` ratcheting downwards at
+  every restart, reported twice two years apart, fixed by PR #8503 in **2.14.6**.
 
 **GitHub, CNCF and the repositories**
 
@@ -300,11 +467,16 @@ Concepts: [[leafnode]] · [[gateway]]
 
 Internals: [[filestore-layout]] · [[meta-layer]]
 
-Operations: [[install-nats-server]] · [[build-a-3-node-cluster]] ·
-[[rotate-tls-certificates]] · [[backup-and-restore-jetstream]] · [[upgrade-a-cluster]]
+Operations: *(none — `rotate-tls-certificates` was written 2026-08-31; see the Operations section above)*
 
-Gotchas: [[consumer-keeps-redelivering]] · [[jetstream-out-of-disk]] ·
-[[stream-leader-keeps-moving]] · [[kv-watcher-misses-updates]]
+Gotchas: [[consumer-keeps-redelivering]] · [[stream-leader-keeps-moving]]
+
+`jetstream-out-of-disk` was written 2026-08-31 and is in the Gotchas section above.
+`kv-watcher-misses-updates` has been **retired rather than written**: the thread it was wanted for
+(gh#6746) asks how to watch many keys on one watcher, and a search of `nats-io/nats-server`
+discussions on 2026-08-31 found nobody publicly reporting a KV watcher missing an update. The KV
+watcher failure people do report is `kv-watchers-stall-the-cluster`, in the Gotchas section above;
+the gap is recorded under `## To verify` on the `key-value` page.
 
 Reference: *(all six reference tables are written — see the Reference section above)*
 

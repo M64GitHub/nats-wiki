@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -28,6 +28,16 @@ most useful thing on this page.
 - **R=5 tolerates two simultaneous failures and is the maximum a stream supports**
   (`num_replicas` maximum is `5`; default `1`). Most production streams run R=3; R=5 is for state
   that cannot be re-derived.
+- **Replication is not a backup, and this is the most expensive misunderstanding on the page.** R3
+  protects against a node dying. An accidental `purge`, a bad migration or a logic bug replicates to
+  all three copies at once — "R3 is availability, not a backup". The copies that survive a *mistake*
+  are a snapshot ([[backup-and-restore-jetstream]]) and, partially, a mirror
+  ([[mirrors-and-sources]]); the choice between them is [[disaster-recovery]]
+  (source: [[s-docs-disaster-recovery]]).
+- **On a single server, R>1 is refused rather than degraded.** `nats stream add … --replicas 3`
+  on a non-clustered server answers `replicas > 1 not supported in non-clustered mode`
+  (error **10074**, [[error-codes]]) — redundancy is a cluster's job, so the fix is
+  [[build-a-3-node-cluster]], not a flag (source: [[s-docs-single-server]]).
 - **Use odd counts.** R=2 still has a single point of failure — lose either copy and one server out
   of two cannot form a majority, so writes block. R=4 tolerates only one loss, the same as R=3,
   while paying for a fourth copy.
@@ -184,7 +194,8 @@ the *whole cluster*" — that is what a mirror at a second site is for (source:
 ## Related
 
 [[stream]] · [[consumer]] · [[raft-in-nats]] · [[stream-placement]] · [[retention-policies]] ·
-[[jetstream-sizing]] · [[stream-leader-keeps-moving]] · [[defaults-and-limits]] · [[config-keys]]
+[[jetstream-sizing]] · [[stream-leader-keeps-moving]] · [[defaults-and-limits]] · [[config-keys]] ·
+[[stream-has-high-message-lag]] · [[malformed-or-corrupt-message]]
 
 ## Sources
 

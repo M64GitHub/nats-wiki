@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-adr-7-server-error-codes, s-adr-1-jetstream-json-api]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -76,17 +76,44 @@ Two structural notes from the table's own appendix:
 | **10003** | `JSBadRequestErr` | 400 | bad request | [[js-api]] |
 | **10005** | `JSClusterNoPeersErrF` | 400 | `{err}` | [[no-suitable-peers-for-placement]] |
 | **10014** | `JSConsumerNotFoundErr` | 404 | consumer not found | [[js-api]] |
-| **10023** | `JSInsufficientResourcesErr` | 503 | insufficient resources | [[jetstream-sizing]] |
+| **10023** | `JSInsufficientResourcesErr` | 503 | insufficient resources | [[jetstream-sizing]] · [[jetstream-out-of-disk]] |
+| **10028** | `JSMemoryResourcesExceededErr` | 500 | insufficient memory resources available | [[jetstream-out-of-disk]] |
+| **10047** | `JSStorageResourcesExceededErr` | 500 | insufficient storage resources available | [[jetstream-out-of-disk]] |
+| **10021** | `JSStreamExternalApiOverlapErrF` | 400 | stream external api prefix `{prefix}` must not overlap with `{subject}` | [[cross-account-sharing]] |
+| **10022** | `JSStreamExternalDelPrefixOverlapsErrF` | 400 | stream external delivery prefix `{prefix}` overlaps with stream subject `{subject}` | [[cross-account-sharing]] |
+| **10024** | `JSStreamInvalidExternalDeliverySubjErrF` | 400 | stream external delivery prefix `{prefix}` must not contain wildcards | [[cross-account-sharing]] |
 | **10035** | `JSNoAccountErr` | 503 | account not found | [[account]] |
 | **10039** | `JSNotEnabledForAccountErr` | 503 | JetStream not enabled for account | [[account]] |
 | **10052** | `JSStreamInvalidConfigF` | 500 | `{err}` | [[message-ttl]] |
 | **10059** | `JSStreamNotFoundErr` | 404 | stream not found | [[js-api]] |
 | **10060** | `JSStreamNotMatchErr` | 400 | expected stream does not match | [[mirrors-and-sources]] |
+| **10064** | `JSStreamSnapshotErrF` | 500 | snapshot failed: `{err}` | [[backup-and-restore-jetstream]] |
+| **10065** | `JSStreamSubjectOverlapErr` | 400 | subjects overlap with an existing stream | [[disaster-recovery]] |
 | **10071** | `JSStreamWrongLastSequenceErrF` | 400 | wrong last sequence: `{seq}` | [[stream]] |
+| **10074** | `JSStreamReplicasNotSupportedErr` | 500 | replicas > 1 not supported in non-clustered mode | [[install-nats-server]] |
+| **10075** | `JSPeerRemapErr` | 503 | peer remap failed | [[rebalance-streams]] |
 | **10099** | `JSConsumerWQMultipleUnfilteredErr` | 400 | multiple non-filtered consumers not allowed on workqueue stream | [[retention-policies]] |
 | **10100** | `JSConsumerWQConsumerNotUniqueErr` | 400 | filtered consumer not unique on workqueue stream | [[retention-policies]] |
 | **10165** | `JSMessageTTLInvalidErr` | 400 | invalid per-message TTL | [[message-ttl]] |
 | **10166** | `JSMessageTTLDisabledErr` | 400 | per-message TTL is disabled | [[message-ttl]] |
+| **10130** | `JSStreamNameExistRestoreFailedErr` | 400 | stream name already in use, cannot restore | [[backup-and-restore-jetstream]] |
+| **10202** | `JSClusterServerMemberChangeInflightErr` | 400 | cluster member change is in progress | [[rebalance-streams]] |
+
+**`10047` and `10028` do not mean the disk or the RAM is full.** They compare **reservations** —
+the sum of every stream's `max_bytes` — against the server or account limit, and never look at actual
+usage (`jetstream.go:2523–2553`, source: [[s-nats-server-jetstream-resources]]). A server with 4 MB
+stored and 35 GiB reserved returns `10047`. `10023` is the clustered sibling, returned when the meta
+layer cannot find a peer that will accept the assignment. All three are read the same way: see
+[[jetstream-out-of-disk]].
+
+**`10064` is the one whose text you must read.** Its whole description is `{err}`, and for a **memory**
+stream the substituted text is `no impl` — see [[backup-and-restore-jetstream]], which is also why
+matching on the number alone tells you nothing here.
+
+**`10021`, `10022` and `10024` are the only public sign that the `external` block exists.** They
+validate `external.api` and `external.deliver` on a stream source or mirror — the fields that reach a
+stream in another account or JetStream domain — and **no docs page documents those fields at all**
+(`inbox/docs-issues.md` #21). See [[cross-account-sharing]].
 
 **`10005` and `10052` are the two to know.** Both have `{err}` as their whole description, so the
 number alone tells you almost nothing and the *text* is the only detail — the exact inversion of the
@@ -151,8 +178,11 @@ reason to explain.
 ## Related
 
 [[js-api]] · [[js-api-subjects]] · [[no-suitable-peers-for-placement]] · [[message-ttl]] ·
-[[retention-policies]] · [[stream-placement]] · [[nats-cli]] · [[defaults-and-limits]]
+[[retention-policies]] · [[stream-placement]] · [[nats-cli]] · [[defaults-and-limits]] ·
+[[install-nats-server]] · [[rebalance-streams]] · [[backup-and-restore-jetstream]] ·
+[[disaster-recovery]] · [[cross-account-sharing]] · [[account]]
 
 ## Sources
 
-[[s-adr-7-server-error-codes]] · [[s-adr-1-jetstream-json-api]]
+[[s-adr-7-server-error-codes]] · [[s-adr-1-jetstream-json-api]] · [[s-nats-server-auth-and-tls]] ·
+[[s-gh-5606-cross-account-jetstream]] · [[s-nats-server-jetstream-resources]]

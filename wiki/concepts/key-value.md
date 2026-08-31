@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [kv, bucket, tombstone, watch, direct-get]
 aliases: [KV, key value, KV bucket, KV_]
-sources: [s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config]
+sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -105,7 +105,7 @@ All three are **ephemeral [[ordered-consumer|ordered consumers]]** under the hoo
 
 | operation | how it is built |
 |---|---|
-| **Watch** | ordered consumer starting at **`last_per_subject`**, so it opens with the newest value of every matching key. Multiple keys = **multiple filter subjects**. |
+| **Watch** | ordered consumer starting at **`last_per_subject`**, so it opens with the newest value of every matching key. Multiple keys = **multiple filter subjects** — one consumer, not one per key (source: [[s-gh-6746-watch-many-keys]]; needs nats-server **2.10+** and a client that exposes it). |
 | **History** | ordered consumer filtered by subject, reading with `deliver_all`. The latest value is the one with `Pending == 0`. |
 | **Keys** | a **headers-only** consumer set to **deliver last per subject** — keys are parsed out of the subject and delete/purge operations skipped. **No values cross the wire.** |
 
@@ -119,7 +119,10 @@ options sends every `last_per_subject` value **including delete and purge operat
 requires the signal to be sent **always** — including for an empty bucket.
 
 Because watches and key listings create and drop ephemeral consumers, a busy KV workload shows up
-as consumer churn; see [[ordered-consumer]] and the memory note on [[jetstream-sizing]].
+as consumer churn; see [[ordered-consumer]] and the memory note on [[jetstream-sizing]]. At scale the
+churn — not the count — is what breaks: 1000 clients each watching one key in a bucket holding a
+single 118-byte message pinned a 3-node cluster at its CPU limit and it did not recover
+(source: [[s-gh-5243-kv-watchers-at-scale]]). See [[kv-watchers-stall-the-cluster]].
 
 ## Limit markers and per-key TTL
 
@@ -137,6 +140,28 @@ Enabling markers requires `allow_msg_ttl: true` and a `subject_delete_marker_ttl
 second**, and a server at **API level 1 or newer (2.11+)**. The spec is specific that clients should
 assert this with **`$JS.API.INFO`, not the connected server's version string**.
 
+## Sharing a bucket with another account
+
+There is no KV-specific sharing mechanism. Because a bucket **is** the stream `KV_<bucket>`, the two
+routes are the JetStream ones, and both are in [[cross-account-sharing]]:
+
+- **import the owning account's JetStream API** as a service export and address it with an API
+  prefix — one user then manages assets in the other account;
+- **mirror or source `KV_<bucket>`** with an `external` block — the second account gets a *copy*,
+  with the mirror's lag, and a write there does not reach the original bucket.
+
+**No docs page covers either**, and the public question — "a single account owns a KV store, and I'd
+like to share access to this KV store with other accounts, ideally with some restrictions" — has had
+**no reply since 2025-06-29** (source: [[s-gh-7017-kv-across-accounts]]). The only public answer is a
+single line from a maintainer on the equivalent stream question: "You should be able to import the
+foreign account jetstream API and manage it using the API prefix options in clients and CLI"
+(source: [[s-gh-5606-cross-account-jetstream]]).
+
+The restrictions half is the part with no public answer at all. A service export of `$JS.API.>` hands
+over the account's whole JetStream control plane, not one bucket; narrowing it to a single
+`KV_<bucket>` is not documented and this wiki has not verified it.
+
+
 ## Version notes
 
 | server | what arrived |
@@ -147,9 +172,13 @@ assert this with **`$JS.API.INFO`, not the connected server's version string**.
 
 ## To verify
 
-- **Why a KV watcher would *miss* updates** (question-bank Q69) is not explained by ADR-8. The
-  mechanism it does give — an ordered consumer that rebuilds itself on a detected gap
-  ([[ordered-consumer]]) — is a candidate cause but the linked thread has not been read.
+- **Why a KV watcher would *miss* updates** is still unexplained, and now known to be unsourced: the
+  thread question-bank Q69 was mined from (gh#6746) asks how to watch **many keys on one watcher**, not
+  about missed updates, and a search of `nats-io/nats-server` discussions on 2026-08-31 found nobody
+  publicly reporting a missed KV update. The row has been corrected; the mechanism ADR-8 does give —
+  an ordered consumer that rebuilds itself on a detected gap ([[ordered-consumer]]) — remains a
+  candidate cause with no report behind it. The KV-watcher failure people **do** report is
+  [[kv-watchers-stall-the-cluster]].
 - **KV sources and mirrors** are delegated to ADR-57, **key/value codecs** to ADR-54, and
   **per-key TTL detail** to ADR-48. None of the three has been ingested.
 - Whether a **mirror on file storage** is materially slower than on memory storage (Q76) is not
@@ -158,9 +187,11 @@ assert this with **`$JS.API.INFO`, not the connected server's version string**.
 ## Related
 
 [[stream]] · [[consumer]] · [[ordered-consumer]] · [[message-ttl]] · [[direct-get]] ·
-[[object-store]] · [[replicas]] · [[kv-watcher-misses-updates]]
+[[object-store]] · [[replicas]] · [[kv-watchers-stall-the-cluster]] · [[cross-account-sharing]] ·
+[[account]] · [[mirrors-and-sources]]
 
 ## Sources
 
 [[s-adr-8-key-value-store]] · [[s-adr-43-per-message-ttl]] · [[s-adr-17-ordered-consumer]] ·
-[[s-docs-stream-config]]
+[[s-docs-stream-config]] · [[s-gh-7017-kv-across-accounts]] · [[s-gh-5606-cross-account-jetstream]] ·
+[[s-gh-6746-watch-many-keys]] · [[s-gh-5243-kv-watchers-at-scale]]

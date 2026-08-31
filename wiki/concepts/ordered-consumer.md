@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ordered-consumer, ephemeral, heartbeats, gap-detection]
 aliases: [ordered consumer, OrderedConsumer]
-sources: [s-adr-17-ordered-consumer, s-adr-8-key-value-store]
+sources: [s-gh-5243-kv-watchers-at-scale, s-adr-17-ordered-consumer, s-adr-8-key-value-store]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -65,6 +65,12 @@ short-lived consumers appearing and vanishing. It is also exactly the "many shor
 pattern named as a memory cost on [[jetstream-sizing]] — so a workload built on many KV watchers is
 paying that cost by construction.
 
+**The churn, not the count, is what breaks a cluster.** Each create and each delete is an assignment
+the meta layer has to land, and the deletions are what fall behind: 1000 clients each watching one KV
+key produced a flood of `Consumer assignment for '<acc> > <stream> > <name>' not cleaned up, retrying`
+on a bucket holding a **single 118-byte message**, with all three nodes pinned at their CPU limit
+(source: [[s-gh-5243-kv-watchers-at-scale]]). See [[kv-watchers-stall-the-cluster]].
+
 **A stuck ordered consumer will not look like a redelivery problem.** With `ack_policy: none` there
 are no acks to be outstanding, and the ~22-hour `ack_wait` means nothing times out. It will look
 idle instead. Watch the `idle_heartbeat` instead of the ack counters.
@@ -80,8 +86,9 @@ replicating because it is rebuilt on failure — see the consumer-replica rules 
 
 ## Related
 
-[[consumer]] · [[key-value]] · [[ack-and-redelivery]] · [[replicas]] · [[jetstream-sizing]]
+[[consumer]] · [[key-value]] · [[ack-and-redelivery]] · [[replicas]] · [[jetstream-sizing]] ·
+[[kv-watchers-stall-the-cluster]] · [[jetstream-slows-as-consumers-grow]]
 
 ## Sources
 
-[[s-adr-17-ordered-consumer]] · [[s-adr-8-key-value-store]]
+[[s-adr-17-ordered-consumer]] · [[s-adr-8-key-value-store]] · [[s-gh-5243-kv-watchers-at-scale]]

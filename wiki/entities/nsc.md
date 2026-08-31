@@ -7,7 +7,7 @@ verified-against: nsc v2.15.0
 verified-on: 2026-08-31
 tags: [tool, nsc, operator-mode, jwt, nkeys, accounts, users]
 aliases: [nsc, "nats-io/nsc"]
-sources: [s-docs-ecosystem, s-github-repo-facts]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -86,10 +86,44 @@ nats auth operator backup  ACME acme-operator.backup --key backup-curve.nk
 nats auth operator restore ACME acme-operator.backup --key backup-curve.nk
 ```
 
+## When a push fails
+
+`nsc push` and `nats auth account push` both publish the account JWT to **`$SYS.REQ.CLAIMS.UPDATE`**
+and wait for a reply. When nothing is subscribed there, the failure is a bare timeout and a zero
+count:
+
+```
+[ERR ] failed to get response to push account: nats: timeout
+       [ OK ] pushed to a total of 0 nats-server
+Error: all jobs failed
+```
+
+**The server logs nothing, even at `-DV`** — the request arrives and no one answers, which is not an
+error from its point of view. The `-DV` trace shows the `PUB $SYS.REQ.CLAIMS.UPDATE` followed by the
+connection closing (source: [[s-gh-7854-jwt-push-timeout]]).
+
+Check, in order: the server is in operator mode at all, `system_account` is set, the resolver is
+`type: full`, and the push is aimed at the **client** port. A server older than **2.2.0** gives the
+identical message because it has no subscriber on that subject — the tooling warns about the floor
+when the operator is created: `When running your own nats-server, make sure they run at least version
+2.2.0`.
+
+The temporary user `nsc` mints for a push is scoped to exactly three subjects —
+`$SYS.REQ.CLAIMS.LIST`, `$SYS.REQ.CLAIMS.UPDATE`, `$SYS.REQ.CLAIMS.DELETE` — plus `_INBOX.>` on the
+subscribe side, so a system account whose permissions are narrowed can break pushes without breaking
+anything else.
+
+Two prerequisites that live in the operator, not the server:
+`nsc edit operator --account-jwt-server-url nats://localhost:4222` sets where a bare `nsc push`
+sends, and `nsc push --prune` needs `allow_delete: true` on the resolver.
+
+
 ## Related
 
-[[nats-cli]] · [[nk]] · [[nats-box]] · [[account]] · [[nats-server]] · [[rotate-tls-certificates]]
+[[nats-cli]] · [[nk]] · [[nats-box]] · [[account]] · [[nats-server]] · [[rotate-tls-certificates]] ·
+[[operator-mode]] · [[set-up-operator-mode]] · [[cross-account-sharing]] ·
+[[backup-and-restore-identity]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]] · [[s-gh-7854-jwt-push-timeout]]

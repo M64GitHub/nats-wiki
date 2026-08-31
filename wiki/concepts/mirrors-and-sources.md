@@ -133,6 +133,10 @@ ADR-31's own advice: "always set `mirror_direct` to their desired value."
 
 ## Related
 
+The promotion procedure that turns a mirror into a writable primary is [[disaster-recovery]];
+what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]].
+
+
 [[stream]] · [[replicas]] · [[direct-get]] · [[error-codes]] · [[key-value]] · [[message-ttl]] ·
 [[backup-and-restore-jetstream]] · [[monitoring-endpoints]] · [[account]]
 

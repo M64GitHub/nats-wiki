@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -66,7 +66,9 @@ comfortably in a few hundred megabytes. What actually drives JetStream memory is
 
 **File descriptors.** Connections, routes and streams each consume them, and **JetStream spends
 roughly two FDs per stream**. The default per-process limit is fine on a small cluster and not on a
-large one; the docs' hardened service unit sets `LimitNOFILE=800000`.
+large one; the unit the server repo ships sets **`LimitNOFILE=800000`**, with the reason in a comment —
+"JetStream requires 2 FDs open per stream" (source: [[s-nats-server-systemd-units]]). Setting it is
+part of [[install-nats-server]].
 
 ## The calculation
 
@@ -118,7 +120,11 @@ Left unset, JetStream sizes itself from the machine
 | `max_file_store` | **75% of the disk actually available under `store_dir`** | **1TB**, only when the platform cannot report disk size (Windows and a few others, or a failed `statfs`) |
 
 The `256MB` and `1TB` figures are **fallbacks, not defaults** — a widely mis-quoted distinction. On
-a Linux container with a 10 GiB volume the file-storage default is about **7.5 GiB**, not 1 TB.
+a Linux container with a 10 GiB volume the file-storage default is about **7.5 GiB**, not 1 TB. Both
+values are now read from the server rather than from the docs: `diskAvailable` is
+`Bavail * Bsize / 4 * 3` (`disk_avail.go:31`) and the memory branch is `sysMem / 4 * 3` over **total**
+system memory (`jetstream.go:2777`), source: [[s-nats-server-jetstream-resources]]. The generated
+config reference contradicts this and is recorded as **docs issue #22**.
 
 ```
 jetstream {
@@ -135,6 +141,25 @@ a **publish error mid-stream, not a startup warning**.
 
 On Kubernetes the Helm chart already defaults `max_file_store` to the PVC size, so this pin is
 usually set for you.
+
+**Pinning it is not optional advice — the maintainers say so twice, and leaving it unset breaks
+restarts.** The dynamic value is 75% of what is **free** at startup, so every byte JetStream itself
+has written lowers the next boot's ceiling:
+
+> "We do not recommend auto-sizing for real world production uses. You should always configure
+> JetStream to use as much disk as you want / need explicitly in the configuration. Auto detection is
+> for development and testing." — @derekcollison, 2024-09-10
+> (source: [[s-issue-8322-dynamic-maxstore-shrinks]])
+
+512 MB volume → limit 338 MB → create a 300 MB stream → fill 250 MB → **restart** → limit 196 MB, and
+the server refuses to restore the stream with `insufficient storage resources available (10047)`.
+**nats-server 2.14.6** adds `finalizeDynamicMaxStore`, which adds recovered bytes back after startup
+recovery (PR #8503, merged 2026-08-24); it is absent from 2.14.5 and every earlier release. Even with
+the fix the limit is computed once, at startup, so a shared volume still invalidates it. See
+[[jetstream-out-of-disk]].
+
+`max_file_store: 0` does **not** mean unlimited. An explicitly configured `0` is honoured as zero and
+no stream can be created (`jetstream.go:2760`, source: [[s-nats-server-jetstream-resources]]).
 
 ### Step 5 — bound the message size
 
@@ -269,7 +294,9 @@ Each with its source. Nothing here is inferred.
 |---|---|
 | Overprovision CPU by **20–30%** above steady state | [[s-docs-sizing-and-resources]] |
 | JetStream spends **~2 file descriptors per stream** | [[s-docs-sizing-and-resources]] |
-| `max_memory_store` defaults to **75% of RAM**, `max_file_store` to **75% of available disk** | [[s-docs-sizing-and-resources]] |
+| `max_memory_store` defaults to **75% of RAM**, `max_file_store` to **75% of available disk** | [[s-docs-sizing-and-resources]], verified [[s-nats-server-jetstream-resources]] |
+| A stream's `max_bytes` is **reserved**, not measured — empty streams consume the ceiling | [[s-issue-4281-insufficient-storage]] |
+| Never leave `max_file_store` unset in production; the dynamic value **shrinks at every restart** before 2.14.6 | [[s-issue-8322-dynamic-maxstore-shrinks]] |
 | An un-tiered account charges **`replicas × bytes`** against `MaxStore` | [[s-docs-sizing-and-resources]] |
 | Keep `max_pending` at **≥ 10× peak message size** | [[s-docs-sizing-and-resources]] |
 | `max_payload`: **1 MB** default, **8MB** not recommended above, **64MB** hard ceiling | [[s-docs-connection-limits-config]] |
@@ -286,13 +313,20 @@ Roughly in the order it bites:
 1. **The account's `MaxStore`** — because of the `replicas × bytes` rule, this is hit at a third of
    the stream size you were planning for, and the symptom is a **placement failure**, not a disk
    alert.
-2. **Disk under `store_dir`** — the resource the docs single out as most likely to run out. The
-   symptom of over-committing `max_file_store` is a **publish error mid-stream**.
-3. **The meta leader** — memory, and Raft/API load that scales with **consumer count** rather than
+2. **The server's `max_file_store` reservation** — `max_bytes` on a stream is counted as *used* the
+   moment the stream exists, so the ceiling is reached by empty streams. A `/varz` dump in
+   [[s-issue-4281-insufficient-storage]] shows **4 MB stored against 35 GiB reserved**. The symptom is
+   `insufficient storage resources available (10047)` on the *next* create — see
+   [[jetstream-out-of-disk]].
+3. **Disk under `store_dir`** — the resource the docs single out as most likely to run out. The
+   symptom of over-committing `max_file_store` is a **publish error mid-stream**, and of genuinely
+   filling the device, `JetStream out of File resources, will be DISABLED` plus the
+   `$JS.EVENT.ADVISORY.SERVER.OUT_OF_STORAGE` advisory.
+4. **The meta leader** — memory, and Raft/API load that scales with **consumer count** rather than
    message count. Not on every node, and not in proportion to traffic.
-4. **File descriptors**, in the hundreds of streams, with a symptom that misleads: **connection
+5. **File descriptors**, in the hundreds of streams, with a symptom that misleads: **connection
    refusals that look like a network fault**.
-5. **CPU**, mostly during TLS handshakes and replication, and mostly visible as a node that cannot
+6. **CPU**, mostly during TLS handshakes and replication, and mostly visible as a node that cannot
    catch up after a rebalance.
 
 ## How to measure it on a running system
@@ -302,6 +336,7 @@ nats account info                 # the live account ceilings: Memory, Storage, 
 nats server info <server>         # this node's Maximum Payload, Maximum Connections, JetStream limits
 nats stream info <stream>         # the stream's real size and its replica states
 df -h /var/lib/nats/jetstream     # what the device says, which outranks what the config says
+curl -s localhost:8222/varz | jq '.jetstream.stats | {storage, reserved_storage, memory, reserved_memory}'
 ulimit -n                         # the FD ceiling the process will actually get
 
 curl -s 'http://localhost:8222/jsz?acc=<account>&streams=true' | jq   # per-account, per-stream state
@@ -365,4 +400,6 @@ wiki could contain.
 [[s-docs-sizing-and-resources]] · [[s-synadia-jetstream-memory-patterns]] ·
 [[s-docs-connection-limits-config]] · [[s-docs-surviving-node-loss]] ·
 [[s-docs-replication-and-r3]] · [[s-docs-upgrade-to-2.12]] · [[s-synadia-jetstream-anti-patterns]] ·
-[[s-nats-server-constants-2.14.6]] · [[s-docs-monitoring-endpoints]]
+[[s-nats-server-constants-2.14.6]] · [[s-docs-monitoring-endpoints]] ·
+[[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] ·
+[[s-issue-8322-dynamic-maxstore-shrinks]]
