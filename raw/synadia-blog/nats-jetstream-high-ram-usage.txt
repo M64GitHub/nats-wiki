@@ -1,0 +1,153 @@
+NEW: The Edge Autonomy Gap report. AI is arriving at the edge — 500 practitioners say the infrastructure isn't ready.
+
+The creators of
+
+NATS Slack: 11K+ membersNATS GitHub: 41K+ stars
+
+ProductsSynadia PlatformSingle-tenant, fully managed NATS in your cloud. Enterprise control without operating it yourself.
+Synadia CloudMulti-tenant, hosted NATS. Build quickly with NATS, don't operate it.
+Synadia Deploy for KubernetesSelf-serve NATS & Synadia Platform deployment for Kubernetes environments.
+Synadia InsightsGranular, NATS-native observability including 100+ audit checks from our experts.
+Synadia ProtectA security gateway for NATS. Enforce policy on every connection and message.
+
+SolutionsDistributed & Agentic AI
+Connected Car
+Financial Services
+Microservices
+Smart Manufacturing
+
+Customers
+
+Resources
+### FEATURED
+RethinkConn 2026The biggest NATS event of the year
+Living on the EdgeEdge-to-core messaging patterns
+Synadia EducationLive NATS training from the experts
+
+### RESOURCES
+BlogDocsVideosNewsletterOn-demand Workshops
+
+### Comparisons
+NATS vs KafkaNATS vs Kinesis
+
+Edge Autonomy 2026
+ReportThe Edge Autonomy GapWhy the edge isn’t ready for AI
+AssessmentBenchmark your edgeGet your autonomy score in ~2 minutes
+
+CompanyHiring!
+
+Contact us
+
+The creators of
+
+Open main menu
+
+All posts
+
+Series: NATS Community FAQs
+# Understanding JetStream Memory Usage Patterns
+Andrew Connolly
+
+• Aug 8, 2025
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in PerplexityShare on XShare on LinkedInShare via emailCopy as MarkdownCopy link
+
+## Why It Matters
+
+Memory management in distributed messaging systems directly impacts performance, reliability, and operational costs. For NATS JetStream users, understanding memory consumption patterns helps architects properly size infrastructure and avoid unexpected resource constraints that could affect message delivery guarantees or system stability.
+
+## The Question
+
+A NATS user recently observed high memory usage (13GB out of 16GB GOMEMLIMIT) on a specific node in their JetStream cluster, particularly on stream/consumer leaders and meta leaders. Even after stopping all clients, memory usage remained elevated while other nodes used only 2-3GB.
+
+## Understanding JetStream Memory Usage
+
+JetStream’s memory footprint comes from a mix of operational features and performance optimizations. Memory is used to track message state, coordinate cluster operations, and accelerate read/write performance. The main contributors include:
+
+- Message Deduplication: – In-memory tables store recently seen message IDs to prevent duplicates, based on the configured deduplication window (default: 2 minutes).
+
+- File Store Caching: – Recently accessed messages and stream data are cached in memory to improve read performance.
+
+- Metadata & Subject Tracking: – State information for streams, consumers, and subjects is held in memory for quick lookups.
+
+- Cluster Meta Leadership: – Nodes acting as meta leaders handle coordination and state management for all streams, which adds overhead.
+
+## Design Patterns and Solutions
+
+### Optimizing Memory Usage
+
+- Tune Deduplication: If using external deduplication, consider disabling this feature or reducing the window on a per-stream basis
+
+- Subject Strategy: Use fewer subjects per stream when possible (the user was already doing this correctly)
+
+- Consumer Patterns: Long-lived consumers are more memory-efficient than short-lived ones
+
+- Meta Leader Distribution: Consider separating meta leadership from nodes handling high-volume streams
+
+### Implementation Tips
+
+- 1
+
+// Configure stream with minimal deduplication window
+
+2
+
+streamConfig := &jetstream.StreamConfig{
+
+3
+
+Name: "MY_STREAM",
+
+4
+
+Subjects: []string{"single.subject"},
+
+5
+
+Retention: jetstream.WorkQueuePolicy,
+
+6
+
+Duplicates: time.Second * 30, // Reduced from default 2 minutes
+
+7
+
+}
+
+## Common Misconceptions
+
+While message count and size affect disk usage, they don’t directly correlate with memory usage unless consumers are performing full stream scans or creating many short-lived consumers. The user’s workload of 300M+ messages across just a few streams with single consumers per stream shouldn’t inherently cause high memory usage.
+
+## Lessons Learned
+
+Memory usage in JetStream clusters is more influenced by architectural patterns (meta leadership, deduplication settings, consumer lifecycle) than by raw message counts. When troubleshooting memory issues, focus on examining and optimizing these patterns rather than assuming a direct correlation with message volume or size.
+
+For persistent memory issues that aren’t addressed by any of the pointers above (as was the case for this questioner), profiling with Go’s built-in tools (pprof) provides the most definitive insights into allocation patterns and potential optimization opportunities.
+
+Need help from the NATS experts? Meet with our architects to get guidance tailored to your use case and environment.
+
+## Related posts
+
+All posts
+
+Open SourcePartitioned Consumer Groups in NATS JetStream: Ordered, Scalable ProcessingPeter Humulock•Jul 15, 2026
+
+Open SourcePull Consumer Priority Groups in NATS JetStream: Overflow, Pinned, and Prioritized RoutingPeter Humulock•Jun 22, 2026
+
+Open SourceJetStream Anti-Patterns: Avoid these pitfalls to scale more efficientlyAndrew Connolly•Jun 6, 2026
+
+Products Synadia CloudSynadia PlatformSynadia Deploy for KubernetesSynadia InsightsSynadia Protect
+Resources BlogDocsVideosSynadia EducationNATS vs KafkaNATS vs Kinesis
+Company AboutBrandCustomersContactCareersPress
+Legal TermsPrivacyDPASubprocessorsSupport LifecycleTrust Center
+
+Get the NATS Newsletter
+News and content from across the community
+
+Subscribe
+
+© 2026 Synadia Communications, Inc.
+
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in Perplexity
+X YouTube LinkedIn Slack GitHub
+
+Cancel
