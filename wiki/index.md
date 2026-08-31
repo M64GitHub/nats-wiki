@@ -59,6 +59,8 @@ exists to answer live in `inbox/question-bank.md`.
   addressable from another, and the three outcomes across a leafnode.
 - [[choosing-a-topology]] — route, gateway or leafnode: the four properties that decide it, the
   ladder, and the three cases where the ladder is the wrong answer.
+- [[stream-compression]] — `compression: s2` on a file stream: whole blocks, never the tail, no
+  ratio metric — and why changing it on a live stream does nothing until the store restarts.
 
 ## Internals
 
@@ -109,6 +111,9 @@ exists to answer live in `inbox/question-bank.md`.
   *shared* ceiling, and why this is not a queue group.
 - [[multi-region-jetstream]] — one hub cluster, leaf regions with their own domains. Why a
   super-cluster couples every region's availability, and what the shape costs you.
+- [[how-clients-reach-a-cluster]] — seed URLs versus what the server advertises: the three designs
+  (discovery on, one VIP with `no_advertise`, per-node `client_advertise`), and why Kubernetes ships
+  with discovery off.
 
 ## Gotchas
 
@@ -122,6 +127,8 @@ exists to answer live in `inbox/question-bank.md`.
   `consumer info` control loop, and how to design consumers away.
 - [[slow-consumer-detected]] — what the log line does *not* tell you. **No confirmed fix**; the
   public thread is unanswered.
+- [[maximum-messages-exceeded]] — `10077` on publish: a `discard: new` stream at its limit refuses
+  every write and **logs nothing**. The four ways out, and which one keeps the data.
 - [[unauthenticated-clients-still-connect]] — you added a system account and the door is still open.
   The server fabricates a `$G` user and advertises `auth_required: true` anyway.
 - [[jetstream-out-of-disk]] — `10047` / `10028` compare **reservations**, not usage. Three failures
@@ -326,10 +333,16 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-adr-7-server-error-codes]] — the `err_code` numbering, `server/errors.json`, and why
   `description` is not part of the API.
 - [[s-adr-8-key-value-store]] — the stream a KV bucket is, and its delete/purge/watch mechanics.
+- [[s-adr-10-extended-purge]] — purge is three operations behind one subject: `filter`, `seq`,
+  `keep`, what the server rejects, and what a purge does *not* reset.
 - [[s-adr-17-ordered-consumer]] — the ordered consumer's forced configuration and restrictions.
 - [[s-adr-20-object-store]] — the stream an object-store bucket is, chunking and digests.
 - [[s-adr-31-direct-get]] — the Direct Get spec: subjects, the `_sys_` queue group, headers, status
   codes, and the four `mirror_direct` alignment rules.
+- [[s-adr-35-filestore-compression]] — block-level S2: why blocks and not messages, the on-disk
+  header, and the one sentence about live changes that the server contradicts (docs issue #30).
+- [[s-adr-40-nats-connection]] — the connection spec: `INFO`/`CONNECT`, TLS-first since 2.10.4, the
+  reconnect algorithm and client defaults, and the discovery section that is still a TODO.
 - [[s-adr-42-priority-groups]] — the three priority policies and the pinned-client protocol.
 - [[s-adr-43-per-message-ttl]] — `Nats-TTL`, markers, the clamp, and seven error codes.
 - [[s-adr-48-kv-ttl]] — KV limit markers: one setting, two stream fields, a 1-second floor, and why

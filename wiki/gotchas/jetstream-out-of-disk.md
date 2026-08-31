@@ -56,6 +56,7 @@ The two numbers that decide everything are in `jetstream.stats`:
 | `config.max_storage` **lower than it was before the last restart**, and `max_file_store` is unset | **shrinking dynamic limit** — cause 2 |
 | the ERR log line above, and the filesystem genuinely full | **a real write failure** — cause 3 |
 | the ERR log line above, and the filesystem *not* full | not a storage problem at all — see [[malformed-or-corrupt-message]] |
+| the publisher gets **`10077 maximum messages exceeded`**, not `10047` | one stream at its own limit under `discard: new` — see [[maximum-messages-exceeded]] |
 
 ## Causes
 
@@ -200,7 +201,8 @@ values.
 
 [[jetstream-sizing]] · [[malformed-or-corrupt-message]] · [[stream-directories-disappear]] ·
 [[stream]] · [[replicas]] · [[account]] · [[error-codes]] · [[advisories]] ·
-[[monitoring-endpoints]] · [[config-keys]] · [[defaults-and-limits]] · [[upgrade-a-cluster]]
+[[monitoring-endpoints]] · [[config-keys]] · [[defaults-and-limits]] · [[upgrade-a-cluster]] ·
+[[maximum-messages-exceeded]]
 
 ## Sources
 

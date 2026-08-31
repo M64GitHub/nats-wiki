@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, mtls, verify, verify_and_map, handshake_first, tls_timeout, encryption-at-rest, prev_key, tls_cert_not_after]
 aliases: [tls, mtls, mutual tls, verify_and_map, handshake_first, encryption at rest, tls block, certificates]
-sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening]
+sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -102,7 +102,8 @@ certificate mapped to the wrong user.**
 ### TLS-first
 
 `handshake_first: true` puts the TLS handshake before any protocol byte, "the way an HTTPS server
-behaves". The server warns at startup:
+behaves" — available **since 2.10.4**, and it needs both sides: the server key *and* the client's
+`tls_first` option (source: [[s-adr-40-nats-connection]]). The server warns at startup:
 
 ```
 [WRN] Clients that are not using "TLS Handshake First" option will fail to connect
@@ -181,9 +182,10 @@ every listener at v2.14.6, and `nats account tls` walks the whole verified chain
 
 [[rotate-tls-certificates]] · [[account]] · [[subject-permissions]] · [[operator-mode]] ·
 [[auth-callout]] · [[monitoring-endpoints]] · [[build-a-3-node-cluster]] · [[install-nats-server]] ·
-[[reload-server-config]] · [[config-keys]] · [[defaults-and-limits]] · [[leafnode]] · [[gateway]]
+[[reload-server-config]] · [[config-keys]] · [[defaults-and-limits]] · [[leafnode]] · [[gateway]] ·
+[[how-clients-reach-a-cluster]]
 
 ## Sources
 
 [[s-docs-encryption-and-tls]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] ·
-[[s-docs-hardening]] · [[s-docs-security-checklist]]
+[[s-docs-hardening]] · [[s-docs-security-checklist]] · [[s-adr-40-nats-connection]]

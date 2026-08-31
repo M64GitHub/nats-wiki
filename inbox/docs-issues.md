@@ -20,10 +20,14 @@ working `inbox/plan-runbooks-and-security-2026-08-31.md`; rows 27–29 by the **
 documented defaults** in `inbox/config-keys-table.md` against the option parser, the use sites, the
 flags and the constants of `nats-server` v2.14.6 (report: `inbox/check-defaults-v2.14.6.md`). That
 sweep re-derived #19, #22 and #23 from the source with no human input, found the three below, and
-left 26 keys it could not resolve — those are listed in the report for a human, not guessed at. Verified against **nats-server v2.14.6**
+left 26 keys it could not resolve — those are listed in the report for a human, not guessed at.
+Rows 30–32 were found while working step 4 of that plan (the remaining ★ ADRs): two are **ADR** errors
+rather than docs errors, which is the direction that matters for client and tooling authors, and one
+is a generator bug that repeats on every page it touches. Verified against **nats-server v2.14.6**
 and the docs tree fetched **2026-08-31**. Where a row says *observed*, the behaviour was **run on the
 v2.14.6 binary**, not only read from the source at that tag; the configs and output are in
-`raw/nats-server-src/topology-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
+`raw/nats-server-src/topology-observed-v2.14.6.md` and, for rows 30–31,
+`raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
 the client repository at its current release plus the package registry, not the server — stated per
 row.
 
@@ -58,6 +62,9 @@ row.
 | 28 | `mqtt.max_ack_pending` is documented as `100`; the server's default is **1024** | `reference/config/mqtt.md` | wrong-value | medium | wiki states the server value |
 | 29 | `mqtt.port` is documented as defaulting to `1883`; the server applies **no default** — `mqtt { }` with no port starts **no MQTT listener**, silently | `reference/config/mqtt.md` | wrong-value | ★ medium | wiki states "no default", as for the other listeners |
 | 26 | Four `leafnodes.remotes` keys are published with a **completely empty description**: `hub`, `deny_imports`, `deny_exports`, `jetstream_cluster_migrate` — including the two keys the only public question on the topic asks about | `reference/config/leafnodes/remotes.md` and the four property pages | missing | medium | wiki states what the two deny keys do, from the source |
+| 30 | ADR-35 says a `compression` change applies to "newly minted blocks"; on a live stream the running store keeps writing with the algorithm it was **created** with, so nothing changes until the store re-opens | `nats-architecture-and-design` ADR-35 | wrong-value | medium | wiki states the observed behaviour and says the docs are right here |
+| 31 | The connection spec's **Servers discovery** section is two paragraphs, a truncated sentence and a `TODO`, in an ADR marked *Implemented* — so what a server advertises to clients is stated nowhere public; `max reconnects` also has no readable default (`**default: 3 / none`) | `nats-architecture-and-design` ADR-40 | missing | medium | wiki observes the `INFO` directly and records what the server sends |
+| 32 | Every `unsigned 64 bit integer` field in the generated JetStream reference publishes `Maximum: 18446744073709552000` — **385 more than uint64 can hold**, and a value the server cannot accept. 11 pages, all of them | `reference/jetstream/api/*`, `reference/jetstream/advisory/*`, `reference/jetstream/metric/consumer-ack.md` | wrong-value | low | wiki quotes no maximum from these pages |
 
 ---
 
@@ -1358,6 +1365,149 @@ of them.
 
 ---
 
+## 30 · ADR-35 says a compression change reaches new blocks; it does not until the store restarts
+
+**Impact: an operator turns compression on, sees `STREAM.INFO` report `s2`, and gets no compression
+at all** — possibly for weeks, until the server happens to restart. The setting looks applied
+because every surface says it is.
+
+ADR-35, *Decision*:
+
+> "The compression algorithm can be updated after the stream has been created. **Newly minted blocks
+> will use the newly selected compression algorithm**, but this will not result in existing blocks
+> being proactively compressed or decompressed."
+
+The second clause is right. The first is not, at v2.14.6.
+
+**Evidence — the source.** The algorithm the store writes with is `fs.fcfg.Compression`, set once
+when the store is constructed:
+
+```go
+// server/stream.go:994, in addStreamWithAssignment
+fsCfg.Compression = config.Compression
+// …
+// server/stream.go:1004
+if err := mset.setupStore(fsCfg); err != nil {
+```
+
+`setupStore` has exactly one caller (`stream.go:1004`). A live update takes the other path,
+`mset.store.UpdateConfig(cfg)` (`stream.go:2788`), and `fileStore.UpdateConfig`
+(`filestore.go:686`) never assigns `fcfg.Compression` — the field has three readers
+(`filestore.go:4971`, `:7769`, `:7848`) and no writer outside construction.
+
+**Evidence — observed on the v2.14.6 binary** (full run in
+`raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`). A file stream created with
+`compression: none`, edited to `s2` while running, then restarted. Block magic bytes: `636d7001` is
+`cmp` + S2, `0a040000` is an uncompressed record header.
+
+```
+phase 1  (compression: none)          1.blk 31020 0a040000   2.blk 10340 0a040000
+phase 2  (after --compression=s2)     1.blk 31020 0a040000   2.blk 31020 0a040000   3.blk 20680 0a040000
+phase 3  (after a server restart)     3.blk   801 636d7001   4.blk   790 636d7001   5.blk 5170 0a040000
+```
+
+`2.blk` sealed **after** the edit, in the same server run, and is uncompressed at the full 31020
+bytes. After the restart the same content compresses to ~800 bytes.
+
+**The docs get this right**, which is the unusual part: `learn/jetstream/policies.md` says the new
+setting "waits until the stream's store restarts, on a server restart or a leader change, and blocks
+already on disk stay as they are". Only the ADR is wrong — and the ADR is what client and tooling
+authors read.
+
+One nuance neither source states: the block that was the **tail** when the store re-opened *is*
+compressed, as soon as it stops being the tail (`3.blk`, 20680 → 801 bytes). "Blocks already on
+disk stay as they are" holds for sealed blocks only.
+
+**Suggested fix:** in ADR-35, replace "Newly minted blocks will use the newly selected compression
+algorithm" with a statement that the algorithm is fixed for the lifetime of the store instance and
+that a change takes effect when the stream's store is next opened.
+
+---
+
+## 31 · The connection spec never says what a server advertises, and one default is unreadable
+
+**Impact: the single most common deployment question about clients — "will my clients be handed
+addresses they can reach?" — has no public answer.** Anyone deploying behind a load balancer, NAT or
+Kubernetes has to read the server source or run `nc` against the port, as this wiki did.
+
+ADR-40 is **Implemented**, four revisions, dated 2023-10-12 to 2025-11-05. Its *Servers discovery*
+section is, in full:
+
+> "**Note**: Server will send back the info only
+>
+> When Server sends back INFO. It may contain additional URLs to which the client can make
+> connection attempts. The client should store those URLs and use them in the Reconnection Strategy.
+>
+> A client should have an option to turn off using advertised URLs. By default, those URLs are used.
+>
+> **TODO**: Add more in-depth explanation how topology discovery works."
+
+The first line is a sentence fragment. The section never says **which** URLs a server puts there,
+how they are resolved, or that `no_advertise` and `client_advertise` exist. A second `**TODO**`
+stands in for the auth flow, and a third for the WebSocket flow.
+
+Separately, under *Max reconnects*:
+
+```
+**default: 3 / none
+```
+
+— an unclosed bold marker and two values with nothing saying which applies. This is a client default
+that can permanently stop a service reconnecting; it deserves a number.
+
+**Evidence — what the server actually does**, observed on v2.14.6 (`INFO` read with `nc`, full runs
+in `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`):
+
+```
+standalone                     connect_urls: null
+2-node cluster, defaults       connect_urls: ["<host-ip>:4231", "<host-ip>:4232"]   # own + peer, routable address
+3 nodes, no_advertise on m1    m1: null   m2: [m2, m3]   m3: [m3, m2]               # m1 vanishes from every list
+3 nodes, client_advertise m1   every node lists "nats.example.internal:4222" for m1
+```
+
+The server-side keys are documented — `reference/config/cluster/no_advertise.md` and
+`reference/config/client_advertise.md` are both correct and both marked *Hot Reloadable* — but
+nothing connects them to the client behaviour ADR-40 specifies, in either direction.
+
+**Suggested fix:** replace the TODO with the four sentences above, and cross-link the two config
+pages. Give `max reconnects` one number and say what happens when it is exhausted.
+
+---
+
+## 32 · Every uint64 maximum in the generated JetStream reference is 385 too large
+
+**Impact: low, but mechanical and everywhere.** A client or tool that trusts the published maximum
+sends a value the server cannot represent.
+
+Every field typed `unsigned 64 bit integer` in the generated reference publishes:
+
+```
+Minimum:`0`
+
+Maximum:`18446744073709552000`
+```
+
+The maximum of a uint64 is **18446744073709551615**. `18446744073709552000` is 385 larger, is not a
+valid uint64, and is the exact value you get by round-tripping 2^64−1 through an IEEE-754 double —
+the signature of a JSON-Schema generator serialising the bound as a JavaScript number.
+
+**Sweep of the neighbours: all 11 pages in the docs tree that state a uint64 maximum carry the wrong
+one**, and the correct value `18446744073709551615` appears **nowhere** in the 861-page tree:
+
+```
+reference/jetstream/api/stream/create.md      reference/jetstream/api/stream/update.md
+reference/jetstream/api/stream/purge.md       reference/jetstream/api/stream/msg-delete.md
+reference/jetstream/api/stream/pub-ack.md     reference/jetstream/api/consumer/create.md
+reference/jetstream/api/consumer/info.md      reference/jetstream/advisory/nak.md
+reference/jetstream/advisory/terminated.md    reference/jetstream/advisory/max-deliver.md
+reference/jetstream/metric/consumer-ack.md
+```
+
+**Suggested fix:** emit the bound as a string in the generator, or omit it — a reader does not need
+to be told that a uint64 field holds a uint64, and a wrong number is worse than none.
+
+---
+
 ## Where the wiki records each of these
 
 | # | wiki page |
@@ -1388,3 +1538,6 @@ of them.
 | 26 | `wiki/concepts/leafnode.md` — *Restricting what crosses*; `wiki/summaries/s-gh-5941-restrict-leafnode-subjects.md` |
 | 27 | `wiki/concepts/leafnode.md` — *Compression is on by default*; `wiki/reference/defaults-and-limits.md` — *Topology — leafnodes and gateways*; `wiki/reference/config-keys.md` — *`leafnodes { … }`* |
 | 28–29 | `wiki/reference/config-keys.md` — *`websocket { … }` and `mqtt { … }`*; `wiki/reference/defaults-and-limits.md` — *Topology — leafnodes and gateways* |
+| 30 | `wiki/concepts/stream-compression.md` — *Changing it on a live stream does nothing until the store restarts*; `wiki/concepts/stream.md`; `wiki/summaries/s-adr-35-filestore-compression.md` |
+| 31 | `wiki/operations/how-clients-reach-a-cluster.md` — *What the server actually advertises*; `wiki/summaries/s-adr-40-nats-connection.md`; `wiki/operations/build-a-3-node-cluster.md` |
+| 32 | nowhere — the wiki quotes no maximum from these pages; recorded here so the generator bug is reported |

@@ -1119,3 +1119,89 @@ not someone asking a question in public, and the bank's rule is a real asker wit
 
 `inbox/adr-toc.md`: **14 of 54 ADRs ingested** (was 8); ★ rows read: 9 of 22.
 `python3 tools/lint.py`: **207 pages, clean**, staleness 0.
+
+## 2026-08-31 — drift plan step 4: the remaining ★ ADRs, triaged down to three
+
+**Operation:** triage + ingest ×3 (`inbox/plan-drift-and-adrs-2026-08-31.md` step 4).
+**Sources:** `raw/adr/ADR-10.md`, `raw/adr/ADR-35.md`, `raw/adr/ADR-40.md`; `nats-server` v2.14.6
+source and **the v2.14.6 binary**; `helm/charts/nats/values.yaml` at chart release `nats-2.14.6`.
+
+**The triage first, because it is most of the work.** Fifteen ★ rows in `inbox/adr-toc.md` had no
+summary. The bank's own test — *if no question needs it, it does not belong here* — leaves **three**:
+ADR-10 (Q27), ADR-35 (Q31), ADR-40 (Q67). The other twelve are recorded with a reason in the plan
+file, not silently dropped. Two deserve naming: **ADR-4** looked relevant and is not — it specifies
+the HPUB/HMSG wire format and client header semantics, and never defines the reserved `Nats-*`
+headers an operator actually meets. **ADR-41** (message path tracing) is a genuinely strong 2.11
+operator tool that no bank row asks for; it wants a scouted thread before a page, not an ingest now.
+
+**ADR-10 — extended purge** ([[s-adr-10-extended-purge]]): purge is three operations behind one
+subject — `filter`, `seq`, `keep`. Verified against v2.14.6, including the JSON/Go name mismatch
+(`filter` ↔ `Subject`) and the server-side rejection of `seq`+`keep` together (`10003`).
+
+**ADR-35 — filestore compression** ([[s-adr-35-filestore-compression]]): block-level S2, compressed
+only once a block stops being the tail, checksum deliberately excluded, compress-then-encrypt. **The
+ADR is wrong about one thing**, and it is the thing an operator hits.
+
+**ADR-40 — the NATS connection** ([[s-adr-40-nats-connection]]): kept for the operator-facing parts —
+the `INFO`/`CONNECT` handshake, TLS-first since 2.10.4, the reconnect algorithm and the client
+defaults that decide what a failure looks like. Its *Servers discovery* section is a `TODO`, so the
+answer had to come from the server.
+
+**Three new pages.** [[stream-compression]] (concept) — what `compression: s2` does, and why setting
+it on a live stream changes nothing until the store re-opens. [[maximum-messages-exceeded]] (gotcha) —
+`10077` on publish, the three limit texts behind it, and **the server log's complete silence**;
+four ways out, ranked. [[how-clients-reach-a-cluster]] (pattern) — seed URLs versus advertised
+`connect_urls`, the three designs, and the Kubernetes case end to end.
+
+**Everything runnable was run**, on the v2.14.6 binary with nats CLI 0.4.0, recorded verbatim in
+`raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`:
+
+- a `compression` change on a live stream — the block sealed *after* the edit is 31020 bytes and
+  uncompressed; after a restart the same content seals at 790 bytes with a `cmp` header;
+- a full `DiscardNew` stream — the `PubAck` error verbatim, `grep -ic 'failed to store' server.log`
+  → `0`, and `--keep=1` leaving the sequence numbers untouched;
+- the `INFO` line off the client port on a standalone server, a 2-node and a 3-node cluster, with
+  `cluster { no_advertise }` and with `client_advertise` — which is how the discovery rules on
+  [[how-clients-reach-a-cluster]] were derived, since no public source states them.
+
+A second extract from the Helm chart was taken for the same page
+(`raw/github-repos/nats-io__k8s.values-advertise-nats-2.14.6.md`): **`config.cluster.noAdvertise:
+true`** is the chart's default, and its comment — "If clients are behind a load balancer it is best
+to leave this as is" — is the closest thing to an official answer to Q67 that exists.
+
+**Ripple (9 pages, plus the Helm summary).** [[stream]] — the compression paragraph now says the live-edit finding and links
+the concept; [[retention-policies]] — a new section on what `discard: new` does at the limit and the
+three purge shapes; [[jetstream-sizing]] — *Compression changes the disk term, and nothing else*,
+including that it does **not** buy room against the account quota or the `max_bytes` reservation;
+[[js-api-subjects]] — the purge request body; [[error-codes]] — `10077`, `10109`, `10110`, and why
+`10077` never appears in a log; [[tls-in-nats]] — TLS-first since 2.10.4 and the client half;
+[[build-a-3-node-cluster]] — read `connect_urls` from where the clients live;
+[[nats-helm-charts]] — the chart's `noAdvertise` default and the ClusterIP Service;
+[[jetstream-out-of-disk]] — a triage row separating `10077` from `10047`.
+
+**Docs issues #30, #31, #32.** Two are **ADR** errors rather than doc-page errors — the first time
+this report has gone that way twice in one step:
+
+- **#30** — ADR-35's "newly minted blocks will use the newly selected compression algorithm" is false
+  on a live stream; `fs.fcfg.Compression` is written once at store construction. Verified in source
+  *and* by running it. `learn/jetstream/policies.md` states the real behaviour, so here **the docs
+  are right and the ADR is wrong**.
+- **#31** — ADR-40 is *Implemented* with a `TODO` where server discovery should be, a truncated
+  sentence, and `**default: 3 / none` for max reconnects.
+- **#32** — every `unsigned 64 bit integer` in the generated JetStream reference publishes
+  `Maximum: 18446744073709552000`, which is 385 more than a uint64 holds. **All 11 pages** that state
+  the bound carry it; the correct value appears nowhere in the 861-page tree.
+
+**Question bank: 104 rows, 65 answered** (was 62); ★ unchanged at 34 of 42 — none of Q27, Q31, Q67
+is starred. **No rows added**: an ADR is a specification, not someone asking in public.
+
+`inbox/adr-toc.md`: **17 of 54 ADRs ingested** (was 14); **★ rows read: 10 of 22** (was 7 — the
+previous entry's "9 of 22" counted the step-3 ingests, three of which are not ★ rows).
+
+**Housekeeping:** `tools/lint.py` arrived from `llm-wiki-starter` with two new checks (citation drift
+and unlanded ripples) part-way through this step. Drift on the seven pages this step already had open
+was fixed by unioning the two lists, taking the wiki from 32 drifting pages to 25; the remaining 25
+are pre-existing and untouched.
+
+`python3 tools/lint.py`: **213 pages, clean** — no broken links, no orphans, no frontmatter issues,
+nothing missing from the index; staleness 0.

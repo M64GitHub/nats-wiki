@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -41,6 +41,13 @@ The **System Account** column is the docs' own, and it is the column that matter
 
 **Publish acknowledgement** has no subject of its own: messages are published directly to the
 stream's own subjects and the `PubAck` comes back as the reply.
+
+**`STREAM.PURGE` is three operations behind one subject.** An empty payload purges everything; a
+JSON body takes `filter` (a subject, wildcards allowed), `seq` (purge below this sequence,
+non-inclusive) and `keep` (retain at most this many). `seq` and `keep` are mutually exclusive and
+the server rejects both together with `10003 bad request`; `filter` combines with either. Note the
+JSON name is `filter` while the CLI flag is `--subject`
+(source: [[s-adr-10-extended-purge]], verified at v2.14.6).
 
 ## Consumer
 
@@ -159,7 +166,7 @@ The three "absent from the index" rows are hand-kept and come from the sources n
 When `jetstream { domain: <name> }` is set, the server installs a mapping into **every non-system
 account** that makes the whole API reachable under a second prefix
 (`generateJSMappingTable`, `jetstream_api.go:326–352`; source:
-[[s-nats-server-leafnode-js-domains]]):
+[[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]]):
 
 | domain-prefixed subject | maps to |
 |---|---|
@@ -192,4 +199,5 @@ domain back out of as the **second token** (`stream.go:432–437`). See [[jetstr
 ## Sources
 
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
-[[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]]
+[[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]] ·
+[[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]]

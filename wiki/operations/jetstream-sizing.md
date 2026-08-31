@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -306,6 +306,28 @@ Each with its source. Nothing here is inferred.
 | Keep total consumers **below ~100,000** | [[s-synadia-jetstream-anti-patterns]] |
 | Keep disjoint subject filters **below ~300 per consumer** | [[s-synadia-jetstream-anti-patterns]] |
 
+### Compression changes the disk term, and nothing else
+
+`compression: s2` on a file-storage stream compresses whole message blocks on disk. It shrinks
+**stored bytes only** — the account quota, the `max_bytes` reservation and the replica multiplier
+are all computed from *logical* bytes, so compression does not buy you room against the ceilings in
+*What runs out first*, only against the physical volume (source:
+[[s-adr-35-filestore-compression]]).
+
+Three things to know before you count on it:
+
+- **The ratio depends on repetition between neighbouring messages**, not within one, because S2 is
+  applied to a whole block. Structured payloads (JSON, protobuf text) compress well; images,
+  archives and anything encrypted client-side do not.
+- **The server publishes no compression ratio.** Measure it as `nats stream info` bytes against
+  `du -sh …/streams/<name>/msgs` on a node holding the stream; there is no metric or endpoint field.
+- **The CPU cost is unquantified in every public source.** ADR-35 says only that "a compressed
+  stream may suffer some performance penalties". Budget for it, then measure.
+
+See [[stream-compression]], including why changing the setting on a live stream does nothing until
+its store restarts.
+
+
 ## What runs out first
 
 Roughly in the order it bites:
@@ -402,4 +424,5 @@ wiki could contain.
 [[s-docs-replication-and-r3]] · [[s-docs-upgrade-to-2.12]] · [[s-synadia-jetstream-anti-patterns]] ·
 [[s-nats-server-constants-2.14.6]] · [[s-docs-monitoring-endpoints]] ·
 [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] ·
-[[s-issue-8322-dynamic-maxstore-shrinks]]
+[[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-35-filestore-compression]] ·
+[[s-nats-server-systemd-units]]

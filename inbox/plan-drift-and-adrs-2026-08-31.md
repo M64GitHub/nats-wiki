@@ -81,11 +81,37 @@ from that table, not from the repo.
 ADR-61 also closes the meta-quorum precondition that [[disaster-recovery]] currently states as a
 design-time assumption.
 
-## Step 4 — the remaining ★ ADRs · status: open
+## Step 4 — the remaining ★ ADRs · status: done 2026-08-31 — 15 triaged, 3 ingested (ADR-10, 35, 40), 12 skipped; 3 new pages, 10 rippled, docs issues #30–#32
 
-The other ten ★ rows in `inbox/adr-toc.md`. Triage them against `inbox/question-bank.md` first and
-**skip any that no open row needs** — say so in the status line. An ADR that no question asks for is
-out of scope by the bank's own test, however interesting it is.
+The other ★ rows in `inbox/adr-toc.md` — **fifteen**, not ten; step 3 took six of the twenty-one that
+were open. Triage them against `inbox/question-bank.md` first and **skip any that no open row needs**
+— say so in the status line. An ADR that no question asks for is out of scope by the bank's own test,
+however interesting it is.
+
+**The triage, in full.** Three ADRs are named by an open row; twelve are not.
+
+| ADR | title | open row it serves | verdict |
+|---|---|---|---|
+| 10 | JetStream Extended Purge | **Q27** — recover a stream full under `DiscardNew` | **ingested** |
+| 35 | JetStream Filestore Compression | **Q31** — how compression works and what it costs | **ingested** |
+| 40 | NATS Connection | **Q67** — LoadBalancer or seed URLs on Kubernetes | **ingested** |
+| 2 | NATS Typed Messages | none | skip — client API surface, out of scope by `CLAUDE.md` |
+| 4 | NATS Message Headers | none | skip — the HPUB/HMSG wire format and client `GET`/`SET` semantics; it does **not** define the reserved `Nats-*` headers an operator sees (those are in ADR-8/43 and the source) |
+| 5 | Lame Duck Notification | Q93 already answered | skip — the client-visible `ldm` flag; the server side is on [[install-nats-server]] and [[upgrade-a-cluster]] |
+| 26 | NATS Authorization Callouts | Q53 already answered | skip — [[auth-callout]] covers it from the docs and the source |
+| 28 | JetStream RePublish | none | skip |
+| 30 | Subject Transform | none | skip |
+| 36 | Subject Mapping Transforms in Streams | none | skip — the sourcing half is already in [[s-adr-59-sourcing-and-mirroring]] |
+| 38 | OCSP Peer Verification | none | skip — Q50/Q94/Q97 are certificate *rotation*, not revocation checking |
+| 39 | Certificate Store | none | skip — Windows certificate store |
+| 41 | Message Path Tracing | none open (Q77 is answered by [[nats-timeout]]) | skip — a strong 2.11 operator tool with no question behind it yet; scout a thread first |
+| 44 | Versioning for JetStream Assets | none | skip — no bank row asks about asset versioning or downgrade metadata |
+| 62 | JetStream desired state reconciliation | none | skip — 2.15, which exists only as a preview, and no open row |
+
+Two of the three ingests produced findings against their own ADR (docs issues **#30** and **#31**),
+and the purge sweep produced a third against the generated reference (**#32**). Everything stated on
+the three new pages that could be run was run on the v2.14.6 binary:
+`raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`.
 
 ## Step 5 — the sizing rows nobody has answered · status: open
 

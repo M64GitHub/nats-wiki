@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [cluster, routes, gossip, seed, cluster-name, no_advertise, failover, tls, 6222]
 aliases: [cluster, clustering, "form a cluster", "first cluster", routes, "cluster setup"]
-sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters]
+sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -309,6 +309,22 @@ Bind it to a private interface, firewall it, and put TLS or route credentials on
 **An even server count is a trap for JetStream, not for routing.** Two servers lose quorum on one
 failure; four tolerate exactly what three do ([[raft-in-nats]]).
 
+**Once a cluster forms, the server starts handing out addresses — check that clients can use them.**
+A standalone server advertises nothing; a clustered one puts its own client URL *and every peer URL
+it has learned* into the `INFO` it sends to clients, resolved to the host's routable address rather
+than to what `listen` says (observed on 2.14.6). Clients then use that list for reconnects, by
+default. Read it from where the clients actually live:
+
+```
+(printf ''; sleep 0.4) | nc n1-east.internal 4222
+```
+
+If any URL in `connect_urls` is unreachable from there — a pod IP, a private address behind a
+load balancer, an unmapped NAT address — the cluster is fine and the *clients* will fail, but only
+at the next failover. [[how-clients-reach-a-cluster]] covers the three ways to fix it
+(`no_advertise`, `client_advertise`, or leaving it alone).
+
+
 ## If this cluster will also carry a gateway or leafnodes
 
 Three checks that belong in the same change, because two of them stop the server from starting and
@@ -357,10 +373,11 @@ See [[gateway]], [[leafnode]] and [[choosing-a-topology]] before adding either l
 [[no-suitable-peers-for-placement]] · [[streams-deleted-when-clustering-a-standalone-server]] ·
 [[config-keys]] · [[account]] · [[nats-helm-charts]] · [[nats-cli]] · [[monitoring-endpoints]] ·
 [[jetstream-sizing]] · [[rotate-tls-certificates]] · [[upgrade-a-cluster]] ·
-[[rebalance-streams]] · [[reload-server-config]] · [[raft-in-nats]] · [[tls-in-nats]]
+[[rebalance-streams]] · [[reload-server-config]] · [[raft-in-nats]] · [[tls-in-nats]] ·
+[[how-clients-reach-a-cluster]]
 
 ## Sources
 
 [[s-docs-your-first-cluster]] · [[s-docs-forming-a-cluster]] ·
 [[s-nats-server-route-cluster-formation]] · [[s-gh-7190-asymmetric-cluster]] ·
-[[s-gh-3569-connect-to-route-port]] · [[s-docs-hardening]] · [[s-docs-kubernetes]] · [[s-nats-server-topology]] · [[s-docs-super-clusters]]
+[[s-gh-3569-connect-to-route-port]] · [[s-docs-hardening]] · [[s-docs-kubernetes]] · [[s-nats-server-topology]] · [[s-docs-super-clusters]] · [[s-adr-40-nats-connection]]

@@ -18,7 +18,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 7 | ADR-7.md | NATS Server Error Codes | Partially Implemented | clients core jetstream | server, client, jetstream | ★ partial | [[s-adr-7-server-error-codes]] |
 | 8 | ADR-8.md | JetStream based Key-Value Stores | Implemented | clients jetstream kv | jetstream, client, kv, spec | implemented | [[s-adr-8-key-value-store]] |
 | 9 | ADR-9.md | JetStream Consumer Idle Heartbeats | Approved | clients core jetstream | server, client, jetstream | approved |  |
-| 10 | ADR-10.md | JetStream Extended Purge | Implemented | clients core jetstream | server, client, jetstream | ★ implemented |  |
+| 10 | ADR-10.md | JetStream Extended Purge | Implemented | clients core jetstream | server, client, jetstream | ★ implemented | [[s-adr-10-extended-purge]] |
 | 11 | ADR-11.md | Hostname resolution | Approved | clients | client | approved |  |
 | 12 | ADR-12.md | JetStream Encryption At Rest | Implemented | jetstream | jetstream | implemented |  |
 | 13 | ADR-13.md | Pull Subscribe internals | Partially Implemented | clients jetstream | jetstream, client | partial |  |
@@ -37,12 +37,12 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 32 | ADR-32.md | Service API | Implemented | clients | client, spec | implemented |  |
 | 33 | ADR-33.md | Metadata for Stream and Consumer | Approved | clients core jetstream | jetstream, client, server | approved |  |
 | 34 | ADR-34.md | JetStream Consumers Multiple Filters | Approved | clients core jetstream | jetstream, client, server | approved |  |
-| 35 | ADR-35.md | JetStream Filestore Compression | Implemented | clients core jetstream | jetstream, client, server | ★ implemented |  |
+| 35 | ADR-35.md | JetStream Filestore Compression | Implemented | clients core jetstream | jetstream, client, server | ★ implemented | [[s-adr-35-filestore-compression]] |
 | 36 | ADR-36.md | Subject Mapping Transforms in Streams | Implemented | clients core jetstream | jetstream, client, server | ★ implemented |  |
 | 37 | ADR-37.md | JetStream Simplification | Approved | clients jetstream | jetstream, client, spec | approved |  |
 | 38 | ADR-38.md | OCSP Peer Verification | Implemented | core security | server, security | ★ implemented |  |
 | 39 | ADR-39.md | Certificate Store | Implemented | core security | server, security | ★ implemented |  |
-| 40 | ADR-40.md | NATS Connection | Implemented | clients core | client, server, spec | ★ implemented |  |
+| 40 | ADR-40.md | NATS Connection | Implemented | clients core | client, server, spec | ★ implemented | [[s-adr-40-nats-connection]] |
 | 41 | ADR-41.md | NATS Message Path Tracing | Implemented | core monitoring | observability, server, 2.11 | ★ implemented 2.11 |  |
 | 42 | ADR-42.md | Pull Consumer Priority Groups | Approved | core jetstream | jetstream, server, 2.11 | approved 2.11 | [[s-adr-42-priority-groups]] |
 | 43 | ADR-43.md | JetStream Per-Message TTL | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 | [[s-adr-43-per-message-ttl]] |

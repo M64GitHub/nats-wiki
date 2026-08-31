@@ -3,12 +3,12 @@ title: "nats Helm chart nats-2.14.6 — values.yaml"
 type: summary
 area: [deploy, topology]
 source-url: https://github.com/nats-io/k8s/blob/nats-2.14.6/helm/charts/nats/values.yaml
-source-path: raw/github-repos/nats-io__k8s.values-nats-2.14.6.md
+source-path: raw/github-repos/nats-io__k8s.values-nats-2.14.6.md, raw/github-repos/nats-io__k8s.values-advertise-nats-2.14.6.md
 author: nats-io/k8s maintainers
 article: "helm/charts/nats/values.yaml at chart release nats-2.14.6"
 date: 2026-08-28          # chart release publish date
 version: "2.14.6"
-tags: [helm, lameDuckDuration, terminationGracePeriodSeconds, reloader, configChecksumAnnotation]
+tags: [helm, lameDuckDuration, terminationGracePeriodSeconds, reloader, configChecksumAnnotation, noAdvertise, service, ClusterIP]
 aliases: []
 sources: []
 created: 2026-08-31
@@ -78,8 +78,34 @@ podTemplate:
   configChecksumAnnotation: false
 ```
 
+**Client discovery is off by default, and the chart says why** (added 2026-08-31, for
+question-bank row 67):
+
+```yaml
+config:
+  cluster:
+    # set to false to allow cluster nodes to advertise their addresses
+    # so that clients can reconnect without extra DNS lookups.
+    # Note: in case clients have external connectivity make sure to define the `advertise` section as well.
+    # If clients are behind a load balancer it is best to leave this as is.
+    noAdvertise: true
+```
+
+This is `cluster { no_advertise: true }` in the server config: the pods never gossip their client
+URLs, so a client is told about no server other than the one it dialled. The chart's reasoning is in
+the comment — pod IPs are useless to a client that reaches NATS through a Service or a load
+balancer, so advertising them would only hand clients addresses they cannot use.
+
+**The client Service is a plain `ClusterIP`.** The `service:` block offers ports but **no `type`
+field**, so there is no `LoadBalancer` or `NodePort` value in the chart, and the only `ingress` in
+the file is under `websocket`. The word `advertise` appears in the file **only** in the comment
+above: the chart defines no `advertise` section itself, so external connectivity is left entirely to
+the operator.
+
 ## Practical takeaways
 
+- **On Kubernetes, discovery is off unless you turn it on**, and turning it on is wrong while
+  clients arrive through a Service or a load balancer — see [[how-clients-reach-a-cluster]].
 - **The two timing values are a pair, and the chart's defaults sit exactly on the boundary.** Change
   one, change the other — the rule is in the file, not only in the docs.
 - **`configChecksumAnnotation: true` converts every config change into a rolling restart.** That is
@@ -93,13 +119,15 @@ podTemplate:
 
 ## Relevance to the wiki
 
-The Kubernetes sections of [[upgrade-a-cluster]] and [[reload-server-config]], and the chart facts on
-[[nats-helm-charts]].
+The Kubernetes sections of [[upgrade-a-cluster]] and [[reload-server-config]], the chart facts on
+[[nats-helm-charts]], and the Kubernetes half of [[how-clients-reach-a-cluster]].
 
 ## Questions it answers
 
-Contributes to **Q63** (the Kubernetes half of a rolling upgrade) and **Q54**.
+Contributes to **Q63** (the Kubernetes half of a rolling upgrade), **Q54**, and **Q67**
+(LoadBalancer or seed URLs on Kubernetes), which [[how-clients-reach-a-cluster]] answers.
 
 ## Pages touched
 
-[[nats-helm-charts]] · [[upgrade-a-cluster]] · [[reload-server-config]] · [[install-nats-server]]
+[[nats-helm-charts]] · [[upgrade-a-cluster]] · [[reload-server-config]] · [[install-nats-server]] ·
+[[how-clients-reach-a-cluster]]

@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -83,7 +83,9 @@ defaults and does not rewrite the request).
 cut disk usage — repetitive payloads such as JSON compress well, already-compressed payloads such
 as images do not. Set it at creation with `--compression s2`. It *can* be edited later, but the new
 setting only takes effect when the stream's store restarts (a server restart or a leader change),
-and blocks already on disk stay as they are (source: [[s-docs-policies]]).
+and blocks already on disk stay as they are (source: [[s-docs-policies]]) — confirmed by running it
+on 2.14.6, where a block sealed after the edit was still uncompressed. Treat it as a create-time
+decision; see [[stream-compression]].
 
 **Persist mode.** By default a message is flushed to storage before the `PubAck` follows. On
 `async` the server acknowledges first and flushes in the background: a higher ingest rate in
@@ -166,14 +168,17 @@ JetStream's memory footprint — see [[jetstream-sizing]].
 
 [[consumer]] · [[retention-policies]] · [[replicas]] · [[stream-placement]] · [[raft-in-nats]] ·
 [[ack-and-redelivery]] · [[jetstream-sizing]] · [[jetstream-out-of-disk]] ·
-[[stream-directories-disappear]] · [[stream-has-high-message-lag]]
+[[stream-directories-disappear]] · [[stream-has-high-message-lag]] · [[stream-compression]] ·
+[[maximum-messages-exceeded]]
 
 ## Sources
 
 [[s-docs-stream-config]] · [[s-docs-policies]] · [[s-docs-retention-policies]] ·
 [[s-docs-surviving-node-loss]] · [[s-docs-replication-and-r3]] ·
 [[s-docs-delivery-and-acknowledgment]] · [[s-synadia-jetstream-memory-patterns]] ·
-[[s-docs-upgrade-to-2.12]] · [[s-relnotes-2.14.0]] · [[s-nats-server-constants-2.14.6]]
+[[s-docs-upgrade-to-2.12]] · [[s-relnotes-2.14.0]] · [[s-nats-server-constants-2.14.6]] ·
+[[s-adr-35-filestore-compression]] ·
+[[s-nats-server-snapshot-restore]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
 [[nats-server-2.14]].

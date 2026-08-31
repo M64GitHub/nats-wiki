@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -78,7 +78,7 @@ Two structural notes from the table's own appendix:
 | code | constant | HTTP | description | where |
 |---|---|---|---|---|
 | **10002** | `JSAccountResourcesExceededErr` | 400 | resource limits exceeded for account | [[jetstream-sizing]] |
-| **10003** | `JSBadRequestErr` | 400 | bad request | [[js-api]] |
+| **10003** | `JSBadRequestErr` | 400 | bad request | [[js-api]] · [[maximum-messages-exceeded]] |
 | **10005** | `JSClusterNoPeersErrF` | 400 | `{err}` | [[no-suitable-peers-for-placement]] |
 | **10014** | `JSConsumerNotFoundErr` | 404 | consumer not found | [[js-api]] |
 | **10023** | `JSInsufficientResourcesErr` | 503 | insufficient resources | [[jetstream-sizing]] · [[jetstream-out-of-disk]] |
@@ -99,6 +99,9 @@ Two structural notes from the table's own appendix:
 | **10071** | `JSStreamWrongLastSequenceErrF` | 400 | wrong last sequence: `{seq}` | [[stream]] |
 | **10074** | `JSStreamReplicasNotSupportedErr` | 500 | replicas > 1 not supported in non-clustered mode | [[install-nats-server]] |
 | **10075** | `JSPeerRemapErr` | 503 | peer remap failed | [[rebalance-streams]] |
+| **10077** | `JSStreamStoreFailedF` | 503 | `{err}` — `maximum messages exceeded`, `maximum bytes exceeded`, `maximum messages per subject exceeded` | [[maximum-messages-exceeded]] |
+| **10109** | `JSStreamSealedErr` | 400 | invalid operation on sealed stream | [[stream]] |
+| **10110** | `JSStreamPurgeFailedF` | 500 | `{err}` — e.g. `stream purge not permitted` on a `deny_purge` stream | [[maximum-messages-exceeded]] |
 | **10099** | `JSConsumerWQMultipleUnfilteredErr` | 400 | multiple non-filtered consumers not allowed on workqueue stream | [[retention-policies]] |
 | **10100** | `JSConsumerWQConsumerNotUniqueErr` | 400 | filtered consumer not unique on workqueue stream | [[retention-policies]] |
 | **10165** | `JSMessageTTLInvalidErr` | 400 | invalid per-message TTL | [[message-ttl]] |
@@ -121,6 +124,13 @@ matching on the number alone tells you nothing here.
 validate `external.api` and `external.deliver` on a stream source or mirror — the fields that reach a
 stream in another account or JetStream domain — and **no docs page documents those fields at all**
 (`inbox/docs-issues.md` #21). See [[cross-account-sharing]].
+
+**`10077` is the one an operator never sees in a log.** It is the publish-side refusal of a
+`discard: new` stream at its limit, and it is delivered **only in the `PubAck`** — the server's own
+record of it is a rate-limited *debug* line (`server/stream.go:7063`), so at the default log level
+nothing appears. Its description is `{err}` again, and the three substituted strings
+(`server/store.go:48-53`) are what tell you *which* limit was hit. See
+[[maximum-messages-exceeded]].
 
 **`10005` and `10052` are the two to know.** Both have `{err}` as their whole description, so the
 number alone tells you almost nothing and the *text* is the only detail — the exact inversion of the
@@ -188,9 +198,11 @@ reason to explain.
 [[retention-policies]] · [[stream-placement]] · [[nats-cli]] · [[defaults-and-limits]] ·
 [[install-nats-server]] · [[rebalance-streams]] · [[backup-and-restore-jetstream]] ·
 [[disaster-recovery]] · [[cross-account-sharing]] · [[account]] · [[cross-domain-sourcing]] ·
-[[jetstream-domain]]
+[[jetstream-domain]] · [[maximum-messages-exceeded]]
 
 ## Sources
 
 [[s-adr-7-server-error-codes]] · [[s-adr-1-jetstream-json-api]] · [[s-nats-server-auth-and-tls]] ·
-[[s-gh-5606-cross-account-jetstream]] · [[s-nats-server-jetstream-resources]]
+[[s-gh-5606-cross-account-jetstream]] · [[s-nats-server-jetstream-resources]] ·
+[[s-adr-10-extended-purge]] ·
+[[s-adr-59-sourcing-and-mirroring]] · [[s-adr-61-meta-quorum-rescue]]

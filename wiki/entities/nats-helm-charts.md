@@ -75,6 +75,15 @@ helm install nats nats/nats -f values.yaml
 - **The reloader only watches volumes mounted under `/etc/`** (`reloader.natsVolumeMountPrefixes`).
   A certificate or config mounted elsewhere never triggers a SIGHUP, and the symptom is
   "reload doesn't work" rather than anything mount-shaped ([[reload-server-config]]).
+- **Client discovery is off by default: the chart sets `config.cluster.noAdvertise: true`.** The
+  pods never gossip their client URLs, so a client is told about no server other than the one the
+  Service gave it — correct, because pod IPs are useless to a client arriving through a Service or a
+  load balancer, and the chart's own comment says "If clients are behind a load balancer it is best
+  to leave this as is". The client Service has **no `type` field** in the chart at all, so it is a
+  plain ClusterIP; there is no `LoadBalancer` or `NodePort` value, and the only ingress in the chart
+  is for WebSocket. External clients therefore need a per-pod address and `client_advertise` — the
+  chart defines no `advertise` section of its own (source: [[s-nats-helm-chart-values-2.14.6]]).
+  See [[how-clients-reach-a-cluster]].
 - **`podTemplate.configChecksumAnnotation: true` is the other door**: it hashes the ConfigMap into a
   pod annotation so a config change **rolls the StatefulSet** instead of hot-reloading. Right for a
   change that is not reloadable at all, wrong for a routine policy edit ([[upgrade-a-cluster]]).
@@ -132,8 +141,10 @@ livenessProbe:  { httpGet: { path: "/healthz?js-enabled-only=true", port: 8222 }
 
 [[nack]] · [[nats-box]] · [[nats-surveyor]] · [[monitoring-endpoints]] · [[replicas]] ·
 [[jetstream-sizing]] · [[nats-server]] · [[build-a-3-node-cluster]] · [[upgrade-a-cluster]] ·
-[[reload-server-config]] · [[install-nats-server]]
+[[reload-server-config]] · [[install-nats-server]] · [[how-clients-reach-a-cluster]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]] ·
+[[s-nats-helm-chart-values-2.14.6]] ·
+[[s-docs-rolling-upgrades]]

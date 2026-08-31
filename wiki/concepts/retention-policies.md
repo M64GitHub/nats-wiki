@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -98,6 +98,27 @@ nats consumer add FULFILLMENT eu-shippers --pull --ack explicit --filter "fulfil
 gone. On a `limits` stream it only clears the consumer's pending entry (source:
 [[s-docs-acknowledgment]]). See [[ack-and-redelivery]].
 
+**`discard: new` stops the world when a limit is reached.** Every publish is refused with
+`10077 maximum messages exceeded` (or `... bytes`, or `... messages per subject`) until something
+removes messages, and **the server logs nothing about it** at the default level — the refusal reaches
+only the publisher, in its `PubAck`. This is the intended behaviour of the policy, and it is the
+most common way a healthy-looking cluster stops accepting writes: see
+[[maximum-messages-exceeded]] for the triage and the four ways out.
+
+The immediate way out is a purge, which takes three shapes — keep the newest *N*, drop one subject,
+or drop everything below a sequence (source: [[s-adr-10-extended-purge]]):
+
+```
+nats stream purge ORDERS --keep=1000
+nats stream purge ORDERS --subject='orders.eu.>'
+nats stream purge ORDERS --seq=45000
+```
+
+A purge does not renumber the stream, and `--seq` and `--keep` cannot be combined (the server
+answers `10003 bad request`). On a `workqueue` stream a purge throws away unprocessed work — fix the
+consumers first.
+
+
 ## Sourcing and mirroring from a WorkQueue or Interest stream
 
 **Supported since nats-server 2.14** (source: [[s-relnotes-2.14.0]], [[s-docs-upgrade-to-2.14]]).
@@ -153,9 +174,9 @@ interest, and new messages were removed before they could be copied
 ## Related
 
 [[stream]] · [[consumer]] · [[ack-and-redelivery]] · [[worker-pool]] · [[jetstream-out-of-disk]] ·
-[[error-codes]]
+[[error-codes]] · [[maximum-messages-exceeded]]
 
 ## Sources
 
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
-[[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]]
+[[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]]
