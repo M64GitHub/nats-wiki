@@ -689,7 +689,9 @@ names now have pages — see the Entities section above. People: none yet.)*
 - `inbox/plan-first-ingests-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as the record
 - `inbox/plan-runbooks-and-security-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as
   the record
-- `inbox/plan-consolidation-2026-08-31.md` — **finished** 2026-08-31; kept as the record
+- `inbox/plan-consolidation-2026-08-31.md` — **partly worked**: steps 1 and 4 done 2026-08-31,
+  **steps 2, 3, 5–8 still open**. The follow-on queue for unlanded ripples, worked per
+  *Operation: consolidate*; say `start the plan` against this file to continue it
 - `inbox/plan-drift-and-adrs-2026-08-31.md` — **finished** 2026-08-31, all 5 steps; kept as the record
 - `inbox/plan-the-unread-chapters-2026-08-31.md` — **finished** 2026-09-01, all 6 steps; its result
   line proposes the next piece of work, which is **filing the two reports above**

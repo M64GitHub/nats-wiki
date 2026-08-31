@@ -2229,3 +2229,10 @@ finished plan as "the current plan". Both fixed, and all five plans now show the
 
 **Numbers unchanged** — 260 pages, bank 105/83, ★ 42 of 42, unlanded ripples 202, drift 0, staleness 0,
 lint clean. Nothing was ingested and no wiki page's content changed.
+
+**Correction, same day.** The `inbox/` list above was written in this session claiming
+`plan-consolidation-2026-08-31.md` was **finished**. It is not: steps 1 and 4 are done, **steps 2, 3,
+5, 6, 7 and 8 are still `status: open`**. Corrected in `wiki/index.md`. The consolidation plan is the
+standing follow-on queue for the unlanded-ripple count, which is why that count has been reported
+before and after every step since — it stands at **202 across 56 pages**, and `concepts/account` is
+still its single biggest debt.
