@@ -417,6 +417,13 @@ TOC table or a cheat-sheet rule, change `wiki.json`, not the generator.
 The generator and the shared look and feel come from `llm-wiki-starter`; improve
 them there and push them here with that repo's `tools/update-tools.sh`.
 
+This wiki uses the **`docs` theme** (`"style": "docs"` in `wiki.json`): a clean
+professional documentation look with a light/dark/auto switch in the header, chosen
+because the site is shared with colleagues. Themes are files under
+`tools/site-assets/themes/`; `style.css` is structure only. Never restyle by editing
+files here — change the theme in `llm-wiki-starter` and push it, or `update-tools.sh`
+will overwrite the change.
+
 ## Boundaries
 
 - Never modify files in `raw/` after creation.

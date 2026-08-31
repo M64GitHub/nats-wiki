@@ -10,6 +10,35 @@
   const FILTER_KEYS = ['type', 'kind', 'tag'].concat(FACET_KEYS);
   const isToc = e => !!TOC_TYPES[e.type];
 
+  /* ---------- theme: auto (follows the system) / light / dark ----------
+     The inline script in <head> has already applied the stored choice, so there is no flash here;
+     this only wires the header button and tells the canvas graphs to repaint. */
+  const themeBtn = $('#theme');
+  if (themeBtn) {
+    const ICON = {
+      auto: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" aria-hidden="true"><circle cx="8" cy="8" r="5.6"/><path d="M8 2.4a5.6 5.6 0 0 1 0 11.2z" fill="currentColor" stroke="none"/></svg>',
+      light: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="3.1"/><path d="M8 .9v1.8M8 13.3v1.8M.9 8h1.8M13.3 8h1.8M2.9 2.9l1.3 1.3M11.8 11.8l1.3 1.3M13.1 2.9l-1.3 1.3M4.2 11.8l-1.3 1.3"/></svg>',
+      dark: '<svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M13.6 9.7A5.9 5.9 0 0 1 6.3 2.4 5.9 5.9 0 1 0 13.6 9.7z"/></svg>'
+    };
+    const NEXT = { auto: 'light', light: 'dark', dark: 'auto' };
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const pref = () => { try { return NEXT[localStorage.getItem('theme')] ? localStorage.getItem('theme') : 'auto'; } catch (e) { return 'auto'; } };
+    function applyTheme(p) {
+      document.documentElement.dataset.theme = p === 'auto' ? (mq.matches ? 'dark' : 'light') : p;
+      themeBtn.innerHTML = ICON[p];
+      themeBtn.title = 'theme: ' + p + (p === 'auto' ? ' (follows your system)' : '') + ' — click for ' + NEXT[p];
+      themeBtn.setAttribute('aria-label', themeBtn.title);
+      document.dispatchEvent(new CustomEvent('themechange'));
+    }
+    themeBtn.addEventListener('click', () => {
+      const p = NEXT[pref()];
+      try { localStorage.setItem('theme', p); } catch (e) { /* storage unavailable */ }
+      applyTheme(p);
+    });
+    mq.addEventListener('change', () => { if (pref() === 'auto') applyTheme('auto'); });
+    applyTheme(pref());
+  }
+
   /* ---------- sidebar: mark the current page, remember open groups, filter ---------- */
   function samePage(href) {
     try { return new URL(href, location.href).pathname === location.pathname; } catch (e) { return false; }

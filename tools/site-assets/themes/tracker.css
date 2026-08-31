@@ -1,0 +1,31 @@
+/* Theme: tracker — the original dark viewer look (built for the chiptune wiki; colours from 037-lab).
+   Dark only: it defines no light palette, so build-site.py shows no theme switch for it. */
+:root{
+  --scheme:dark;
+  --bg:#0e1220; --panel:#151a2c; --panel2:#1a2038; --line:#262e4a; --line2:#333d63;
+  --side-bg:rgba(21,26,44,.5); --top-bg:rgba(14,18,32,.92); --scrim:rgba(6,8,16,.72); --scroll:#2b3352;
+  --ink:#dfe4f5; --dim:#8890ad; --faint:#5a6180; --strong:#fff;
+  --cyan:#5fd9e0; --cyan-soft:rgba(95,217,224,.14);
+  --amber:#ffb454; --amber-soft:rgba(255,180,84,.16);
+  --pink:#ff6fa5; --pink-soft:rgba(255,111,165,.16);
+  --green:#7ee787; --green-soft:rgba(126,231,135,.14);
+  --red:#ff5c5c; --red-soft:rgba(255,92,92,.16);
+  --accent:var(--cyan); --accent-soft:var(--cyan-soft); --link:var(--cyan);
+  --code-ink:var(--amber); --th-ink:var(--cyan); --h3-ink:var(--cyan); --h4-ink:var(--amber);
+  --quote-line:var(--amber); --quote-bg:var(--amber-soft);
+  --sel:rgba(95,217,224,.28); --row-alt:rgba(255,255,255,.015); --row-hover:var(--cyan-soft);
+  --hit-bg:var(--amber-soft); --hit-line:var(--amber);
+  --mark-bg:rgba(255,180,84,.3); --mark-ink:#fff; --unv-bg:var(--red-soft); --unv-ink:#ffb3b3;
+  --shadow:0 8px 24px rgba(0,0,0,.5); --shadow-lg:0 30px 80px rgba(0,0,0,.6);
+  --mono:'JetBrains Mono',ui-monospace,'Cascadia Mono',Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,-apple-system,'Segoe UI',Inter,Roboto,'Helvetica Neue',sans-serif;
+  --head:var(--mono); --ui:var(--mono); --table-font:var(--mono);
+  --nav-tt:uppercase; --nav-ls:1.2px; --label-tt:uppercase; --label-ls:1.2px;
+  --r:6px; --r-lg:8px; --side-w:250px; --rail-w:280px;
+  /* link-graph canvas */
+  --g-edge:rgba(255,255,255,.1); --g-edge-dim:rgba(255,255,255,.05); --g-edge-spoke:rgba(255,255,255,.22);
+  --g-edge-on:rgba(95,217,224,.8); --g-halo:rgba(14,18,32,.92);
+  --g-label:#dfe4f5; --g-label-dim:#b9c0d8; --g-ring:#fff;
+}
+body{background-image:radial-gradient(1200px 500px at 50% -140px,rgba(95,217,224,.07),transparent 60%)}
+.logo .mark,.hero h1{background:linear-gradient(90deg,var(--cyan),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}

@@ -1,0 +1,72 @@
+/* Theme: docs — a clean, professional technical-documentation look. Light and dark.
+   The theme switch is driven by data-theme on <html> (set before first paint by the inline script
+   build-site.py writes; "auto" is resolved to light/dark in JS, so this file needs no media query).
+   Page-type colours stay as small accents only: --wl-tint, --h1-tint and --tile-num route body
+   links, page titles and home tiles back to neutral ink. */
+:root{
+  --scheme:light;
+  --bg:#ffffff; --panel:#f8f9fb; --panel2:#f1f3f6; --line:#e5e8ec; --line2:#cfd5dd;
+  --side-bg:#fbfcfd; --top-bg:rgba(255,255,255,.88); --scrim:rgba(20,24,31,.38); --scroll:#c9d0d8;
+  --ink:#1b2229; --dim:#5b6673; --faint:#8b96a3; --strong:#0b0f14;
+  --accent:#0f62b5; --accent-soft:rgba(15,98,181,.09); --link:#0f62b5;
+  --cyan:#0e7490; --cyan-soft:rgba(14,116,144,.10);
+  --amber:#a1670a; --amber-soft:rgba(161,103,10,.10);
+  --pink:#be185d; --pink-soft:rgba(190,24,93,.10);
+  --green:#15803d; --green-soft:rgba(21,128,61,.10);
+  --red:#b3261e; --red-soft:rgba(179,38,30,.10);
+  --code-ink:#1c3f5f; --th-ink:#3d4854; --h3-ink:var(--ink); --h4-ink:var(--dim);
+  --quote-line:var(--line2); --quote-bg:var(--panel);
+  --sel:rgba(15,98,181,.16); --row-alt:rgba(15,23,32,.022); --row-hover:rgba(15,98,181,.05);
+  --hit-bg:rgba(255,196,84,.22); --hit-line:#e0a300;
+  --mark-bg:rgba(255,214,102,.55); --mark-ink:#20262d;
+  --unv-bg:rgba(179,38,30,.08); --unv-ink:#9b1c1c;
+  --shadow:0 4px 14px rgba(16,24,40,.10); --shadow-lg:0 24px 60px rgba(16,24,40,.18);
+  --g-edge:rgba(27,34,41,.14); --g-edge-dim:rgba(27,34,41,.05); --g-edge-spoke:rgba(27,34,41,.28);
+  --g-edge-on:rgba(15,98,181,.75); --g-halo:rgba(255,255,255,.92);
+  --g-label:#39434e; --g-label-dim:#6c7581; --g-ring:#1b2229;
+}
+:root[data-theme=dark]{
+  --scheme:dark;
+  --bg:#14181d; --panel:#1a1f26; --panel2:#222831; --line:#2a313a; --line2:#3b444f;
+  --side-bg:#161b21; --top-bg:rgba(20,24,29,.88); --scrim:rgba(0,0,0,.6); --scroll:#39424d;
+  --ink:#e3e7ec; --dim:#9aa4b1; --faint:#6d7783; --strong:#ffffff;
+  --accent:#6cb2f5; --accent-soft:rgba(108,178,245,.14); --link:#7cbcf8;
+  --cyan:#3fb8cc; --cyan-soft:rgba(63,184,204,.15);
+  --amber:#e0a83c; --amber-soft:rgba(224,168,60,.15);
+  --pink:#ef8bb4; --pink-soft:rgba(239,139,180,.15);
+  --green:#5ec97a; --green-soft:rgba(94,201,122,.15);
+  --red:#f28b82; --red-soft:rgba(242,139,130,.15);
+  --code-ink:#b8cfe8; --th-ink:#b6c0cc;
+  --quote-bg:rgba(255,255,255,.03);
+  --sel:rgba(108,178,245,.28); --row-alt:rgba(255,255,255,.02); --row-hover:rgba(108,178,245,.08);
+  --hit-bg:rgba(224,168,60,.16); --hit-line:#e0a83c;
+  --mark-bg:rgba(224,168,60,.34); --mark-ink:#fff;
+  --unv-bg:rgba(242,139,130,.14); --unv-ink:#fca5a5;
+  --shadow:0 6px 20px rgba(0,0,0,.45); --shadow-lg:0 24px 70px rgba(0,0,0,.6);
+  --g-edge:rgba(227,231,236,.13); --g-edge-dim:rgba(227,231,236,.05); --g-edge-spoke:rgba(227,231,236,.26);
+  --g-edge-on:rgba(108,178,245,.8); --g-halo:rgba(20,24,29,.92);
+  --g-label:#cbd3dc; --g-label-dim:#98a2ae; --g-ring:#ffffff;
+}
+:root{
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,'Helvetica Neue',Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;
+  --head:var(--sans); --ui:var(--sans); --table-font:var(--sans);
+  --nav-tt:none; --nav-ls:0; --nav-weight:500; --label-tt:uppercase; --label-ls:.07em; --label-weight:600;
+  --mark-ls:.02em; --h1-ls:-.015em; --hero-ls:-.02em;
+  --r:5px; --r-lg:6px; --side-w:262px; --rail-w:272px; --side-size:13px;
+  /* page types stay badge-sized accents: titles, body links and tile numbers read as ink */
+  --h1-tint:var(--ink); --wl-tint:var(--link); --tile-num:var(--ink);
+}
+/* type sets --type on the tile; a 3px edge is all the colour a tile gets */
+.tile{border-left:3px solid var(--type,var(--line2))}
+.body{line-height:1.62}
+.body h2{font-weight:650;margin-top:34px}
+.body h3{font-weight:650}
+.body h4{font-weight:600;letter-spacing:.01em}
+.ph h1,.hero h1{font-weight:700}
+.topnav a.on{font-weight:600}
+.meta{background:var(--panel);border-color:var(--line)}
+th{font-weight:600;letter-spacing:.01em}
+.badge{font-weight:600}
+.res.on{outline-color:var(--accent)}
+.tbtn:hover{color:var(--accent);border-color:var(--accent)}

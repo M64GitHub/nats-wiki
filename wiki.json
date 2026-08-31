@@ -1,6 +1,7 @@
 {
   "name": "NATS Wiki",
   "mark": "NATS WIKI",
+  "style": "docs",
   "tagline": "Running NATS in production — nats-server and JetStream from the solution architect's chair: concepts, the internals that explain observable behaviour, runbooks, sizing, symptom-first gotchas and reference tables. An LLM wiki: sources in, cross-linked pages out.",
   "search_placeholder": "search pages, cheat sheets, questions, ADRs…",
   "search_help": "config keys, subjects and flags search as typed (<code>max_ack_pending</code>, <code>$JS.API.STREAM.INFO</code>, <code>--replicas</code>)",

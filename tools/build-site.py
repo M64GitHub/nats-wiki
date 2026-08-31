@@ -13,7 +13,8 @@ What it renders
   raw/**                  -> site/raw/<collection>/<file>.html  numbered lines, article anchors (+ original copies)
   generated               -> graph.html, cheatsheets.html + cheatsheet/<slug>.html, browse.html + browse/*.html,
                              wanted.html + wanted/<slug>.html, health.html, sources.html,
-                             search-index.js, raw-index.js, graph-data.js, assets/types.css
+                             search-index.js, raw-index.js, graph-data.js, assets/types.css,
+                             assets/theme.css (the site-assets/themes/ file "style" in wiki.json picks)
 
 Everything topic-specific comes from wiki.json: the site name and tagline, the page types (id, folder, label,
 colour, optional kinds), extra frontmatter facets (e.g. platforms), inbox TOC tables, raw-collection article
@@ -27,13 +28,34 @@ import argparse, collections, datetime, glob, html, json, os, re, shutil, sys, t
 R = '@@R@@'  # placeholder for the relative path to the site root
 esc = html.escape
 
-PALETTE = {  # named colours a wiki.json "color" may use: (colour, soft background)
-    'cyan': ('#5fd9e0', 'rgba(95,217,224,.14)'), 'amber': ('#ffb454', 'rgba(255,180,84,.16)'),
-    'pink': ('#ff6fa5', 'rgba(255,111,165,.16)'), 'green': ('#7ee787', 'rgba(126,231,135,.14)'),
-    'red': ('#ff5c5c', 'rgba(255,92,92,.16)'), 'violet': ('#b48cff', 'rgba(180,140,255,.16)'),
-    'blue': ('#6ea8fe', 'rgba(110,168,254,.16)'), 'lime': ('#c8e64a', 'rgba(200,230,74,.14)'),
-    'orange': ('#ff8c42', 'rgba(255,140,66,.16)'), 'teal': ('#3fc1a8', 'rgba(63,193,168,.14)'),
-    'magenta': ('#e56ce5', 'rgba(229,108,229,.16)'), 'grey': ('#8890ad', 'rgba(136,144,173,.16)')}
+PALETTES = {  # named colours a wiki.json "color" may use, per theme mode: name -> (colour, soft background)
+    'neon': {   # the tracker theme: saturated on a near-black navy
+        'cyan': ('#5fd9e0', 'rgba(95,217,224,.14)'), 'amber': ('#ffb454', 'rgba(255,180,84,.16)'),
+        'pink': ('#ff6fa5', 'rgba(255,111,165,.16)'), 'green': ('#7ee787', 'rgba(126,231,135,.14)'),
+        'red': ('#ff5c5c', 'rgba(255,92,92,.16)'), 'violet': ('#b48cff', 'rgba(180,140,255,.16)'),
+        'blue': ('#6ea8fe', 'rgba(110,168,254,.16)'), 'lime': ('#c8e64a', 'rgba(200,230,74,.14)'),
+        'orange': ('#ff8c42', 'rgba(255,140,66,.16)'), 'teal': ('#3fc1a8', 'rgba(63,193,168,.14)'),
+        'magenta': ('#e56ce5', 'rgba(229,108,229,.16)'), 'grey': ('#8890ad', 'rgba(136,144,173,.16)')},
+    'light': {  # readable on white: ~AA on #fff for 13px text
+        'cyan': ('#0e7490', 'rgba(14,116,144,.10)'), 'amber': ('#a1670a', 'rgba(161,103,10,.10)'),
+        'pink': ('#be185d', 'rgba(190,24,93,.10)'), 'green': ('#15803d', 'rgba(21,128,61,.10)'),
+        'red': ('#b3261e', 'rgba(179,38,30,.10)'), 'violet': ('#6d28d9', 'rgba(109,40,217,.10)'),
+        'blue': ('#1d4ed8', 'rgba(29,78,216,.10)'), 'lime': ('#4d7c0f', 'rgba(77,124,15,.10)'),
+        'orange': ('#c2410c', 'rgba(194,65,12,.10)'), 'teal': ('#0f766e', 'rgba(15,118,110,.10)'),
+        'magenta': ('#a21caf', 'rgba(162,28,175,.10)'), 'grey': ('#5b6673', 'rgba(91,102,115,.10)')},
+    'dark': {   # the docs theme's dark mode: muted, not neon
+        'cyan': ('#3fb8cc', 'rgba(63,184,204,.15)'), 'amber': ('#e0a83c', 'rgba(224,168,60,.15)'),
+        'pink': ('#ef8bb4', 'rgba(239,139,180,.15)'), 'green': ('#5ec97a', 'rgba(94,201,122,.15)'),
+        'red': ('#f28b82', 'rgba(242,139,130,.15)'), 'violet': ('#b39ddf', 'rgba(179,157,223,.15)'),
+        'blue': ('#7cbcf8', 'rgba(124,188,248,.15)'), 'lime': ('#b7d24f', 'rgba(183,210,79,.15)'),
+        'orange': ('#f0975a', 'rgba(240,151,90,.15)'), 'teal': ('#4bc0ad', 'rgba(75,192,173,.15)'),
+        'magenta': ('#d982e0', 'rgba(217,130,224,.15)'), 'grey': ('#9aa4b1', 'rgba(154,164,177,.15)')}}
+PALETTE = PALETTES['neon']
+THEMES = {  # "style" in wiki.json -> stylesheet under site-assets/themes/ and the palettes it wants
+    'tracker': {'file': 'tracker.css', 'light': False, 'palettes': ('neon', None),
+                'about': 'the original dark viewer look — mono everywhere, neon accents'},
+    'docs': {'file': 'docs.css', 'light': True, 'palettes': ('light', 'dark'),
+             'about': 'a clean professional documentation look, light and dark with a header switch'}}
 DEFAULT_COLORS = ['cyan', 'amber', 'pink', 'green', 'violet', 'blue', 'lime', 'orange', 'teal', 'magenta']
 DEFAULT_TYPES = [
     {'id': 'technique', 'folder': 'techniques', 'label': 'Techniques'},
@@ -44,23 +66,29 @@ DEFAULT_TYPES = [
     {'id': 'summary', 'folder': 'summaries', 'label': 'Summaries'}]
 
 
-def color_pair(c, i=0):
+def color_pair(c, i=0, palette='neon'):
+    pal = PALETTES.get(palette, PALETTES['neon'])
     if not c:
         c = DEFAULT_COLORS[i % len(DEFAULT_COLORS)]
-    if c in PALETTE:
-        return PALETTE[c]
+    if c in pal:
+        return pal[c]
     m = re.fullmatch(r'#?([0-9a-fA-F]{6})', str(c))
     if m:
         h = m.group(1)
         return '#' + h, f'rgba({int(h[0:2], 16)},{int(h[2:4], 16)},{int(h[4:6], 16)},.16)'
-    return PALETTE['grey']
+    return pal['grey']
 
 
 def load_config(path):
-    cfg = {'name': 'LLM Wiki', 'mark': '', 'tagline': '', 'search_placeholder': '', 'search_help': '',
+    cfg = {'name': 'LLM Wiki', 'mark': '', 'tagline': '', 'search_placeholder': '', 'search_help': '', 'style': 'tracker',
            'types': DEFAULT_TYPES, 'facets': [], 'tocs': [], 'raw_collections': {}, 'cheatsheets': None, 'stub_words': 180}
     if path and os.path.exists(path):
         cfg.update(json.load(open(path, encoding='utf-8')))
+    if cfg['style'] not in THEMES:
+        print(f'warning: unknown style {cfg["style"]!r} in wiki.json — using "tracker" (have: {", ".join(THEMES)})', file=sys.stderr)
+        cfg['style'] = 'tracker'
+    cfg['theme'] = THEMES[cfg['style']]
+    pal_light, pal_dark = cfg['theme']['palettes']
     types = []
     for i, t in enumerate(cfg['types'] or DEFAULT_TYPES):
         t = dict(t)
@@ -68,7 +96,9 @@ def load_config(path):
         t.setdefault('folder', t['id'] + 's')
         t.setdefault('label', t['id'].replace('-', ' ').title() + 's')
         t.setdefault('plural', t['label'].lower())
-        t['color'], t['soft'] = color_pair(t.get('color'), i)
+        want = t.get('color')   # keep the name: color_pair resolves it differently per palette
+        t['color'], t['soft'] = color_pair(want, i, pal_light)
+        t['color_dark'], t['soft_dark'] = color_pair(want, i, pal_dark) if pal_dark else (None, None)
         t['kinds'] = [dict(k) if isinstance(k, dict) else {'id': k} for k in (t.get('kinds') or [])]
         for k in t['kinds']:
             k.setdefault('label', k['id'].replace('-', ' ').title() + 's')
@@ -108,7 +138,7 @@ def load_config(path):
 def configure(root, config_path=None):
     """Point the module at a wiki root and its wiki.json (called at import for the enclosing repo, and from main)."""
     global ROOT, WIKI, INBOX, RAW, ASSETS, CFG, SITE, TYPES, TYPE_ORDER, TYPE_LABEL, TYPE_PLURAL, TYPE_BY_ID, FOLDER_TYPE
-    global KIND_LABEL, FACETS, TOCS, RAWCOLL, CHEAT
+    global KIND_LABEL, FACETS, TOCS, RAWCOLL, CHEAT, THEME
     ROOT = os.path.abspath(root)
     WIKI, INBOX, RAW = os.path.join(ROOT, 'wiki'), os.path.join(ROOT, 'inbox'), os.path.join(ROOT, 'raw')
     ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'site-assets')
@@ -125,16 +155,28 @@ def configure(root, config_path=None):
     TOCS = CFG['tocs']
     RAWCOLL = CFG['raw_collections'] or {}
     CHEAT = CFG['cheatsheets']
+    THEME = CFG['theme']
 
 
 configure(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def types_css():
-    """Per-type colour tokens and the rules that use them (badges, links, tiles, legend swatches, headings)."""
-    out = [':root{']
-    for t in TYPES:
-        out.append(f'  --t-{t["id"]}:{t["color"]}; --t-{t["id"]}-soft:{t["soft"]};')
+    """Per-type colour tokens and the rules that use them (badges, links, tiles, legend swatches, headings).
+
+    A theme may neutralise the tinting without touching this file: --wl-tint recolours body wikilinks,
+    --h1-tint page titles and --tile-num the home tiles (the docs theme sends all three back to ink)."""
+    def block(sel, dark):
+        out = [sel + '{']
+        for t in TYPES:
+            c, soft = (t['color_dark'], t['soft_dark']) if dark else (t['color'], t['soft'])
+            out.append(f'  --t-{t["id"]}:{c}; --t-{t["id"]}-soft:{soft};')
+        out.append('}')
+        return out
+    out = block(':root', False)
+    if THEME['palettes'][1]:
+        out += block(':root[data-theme=dark]', True)
+    out.append(':root{')
     for tc in TOCS:
         out.append(f'  --t-{tc["id"]}:var(--amber); --t-{tc["id"]}-soft:var(--amber-soft);')
     out.append('  --t-wanted:var(--red); --t-wanted-soft:var(--red-soft); --t-log:var(--dim); --t-index:var(--dim); --t-page:var(--dim);'
@@ -143,7 +185,9 @@ def types_css():
     ids = TYPE_ORDER + [tc['id'] for tc in TOCS] + ['wanted', 'cheatsheet']
     for i in ids:
         out.append(f'.badge.t-{i}{{color:var(--t-{i});border-color:var(--t-{i});background:var(--t-{i}-soft)}}')
-        out.append(f'.wl.t-{i}{{color:var(--t-{i})}}.tile.t-{i} b{{color:var(--t-{i})}}.sw.t-{i}{{background:var(--t-{i})}}.t-{i} .ph h1{{color:var(--t-{i})}}')
+        out.append(f'.wl.t-{i}{{color:var(--wl-tint,var(--t-{i}))}}.tile.t-{i}{{--type:var(--t-{i})}}'
+                   f'.tile.t-{i} b{{color:var(--tile-num,var(--t-{i}))}}.sw.t-{i}{{background:var(--t-{i})}}'
+                   f'.t-{i} .ph h1{{color:var(--h1-tint,var(--t-{i}))}}')
     out.append('@media print{' + ','.join(f'.wl.t-{i}' for i in ids) + '{color:#000;text-decoration:underline}}')
     return '\n'.join(out) + '\n'
 
@@ -526,6 +570,21 @@ def toc_html(headings):
 
 
 # ---------------------------------------------------------------- layout
+def theme_script():
+    """Apply the stored theme before first paint (no flash). 'auto' is resolved here, so the
+    stylesheets only ever see data-theme=light|dark and need no prefers-color-scheme duplicate."""
+    if not THEME['light']:
+        return ''
+    return ("<script>try{var t=localStorage.getItem('theme');"
+            "document.documentElement.dataset.theme=(t==='light'||t==='dark')?t:"
+            "(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light')}"
+            "catch(e){document.documentElement.dataset.theme='light'}</script>")
+
+
+def theme_button():
+    return '\n  <button class="tbtn" id="theme" type="button" title="switch theme">\u25d0</button>' if THEME['light'] else ''
+
+
 def client_config():
     """What app.js / graph.js need to know about this wiki."""
     return {'facets': [f['key'] for f in FACETS], 'types': TYPE_ORDER,
@@ -582,15 +641,17 @@ class Site:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{esc(title)} · {SITE}</title>
 <link rel="stylesheet" href="{R}assets/style.css">
+<link rel="stylesheet" href="{R}assets/theme.css">
 <link rel="stylesheet" href="{R}assets/types.css">
 <script>window.ROOT="{R}";window.WIKI_CFG={json.dumps(client_config())};</script>
+{theme_script()}
 {head}
 </head>
 <body class="{cls}">
 <header class="top">
   <a class="logo" href="{R}index.html"><span class="mark">{esc(CFG.get('mark') or SITE.upper())}</span><span class="sub">llm wiki · {self.stats["pages"]} pages</span></a>
   <nav class="topnav">{navh}<a href="#" id="random" title="random page">Random</a></nav>
-  <button class="sbtn" id="sopen" type="button">search <kbd>/</kbd></button>
+  <button class="sbtn" id="sopen" type="button">search <kbd>/</kbd></button>{theme_button()}
 </header>
 <div class="{shell_cls}">
   <aside class="side">{self.sidebar}</aside>
@@ -1046,6 +1107,9 @@ def build(out):
     site.stats = {'pages': len(pages), 'links': n_links, 'wanted': len(wanted), 'built': datetime.date.today().isoformat()}
     site.sidebar = build_sidebar(pages)
     shutil.copytree(ASSETS, os.path.join(out, 'assets'))
+    themes_dir = os.path.join(out, 'assets', 'themes')   # ship only the theme wiki.json asked for
+    shutil.copy2(os.path.join(themes_dir, THEME['file']), os.path.join(out, 'assets', 'theme.css'))
+    shutil.rmtree(themes_dir)
 
     # -- graph data (index and log excluded: they link to everything)
     nodes, nid, glinks = [], {}, set()

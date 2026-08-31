@@ -1,10 +1,39 @@
 /* LLM wiki viewer — force-directed link graph on <canvas>. Used by graph.html and by the local graph on every page.
-   Page types and their colours come from window.GRAPH.types (graph-data.js, generated from wiki.json). */
+   Page types come from window.GRAPH.types (graph-data.js, generated from wiki.json); every colour is read
+   from the live CSS variables (assets/theme.css + types.css) so the canvas follows the light/dark switch. */
 window.WikiGraph = (function () {
   'use strict';
   const TYPE_DEFS = (window.GRAPH && window.GRAPH.types) || [{ id: 'technique', color: '#5fd9e0' }, { id: 'concept', color: '#ffb454' }, { id: 'entity', color: '#ff6fa5' }, { id: 'summary', color: '#7ee787' }];
   const COLORS = { wanted: '#ff5c5c', other: '#8890ad' };
-  TYPE_DEFS.forEach(t => { COLORS[t.id] = t.color; });
+  const PAINT = { edge: 'rgba(255,255,255,.1)', edgeDim: 'rgba(255,255,255,.05)', edgeSpoke: 'rgba(255,255,255,.22)',
+    edgeOn: 'rgba(95,217,224,.8)', halo: 'rgba(14,18,32,.92)', label: '#dfe4f5', labelDim: '#b9c0d8', ring: '#fff',
+    font: 'ui-monospace, Menlo, monospace' };
+  let probe = null;
+  function resolve(expr, fallback) {   // computed style resolves var() chains; getPropertyValue would not
+    if (!probe) {
+      probe = document.createElement('span');
+      probe.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden';
+      (document.body || document.documentElement).appendChild(probe);
+    }
+    probe.style.color = 'var(' + expr + ', ' + fallback + ')';
+    return getComputedStyle(probe).color || fallback;
+  }
+  function readPaint() {   // re-read after a theme switch
+    TYPE_DEFS.forEach(t => { COLORS[t.id] = resolve('--t-' + t.id, t.color); });
+    COLORS.wanted = resolve('--t-wanted', '#ff5c5c');
+    COLORS.other = resolve('--dim', '#8890ad');
+    PAINT.edge = resolve('--g-edge', 'rgba(255,255,255,.1)');
+    PAINT.edgeDim = resolve('--g-edge-dim', 'rgba(255,255,255,.05)');
+    PAINT.edgeSpoke = resolve('--g-edge-spoke', 'rgba(255,255,255,.22)');
+    PAINT.edgeOn = resolve('--g-edge-on', 'rgba(95,217,224,.8)');
+    PAINT.halo = resolve('--g-halo', 'rgba(14,18,32,.92)');
+    PAINT.label = resolve('--g-label', '#dfe4f5');
+    PAINT.labelDim = resolve('--g-label-dim', '#b9c0d8');
+    PAINT.ring = resolve('--g-ring', '#fff');
+    probe.style.fontFamily = 'var(--ui, ui-monospace, Menlo, monospace)';
+    PAINT.font = getComputedStyle(probe).fontFamily || 'ui-monospace, Menlo, monospace';
+  }
+  const instances = [];
   const ALL_TYPES = TYPE_DEFS.map(t => t.id).concat(['wanted']);
   const ORDER = {}; ALL_TYPES.forEach((t, i) => { ORDER[t] = i; });
   const color = t => COLORS[t] || COLORS.other;
@@ -150,19 +179,19 @@ window.WikiGraph = (function () {
         const a = ns[i], b = ns[j];
         const on = hov >= 0 && (i === hov || j === hov);
         const spoke = st.mini && (i === st.g.focus || j === st.g.focus);
-        ctx.strokeStyle = on ? 'rgba(95,217,224,.8)' : (hov >= 0 ? 'rgba(255,255,255,.05)' : (spoke ? 'rgba(255,255,255,.22)' : 'rgba(255,255,255,.1)'));
+        ctx.strokeStyle = on ? PAINT.edgeOn : (hov >= 0 ? PAINT.edgeDim : (spoke ? PAINT.edgeSpoke : PAINT.edge));
         ctx.lineWidth = (on ? 1.6 : 1) / st.scale;
         ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
       }
       const fontPx = st.mini ? 10 / st.scale : Math.max(9, Math.min(13, 11 / Math.sqrt(st.scale)));
-      ctx.font = fontPx + 'px ui-monospace, Menlo, monospace'; ctx.textBaseline = 'middle';
+      ctx.font = fontPx + 'px ' + PAINT.font; ctx.textBaseline = 'middle';
       const cx = (st.w / 2 - st.tx) / st.scale;
       for (let i = 0; i < ns.length; i++) {
         const a = ns[i], r = radius(a), dimmed = (hov >= 0 && !nb.has(i)) || (hl.size && !hl.has(i));
         ctx.globalAlpha = dimmed ? 0.22 : 1;
         ctx.beginPath(); ctx.arc(a.x, a.y, r, 0, Math.PI * 2);
         ctx.fillStyle = color(a.type); ctx.fill();
-        if (i === st.g.focus || hl.has(i)) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 / st.scale; ctx.stroke(); }
+        if (i === st.g.focus || hl.has(i)) { ctx.strokeStyle = PAINT.ring; ctx.lineWidth = 1.5 / st.scale; ctx.stroke(); }
         if (a.type === 'wanted') { ctx.strokeStyle = COLORS.wanted; ctx.lineWidth = 1 / st.scale; ctx.setLineDash([2 / st.scale, 2 / st.scale]); ctx.stroke(); ctx.setLineDash([]); }
       }
       ctx.globalAlpha = 1;
@@ -197,9 +226,9 @@ window.WikiGraph = (function () {
         placed.push([sx, sy, tw]);
         ctx.globalAlpha = dimmed ? 0.35 : 1;
         ctx.textAlign = align;
-        ctx.lineWidth = 3 / st.scale; ctx.strokeStyle = 'rgba(14,18,32,.92)'; ctx.lineJoin = 'round';
+        ctx.lineWidth = 3 / st.scale; ctx.strokeStyle = PAINT.halo; ctx.lineJoin = 'round';
         ctx.strokeText(t, lx, ly);
-        ctx.fillStyle = nb.has(i) || i === hov || i === st.g.focus ? '#fff' : (pri < 10 ? '#dfe4f5' : '#b9c0d8');
+        ctx.fillStyle = nb.has(i) || i === hov || i === st.g.focus ? PAINT.ring : (pri < 10 ? PAINT.label : PAINT.labelDim);
         ctx.fillText(t, lx, ly);
       }
       ctx.globalAlpha = 1;
@@ -229,7 +258,7 @@ window.WikiGraph = (function () {
       const el = opts.tip; if (!el) { canvas.title = i >= 0 ? st.g.nodes[i].title : ''; return; }
       if (i < 0) { el.hidden = true; return; }
       const a = st.g.nodes[i];
-      el.innerHTML = '<b>' + a.title.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) + '</b>' + a.type + (a.kind ? ' · ' + a.kind : '') + ' · ' + a.d + ' link' + (a.d === 1 ? '' : 's') + '<br><span style="color:#8890ad">click: open · double-click: focus</span>';
+      el.innerHTML = '<b>' + a.title.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])) + '</b>' + a.type + (a.kind ? ' · ' + a.kind : '') + ' · ' + a.d + ' link' + (a.d === 1 ? '' : 's') + '<br><span class="gdim">click: open · double-click: focus</span>';
       el.hidden = false; el.style.left = (ev.clientX + 14) + 'px'; el.style.top = (ev.clientY + 14) + 'px';
     }
 
@@ -270,7 +299,7 @@ window.WikiGraph = (function () {
     else window.addEventListener('resize', resize);
 
     resize(); build();
-    return {
+    const api = {
       setTypes(types) { st.types = new Set(types); build(); },
       setFocus(slug) { st.focus = slug; build(); },
       setDepth(d) { st.depth = d; build(); },
@@ -279,12 +308,17 @@ window.WikiGraph = (function () {
       fit() { fit(); draw(); },
       state: st, tick, draw
     };
+    instances.push(api);
+    return api;
   }
+
+  document.addEventListener('themechange', () => { readPaint(); instances.forEach(a => a.draw()); });
 
   /* ---------- wire up the graph page and the local graphs ---------- */
   document.addEventListener('DOMContentLoaded', () => {
     const data = window.GRAPH, ROOT = window.ROOT || '';
     if (!data) return;
+    readPaint();
     const big = document.getElementById('graph');
     if (big) {
       const $ = s => document.querySelector(s);
