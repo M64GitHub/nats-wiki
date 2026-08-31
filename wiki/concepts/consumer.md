@@ -1,0 +1,202 @@
+---
+title: Consumer
+type: concept
+area: [jetstream]
+verified-against: nats-server 2.14.6
+verified-on: 2026-08-31
+tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
+aliases: [consumers, ConsumerConfig, durable, pull consumer]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6]
+created: 2026-08-31
+updated: 2026-08-31
+---
+
+# Consumer
+
+A consumer is a stateful cursor over a [[stream]]: it remembers how far a reader has got, which
+messages are still waiting for an acknowledgement, and which subjects the reader cares about. A
+stream can carry many consumers, each with an independent position over **one shared copy** of the
+data — one consumer catching up never moves another's (source:
+[[s-docs-delivery-and-acknowledgment]]).
+
+## How it behaves
+
+- The consumer hands a message to a reader, holds it **in flight** until the reader answers, and
+  redelivers it if no answer arrives within `ack_wait`. That loop is [[ack-and-redelivery]].
+- The **acknowledgment floor** is the highest *contiguous* acknowledged message
+  (source: [[s-docs-consumer-config]]) — which is why acking out of order does not advance it, and
+  why the gap between "last delivered" and "ack floor" is the in-flight set.
+- A **durable** consumer keeps its position under a fixed name, so a reader can disconnect and pick
+  up where it left off. Recreating a durable **loses the saved position**: the new consumer starts
+  wherever its deliver policy says, not where the old one stopped (source: [[s-docs-policies]]).
+- On a replicated stream a consumer has **its own RAFT group and its own leader**, which can sit on
+  any of the stream's replicas — so delivery spreads across the replica servers instead of piling
+  on the stream leader (source: [[s-docs-surviving-node-loss]]). See [[raft-in-nats]].
+
+## Pull consumers: fetch and consume
+
+A pull consumer delivers a message when a reader asks for one. Client libraries expose two
+patterns over the same underlying pull request (source: [[s-docs-pull-consumers]]):
+
+- **Fetch** — ask for a batch of up to *N* messages; the call returns when the batch is full or the
+  timeout expires, whichever comes first. Fetch again to keep going.
+- **Consume** — a continuous flow: the library keeps pull requests in flight in the background and
+  calls a handler per message until you stop it. Most services use this.
+
+Two fields bound a single pull:
+
+| field | what it does |
+|---|---|
+| `batch` | maximum messages this pull may return. Bigger = fewer round trips, higher throughput. Smaller = lower per-message latency, less work lost if the worker dies mid-batch. |
+| `expires` | how long the server holds the pull open before returning what it has. Bounds latency on a quiet stream. **`0` never times out**; client libraries default to about 30 seconds. |
+
+`batch` counts **messages, not bytes**. Most clients also accept a `max_bytes` option; whichever
+limit is hit first ends the pull.
+
+An **empty fetch is normal**: with nothing queued and `expires` elapsed the server replies
+`408 Request Timeout`; a *no-wait* fetch with no messages gets `404 No Messages`. Since **2.14** the
+server also returns `404 No Messages` for a `no_wait` pull that sets **no expiry at all** when
+nothing is pending (source: [[s-relnotes-2.14.0]]). Clients report
+both as an empty batch and the CLI exits non-zero. Code that treats that as a failure fails on a
+quiet stream.
+
+## What configures it
+
+Consumer defaults below are **not readable from the docs' consumer reference at all** — it renders
+the `config` object as a collapsed schema node (source: [[s-docs-consumer-config]]; recorded as
+issue 4 in `inbox/docs-issues.md`). They come from the learn pages, confirmed against the server at
+**v2.14.6** (source: [[s-nats-server-constants-2.14.6]]).
+
+| setting | CLI flag | default | source |
+|---|---|---|---|
+| `ack_policy` | `--ack` | `explicit` in the docs' walkthrough | [[s-docs-acknowledgment]] |
+| `ack_wait` | `--wait` | `30s` — `consumer.go:573` | [[s-nats-server-constants-2.14.6]] |
+| `max_deliver` | `--max-deliver` | `-1` (unlimited) — `consumer.go:589` | [[s-nats-server-constants-2.14.6]] |
+| `max_ack_pending` | `--max-pending` | `1000` — `consumer.go:580` | [[s-nats-server-constants-2.14.6]] |
+| `inactive_threshold` (ephemerals) | — | `5s` — `consumer.go:576` | [[s-nats-server-constants-2.14.6]] |
+| `backoff` | `--backoff`, `--backoff-steps`, `--backoff-min`, `--backoff-max` | unset | [[s-docs-acknowledgment]] |
+| `deliver_policy` | `--deliver` | `all` | [[s-docs-policies]] |
+| `replay_policy` | — | `instant` | [[s-docs-policies]] |
+| `filter_subject` | `--filter` | unset | [[s-docs-retention-policies]] |
+
+**Deliver policy** decides where the consumer starts reading, **once, at creation**:
+`all` (default, the stream's first message), `last` (the newest message, then live), `new` (only
+messages that arrive after creation), `by_start_sequence` (`--deliver 1000`), `by_start_time`
+(`--deliver 1h`), and `last_per_subject` (the newest message *for each subject* the consumer
+matches — the basis of KV watches) (source: [[s-docs-policies]]).
+
+**Replay policy**: `instant` (default) delivers as fast as the reader takes them; `original` spaces
+deliveries to match the gaps between the original timestamps, so a long quiet stretch replays as a
+long quiet wait (source: [[s-docs-policies]]).
+
+**Priority policy**: `none` (default), `overflow`, `pinned_client`, `prioritized`. It *can* be
+changed on a live consumer, but `nats consumer edit` has no flag for it — pass a config file with
+`--config` (source: [[s-docs-policies]]).
+
+**Ack policy**: `explicit`, `none`, `all`, `flow_control` — see [[ack-and-redelivery]].
+
+### Resetting a consumer (2.14)
+
+Since 2.14, **`$JS.API.CONSUMER.RESET.<stream>.<consumer>`** resets delivery state back to the
+acknowledgement floor, or to an arbitrary sequence while still respecting start sequences —
+**without deleting and recreating the consumer**. The state after a reset equals what a delete and
+recreate at that sequence would produce (source: [[s-relnotes-2.14.0]]). That matters because
+recreating a durable is otherwise the only way to move its position, and it loses the saved one.
+
+Related: since 2.14, **invalid or divergent consumer state is reset to match the stream on
+startup**, after an unclean shutdown.
+
+### Fixed at creation
+
+`deliver_policy`, `ack_policy` and `replay_policy` are **fixed at creation**. The server refuses
+the update — for the start position, verbatim: `deliver policy can not be updated`. Recreating the
+consumer is the only way to change them, and it loses the saved position
+(source: [[s-docs-policies]]).
+
+### Replicas
+
+By default a durable consumer takes its stream's replica count. On a `limits` stream a consumer may
+be given **fewer** replicas than its stream when its state is cheap to rebuild, but **never more**.
+On `interest` and `workqueue` streams the consumer's replica count **must match** the stream's
+(source: [[s-docs-surviving-node-loss]]). Consumer replicas buy failover, not throughput: one
+consumer leader does all the work and the followers only stand by.
+
+## Limits and failure modes
+
+- **`max_ack_pending` below the batch size silently caps throughput.** With a limit of 10 against a
+  batch of 100 the server delivers 10 and stops until the worker acks, however large a batch is
+  asked for. Keep it at or above the batch size (source: [[s-docs-pull-consumers]]).
+- **A worker pool shares one `max_ack_pending`** across every worker on the consumer, so the limit
+  matters more, not less, as the pool grows (source: [[s-docs-pull-consumers]]). See
+  [[worker-pool]].
+- **Deliver policy `new` does not skip the backlog on every restart.** It applies once, at
+  creation; a client that re-attaches to the durable resumes from its saved position, backlog
+  included (source: [[s-docs-policies]]).
+- **On a `workqueue` stream the server refuses overlapping consumers** — see
+  [[retention-policies]].
+- Two different features answer to "last per subject": the deliver policy `last_per_subject`
+  (a standing view) and the Direct Get `--last-per-subject` flag (a one-shot read with no
+  consumer). They are not the same feature (source: [[s-docs-policies]]).
+
+## `consumer info` is a debugging tool, not a control-loop primitive
+
+The call routes to the **meta leader** before it can return "does not exist", and when the consumer
+does exist it **calculates state** — so it is expensive by construction, and expensive in a place
+that is shared cluster-wide (source: [[s-synadia-jetstream-anti-patterns]]).
+
+Two habits to avoid:
+
+- **Checking whether a consumer exists before creating it.** Just call create: if a consumer of that
+  name already exists on the stream, the server verifies the request against the existing config and
+  the call is **idempotent**; if the config differs it **updates** the consumer, except where the
+  change targets a non-editable field (a start sequence, say), which errors.
+- **Polling for pending messages.** `NumPending` already rides on **every message the consumer
+  delivers**, alongside `Sequence`, `NumDelivered`, `Timestamp`, `Stream`, `Consumer` and `Domain`.
+  No API call is needed.
+
+Both are cheap at prototype scale and expensive across tens of thousands of clients — see
+[[jetstream-slows-as-consumers-grow]].
+
+## What you can observe
+
+`nats consumer info <stream> <consumer>` and the `ConsumerInfo` response of
+`$JS.API.CONSUMER.CREATE.<stream>.<consumer>` expose (source: [[s-docs-consumer-config]]):
+
+| field | meaning |
+|---|---|
+| `delivered` | the last message delivered from this consumer |
+| `ack_floor` | the highest **contiguous** acknowledged message |
+| `num_ack_pending` | messages pending acknowledgement (in flight) |
+| `num_redelivered` | redeliveries performed |
+| `num_waiting` | pull requests currently waiting for messages |
+| `num_pending` | messages left unconsumed by this consumer |
+| `cluster` | the consumer's RAFT group — leader and replicas |
+| `push_bound` | whether a client is attached to a push consumer |
+| `paused` / `pause_remaining` | whether the consumer is paused, and for how long |
+| `priority_groups` | priority-group state |
+
+The CLI renders the same three numbers as `Last Delivered`, `Acknowledgment Floor` and
+`Outstanding Acks` (source: [[s-docs-delivery-and-acknowledgment]]).
+
+## Cheat sheet
+
+```
+nats consumer add ORDERS shipping --pull --ack explicit --defaults
+nats consumer add FULFILLMENT us-shippers --pull --ack explicit --filter "fulfill.us" --defaults
+nats consumer next ORDERS shipping --count 10 --wait 2s
+nats consumer edit ORDERS shipping --ack=explicit --wait=10s --max-deliver=5
+nats consumer info ORDERS shipping
+nats consumer rm FULFILLMENT shippers --force
+```
+
+## Related
+
+[[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
+[[worker-pool]]
+
+## Sources
+
+[[s-docs-delivery-and-acknowledgment]] · [[s-docs-pull-consumers]] · [[s-docs-policies]] ·
+[[s-docs-consumer-config]] · [[s-docs-acknowledgment]] · [[s-docs-surviving-node-loss]] ·
+[[s-docs-retention-policies]] · [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] ·
+[[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-constants-2.14.6]]
