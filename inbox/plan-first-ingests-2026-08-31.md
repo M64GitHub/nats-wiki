@@ -1,5 +1,20 @@
 # Plan — first ingests (2026-08-31)
 
+**Result: all 7 steps done 2026-08-31. 97 pages — 10 concepts, 3 internals, 1 sizing, 4 gotchas,
+6 reference tables, 34 entities, 37 summaries — from 8 raw collections, with lint clean and
+25 of 87 question-bank rows answered.**
+**The wiki's other output grew too: `inbox/docs-issues.md` now carries 10 verified findings in the
+public NATS docs, 3 of them ★ confirmed errors, each with server or repository evidence.**
+
+**Next plan proposed: `inbox/plan-runbooks-and-security-2026-08-31.md`** — the runbook layer and the
+security facet, in that order. Reasoning at the bottom of this file: both were named as blockers by
+five of the seven steps, both have their sources already local (`learn/deployment/`,
+`learn/backup-recovery/`, `learn/security/`, `learn/topologies/`), and between them they hold
+Q32, Q34, Q39, Q49–Q56, Q63–Q66 and the wanted page [[account]], which eight finished pages already
+link to.
+
+---
+
 Say **`start the plan`** to work this file; `CLAUDE.md` → *Operation: plan* says how. One step at
 a time, `status:` rewritten in place, `wiki/log.md` appended, lint run, question-bank cells filled.
 
@@ -111,7 +126,7 @@ Now write the curated pages from it, each citing the table's source pages and ca
 - `wiki/reference/advisories.md` — from `raw/nats-docs/reference/jetstream/advisory/` (22) and
   `system/advisory/` (3). Answers Q59, Q82.
 
-## Step 7 — entities · status: open — **last step**. Pre-flight done 2026-08-31: `raw/nats-docs/concepts/ecosystem.md` exists (15 KB) and names **every** client and tool listed below, so no fetching is needed. Note the docs use **three** categories, not two — Tier 1 ("Synadia-maintained, track new server features at release"), Tier 2 ("Synadia-maintained, may lag behind on new server features") and **community** (third-party); the list below covers tiers 1 and 2 only. Orbit repos live under the `synadia-io` org and are "optional higher-level utilities and experimental features built on top of the matching tier 1 client".
+## Step 7 — entities · status: done 2026-08-31 — s-docs-ecosystem, s-github-repo-facts, s-nats-server-readme, s-cncf-nats-project, s-docs-getting-started, s-docs-kubernetes, s-docs-prometheus-and-dashboards → **34 entity pages**: 12 clients, [[orbit]], 9 tools (each with a `## Cheat sheet`), 4 repos, [[synadia]], [[cncf]], [[synadia-products]]. Two deliberate deviations: **[[nats-surveyor]] and [[nack]] added** (named on the same ecosystem page, both operator-facing, both sourced), and the commercial products are **one page, not five** — the public sources give one sentence per product, so five stubs would have been worse. Fetching *was* needed after all: the ecosystem page states no version, licence or feature coverage and delegates coverage to the READMEs, so `tools/fetch-repo-facts.py` (new) pulled **32 repos and 24 READMEs** into `raw/github-repos/`, plus the server README and the CNCF project page. Found **3 more docs issues** (#8–10) and added question-bank rows **83–87**. Answered Q83–Q87. Pre-flight done 2026-08-31: `raw/nats-docs/concepts/ecosystem.md` exists (15 KB) and names **every** client and tool listed below, so no fetching is needed. Note the docs use **three** categories, not two — Tier 1 ("Synadia-maintained, track new server features at release"), Tier 2 ("Synadia-maintained, may lag behind on new server features") and **community** (third-party); the list below covers tiers 1 and 2 only. Orbit repos live under the `synadia-io` org and are "optional higher-level utilities and experimental features built on top of the matching tier 1 client".
 
 - **Clients — all official ones**, from `raw/nats-docs/concepts/ecosystem.md`: tier 1
   `nats.go`, `nats.js`, `nats.py`, `nats.java`, `nats.rs`, `nats.net`, `nats.c`; tier 2
@@ -127,9 +142,8 @@ Now write the curated pages from it, each citing the table's source pages and ca
 - **Orgs and products**: `synadia`, `cncf`, and a thin "where they sit" page per commercial
   product — what it adds over open-source NATS, nothing more.
 
-**When this step is done, step 7 is the last one**: write the two-line result at the top of this
-file and propose the next plan (`CLAUDE.md` → *Operation: plan*, point 5). Candidates the six
-finished steps have surfaced, in rough order of how often they blocked a page:
+**Step 7 was the last one.** The result is at the top of this file; the next plan is proposed there
+too. The candidates the seven steps surfaced, in rough order of how often they blocked a page:
 
 - **The runbook layer** — [[install-nats-server]], [[build-a-3-node-cluster]],
   [[upgrade-a-cluster]], [[backup-and-restore-jetstream]], [[rotate-tls-certificates]]. Q63/Q64 and

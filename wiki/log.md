@@ -351,3 +351,57 @@ Append-only. One entry per operation: date, operation, source, pages created / u
   reverted** — both `ack_wait` and `duplicate_window` are now known, but no source states how they
   *interact*, which is what the row asks. Running total **20 of 82 answered, 13 of 35 ★**.
 - `python3 tools/lint.py`: 61 pages, clean. Viewer rebuilt: 1209 files, 642 links, 783 TOC rows.
+
+## 2026-08-31 — plan step 7: entities (the last step of the plan)
+- **34 entity pages, one for every repo, client, tool, product and organisation the docs' ecosystem
+  page names.** Twelve clients ([[nats-go]], [[nats-js]], [[nats-py]], [[nats-java]], [[nats-rs]],
+  [[nats-net]], [[nats-c]], [[nats-zig]], [[nats-swift]], [[nats-pure-rb]], [[nats-rb]],
+  [[nats-ex]]); [[orbit]] for the seven `synadia-io/orbit.*` repos together; nine tools
+  ([[nats-cli]], [[nsc]], [[nk]], [[nats-top]], [[nats-box]], [[prometheus-nats-exporter]],
+  [[nats-surveyor]], [[nats-helm-charts]], [[nack]]); four project repos ([[nats-server]],
+  [[nats-architecture-and-design]], [[jsm-go]], [[nats-streaming]] with `deprecated: true`); two
+  organisations ([[synadia]], [[cncf]]); one products page. Every `kind: tool` page carries a
+  `## Cheat sheet`, which the viewer collects.
+- **Two deviations from the plan, deliberate.** (1) The plan listed the Prometheus exporter but not
+  **[[nats-surveyor]]** or **[[nack]]**; both are named on the same ecosystem page, both are what an
+  operator actually reaches for, and both had sources to hand — added. (2) The plan asked for "a thin
+  page per commercial product"; the public sources read give **one sentence per product and no
+  more**, so the five are one page, [[synadia-products]], rather than five stubs. Said on the page
+  itself.
+- **New sources, because the ecosystem page states no versions, licences or feature coverage and
+  explicitly delegates coverage to "each repo's README".**
+  - `raw/github-repos/` — **32 repos and 24 READMEs**, verbatim from the GitHub API through a new
+    `tools/fetch-repo-facts.py` (`--readme`, `--refresh`, `--list`; regenerates `_index.md` every
+    run). Summarised as [[s-github-repo-facts]]. This is what makes the entity pages falsifiable:
+    one command re-checks every version, licence and archived flag.
+  - `raw/nats-server-src/README-v2.14.6.md` → [[s-nats-server-readme]] — the only public source read
+    for **CNCF membership**, the Apache-2.0 statement and the **Trail of Bits / OSTIF security audit
+    (April 2025)**.
+  - `raw/cncf/` → [[s-cncf-nats-project]] — "NATS was accepted to CNCF on **March 15, 2018** at the
+    **Incubating** maturity level", which nothing inside `nats-io` states.
+  - Docs ingests: [[s-docs-ecosystem]] (the naming authority for the whole step),
+    [[s-docs-getting-started]], [[s-docs-kubernetes]], [[s-docs-prometheus-and-dashboards]].
+- **Facts worth having found**: [[nats-swift]] is **Core NATS only** — JetStream, KV, Object Store
+  and Services are roadmap, and its last release is 2024-10-31; [[nats-zig]] is pre-1.0 with **no
+  Object Store and no mTLS**; [[nats-ex]] publishes as **`gnat`** and, with [[nats-top]], is **MIT**
+  rather than Apache-2.0; [[nats-rs]]'s `chrono` feature is unified across the whole Cargo graph;
+  [[nack]] **silently does not reconcile** KeyValue/ObjectStore resources outside `--control-loop`
+  mode; the Helm chart's readiness probe is deliberately shallow, so a pod still catching up its R3
+  replicas serves clients.
+- **Three docs issues found and reported** (`inbox/docs-issues.md` #8–10), all from checking every
+  claim in the docs' client tables against its repository — 12 clients read, 3 claims did not
+  survive. **#8** `nats.net` is documented as ".NET 6+" but v3.0.0 (2026-07-10) **dropped `net6.0`**;
+  **#9** `nats.deno` is listed among "the archived" superseded repos and is **not archived** (3 of 4
+  are); **#10** the Python client now ships **two PyPI distributions** — `nats-py` (>=3.7) and
+  `nats-core` 0.2.0 (**>=3.13**) — and no docs page reconciles them: the client map names neither and
+  the only mention of `nats-core` in the whole tree is a WebSocket page. Both `wrong-value` rows are
+  staleness in a hand-maintained table, which is a different failure from the generated-page errors
+  in #1–3.
+- **`inbox/question-bank.md`**: five rows added, each with a public thread behind it — **83–85** from
+  three *unanswered* Q&A discussions on metrics (gh#3857, gh#6145, gh#6224), answered here by
+  [[prometheus-nats-exporter]], [[nats-surveyor]] and [[monitoring-endpoints]]; **86–87** from
+  gh#7296, answered by [[orbit]]. Two further rows were drafted and **dropped for want of a source** —
+  a "which client should I pick" question is not in the public record in any form this wiki could
+  cite, so it is not in the bank.
+- `python3 tools/lint.py`: **97 pages, clean** — no frontmatter issues, no orphans, no broken links,
+  nothing missing from the index.

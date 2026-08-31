@@ -100,6 +100,11 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 80 | How does MQTT QoS 1/2 map onto JetStream, and what does it cost? | interop | [gh#7641](https://github.com/nats-io/nats-server/discussions/7641) | concept | |
 | 81 | How do I restrict MQTT client ids per account with JWT? | interop security | [gh#7397](https://github.com/nats-io/nats-server/discussions/7397) | config | |
 | 82 | How do I track client connect and disconnect events? | monitoring core | [gh#6445](https://github.com/nats-io/nats-server/discussions/6445) | runbook | [[advisories]] |
+| 83 | How do I get consumer pending metrics out of nats-surveyor or the Prometheus exporter, and what are the series called? | monitoring jetstream | [gh#3857](https://github.com/nats-io/nats-server/discussions/3857) | monitoring | [[prometheus-nats-exporter]] · [[nats-surveyor]] |
+| 84 | Exporter or surveyor — which do I run for cluster-level alerts, and what does each need? | monitoring topology | [gh#6145](https://github.com/nats-io/nats-server/discussions/6145) | monitoring runbook | [[nats-surveyor]] · [[prometheus-nats-exporter]] |
+| 85 | What is the ideal way to set metrics up at all — exporter, surveyor, Prometheus, Grafana, checks? | monitoring | [gh#6224](https://github.com/nats-io/nats-server/discussions/6224) | monitoring runbook | [[prometheus-nats-exporter]] · [[nats-surveyor]] · [[monitoring-endpoints]] |
+| 86 | Are partitioned consumer groups a server feature, or a client-side construct? | jetstream clients | [gh#7296](https://github.com/nats-io/nats-server/discussions/7296) | concept clients | [[orbit]] |
+| 87 | The Orbit docs show `orbit.go` — is the same module available for my language (C#, Java, Python…)? | clients | [gh#7296](https://github.com/nats-io/nats-server/discussions/7296) | clients | [[orbit]] |
 
 ## Thread titles behind the rows
 
@@ -187,4 +192,10 @@ The exact title of the linked thread, so a row can be checked against its source
 80. [gh#7641](https://github.com/nats-io/nats-server/discussions/7641) — [Question] how to publish with MQTT QOS 1/2
 81. [gh#7397](https://github.com/nats-io/nats-server/discussions/7397) — MQTT: Only allow specific client ids via JWT/NSC?
 82. [gh#6445](https://github.com/nats-io/nats-server/discussions/6445) — Recording Connection & Disconnection events.
+83. [gh#3857](https://github.com/nats-io/nats-server/discussions/3857) — Can anyone tell me how to get information about consumer pending metrics on  nats-surveyor or prometheus-nats-exporter
+84. [gh#6145](https://github.com/nats-io/nats-server/discussions/6145) — Configuring NATS Monitoring: Cluster-Level Alerts with Prometheus Exporter
+85. [gh#6224](https://github.com/nats-io/nats-server/discussions/6224) — Ideal way to set up metrics
+86–87. [gh#7296](https://github.com/nats-io/nats-server/discussions/7296) — Are Client-side Partitioned Consumer Groups equivilent to Pulsar Key-Shared subscriptions? One thread, two questions: the body asks whether the mechanism is client- or server-side, and closes with "the blog mentions Orbit.go, is this supported for C# libraries as well".
 
+All three metrics threads (83–85) are **Q&A discussions with no accepted answer** as of 2026-08-31,
+which is why they are worth answering here.

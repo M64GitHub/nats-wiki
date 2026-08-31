@@ -15,7 +15,9 @@ factually wrong.
 - `status` is this wiki's handling, not the upstream state.
 
 Found while working `inbox/plan-first-ingests-2026-08-31.md`. Verified against **nats-server
-v2.14.6** and the docs tree fetched **2026-08-31**.
+v2.14.6** and the docs tree fetched **2026-08-31**. Rows 8–10 concern **client** claims, so their
+authority is the client repository at its current release plus the package registry, not the server
+— stated per row.
 
 | # | issue | where | kind | severity | status |
 |---|---|---|---|---|---|
@@ -26,6 +28,9 @@ v2.14.6** and the docs tree fetched **2026-08-31**.
 | 5 | `duplicate_window` default documented only as "0 for default" — the substituted value is never stated | `reference/jetstream/api/stream/create.md` | missing | medium | wiki reads the server source instead |
 | 6 | `max_payload` "not recommended" over 8MB without saying what actually happens | `reference/config/max_payload.md` | enhancement | low | wiki states the real behaviour |
 | 7 | ADR-42 is tagged `2.11` but describes the `prioritized` policy, which shipped in 2.12 | `nats-architecture-and-design` ADR-42 | wrong-value | medium | wiki corrects the attribution |
+| 8 | `nats.net` is described as ".NET 6+"; the current client **dropped `net6.0`** | `concepts/ecosystem.md` | wrong-value | medium | wiki states the v3 target frameworks |
+| 9 | `nats.deno` is listed among "the archived" repos superseded by `nats.js`; it is **not archived** | `concepts/ecosystem.md` | wrong-value | low | wiki says which three are archived |
+| 10 | The Python client's two PyPI distributions are never reconciled: the client map names neither, and `nats-core` appears only on a WebSocket page | `concepts/ecosystem.md`, `concepts/getting-started.md`, `learn/websocket/your-first-websocket-connection.md` | missing | medium | wiki lists both packages and their Python floors |
 
 ---
 
@@ -199,6 +204,100 @@ treatment for *arrival* versions would close this.)
 
 ---
 
+## 8 · The .NET client is documented as ".NET 6+", and v3 dropped .NET 6
+
+**`concepts/ecosystem.md`**, tier 1 client table:
+
+> | C# / .NET | [nats-io/nats.net](https://github.com/nats-io/nats.net) | **.NET 6+**. Modern async client |
+
+**Authority: the client repository at its current release.** `nats.net`'s latest release is
+**v3.2.0** (2026-08-29); the v3.0.0 release notes (2026-07-10) say:
+
+> "3.0 targets `netstandard2.0`, `netstandard2.1`, `net8.0`, and `net10.0`. **`net6.0` has been
+> dropped.**"
+
+The repository README repeats it in an admonition at the top of the page: "v3 adds OpenTelemetry
+tracing and metrics, .NET 10 support, and **drops .NET 6.0**."
+
+**Impact:** a team on .NET 6 reads the docs' client map, picks the current `NATS.Net` package, and
+the build fails on target framework. Not silent — which is why this is `medium` and not ★ — but the
+docs' own client-selection page is the wrong place to learn it. The correct advice for a .NET 6
+service is to pin the v2 line or move the runtime first.
+
+**Suggested fix:** change the cell to name the supported targets, e.g. "`netstandard2.0/2.1`,
+`net8.0`, `net10.0` (v3); .NET 6 users must stay on v2". Better still, drop the version from the
+prose and link the repo's target-framework list, which is what actually moves.
+
+---
+
+## 9 · `nats.deno` is listed as archived; it is not
+
+**`concepts/ecosystem.md`**:
+
+> | JavaScript / TypeScript | nats-io/nats.js | Node, Deno, Bun, browser (WebSocket). Supersedes **the archived** `nats.node`, `nats.deno`, `nats.ws`, `nats.ts` |
+
+**Authority: the GitHub API, fetched 2026-08-31** (`raw/github-repos/`):
+
+| repo | `archived` | last pushed |
+|---|---|---|
+| `nats-io/nats.node` | `true` | 2025-12-15 |
+| `nats-io/nats.ws` | `true` | 2025-12-15 |
+| `nats-io/nats.ts` | `true` | 2023-02-24 |
+| **`nats-io/nats.deno`** | **`false`** | 2025-12-15 |
+
+Three of the four are archived. `nats.deno` is superseded — `nats.js`'s own README says "This
+repository now supersedes: nats.deno, nats.ws" — but it is not archived, so the sentence is right
+about supersession and wrong about the state of one repo.
+
+**Impact:** low. A reader checking `nats.deno` finds a live repository and may reasonably conclude it
+is still maintained.
+
+**Suggested fix:** either archive `nats.deno` (which is presumably the intent, given its siblings) or
+reword to "Supersedes `nats.node`, `nats.deno`, `nats.ws` and `nats.ts`", dropping the claim about
+their archive state.
+
+---
+
+## 10 · The Python client now ships two packages, and no docs page says which to install
+
+Three docs pages touch the Python client and none of them resolves it:
+
+1. **`concepts/ecosystem.md`** names the repo and describes it as "asyncio-based, Python 3 only". No
+   package name.
+2. **`concepts/getting-started.md`** has an "Install Client Libraries" section with lines for
+   JavaScript, Go, Java, Rust and .NET — and **no Python line at all**, though it links the Python
+   repo in its closing list.
+3. **`learn/websocket/your-first-websocket-connection.md`** is the only page in the whole tree that
+   names a Python package, and it names a different one:
+
+   > "The `nats-core` client keeps its WebSocket transport behind an optional extra, so plain
+   > `pip install nats-core` can't open a `ws://` connection — install `nats-core[websocket]`.
+   > **It's the new Python client** and needs **Python 3.13 or later**."
+
+**Authority: PyPI and the repository, checked 2026-08-31.** Both packages exist and both point at
+`nats-io/nats.py`:
+
+| package | version | `requires_python` | summary |
+|---|---|---|---|
+| `nats-py` | 2.15.0 | **>=3.7** | "NATS client for Python" |
+| `nats-core` | **0.2.0** | **>=3.13** | "NATS core implementation in Python" |
+
+The repository root confirms the split — alongside `nats/` it holds `nats-core/`, `nats-jetstream/`,
+`nats-key-value/` and `nats-server/` directories — while the repo's own README documents only
+`nats-py` and `nats-server` and states "Should be compatible with at least Python +3.8".
+
+**Impact:** a Python reader following the docs cannot tell which package to install, and the one
+package the docs do name is a 0.2.0 release with a Python floor five minor versions above the mature
+client's. The claim on the WebSocket page is *correct*, which is why this is `missing` rather than
+`wrong-value` — the defect is that it is the only place it appears.
+
+**Suggested fix:** give `concepts/getting-started.md` a Python install line (`pip install nats-py`),
+and say in `concepts/ecosystem.md` that the Python client publishes `nats-py` today with a modular
+`nats-core` line in progress, with its 3.13 floor. The same modular split already happened to
+[[nats-js]] and the docs handle that one well — the Python entry can follow the same pattern.
+
+---
+
 ## How these were found
 
 Not by looking for them. Each fell out of ingesting a source and cross-checking it against another:
@@ -210,6 +309,10 @@ Not by looking for them. Each fell out of ingesting a source and cross-checking 
 - **6**: answering "what breaks above 8MB" (question-bank Q12) required knowing whether the boundary
   is enforced.
 - **7**: writing the release entity pages put ADR dates and shipping versions side by side.
+- **8–10**: writing one entity page per official client meant reading all twelve READMEs next to the
+  docs' client table. Every claim in that table was checked against its repository; three did not
+  survive. The two `wrong-value` rows are both **staleness in a hand-maintained table** — the docs
+  page is correct as written for an earlier release of the thing it describes.
 
 **The generalisable lesson for the docs:** the three factual errors are all in **generated**
 reference pages, and in all three cases a **hand-written** page (a learn page, an ADR) had the
@@ -225,3 +328,6 @@ describe would have caught all three.
 | 5 | `wiki/concepts/stream.md` — *The deduplication window* |
 | 6 | `wiki/reference/defaults-and-limits.md` — *The 8 MB question* |
 | 7 | `wiki/concepts/priority-groups.md`, `wiki/entities/nats-server-2.11.md` |
+| 8 | `wiki/entities/nats-net.md` — *What an operator needs to know* |
+| 9 | `wiki/entities/nats-js.md` — *What an operator needs to know* |
+| 10 | `wiki/entities/nats-py.md` — *What an operator needs to know* |

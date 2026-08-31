@@ -92,9 +92,57 @@ exists to answer live in `inbox/question-bank.md`.
 
 **Repos**
 
+- [[nats-server]] — the one binary the whole wiki is about: CNCF, Apache-2.0, the Trail of Bits audit,
+  and the source this wiki quotes defaults from.
+- [[nats-architecture-and-design]] — the 54 ADRs: the specification layer between the docs and the
+  source, and where client-side behaviour is defined at all.
+- [[jsm-go]] — the JetStream management library under the `nats` CLI, NACK and Terraform, and the
+  canonical home of the JetStream API JSON schemas the docs are generated from.
+- [[orbit]] — `synadia-io/orbit.*`: the seven extension repos, and the versioning contract that
+  keeps opinionated helpers out of the core clients.
+- [[nats-streaming]] — STAN, archived and replaced by JetStream. Kept so a search for it lands here.
+
 **Clients**
 
+*Tier 1 — "track new server features at release".*
+
+- [[nats-go]] — the reference implementation, and the parity target the other clients name.
+- [[nats-js]] — the v3 mono-repo: Node/Bun, Deno and the browser, with the base client split into
+  modules.
+- [[nats-py]] — `nats-py` today, a modular `nats-core` (Python 3.13+) in progress; the docs name
+  neither.
+- [[nats-java]] — the artifact is `io.nats:jnats`, not the repo name.
+- [[nats-rs]] — `async-nats`: stable API on 0.x versions, and the `chrono` feature that poisons a
+  whole build.
+- [[nats-net]] — v3 added OpenTelemetry and **dropped .NET 6**.
+- [[nats-c]] — the FFI and embedded client; a port of the Go client's semantics, with no support
+  matrix.
+
+*Tier 2 — "may lag behind on new server features".*
+
+- [[nats-zig]] — pre-1.0; no Object Store, no mTLS.
+- [[nats-swift]] — **Core NATS only**; JetStream, KV, Object Store and Services are roadmap.
+- [[nats-pure-rb]] — the preferred Ruby client, thread-safe, no EventMachine.
+- [[nats-rb]] — legacy Ruby, no release since 2019. Use [[nats-pure-rb]].
+- [[nats-ex]] — Elixir, published to hex as **`gnat`**, MIT-licensed.
+
 **Tools**
+
+- [[nats-cli]] — `nats`: the tool an operator lives in. Contexts, streams, consumers, `server check`,
+  `server report`, `bench`, and `nats auth`.
+- [[nsc]] — the standalone identity CLI; same on-disk store as `nats auth`, and the two things
+  `nats auth` cannot do yet.
+- [[nk]] — nkeys: Ed25519, the prefix letters, and why the server never holds a private key.
+- [[nats-top]] — one server, live: who is the noisy connection, and the slow-consumer counter.
+- [[nats-box]] — the container with `nats`, `nsc`, `nats-top` and `nk` in it; the CLI's deployment
+  vehicle on Kubernetes.
+- [[prometheus-nats-exporter]] — the monitoring port as Prometheus metrics; why `-prefix nats`
+  is not optional.
+- [[nats-surveyor]] — cluster-wide monitoring through the system account, including `/raftz`.
+- [[nats-helm-charts]] — `nats-io/k8s`: the StatefulSet, the three probes, the config reloader, and
+  the `Parallel` policy you must not "fix".
+- [[nack]] — streams and consumers as CRDs; the ~30-second resync, `--control-loop`, and the KV
+  trap.
 
 **Releases**
 
@@ -110,7 +158,14 @@ exists to answer live in `inbox/question-bank.md`.
 
 **Products**
 
+- [[synadia-products]] — the five commercial offerings, and which operational problem each removes.
+  Deliberately thin.
+
 **Organisations**
+
+- [[synadia]] — the maintainer: who defines the client tiers, why `synadia-io` is a separate org.
+- [[cncf]] — NATS is a CNCF project, **Incubating since 2018-03-15**; what that does and does not
+  claim.
 
 **People**
 
@@ -192,6 +247,24 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-synadia-jetstream-anti-patterns]] — the ~100k consumer and ~300 subject-filter thresholds,
   why `consumer info` is expensive, and republish / Direct Get as alternatives to consumers.
 
+**docs.nats.io — Ecosystem, install and deployment**
+
+- [[s-docs-ecosystem]] — the docs' own map: three client tiers, Orbit, the tooling, the identity
+  libraries. The naming authority for every entity page.
+- [[s-docs-getting-started]] — install commands and package coordinates, and the two pinned example
+  versions that have aged.
+- [[s-docs-kubernetes]] — the Helm chart, the three probes, the config-reloader sidecar, and NACK's
+  two reconcile modes.
+- [[s-docs-prometheus-and-dashboards]] — the exporter's real invocation, the metric names, and the
+  health check that passes with no quorum.
+
+**GitHub, CNCF and the repositories**
+
+- [[s-github-repo-facts]] — 32 repos and 24 READMEs: versions, licences, archived flags, and the
+  feature coverage the docs delegate to them.
+- [[s-nats-server-readme]] — CNCF, Apache-2.0, and the Trail of Bits / OSTIF security audit.
+- [[s-cncf-nats-project]] — accepted 2018-03-15 at the Incubating maturity level.
+
 ## Wanted pages (topics with no source yet)
 
 These are deliberately unresolved links; ingest a source to fill them.
@@ -209,8 +282,8 @@ Gotchas: [[consumer-keeps-redelivering]] · [[jetstream-out-of-disk]] ·
 
 Reference: *(all six reference tables are written — see the Reference section above)*
 
-Entities: [[nats-server]] · [[nats-cli]] · [[nsc]] · [[nats-architecture-and-design]] ·
-[[nats-go]] · [[nats-streaming]] · [[synadia]]
+Entities: *(all the repos, clients, tools, releases, products and organisations the ecosystem page
+names now have pages — see the Entities section above. People: none yet.)*
 
 ## Inbox
 
@@ -219,5 +292,6 @@ Entities: [[nats-server]] · [[nats-cli]] · [[nsc]] · [[nats-architecture-and-
 - `inbox/docs-issues.md` — errors and gaps found in the public NATS docs, verified against the
   server source, kept so they can be sent to the maintainers
 - `inbox/config-keys-table.md` — 621 config keys with type, default and reload behaviour
-- `inbox/plan-first-ingests-2026-08-31.md` — the current plan; say `start the plan`
+- `inbox/plan-first-ingests-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as the record
+- `inbox/plan-runbooks-and-security-2026-08-31.md` — the current plan; say `start the plan`
 - `inbox/` also holds scout files and plans; nothing there is a wiki page.

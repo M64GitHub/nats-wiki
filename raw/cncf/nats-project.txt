@@ -1,0 +1,499 @@
+<!-- source: https://www.cncf.io/projects/nats/ · fetched 2026-08-31 · converted from the saved HTML by tools/html-to-text.py -->
+Skip to content
+Accessibility
+help
+
+KubeCon + CloudNativeCon China 2026 · Sep 7 - 9 · Shanghai · REGISTER NOW
+
+-
+About
+
+- Discover CNCF
+
+- Membership Hub – For Current MembersLearn about all the benefits of being a CNCF Member
+
+- Technical Oversight CommitteeThe TOC defines CNCF’s technical vision and provides experienced technical leadership to the cloud native community
+
+- Governing BoardThe GB is responsible for marketing, business oversight, and budget decisions for CNCF
+
+- End User Technical Advisory BoardThe End User TAB serves as the voice of the end users in CNCF community decisions
+
+- AmbassadorsMeet our Ambassadors—experienced practitioners passionate about helping others learn about cloud native technologies
+
+- Additional Info
+
+- Who We Are
+
+- Member Listing
+
+- Code of Conduct
+
+- Policies
+
+- Staff
+
+- FAQ
+
+- Contact Us
+
+- Featured Reads
+
+Annual Report
+
+CNCF Annual Report 2025
+
+February 24, 2026
+
+Survey Report
+
+The State of Cloud Native Development in Japan 2026
+
+July 28, 2026
+
+#### Shanghai, China
+
+Next Event
+
+KubeCon + CloudNativeCon + OpenInfra Summit + PyTorch Conference China 2026
+
+September 7-9, 2026
+
+- Projects
+
+- CNCF Projects
+
+- GraduatedProjects considered stable, widely adopted, and production ready, attracting thousands of contributors
+
+- IncubatingProjects used successfully in production by a small number users with a healthy pool of contributors
+
+- SandboxExperimental projects not yet widely tested in production on the bleeding edge of technology
+
+- ArchivedProjects that have reached the end of their lifecycle and have become inactive
+
+- Project MetricsView metrics of CNCF projects moving through maturity levels
+
+- Get Involved
+
+- ContributeJoin the 150K+ folx in #TeamCloudNative who’ve contributed their expertise to CNCF hosted projects
+
+- Services for CNCF ProjectsCNCF services for our open source projects – from marketing to legal services
+
+- Cloud Native LandscapeA comprehensive categorical overview of projects and product offerings in the cloud native space
+
+- Project Journey ReportsShowing how CNCF has impacted the progress and growth of various graduated projects
+
+- Project ToolsQuick links to tools and resources for your CNCF project
+
+- Latest Project Journey Reports
+
+Project Journey Report
+
+Cilium Project Journey Report – Japanese translation
+
+November 11, 2024
+
+Project Journey Report
+
+Cilium Project Journey Report
+
+November 11, 2024
+
+Project Journey Report
+
+etcd Project Journey Report
+
+September 25, 2024
+
+- Training
+
+- Become an expert
+
+- Training OverviewFind your path to cloud native success with training and certificates from the pioneer of cloud-native technology
+
+- CertificationsGet certified by the only authoritative source for cloud-native certification accepted by industry
+
+- CoursesLearn the basics of cloud native or train for a certification with training courses built in collaboration with the Linux Foundation
+
+- Kubestronaut ProgramUplevel your Kubernetes skills
+
+- Additional Resources
+
+- Kubernetes Training PartnersFind a qualified KCNTP to prepare for your next certification
+
+- Certified KubernetesSoftware conformance ensures your versions of CNCF projects support the required APIs
+
+- Cloud Native Network Function Certification (Beta)CNF Certification ensures applications demonstrate cloud native best practices
+
+- Kubernetes Certified Service ProviderKCSPs have deep experience helping enterprises successfully adopt cloud native technologies
+
+- Recommended Links
+
+Save $10K on Cloud Native
+
+Enroll your company as a CNCF End User and save more than $10K in training and conference costs
+
+Become an End User
+
+- Community
+
+- Take Part
+
+- End User CommunityJoin our vendor-neutral community using cloud native technologies to build products and services
+
+- EventsMeet #TeamCloudNative and CNCF staff at events around the world
+
+- Case StudiesRead real-world case studies about the impact cloud native projects are having on organizations around the world
+
+- Humans of Cloud NativeRead stories of amazing individuals and their contributions
+
+- The Cloud Native Heroes ChallengeBe a cloud native hero! Help us defeat patent trolls to earn swag and prizes
+
+- Community Content
+
+- Online ProgramsWatch our free online programs for the latest insights into cloud native technologies and projects
+
+- Community GroupsJoin #TeamCloudNative at events and meetups near you
+
+- Phippy & FriendsPhippy explains core cloud native concepts in simple terms through stories perfect for all ages
+
+- Cloud Native GlossaryExplore cloud native concepts in clear and simple language – no technical knowledge required!
+
+- Additional Resources
+
+- Job Board
+
+- Slack
+
+- Mailing Lists
+
+- Store
+
+- Calendar
+
+- Blog &
+News
+
+- All the news
+
+- BlogCatch up on the latest happenings and technical insights from #TeamCloudNative
+
+- AnnouncementsMedia releases and official CNCF announcements
+
+- NewsCNCF projects and #TeamCloudNative in the media
+
+- ReportsRead transparent, in-depth reports on our organization, events, and projects
+
+- Media Resources
+
+- Brand Guidelines
+
+- Project Logos
+
+- Videos
+
+- Pictures
+
+- Latest Blog Posts
+
+Scale before the spike: Predictive autoscaling for GPU workloads on Kubernetes
+
+August 28, 2026
+
+Member Post
+
+Your Kubernetes platform is ready for containers. Is it ready for AI?
+
+August 28, 2026
+
+Ambassador Post
+
+Building an AI factory on Kubernetes
+
+August 27, 2026
+
+Join
+
+Search
+CNCF
+
+Projects
+
+# NATS
+
+##
+NATS.io is a connective technology for distributed systems and is a perfect fit to connect devices, edge, cloud or hybrid deployments. True multi-tenancy makes NATS ideal for SaaS and self-healing and scaling technology allows for topology changes anytime with zero downtime.
+
+NATS was accepted to CNCF on March 15, 2018 at the Incubating maturity level.
+
+Visit Project
+Website
+
+## Project Insights
+
+Key metrics, providing insights into development activity, community engagement, and project health. Powered by LFX Insights.
+
+Health Score
+
+Fair (67)
+
+Health Score measures a project’s overall trustworthiness across four key areas: contributors, development, popularity, and security.
+
+Total contributors
+
+6,482
+
++9% vs. previous year
+
+Total contributing organizations
+
+1,768
+
++13% vs. previous year
+
+GitHub Stars
+
+5,977
+
++6% vs. previous year
+
+GitHub Forks
+
+922
+
+-5% vs. previous year
+
+Software Value
+
+$90.4M
+
+First commit
+
+October 30, 2010
+
+Explore more insights
+
+### NATS case studies
+
+Related Case
+Studies
+
+## DeFacto
+
+27.5 Million Events published per 100 hours
+
+July 3, 2023
+
+How DeFacto migrated to an event-driven architecture
+
+Read Case Study
+
+## Finleap Connect
+
+5 Months Implemented mTLS across all services in clusters for code to comply with European PSD2
+
+June 7, 2022
+
+Operating multiple high-density bare-metal clusters in a highly regulated industry
+
+Read Case Study
+
+### Recorded
+NATS programs
+
+See more recordings
+
+### Cloud Native Live: Advanced NATS – Building a Wasm native reconciliation loop
+
+Presented by:
+Synadia
+
+May 16, 2024
+
+1,023 views
+
+### NATS 2.0
+
+Presented by:
+CNCF
+
+September 10, 2019
+
+2,610 views
+
+### Recent
+NATS news
+
+See all news
+
+### wasmCloud on the factory floor: efficient and secure processing of high velocity machine data
+
+August 23, 2024
+
+### Congratulations to 57 CNCF Term 1 LFX Program Mentees!
+
+June 9, 2023
+
+### Better together: A Kubernetes and Wasm case study
+
+November 17, 2022
+
+Subscribe for updates, event info, webinars, and the latest community news
+
+By submitting this form, I consent to receive marketing emails from the LF and its projects regarding their events, training, research, developments, and related announcements. I understand that I can unsubscribe at any time using the links in the footers of the emails I receive. Privacy Policy.
+
+- About Us
+
+- Membership Hub – For Current Members
+
+- Technical Oversight Committee
+
+- Governing Board
+
+- End User TAB
+
+- Ambassadors
+
+-
+
+- Who We Are
+
+- Member Listing
+
+- Code of Conduct
+
+- Policies
+
+- Staff
+
+- FAQ
+
+- Contact Us
+
+- Projects
+
+- Contribute
+
+- Services for CNCF Projects
+
+- Cloud Native Landscape
+
+- Project Journey Reports
+
+- Project Tools
+
+-
+
+- Graduated
+
+- Incubating
+
+- Sandbox
+
+- Archive
+
+- Project Metrics
+
+- Training
+
+- Training Overview
+
+- Certifications
+
+- Courses
+
+- Kubestronaut Program
+
+-
+
+- KCNTP
+
+- Certified Kubernetes
+
+- CNF
+
+- KCSP
+
+- Community
+
+- End User Community
+
+- Events We’ll Be At
+
+- Case Studies
+
+- Humans of Cloud Native
+
+- The Cloud Native Heroes Challenge
+
+-
+
+- Online Programs
+
+- Community Groups
+
+- Phippy & Friends
+
+- Cloud Native Glossary
+
+-
+
+- Job Board
+
+- Slack
+
+- Mailing Lists
+
+- Store
+
+- Calendar
+
+- Blog & News
+
+- Blog
+
+- Announcements
+
+- News
+
+- Reports
+
+-
+
+- Brand Guidelines
+
+- Project Logos
+
+- Videos
+
+- Pictures
+
+Join Now
+
+All
+CNCF Sites
+
+-
+
+-
+
+-
+
+-
+
+-
+
+-
+
+-
+
+-
+
+-
+
+-
+
+Copyright © 2026 The Linux Foundation®. All rights reserved. The Linux Foundation has registered trademarks and uses trademarks. For a list of trademarks of The Linux Foundation, please see our Trademark Usage page. Linux is a registered trademark of Linus Torvalds. Privacy Policy and Terms of Use.
+
+Accessibility Statement
+
+Submit an issue with this page

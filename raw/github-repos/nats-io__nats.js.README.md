@@ -1,0 +1,183 @@
+<!-- source: https://github.com/nats-io/nats.js/blob/main/README.md · fetched 2026-08-31 · README.md of nats-io/nats.js -->
+# NATS.js - The JavaScript clients for [NATS](http://nats.io)
+
+[![License](https://img.shields.io/badge/Licence-Apache%202.0-blue.svg)](./LICENSE)
+[![JSDoc](https://img.shields.io/badge/JSDoc-reference-blue)](https://nats-io.github.io/nats.js/)
+[![example workflow](https://github.com/nats-io/nats.js/actions/workflows/test.yml/badge.svg)](https://github.com/nats-io/nats.js/actions/workflows/test.yml)
+[![Coverage Status](https://coveralls.io/repos/github/nats-io/nats.js/badge.svg?branch=main&kill_cache=1)](https://coveralls.io/github/nats-io/nats.js?branch=main)
+
+> [!IMPORTANT]
+>
+> This project reorganizes the NATS Base Client library (originally part of
+> nats.deno), into multiple modules, and on-boards the supported transports
+> (Deno, Node/Bun, and WebSocket).
+>
+> This repository now supersedes:
+>
+> - [nats.deno](https://github.com/nats-io/nats.deno)
+> - [nats.ws](https://github.com/nats-io/nats.ws)
+> - Note that the old nats.js has been renamed to
+>   [nats.node](https://github.com/nats-io/nats.node) so that the repository
+>   _nats.js_ could be used for this project.
+>
+> Changes are well documented and should be easy to locate and implement, and
+> are all described in [migration.md](migration.md).
+
+Welcome to the new NATS.js repository! Beginning with the v3 release of the
+JavaScript clients, the NATS.js repository reorganizes the NATS JavaScript
+client libraries into a formal mono-repo.
+
+This repository hosts native runtime support ("transports") for:
+
+- Deno
+- Node/Bun
+- Browsers (W3C websocket)
+
+A big change with the v3 clients is that the "nats-base-client" which implements
+all the runtime agnostic functionality of the clients, is now split into several
+modules. This split simplifies the initial user experience as well as the
+development and evolution of the JavaScript clients and new functionality.
+
+The new modules are:
+
+- [Core](core/README.md) which implements basic NATS core functionality
+- [JetStream](jetstream/README.md) which implements JetStream functionality
+- [Kv](kv/README.md) which implements NATS KV functionality (uses JetStream)
+- [Obj](obj/README.md) which implements NATS Object Store functionality (uses
+  JetStream)
+- [Services](services/README.md) which implements a framework for building NATS
+  services
+
+If you are getting started with NATS for the first time, you'll be able to pick
+one of our technologies and more easily incorporate it into your apps. Perhaps
+you heard about the NATS KV and would like to incorporate it into your app. The
+KV module will shortcut a lot of concepts for you. You will of course need a
+transport which will allow you to `connect` to a NATS server, but once you know
+how to create a connection you will be focusing on a smaller subset of the APIs
+rather than be confronted with all the functionality you available to a NATS
+client. From there, we are certain that you will broaden your use of NATS into
+other areas, but your initial effort should be more straight forward.
+
+Another reason for the change is that, the new modules have the potential to
+make your client a bit smaller, and if versions change on a submodule that you
+don't use, you won't be confronted with an upgrade choice. These modules also
+allows us to version more strictly, and thus telegraph to you the effort or
+scope of changes in the update and prevent surprises when upgrading.
+
+By decoupling of the NATS client functionality from a transport, we enable NATS
+developers to create new modules that can run in all runtimes so long as they
+follow a pattern where a `NatsConnection` (or some other standard interface) is
+used as the basis of the module. For example, the JetStream module exposes the
+`jetstream()` and `jetstreamManager()` functions that return the JetStream API
+to interact with JetStream for creating resources or consuming streams. The
+actual connection type is not important, and the library will work regardless of
+the runtime provided so long as the runtime has the minimum support required by
+the library.
+
+# Getting Started
+
+For a quick overview of the libraries and how to install them, see
+[runtimes.md](runtimes.md).
+
+If you are migrating from the legacy nats.deno or nats.js or nats.ws clients
+don't despair. Changes are well documented and should be easy to locate and
+implement, and are all [described in migration.md](migration.md).
+
+If you want to get started with NATS the best starting point is the transport
+that matches the runtime you want to use:
+
+- [Deno Transport](transport-deno/README.md) which implements a TCP transport
+  for [Deno](https://deno.land)
+- [Node Transport](transport-node/README.md) which implements a TCP transport
+  for [Node](https://nodejs.org) and [Bun](https://bun.sh).
+- For browser [W3C Websocket] runtimes, the websocket client is now part of the
+  [Core](core/README.md), as some runtimes such as Deno and Node v22 support it
+  natively.
+
+The module for the transport will tell you how to install it, and how to use it.
+
+If you want to write a library that uses NATS under the cover, your starting
+point is likely [Core](core/README.md). If data oriented, it may be
+[JetStream](jetstream/README.md).
+
+## Documentation
+
+Each of the modules has an introductory page that shows the main API usage for
+the module. You can access it's
+[JSDoc here](https://nats-io.github.io/nats.js/).
+
+## Client and Orbit
+
+NATS client functionality is split across two layers: the **core client**
+(the `@nats-io/*` modules in this repo) and
+**[Orbit](https://github.com/synadia-io/orbit.js)**, a separate set of
+modules with higher-level utilities.
+
+The split exists so the core can stay small, stable, and consistent across
+NATS clients in every language, while Orbit can iterate quickly on
+opinionated abstractions without dragging the core API along for the ride.
+
+### Core client (`nats.js`)
+
+- Direct API over Core NATS and JetStream as exposed by `nats-server`.
+- Lightweight, unopinionated, performance-oriented.
+- API surface kept in **parity** with other official NATS clients
+  (Rust, Go, .NET, Java, Python, C). A feature shipped here should look
+  the same shape everywhere.
+- Stable, conservative versioning. Breaking changes are rare and deliberate.
+
+### Orbit (`orbit.js`)
+
+- Higher-level, opinionated abstractions built **on top of** the core client.
+- Per-module versioning, so an experimental utility can iterate
+  without bumping every other piece.
+- Free to be language-specific: a JavaScript-idiomatic API does not need to
+  match the equivalent in other languages.
+- May lag, omit, or extend cross-client parity items.
+
+### What goes where?
+
+| Concern                                            | Core (`nats.js`)    | Orbit |
+|----------------------------------------------------|:-------------------:|:-----:|
+| Connect, publish, subscribe, request/reply         | ✅                  |       |
+| JetStream publish, consumers, streams, KV, OS      | ✅                  |       |
+| Service API (request/reply micro-services)         | ✅                  |       |
+| Wire-protocol coverage, auth, TLS, reconnection    | ✅                  |       |
+| Cross-client parity, conservative semver           | ✅                  |       |
+| Opinionated helpers / sugar over core APIs         |                     | ✅    |
+| New experimental patterns (e.g. partitioned groups)|                     | ✅    |
+| KV codecs, distributed counters, NATS contexts     |                     | ✅    |
+| JS-idiomatic abstractions with no parity mandate   |                     | ✅    |
+| Per-utility versioning, faster API churn allowed   |                     | ✅    |
+
+> **Rule of thumb:** if it is a thin mapping of something `nats-server`
+> already speaks and every official client must expose it, it belongs in
+> core. If it is a pattern, helper, or abstraction layered on top, it
+> belongs in Orbit.
+
+### Layering
+
+```text
+   ┌──────────────────────────────────────────────────────┐
+   │  Application code                                    │
+   └──────────────┬───────────────────────────┬───────────┘
+                  │                           │
+                  ▼                           ▼
+        ┌───────────────────┐       ┌───────────────────┐
+        │ Orbit modules     │  uses │ nats.js (core)    │
+        │ (opinionated,     │──────▶│ (parity, stable,  │
+        │  per-mod semver)  │       │  protocol-level)  │
+        └───────────────────┘       └─────────┬─────────┘
+                                              │
+                                              ▼
+                                       ┌─────────────┐
+                                       │ nats-server │
+                                       └─────────────┘
+```
+
+## Contributing
+
+If you are interested in contributing to NATS, read about our...
+
+- [Contributing guide](./CONTRIBUTING.md)
+- [Report issues or propose Pull Requests](https://github.com/nats-io)
