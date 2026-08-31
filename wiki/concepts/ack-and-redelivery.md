@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [ack, nak, term, ack_wait, max_deliver, max_ack_pending, backoff, advisories]
 aliases: [acknowledgement, acknowledgment, ack, nak, term, at-least-once, AckWait, MaxDeliver]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -205,6 +205,34 @@ nats events --js-advisory --no-srv-advisory
 - No source ingested so far gives **metrics** (as opposed to advisories) for acked / naked /
   terminated / redelivered counts (question-bank Q59).
 
+## What happens after the last redelivery: an advisory, and nothing else
+
+When a message exhausts `max_deliver` the server stops delivering it and publishes **one** advisory on
+`$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.<stream>.<consumer>` (confirmed on the wire at 2.14.6,
+[[advisories]]). The message itself stays in the stream under its retention policy; what stops is
+delivery to that consumer.
+
+**There is no dead-letter queue.** The docs say it plainly: that advisory "is the only built-in signal
+that this happened… If no one is subscribed when it fires, you never learn that order `987` stopped
+being delivered" (source: [[s-docs-monitoring-advisories-and-events]]). Advisories are published once
+and stored nowhere, so a design that depends on noticing exhausted messages needs a stream capturing
+`$JS.EVENT.ADVISORY.>`, not a subscriber someone remembers to run.
+
+## MQTT has its own `ack_wait` and `max_ack_pending`
+
+They are unrelated to a [[consumer]]'s, live in the `mqtt {}` block, and govern MQTT QoS 1 and 2
+redelivery rather than JetStream acks (source: [[s-docs-mqtt-qos-sessions-and-retained]]). The shape
+is familiar and the numbers are not: `ack_wait` defaults to **30s**, `max_ack_pending` to **1024** with
+`0` meaning "use the default", and a redelivered MQTT message is flagged as a duplicate.
+
+The one that has no JetStream analogue is the **per-session ceiling**: 65535 in flight across all of a
+session's subscriptions, so at the default a session holds 63 subscriptions — or 31 if they end in
+`#`, which cost two apiece. Over it, the subscription is refused with `0x80` in the SUBACK rather than
+failing later. See [[mqtt]].
+
+A change to either applies only to subscriptions created **after** it, which is the same
+create-time-only rule a consumer's `ack_wait` follows.
+
 ## Related
 
 [[consumer]] · [[stream]] · [[retention-policies]] · [[worker-pool]] · [[advisories]] ·
@@ -213,4 +241,6 @@ nats events --js-advisory --no-srv-advisory
 ## Sources
 
 [[s-docs-delivery-and-acknowledgment]] · [[s-docs-acknowledgment]] · [[s-docs-pull-consumers]] ·
-[[s-docs-consumer-config]] · [[s-docs-policies]] · [[s-nats-server-constants-2.14.6]]
+[[s-docs-consumer-config]] · [[s-docs-policies]] · [[s-nats-server-constants-2.14.6]] ·
+[[s-docs-mqtt-qos-sessions-and-retained]] ·
+[[s-docs-monitoring-advisories-and-events]]

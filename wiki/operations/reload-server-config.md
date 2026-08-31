@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [reload, SIGHUP, dry-run, include, reloader, configmap, accounts, max_subscriptions]
 aliases: [reload, SIGHUP, "config reload", "reload config", "add an account", "nats-server --signal reload"]
-sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload]
+sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -232,8 +232,29 @@ identical to a no-op reload's, so `/varz`'s `tls_cert_not_after` is the only con
 connection and every reconnect fails the handshake** until you drop in a valid file and reload. Track
 expiry; rotate with margin ([[rotate-tls-certificates]]).
 
+That distinction is worth stating because the public thread this was investigated from reads as a
+reload defect and is not one: the reporter's certificate had already expired, and a reload that
+changes nothing looks identical to one that worked (source: [[s-gh-7684-certificate-expiry]]).
+
 **A reload applied on one node is not applied on the cluster.** Signal every node, and on Kubernetes
 confirm the sidecar actually watched the path you changed.
+
+## `websocket { … }` is nearly all-or-nothing
+
+Worth a line of its own because it is the block most likely to be edited during an incident, and its
+reload rule is unlike the rest of the server's (source: [[s-docs-websocket-tls-and-proxies]]).
+
+**Only certificate material reloads.** Changing `cert_file` or `key_file` and sending a reload picks
+up the new certificate for connections made afterwards; existing connections keep the one they
+negotiated — the same rule as any other listener.
+
+**Everything else in the block is rejected — and a rejected field aborts the whole reload**, including
+changes in the same edit that would have been accepted. So editing `allowed_origins` and a certificate
+path together lands **neither**. `verify_and_map`, `pinned_certs`, `allowed_origins` and the timeouts
+all fall on that side.
+
+The practical rule: treat any `websocket {}` change except a certificate path as a **restart**, and
+make certificate rotations their own edit. See [[websocket]] and [[run-nats-behind-a-proxy]].
 
 ## Related
 
@@ -247,4 +268,6 @@ confirm the sidecar actually watched the path you changed.
 
 [[s-docs-config-management]] · [[s-nats-server-signals]] · [[s-nats-helm-chart-values-2.14.6]] ·
 [[s-docs-hardening]] · [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-topology]] ·
-[[s-nats-server-tls-reload]]
+[[s-nats-server-tls-reload]] ·
+[[s-docs-websocket-tls-and-proxies]] ·
+[[s-gh-7684-certificate-expiry]]

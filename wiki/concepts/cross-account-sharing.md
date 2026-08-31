@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [exports, imports, stream-export, service-export, prefix, to, external, api-prefix, 10021, 10022, 10024]
 aliases: [exports, imports, export, import, cross-account, account import, account export, activation token, api prefix, external]
-sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources]
+sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -107,6 +107,16 @@ stream rather than the account's entire control plane. The thread says "with som
 stops. Treat the whole-API export as all-or-nothing until you have verified narrower subjects
 yourself.
 
+**An [[object-store]] bucket is the same problem with a better-shaped surface.** The docs put it
+plainly — "exporting the bucket to another account" is a security concern, "not an object-store one"
+(source: [[s-docs-object-store-under-the-hood]]) — and the bucket's data plane is two ordinary subject
+spaces, `$O.<bucket>.C.>` for chunks and `$O.<bucket>.M.>` for metadata. That means an export can be
+split: a consuming account granted only `$O.<bucket>.M.>` can watch the bucket's inventory without
+being able to read a single object's bytes ([[subject-permissions]]). Nothing public documents this
+being done, so it is a shape the mechanism allows, not a recipe anyone has published — and the
+control-plane caveat above still applies, because listing needs `$JS.API.CONSUMER.*` too
+([[js-api-subjects]]).
+
 ### Route 2 — mirror or source the stream (data plane)
 
 The stream config's `external` block reaches a stream in another account or domain
@@ -191,4 +201,5 @@ Three error codes guard the prefixes:
 ## Sources
 
 [[s-docs-cross-account]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7017-kv-across-accounts]] ·
-[[s-nats-server-auth-and-tls]] · [[s-docs-mirrors-and-sources]]
+[[s-nats-server-auth-and-tls]] · [[s-docs-mirrors-and-sources]] ·
+[[s-docs-object-store-under-the-hood]]

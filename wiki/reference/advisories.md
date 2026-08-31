@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -136,6 +136,52 @@ nothing**, silently.
 
 This wiki uses **`MSG_NAKED`**.
 
+**Since 2026-09-01 this is confirmed on the wire, not only from the constant.** A consumer was given a
+message, the message was NAK'd, and `nats sub '$JS.EVENT.ADVISORY.>'` received
+(source: [[s-nats-server-monitoring-observed]]):
+
+```
+$JS.EVENT.ADVISORY.CONSUMER.MSG_NAKED.ORDERS.naktest
+```
+
+The same run confirmed the max-deliveries subject **does** carry `.CONSUMER.`:
+
+```
+$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.ORDERS.shipping
+{"type":"io.nats.jetstream.advisory.v1.max_deliver","id":"9lWb25w5SokA1gpeK2wgeB",
+ "timestamp":"2026-08-31T22:39:02.825838Z","stream":"ORDERS","consumer":"shipping",
+ "stream_seq":1,"deliveries":2}
+```
+
+Two things follow. The **hand-written chapter's prose agrees with the server** and its own animation
+caption does not — it writes `$JS.EVENT.ADVISORY.MAX_DELIVERIES.ORDERS.shipping`, dropping
+`.CONSUMER.`, three times (`inbox/docs-issues.md` **#36**, source:
+[[s-docs-monitoring-advisories-and-events]]). And the **advisory body carries `id` and `timestamp`**
+beyond the fields the chapter's example shows.
+
+**The chapter does not settle the pinned/unpinned subjects.** It names `nak`, `consumer_action` and
+`terminated` as *types* and never writes their subjects, and does not mention pinned or unpinned at
+all — so docs issues #2 and #3 still rest on the server alone.
+
+### An advisory subscription is noisier than the examples suggest
+
+`$JS.EVENT.ADVISORY.API` fires for ordinary JetStream API calls. Creating one stream and two consumers
+produced **three** `API` advisories before the first interesting one arrived
+(source: [[s-nats-server-monitoring-observed]]). A `nats sub '$JS.EVENT.ADVISORY.>'` left running on a
+busy cluster is mostly API audit traffic; filter to the subtree you care about, or capture into a
+stream and filter on read — the chapter's own remedy:
+
+```
+nats stream add ADVISORIES --subjects '$JS.EVENT.ADVISORY.>' \
+  --storage file --retention limits --max-age 168h --defaults
+```
+
+**Advisories are published once and stored nowhere.** "If no one is subscribed when it fires, you
+never learn that order `987` stopped being delivered" — and there is **no dead-letter queue**: the
+`max_deliver` advisory "is the only built-in signal that this happened" (source:
+[[s-docs-monitoring-advisories-and-events]]). The message itself stays in the stream under its
+retention policy; what stops is delivery to that consumer.
+
 ## The schema types
 
 Each JetStream advisory carries a `type` of the form
@@ -197,8 +243,12 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 
 - **The per-advisory payload fields are not on this page.** Each of the 25 reference pages carries a
   response schema; none has been ingested field-by-field.
-- `learn/monitoring/advisories-and-events.md` has been read only for the `$SYS` subjects and the
-  `STATSZ` heartbeat, **not ingested as a summary** — it is the obvious next monitoring source.
+- ~~`learn/monitoring/advisories-and-events.md` not ingested~~ — **done 2026-09-01**
+  ([[s-docs-monitoring-advisories-and-events]]). It confirmed the max-deliveries subject and produced
+  docs issue #36, and it does **not** state the nak, pinned or unpinned subjects, so it could not
+  cross-check #1–#3 by itself.
+- **The `$SYS` connect/disconnect and `STATSZ` events have not been captured on the wire.** They need
+  a system-account connection; the advisory captures above were made in the application account.
 
 ## Related
 
@@ -213,4 +263,5 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 [[s-nats-server-jetstream-log-warnings]] ·
 [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
-[[s-docs-advanced-publishing]]
+[[s-docs-advanced-publishing]] ·
+[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]]

@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [10005, placement, server_tags, replicas, debug-logs]
 aliases: ["no suitable peers", 10005, "JSClusterNoPeersErrF", "cannot increase replicas"]
-sources: [s-gh-7982-no-suitable-peers, s-docs-placement, s-docs-sizing-and-resources, s-adr-7-server-error-codes]
+sources: [s-gh-7982-no-suitable-peers, s-docs-placement, s-docs-sizing-and-resources, s-adr-7-server-error-codes, s-nats-server-mqtt-websocket-observed]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -137,6 +137,35 @@ failure that already happened.
 [[stream-placement]] — how the meta leader selects peers, and why the constraint fails loudly rather
 than falling back.
 
+## It can also arrive as "MQTT clients cannot connect"
+
+`10005` is a JetStream error, but [[mqtt]] stores its state in JetStream streams it creates for
+itself, so an MQTT connection can fail on placement with nothing MQTT-shaped in the symptom.
+
+Reproduced on 2.14.6: a two-node cluster with `mqtt { stream_replicas: 3 }` refuses every MQTT
+connection, and **the device gets the TCP connection closed with no CONNACK at all** — not a return
+code, nothing an MQTT client can report or log. The whole diagnosis is server-side
+(source: [[s-nats-server-mqtt-websocket-observed]]):
+
+```
+[INF] Creating MQTT streams/consumers with replicas 3 for account "$G"
+[ERR] 127.0.0.1:50068 - mid:25 - "cluster-probe3" - unable to connect: create sessions stream
+      for account "$G": no suitable peers for placement (10005)
+```
+
+The cause is the ordinary one — more replicas asked for than the cluster has peers — but the request
+was never written by an operator: unset, `mqtt.stream_replicas` is **derived from the number of
+addresses in the server's own `routes` list**. The related failure, before a meta leader exists, times
+out instead:
+
+```
+[ERR] ... unable to connect: lookup sessions stream for account "$G": timeout after 5.000369875s:
+      request type "SL" on "$JS.API.STREAM.INFO.$MQTT_sess"
+```
+
+**How to confirm**: grep the server log for `Creating MQTT streams/consumers with replicas`, and
+compare that number against `/jsz?meta=1`'s `cluster_size`.
+
 ## Related
 
 [[stream-placement]] · [[replicas]] · [[jetstream-sizing]] · [[raft-in-nats]] · [[error-codes]] ·
@@ -145,4 +174,5 @@ than falling back.
 ## Sources
 
 [[s-gh-7982-no-suitable-peers]] · [[s-docs-placement]] · [[s-docs-sizing-and-resources]] ·
-[[s-adr-7-server-error-codes]]
+[[s-adr-7-server-error-codes]] ·
+[[s-nats-server-mqtt-websocket-observed]]

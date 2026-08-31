@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [kv, bucket, tombstone, watch, direct-get]
 aliases: [KV, key value, KV bucket, KV_]
-sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket]
+sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-object-store-watching-and-listing, s-docs-object-store-metadata-and-links, s-adr-20-object-store]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -208,6 +208,14 @@ it as "cache warm".
 **`IncludeHistory` and `UpdatesOnly` conflict** — one asks for a full snapshot with history, the
 other for no snapshot — "and a client rejects the pair" (source: [[s-docs-kv-watching]]).
 
+**The [[object-store]] watch has the same boundary and a different payload**, and the contrast is the
+cleanest statement of what each store is for. A KV watch "delivers each key's *value* directly,
+because values are small"; an object-store watch delivers only the `ObjectInfo` — name, size, chunk
+count, digest — "so the watch delivers only the metadata and leaves the data fetch to you", and the
+caller issues a separate get for the bytes it wants (source:
+[[s-docs-object-store-watching-and-listing]]). Same nil sentinel, same trap; a KV watcher that quits
+on it misses live values, an object watcher that quits on it misses live *names*.
+
 ### A filter is a subject filter, so key naming decides what can be watched
 
 A watch's key filter is matched the way a subject is: **`*` is exactly one whole token**, `>` is one
@@ -384,7 +392,14 @@ something else when:
 - **You need read-after-write.** There is none — see *There is no read-after-write consistency*
   above. A `put` followed immediately by a `get` on another connection can return the old value.
 - **Values are large.** They are capped by `max_msg_size` and meant to be small; "large values belong
-  in the Object Store" ([[object-store]], source: [[s-docs-kv-ttl-and-limits]]).
+  in the Object Store" ([[object-store]], source: [[s-docs-kv-ttl-and-limits]]). The boundary runs
+  the other way too, and it is the *history* that decides it: the object store "keeps the current
+  `ObjectInfo`, not the trail of edits that produced it", so a re-put replaces the metadata and
+  nothing keeps the old version. If you need versions of a value, it is a KV key however large it
+  feels; if you need bytes and only ever the latest, it is an object however small
+  (source: [[s-docs-object-store-metadata-and-links]]). This is not a gap waiting to be filled:
+  ADR-20 lists **"versioning and revisions"** among the object store's *possible future features*,
+  i.e. not implemented (source: [[s-adr-20-object-store]], [[object-store]]).
 - **You need an audit trail.** History is per key, bounded at **64** revisions, and trimmed silently.
   "It isn't an audit log of the whole bucket" (source: [[s-docs-kv-history-and-revisions]]). Use a
   [[stream]] with the retention you actually need.
@@ -479,4 +494,6 @@ See [[filestore-layout]] for the mechanism and [[jetstream-sizing]] for sizing a
 [[s-docs-stream-config]] · [[s-gh-7017-kv-across-accounts]] · [[s-gh-5606-cross-account-jetstream]] ·
 [[s-gh-6746-watch-many-keys]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-adr-48-kv-ttl]] · [[s-adr-57-kv-subject-transforms]] · [[s-adr-54-kv-codecs]] · [[s-nats-server-filestore-layout]] ·
 [[s-docs-kv-under-the-hood]] · [[s-docs-kv-watching]] · [[s-docs-kv-history-and-revisions]] ·
-[[s-docs-kv-ttl-and-limits]] · [[s-docs-kv-your-first-bucket]]
+[[s-docs-kv-ttl-and-limits]] · [[s-docs-kv-your-first-bucket]] ·
+[[s-docs-object-store-watching-and-listing]] · [[s-docs-object-store-metadata-and-links]] ·
+[[s-adr-20-object-store]]

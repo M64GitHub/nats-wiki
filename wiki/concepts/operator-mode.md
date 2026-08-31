@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [operator, jwt, nkeys, ed25519, signing-keys, scoped, revocation, bearer, resolver, creds]
 aliases: [decentralized auth, decentralized authentication, jwt auth, operator, trust chain, nkeys, scoped signing key, resolver]
-sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist]
+sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -170,6 +170,41 @@ The operational cost is a second source of truth. Every account change needs a p
 when you forget, and the only way to see what the server actually holds is
 `nats auth account query`.
 
+## Clients that cannot sign a nonce: MQTT and the browser
+
+Operator mode authenticates by challenge — the server sends a nonce and the client signs it with the
+private key in its credentials file. **Two kinds of client cannot do that**, and both are handled the
+same way: with a **bearer** user, where the JWT itself is the credential and no signature is required.
+
+**MQTT devices.** "There's nothing in the MQTT protocol that signs a server-supplied nonce", so the
+device sends **the JWT as the MQTT password**, with any non-empty username. That needs the user *and*
+the account marked bearer, because accounts disallow bearer tokens by default:
+
+```
+nats auth account edit SENSORS --bearer
+nats auth user add sensor SENSORS --bearer
+```
+
+Miss either and the device sees **CONNACK return code 5** — MQTT clients never receive the
+`Authorization Violation` string a NATS client would get, so check the CONNACK code
+(source: [[s-docs-mqtt-auth-and-clustering]]).
+
+**Browsers**, which have no filesystem to keep a credentials file in. A [[websocket]] listener can
+take the JWT from an `HttpOnly` cookie the page cannot read, via `jwt_cookie` — **which only works in
+operator mode**, and the server refuses to start when it is set without a trusted operator or key:
+
+```
+trusted operators or trusted keys configuration is required for JWT authentication via cookie "acme_nats_jwt"
+```
+
+`user_cookie`, `pass_cookie` and `token_cookie` arrived in **2.11**; each is consulted only when the
+client did not supply that field itself (source: [[s-docs-websocket-browsers-and-origins]]).
+
+**The cost of both is the same**: a bearer credential proves nothing beyond possession, so anyone
+holding the JWT can connect as that user. Treat it like a password, put TLS in front of it, and keep
+its expiry short. And `no_auth_user` is not available in operator mode at all — every connection needs
+a JWT.
+
 ## Related
 
 [[account]] · [[subject-permissions]] · [[set-up-operator-mode]] · [[auth-callout]] ·
@@ -179,4 +214,5 @@ when you forget, and the only way to see what the server actually holds is
 ## Sources
 
 [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]] · [[s-gh-7854-jwt-push-timeout]] ·
-[[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]]
+[[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] ·
+[[s-docs-mqtt-auth-and-clustering]] · [[s-docs-websocket-browsers-and-origins]]

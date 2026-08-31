@@ -34,6 +34,19 @@ changed the answer, and the reason is worth writing down:
   serves (Q37, Q40) are **not ★**. It is the plan after this one, and it will be better for having
   the monitoring chapter's `/healthz` and advisory material read first.
 
+**Result (all six steps done, 2026-09-01).** 215 → **260 pages**; bank 104 rows / 67 answered / ★ 36
+of 42 → **105 rows / 83 answered / ★ 42 of 42**; `inbox/docs-issues.md` 33 → **36**; unlanded ripples
+206 → **202**; staleness 0 throughout. Every chapter this plan named has been read, `interop` has two
+concepts and a runbook where it had one entity page, and five rows were closed by **running the
+binary** rather than reading — Q75, Q80, Q97, Q60 and Q61.
+
+**Next**, and the reason it is not another ingest: `inbox/docs-issues.md` now holds **36 verified
+findings, 15 of them ★, and not one has ever been sent to anyone.** `CLAUDE.md` calls that file an
+output of this wiki. The next plan should file it — the docs errors against `nats-io/nats-docs`, and
+separately the `$OBJ`/`$O.` mismatch (#35) against `nats-io/nats-server`, since that one is a server
+question rather than a docs one. After that, `meta-layer` and `stream-leader-keeps-moving` are still
+the two wanted pages, and Q105 is open.
+
 **Done when:** every ★ row is either answered or carries a written reason why it cannot be; the
 JetStream, KV, Object Store, MQTT, WebSocket and monitoring chapters have been read to the depth this
 wiki's focus asks for; and `interop` has real pages rather than scattered config keys.
@@ -289,7 +302,65 @@ question.
 `ttl-and-limits.md` should be checked against [[message-ttl]]'s open item: **the server-side default
 for `subject_delete_marker_ttl`**, which no source read so far states.
 
-## Step 4 — `learn/object-store`, the five articles · status: open
+## Step 4 — `learn/object-store`, the five articles · status: done 2026-08-31 — s-docs-object-store-your-first-object, s-docs-object-store-chunking, s-docs-object-store-metadata-and-links, s-docs-object-store-watching-and-listing, s-docs-object-store-under-the-hood, s-gh-6836-object-store-list-slow, s-nats-server-object-store-observed, s-nats-server-object-store-leafnode
+
+**Result.** All five ingested (`where-next.md` skipped as a recap; its checklist supplied
+`ErrNoObjectsFound`). Bank: **105 rows** (was 104), **77 answered** (was 76), ★ **42 of 42**.
+Unlanded ripples **206 → 205** (peaked at 211 mid-step); citation drift 0 → 0; lint clean;
+**233 → 242 pages**. `inbox/docs-issues.md` **34 → 35**.
+
+**Row closed: Q75** — and not by the page this plan named for it. `watching-and-listing.md` says "a
+list is cheap: it reads metadata, never chunks" and **never mentions concurrency**; gh#6836 has one
+comment, by the asker, and no reply from anyone in sixteen months. So it was **run**: nine experiments
+on the v2.14.6 binary. Object count is nearly free (200 objects 0.027–0.034 s, 5,000 objects
+0.044–0.046 s — 25× for 1.6×); concurrent writes are not. The slowdown has **two separable layers** —
+a flat server-wide JetStream tax of +27–35 % that an *unrelated* stream pays equally, and on top of it
+**2×–6.9×** on the bucket being written to. The mechanism, traced on `$JS.API.>`: one `nats object ls`
+is four API calls, the third an **ephemeral `last_per_subject` consumer created and destroyed per
+call**. New page [[object-store-list-is-slow]]. A negative result kept: `--timeout` does not bound the
+whole operation — `--timeout=1ms` still completed.
+
+**Q73's object-store half filled.** The row was answered by [[key-value]] alone; [[object-store]] now
+joins it.
+
+**The plan's two `## To verify` items: one settled, one settled the other way.** Chunk-size guidance
+**exists** — `chunking.md` gives both bounds and says not to tune it, which the ADR never did. The
+slow-listing question is answered by measurement, not by the page named for it.
+
+**Three numbers the docs never give, now measured:**
+
+- **The default chunk size is exactly 128 KiB**, not "roughly": 3,145,728 bytes → exactly 24 chunks.
+- **The disk-reclamation pitfall is overstated.** A 200 MiB delete took the stream directory from
+  204,912 KB to **3,212 KB at the call**, and held there through +60 s — **98.4 % synchronous**, the
+  residue one trailing block, which [[filestore-layout]] already explains (neither compaction path
+  touches the last block). Both pages corrected.
+- **Per-message overhead has a figure.** `chunking.md` is the one page in the tree that raises it and
+  states no number; at the default it is about **2.4 %**. Landed on [[filestore-layout]] and in
+  [[jetstream-sizing]]'s new *Step 6*, which sizes an object bucket in messages first.
+
+**The finding this step did not go looking for — docs issue #35.** The leafnode JetStream deny list is
+`["$JS.API.>", "$KV.>", "$OBJ.>"]` (`jetstream_api.go:323`), and **the object store uses `$O.`, not
+`$OBJ`** — a prefix that appears nowhere in the 861-page docs tree. Run on a hub/leaf pair with
+differing domains: `$KV.…` and `$OBJ.…` denied, **`$O.TEST.C.abc` and `$O.TEST.M.abc` crossed**. With a
+same-named bucket on both sides, one 600 KiB put on the leaf left **both** streams at
+`6 msgs / 615,040 bytes` and the hub listing an object nobody put there. KV control: 0 msgs on the hub.
+Nothing logged, on either side. Recorded on [[object-store]], [[jetstream-domain]], [[leafnode]] and
+[[streams-not-visible-across-a-leafnode]], with the `$O.>` deny as the mitigation. **Whether it is a
+defect or an intended asymmetry is not established** and the issue says so.
+
+**Row added: Q105**, open — gh#5106, `nats object ls` failing on a *mirror* of an object bucket across
+two JetStream domains, answered upstream by a maintainer (the CLI assumes metadata and chunk subjects
+align with the stream name; mirrors break that) and by nothing here. It is the nearest public question
+to the isolation finding, which has **none** — recorded in the bank's closing note rather than given a
+row it has no source for.
+
+**Also opened, honestly:** no source states which nats-server version the object store shipped in, so
+`since:` on [[object-store]] stays empty; links and `UpdateMeta` were not run, because the `nats` CLI
+has neither subcommand; `ErrDigestMismatch` was not observed.
+
+**One strike, named in the log**: `s-docs-object-store-your-first-object` → [[jetstream-sizing]]. The
+page carries no rate, size, count or overhead figure; the arithmetic sizing needs came from
+`s-docs-object-store-chunking`, which did land there.
 
 ```
 ingest raw/nats-docs/learn/object-store/under-the-hood.md
@@ -314,7 +385,65 @@ whether any source gives guidance on choosing a chunk size beyond "clients may t
 it does so without a number. Now that [[filestore-layout]] has the number, that page is worth
 re-reading with docs issue **#33** in hand — it may deserve a second `where`.
 
-## Step 5 — `interop`: WebSocket and MQTT · status: open
+## Step 5 — `interop`: WebSocket and MQTT · status: done 2026-09-01 — s-docs-mqtt-your-first-mqtt-client, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-qos-sessions-and-retained, s-docs-mqtt-auth-and-clustering, s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed
+
+**Result.** All eight articles ingested; both `where-next.md` recaps skipped but harvested. Bank: 105
+rows, **81 answered** (was 77), ★ **42 of 42**. Unlanded ripples **205 → 203** (peaked at 230
+mid-step); citation drift 0 → 0; lint clean; **242 → 254 pages**. `inbox/docs-issues.md` **unchanged
+at 35**.
+
+**Nine summaries, one over the ~8 cap.** The extra is the observed run, and the alternative was
+leaving Q80 answered from prose that names nothing.
+
+**`interop` is no longer scattered config keys.** It was one entity page and **zero summaries**; it is
+now [[mqtt]], [[websocket]], [[run-nats-behind-a-proxy]], nine summaries and an *Interop* section in
+[[defaults-and-limits]].
+
+**Rows closed: Q79** ([[run-nats-behind-a-proxy]] · [[websocket]]) and **Q80** ([[mqtt]]).
+**Q78 and Q81 closed as dead ends**, both `no-public-answer`.
+
+**Q80 had to be measured, exactly as this step predicted.** `learn/mqtt` describes the QoS contract in
+full and **never names a single stream**. Fifteen runs on the v2.14.6 binary named all five, created
+**lazily on the first MQTT connection**: `$MQTT_sess`, `$MQTT_msgs` (**interest** retention),
+`$MQTT_out` (**interest**), `$MQTT_qos2in` (`discard: new`, `max_msgs_per_subject: 1`), `$MQTT_rmsgs`.
+And priced them, at a 100-byte payload: **QoS 0 costs nothing; QoS 1 and QoS 2 cost the same** — one
+message, 194 bytes — so QoS 2's price is round trips, not storage. A retained message costs 174 bytes
+**even at QoS 0**. A session record is 104 bytes bare, **791 with one subscription**.
+
+**No MQTT client was installed to do it.** `raw/nats-server-src/mqtt-probe-client-v3.1.1.py` is a
+~110-line stdlib-only MQTT 3.1.1 probe written for the step, which is what made SUBACK `0x80` and the
+four-packet QoS 2 handshake observable.
+
+**Two findings the chapters do not contain:**
+
+- **An abandoned QoS 2 handshake leaks a record** in `$MQTT_qos2in` that survives the disconnect and
+  never expires. Bounded at 65,535 per client id (`max_msgs_per_subject: 1` on
+  `$MQTT.qos2.in.<client-id>.<packet-id>`), unbounded in client ids.
+- **Stale sessions pin QoS 1 messages forever** — `$MQTT_msgs` is interest-retention and a vanished
+  session's durable consumer still holds interest. Three killed sessions plus five publishes left five
+  undrainable messages; one clean-session reconnect per dead client id emptied the stream. **That is
+  Q81's unanswered thread, explained**, even though it is not the restriction the row asks for.
+
+**The chapters were right, and this step filed no new docs issue** — worth recording as a result. All
+ten conversion rules, the derived **63/31** subscription ceiling, the whole origin table, the six
+refused characters with the publish-closes/subscribe-`0x80` asymmetry, MQTT v5 refused with CONNACK
+code 1, `Nmqtt-Pub` carrying the QoS, and four startup errors all reproduced exactly.
+
+**`stream_replicas` derived from `routes` is real**, and worse than it sounds: a genuine three-node
+cluster whose node listed its two peers created all five MQTT streams at **R=2**. The server says so
+once — `Creating MQTT streams/consumers with replicas 2 for account "$G"`. Asking for more than the
+cluster can satisfy makes MQTT clients unable to connect **with no CONNACK at all**, logging
+`no suitable peers for placement (10005)` — a second door into
+[[no-suitable-peers-for-placement]].
+
+**Q78 was deliberately not measured.** A connection-count benchmark says more about the machine than
+the server, and this wiki does not publish sizing numbers it cannot attribute. Stated once, on
+[[websocket]]'s *To verify*.
+
+**A near-miss recorded in the raw file.** The first origin-check run reported `400` for every origin
+including the allowed one — a shell-quoting bug in the harness, not server behaviour. Caught by
+re-running one case by hand. A harness bug that produces a plausible finding is the most dangerous
+kind, so it is written down.
 
 ```
 ingest raw/nats-docs/learn/mqtt/qos-sessions-and-retained.md
@@ -364,7 +493,52 @@ the MQTT layer creates on your behalf. If the docs describe the mapping without 
 **look at the server** — and if a claim is testable, the binary is right here and
 [[filestore-layout]] has just shown what running it buys.
 
-## Step 6 — `learn/monitoring`'s three unread articles · status: open
+## Step 6 — `learn/monitoring`'s three unread articles · status: done 2026-09-01 — s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-docs-monitoring-profiling, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers
+
+**Result.** All three ingested (`where-next.md` skipped as a recap). Bank: 105 rows, **83 answered**
+(was 81), ★ **42 of 42**. Unlanded ripples **203 → 202** (peaked at 211); citation drift 0 → 0; lint
+clean; **254 → 260 pages**. `inbox/docs-issues.md` **35 → 36**. Six summaries, within the cap.
+
+**Rows closed: Q60 and Q61 — both from the server source, neither from the chapter named for them.**
+The plan said "both if the pages state it, and both left open with a note if they do not." The pages do
+not: `profiling.md` is about CPU *profiles*, not the `/varz` `cpu` field, and the endpoints page prints
+`rtt` without saying what produces it. So both were read out of `monitor.go`, `pse/pse_linux.go`,
+`client.go` and `const.go` at v2.14.6 instead.
+
+- **Q60**: `cpu` is a percentage of **one core** — `100.0` is one core fully consumed — relative to
+  neither the host's cores nor a container's allocation, sampled once a second by a background timer.
+  The asker's thread was **closed with zero comments**; their `cpu: 10` on a 0.25 vCPU Fargate task is
+  **40 % of allocation**. Two caveats: `ticks` is hardcoded to 100, and elapsed seconds come from the
+  **host's** uptime.
+- **Q61**: `rtt` is a PING/PONG floored at 1ns, but a **client's** refreshes only after **an hour**
+  (`DEFAULT_RTT_MEASUREMENT_INTERVAL`), and its *first* value is the connection setup time, not a ping.
+  Routes/gateways/spoke-leafnodes refresh at the ping interval; **MQTT connections never get one**. The
+  thread's chosen answer omits the period, and its reporter's "I don't see these values getting
+  updated, even if we wait minutes" is right and unanswered.
+
+**The #1–#3 cross-check this step was ordered last for: a partial result, plus an upgrade.**
+`advisories-and-events.md` **does not settle #2 and #3** — it names `nak`, `consumer_action` and
+`terminated` as *types* without their subjects, and never mentions pinned or unpinned. Recorded as
+checked so it is not re-read for that. **But #1 is now confirmed on the wire**: a NAK'd message on a
+live 2.14.6 server produced `$JS.EVENT.ADVISORY.CONSUMER.MSG_NAKED.ORDERS.naktest`, against the
+generated reference's `MSG_NAK`. That is the evidence upgrade the report wanted before filing.
+
+**New: docs issue #36.** The same page's prose gives the max-deliveries subject correctly and its own
+**animation caption drops `.CONSUMER.` three times**. Filed `low` — the right value is immediately
+above the picture. Two smaller findings recorded inside it: the advisory body carries `id` and
+`timestamp` beyond the docs' example, and `$JS.EVENT.ADVISORY.API` fires for ordinary API calls, so the
+chapter's whole-tree subscribe example is noisier than it reads.
+
+**No profiling page, deliberately.** The material closed [[jetstream-sizing]]'s five-plan-old dangling
+"profile with Go's `pprof`" pointer as a section, plus `$SYS.REQ.SERVER.PING.PROFILEZ` on
+[[monitoring-endpoints]] and the `prof_port` / `prof_block_rate` reload split on [[config-keys]]. No
+bank row asks about profiling and a search for a public question found none, so the scope test says no
+page — and **no question was invented to justify one**.
+
+**Landed on the reader layer:** lag as arithmetic, the three confused numbers, and the crashed-worker
+signature (`num_pending` climbing · `num_waiting` 0 · `delivered.stream_seq` flat) on
+[[stream-has-high-message-lag]]; the consumer state field table on [[consumer]]; and **there is no
+dead-letter queue** on [[ack-and-redelivery]].
 
 ```
 ingest raw/nats-docs/learn/monitoring/advisories-and-events.md

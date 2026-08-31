@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [jetstream-domain, domain, default_js_domain, js-domain, mapping, external, api-prefix, leafnode]
 aliases: [domain, js domain, js-domain, jetstream domains, "$JS.<domain>.API", default_js_domain]
-sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain]
+sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain, s-nats-server-object-store-leafnode, s-docs-mqtt-auth-and-clustering]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -65,6 +65,15 @@ The last row is the supported cross-domain path, not a workaround. Two **identic
 a shared system account are actively guarded against: the server also denies publishing
 `$JS.<domain>.API.>` outward over that link, with a source comment saying the guard "will only cover
 some forms of this issue, not all of them" — see [[streams-not-visible-across-a-leafnode]].
+
+**"Nothing crosses" is not literally true, and the exception is the [[object-store]].** The deny list
+is `["$JS.API.>", "$KV.>", "$OBJ.>"]` (`jetstream_api.go:323`, v2.14.6), but an object bucket's
+subjects are `$O.<bucket>.C.>` and `$O.<bucket>.M.>` — **`$OBJ.>` matches neither**. Measured on
+2.14.6 across a hub/leaf pair with differing domains: `$KV.TEST.key1` and `$OBJ.TEST.thing` were both
+denied, and `$O.TEST.C.abc` and `$O.TEST.M.abc` both crossed. With a same-named object bucket on each
+side of the link, a put on one landed the object, chunks and metadata, in **both** streams; a KV
+bucket in the same position did not (source: [[s-nats-server-object-store-leafnode]]). A domain is
+therefore an isolation boundary for streams, consumers and KV — and not for object-store data.
 
 ## What configures it
 
@@ -129,11 +138,32 @@ JetStream and see this line, you have two.
 [[account]] · [[js-api-subjects]] · [[streams-not-visible-across-a-leafnode]] ·
 [[choosing-a-topology]] · [[key-value]]
 
+## `mqtt { js_domain }` — the one other place a domain is selected
+
+[[mqtt]] stores sessions, retained messages and in-flight QoS 1/2 deliveries in JetStream, and
+`js_domain` in the `mqtt {}` block chooses **which domain** that state goes to. On a leaf close to the
+devices, pointing it at the leaf's own domain keeps sessions and retained messages local, so devices
+keep working when the link to the hub is down (source: [[s-docs-mqtt-auth-and-clustering]]).
+
+```
+mqtt {
+  listen: 127.0.0.1:1883
+  js_domain: "factory"
+}
+```
+
+Two consequences worth carrying. **The domain is part of the session's storage identity**, which is
+what keeps sessions in different domains from colliding — the same client id can hold a session in two
+domains without either evicting the other. And **a leaf serving MQTT need not run JetStream itself**:
+the standalone `mqtt requires JetStream to be enabled` check does not apply once a `leafnodes` block
+exists, because the leaf can reach JetStream through the hub.
+
 ## Sources
 
 [[s-nats-server-leafnode-js-domains]] · [[s-docs-leaf-nodes]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7881-cross-domain-sourcing]] ·
-[[s-gh-7834-leafnode-same-js-domain]]
+[[s-gh-7834-leafnode-same-js-domain]] · [[s-nats-server-object-store-leafnode]] ·
+[[s-docs-mqtt-auth-and-clustering]]
 
 ## To verify
 

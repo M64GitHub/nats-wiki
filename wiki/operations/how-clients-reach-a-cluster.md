@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [connect_urls, no_advertise, client_advertise, seed-urls, loadbalancer, kubernetes, discovery, reconnect]
 aliases: ["seed URLs", "server discovery", "connect_urls", "no_advertise", "client_advertise", "LoadBalancer vs seed URLs", "client connection URLs"]
-sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls]
+sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls, s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -169,6 +169,30 @@ Do this **from where the clients live** — the whole class of failure here is a
 routable from the server and not from the client. Every URL in the list must be reachable from that
 vantage point; if one is not, the design is wrong, not the client.
 
+## WebSocket clients, and `advertise` behind a proxy
+
+A [[websocket]] listener is a separate door with its own address, and two things about reaching it
+differ from the client port (sources: [[s-docs-websocket-tls-and-proxies]],
+[[s-docs-websocket-your-first-websocket-connection]]).
+
+**`advertise` in the `websocket {}` block** is what a server behind NAT or a terminating proxy tells
+clients about itself. Without it the server hands out the address it can see locally, which clients
+cannot reach — and because discovery is used on **reconnect**, the failure appears later than the
+change that caused it, not at first connect:
+
+```
+websocket { listen: 0.0.0.0:8080, no_tls: true, advertise: "nats.example.com:443" }
+```
+
+**The client's URL scheme is not the server's configuration.** A client connects with `wss://` because
+the *proxy* presents the certificate; whether the listener itself runs TLS is decided by its own
+`tls {}` block or `no_tls`. The two are set independently and a mismatch fails at the handshake.
+
+**Always write the scheme and the port in a WebSocket client URL.** nats.js fills a missing port in
+and never picks 4222 — a bare host becomes `wss://host:443`, `ws://host` becomes port 80, and
+`nats://host:4222` keeps the port while losing the scheme, sending a WebSocket handshake to the plain
+client port. The failure looks like the server being down.
+
 ## Related
 
 [[build-a-3-node-cluster]] · [[upgrade-a-cluster]] · [[tls-in-nats]] · [[nats-helm-charts]] ·
@@ -184,3 +208,5 @@ vantage point; if one is not, the design is wrong, not the client.
 - [[s-docs-encryption-and-tls]] — advertised IPs versus the hostname a client verifies
 - `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md` — the `INFO` lines quoted
   above, observed on the v2.14.6 binary
+- [[s-docs-websocket-tls-and-proxies]]
+- [[s-docs-websocket-your-first-websocket-connection]]

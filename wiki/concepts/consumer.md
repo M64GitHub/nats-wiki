@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -285,6 +285,28 @@ RAFT traffic and meta-leader load — see [[jetstream-sizing]] and
 See [[filestore-layout]] for the rest of the directory.
 
 
+## Reading a consumer's state
+
+Four fields describe where a reader has got to, and three of them are routinely confused (source:
+[[s-docs-monitoring-jetstream-health]]):
+
+| field | CLI label | meaning |
+|---|---|---|
+| `delivered.stream_seq` | Last Delivered Message | stream sequence of the last message handed out |
+| `ack_floor.stream_seq` | Acknowledgment Floor | the sequence below which **everything** is acked |
+| `num_ack_pending` | Outstanding Acks | delivered but not yet acked — **in-flight** |
+| `num_redelivered` | Redelivered Messages | currently tracked as delivered more than once |
+| `num_pending` | Unprocessed Messages | **lag** — waiting, never delivered |
+| `num_waiting` | Waiting Pulls | outstanding pull requests |
+
+`num_redelivered` is not a lifetime tally: when one of those messages is finally acked the server
+stops tracking it and the count falls. And `num_pending` on a **filtered** consumer counts only its
+own subjects, so it can be zero on a stream that is far from empty.
+
+Which number moved tells you which problem you have: rising `num_ack_pending` is a **stuck handler**,
+rising `num_pending` is **not enough handlers**. [[stream-has-high-message-lag]] has the diagnostic
+that separates them from a crashed pool.
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
@@ -296,4 +318,5 @@ See [[filestore-layout]] for the rest of the directory.
 [[s-docs-consumer-config]] · [[s-docs-acknowledgment]] · [[s-docs-surviving-node-loss]] ·
 [[s-docs-retention-policies]] · [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] ·
 [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-filestore-layout]] ·
-[[s-adr-60-reliable-sourcing]] · [[s-docs-reading-back]] · [[s-docs-filtering]]
+[[s-adr-60-reliable-sourcing]] · [[s-docs-reading-back]] · [[s-docs-filtering]] ·
+[[s-docs-monitoring-jetstream-health]]

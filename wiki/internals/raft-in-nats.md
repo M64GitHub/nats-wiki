@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -136,6 +136,13 @@ Cluster Information:
 `/raftz` gives a live view of a group's RAFT state: the current term, who the leader is, and each
 peer's status. It takes `account` and `group` query parameters — see [[monitoring-endpoints]].
 
+**The meta group has its own view**: `/jsz?meta=1` reports `meta_cluster.leader` and
+`meta_cluster.cluster_size`, which is how you confirm a meta leader exists at all before blaming
+anything downstream on the group layer (source: [[s-docs-monitoring-endpoints]]). A JetStream
+operation that hangs while `/jsz?meta=1` shows no leader is waiting on the meta layer, not on the
+stream's own group — the server says so directly in the log,
+`JetStream has not established contact with a meta leader`.
+
 **When an entry cannot be applied, the server tries to rebuild the group itself.** The apply loop
 calls `resetClusteredState` (`jetstream_cluster.go:3912`), which steps the node down and either stops
 or deletes the Raft state, logging
@@ -223,6 +230,23 @@ when you retire it.
   endpoint and its `account` and `group` query parameters, but not what it returns. Log compaction
   and snapshot timing are documented with it and likewise unread.
 
+## The election as an observable: the leader-elected advisory
+
+An election is not only a log line. JetStream publishes a **leader-elected advisory** whenever the
+leader of a replicated stream or consumer changes, on
+`$JS.EVENT.ADVISORY.STREAM.LEADER_ELECTED.<stream>` and
+`$JS.EVENT.ADVISORY.CONSUMER.LEADER_ELECTED.<stream>.<consumer>`, with `…QUORUM_LOST.…` alongside them
+([[advisories]] has the full constant list).
+
+**A flapping leader shows up here first**, and repeated advisories for one stream are the cheapest
+signal that a cluster is unstable. But the docs are careful about what the advisory is worth: it
+"reports a flap, not its cause… Don't try to diagnose the election from the advisory body alone"
+(source: [[s-docs-monitoring-advisories-and-events]]). The advisory tells you *that* leadership moved;
+this page is *why* it can.
+
+Because advisories are published once and stored nowhere, catching a flap that happened overnight
+means a stream was already capturing `$JS.EVENT.ADVISORY.>` — not that someone was watching.
+
 ## Related
 
 [[replicas]] · [[stream-placement]] · [[stream]] · [[consumer]] · [[monitoring-endpoints]] ·
@@ -235,4 +259,5 @@ when you retire it.
 [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] · [[s-docs-surviving-node-loss]] ·
 [[s-docs-placement]] · [[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] ·
 [[s-docs-upgrade-to-2.12]] · [[s-nats-server-jetstream-log-warnings]] · [[s-adr-61-meta-quorum-rescue]] ·
-[[s-docs-rolling-upgrades]]
+[[s-docs-rolling-upgrades]] ·
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-endpoints]]

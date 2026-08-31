@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [message-lag, log-warnings, publish, backpressure, puback, replicas, raft]
 aliases: ["has high message lag", "high message lag", "JetStream warnings in the log", "streamLagWarnThreshold"]
-sources: [s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-replication-and-r3]
+sources: [s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-replication-and-r3, s-docs-monitoring-jetstream-health]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -155,6 +155,48 @@ Everything in the table above is rate-limited or one-shot at the server's discre
 [[raft-in-nats]] for append→commit→apply; [[replicas]] for what a `PubAck` proves and what it does
 not.
 
+## Lag as a number, and the two numbers it is not
+
+The server's warning is one thing; the number an operator computes is another, and the docs give it as
+arithmetic (source: [[s-docs-monitoring-jetstream-health]]):
+
+```
+lag = stream.last_seq − consumer.delivered.stream_seq
+```
+
+A pull consumer reports the same value directly as **`num_pending`** (*Unprocessed Messages*), so you
+normally read it rather than subtract — but doing the subtraction once is what makes clear exactly
+what `num_pending` measures.
+
+Three numbers describe a consumer, and confusing them is the usual reason a dashboard misleads:
+
+| number | field | means | rising means |
+|---|---|---|---|
+| **lag** | `num_pending` | waiting, never delivered | not enough handlers |
+| **in-flight** | `num_ack_pending` | delivered, not yet acked | a **stuck handler** |
+| **redelivered** | `num_redelivered` | currently tracked as delivered more than once | handlers taking and not acking |
+
+`num_redelivered` is **not a lifetime tally** — when one of those messages is finally acked the server
+stops tracking it and the count drops.
+
+### The crashed-worker signature
+
+A high `num_pending` on its own is ambiguous: the server updates it on every new matching message
+whether or not anyone is fetching, so a healthy consumer draining a backlog looks the same for a
+moment. The signature that says the pool is **gone** is the combination of three fields:
+
+> `num_pending` large and climbing · `num_waiting` at **0** · `delivered.stream_seq` **not advancing**
+
+```
+nats consumer info ORDERS shipping --json |   jq '{num_pending, num_ack_pending, num_redelivered, num_waiting, delivered, ack_floor}'
+```
+
+### A filtered consumer's lag is not a stream-wide number
+
+A consumer filtered to `orders.shipped` counts only the shipped messages it has not seen. "An empty
+pending on a filtered consumer doesn't mean the stream is empty; it means nothing on *that filter* is
+waiting." Compare it against the stream's per-subject counts, not against `last_seq`.
+
 ## Related
 
 [[nats-timeout]] · [[malformed-or-corrupt-message]] · [[jetstream-out-of-disk]] ·
@@ -169,3 +211,4 @@ not.
   table above, at v2.14.6 with file and line.
 - [[s-nats-server-jetstream-resources]] — the out-of-resources line's two callers.
 - [[s-docs-replication-and-r3]] — quorum commit and what a `PubAck` promises.
+- [[s-docs-monitoring-jetstream-health]]

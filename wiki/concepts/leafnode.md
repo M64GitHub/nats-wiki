@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -201,6 +201,47 @@ So:
 - The two ends **compose**: the hub's permissions arrive in the INFO and the remote's local denies are
   merged on top (`leafnode.go:1715–1735`).
 
+## Dialling the hub over WebSocket
+
+A leaf can reach its hub through the `websocket {}` listener instead of the leafnode port, which is
+the answer when an HTTPS ingress is the only published way into the network. Nothing about the leaf
+model changes — same account, same interest propagation, same behaviour when the link drops — only the
+transport (source: [[s-docs-websocket-leaf-nodes-over-websocket]]).
+
+The hub needs **both** blocks, and one of them is never dialled:
+
+- `leafnodes { port: 7422 }` is "the switch that makes this server willing to accept leaf nodes **at
+  all**". Drop it, or write it empty, and the branch's connection is accepted by the WebSocket
+  listener and then closed.
+- `websocket {}` is the door the branch arrives through.
+
+So **7422 stays open and unused** — a real listener reachable by whatever can get to it, and a
+firewall item easy to miss precisely because nothing connects to it.
+
+The branch side is one URL:
+
+```
+leafnodes { remotes [ { urls: ["wss://nats.example.com:443"] } ] }
+```
+
+Four things that bite:
+
+- **Clients and leaves are told apart by the request path** — a leaf asks for `/leafnode`, a client
+  for `/`. You never write it; the server appends `/leafnode` to whatever path the remote URL carries,
+  which a path-routing proxy must account for ([[run-nats-behind-a-proxy]]).
+- **Write the port.** A leafnode URL without one gets `:7422` appended *whatever the scheme*, so
+  `wss://host` quietly dials the leafnode port and then fails, because it does not speak WebSocket.
+- **One scheme per remote**, enforced at startup (confirmed on 2.14.6, exit 1):
+  `remote leaf node configuration cannot have a mix of websocket and non-websocket urls`. You cannot
+  offer the ingress and a direct leafnode port as alternatives to each other.
+- **The connection type is `LEAFNODE_WS`, not `LEAFNODE`.** Granting `LEAFNODE` refuses the branch —
+  the transport is part of what the value names ([[subject-permissions]]).
+
+Two WebSocket-only remote settings exist: `ws_compression` and `ws_no_masking` (aliases
+`websocket_compression`, `websocket_no_masking`). Masking exists to stop a browser poisoning
+intermediary caches, which does not apply to a server-to-server link; both are requests the hub may
+decline, and the link works either way. See [[websocket]].
+
 ## Limits and failure modes
 
 - **A `urls` list spanning two clusters of one supercluster loops.** One bridge per NATS system;
@@ -213,6 +254,14 @@ So:
 - **Enabling JetStream on a leaf that shares the hub's system account with a matching domain extends
   the hub's JetStream**, so a stream created on the leaf may land on the hub —
   [[streams-not-visible-across-a-leafnode]].
+- **The JetStream deny list does not cover the [[object-store]].** When domains differ, the server
+  merges `["$JS.API.>", "$KV.>", "$OBJ.>"]` both ways — but an object bucket's subjects are
+  `$O.<bucket>.C.>` and `$O.<bucket>.M.>`, which `$OBJ.>` does not match. Measured on 2.14.6: `$O.…`
+  publishes crossed the link while `$KV.…` did not, and a same-named object bucket on both sides ended
+  up holding the same object, chunks and metadata (source:
+  [[s-nats-server-object-store-leafnode]]). Until that changes, the mitigation on this page's own
+  terms is a `deny_exports` / `deny_imports` entry for `$O.>` on the remote — one of the few cases
+  where the deny-only keys are exactly the right tool, because there is nothing to allow.
 - **No public source describes converting a leaf region into a non-leaf cluster**, or what happens if
   a leaf outgrows its hub. Both were asked in [[s-gh-7438-multi-region-availability]] and neither was
   answered. Treat the choice of hub as hard to reverse.
@@ -250,7 +299,9 @@ Needs the system account. `Spoke` is a property of **where you ran the command**
 [[s-docs-leaf-nodes]] · [[s-docs-putting-it-together]] · [[s-nats-server-topology]] ·
 [[s-nats-server-leafnode-js-domains]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
 [[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-gh-6328-jetstream-behind-gateways]] ·
-[[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]]
+[[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]] ·
+[[s-nats-server-object-store-leafnode]] ·
+[[s-docs-websocket-leaf-nodes-over-websocket]]
 
 ## To verify
 

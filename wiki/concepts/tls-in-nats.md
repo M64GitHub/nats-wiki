@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, mtls, verify, verify_and_map, handshake_first, tls_timeout, encryption-at-rest, prev_key, tls_cert_not_after]
 aliases: [tls, mtls, mutual tls, verify_and_map, handshake_first, encryption at rest, tls block, certificates]
-sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload]
+sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -194,8 +194,37 @@ CPU".
 The two things that actually bite are both invisible until they matter: a cluster whose routes were
 never given a `tls {}` block, and a certificate nobody was watching. The first is a config review; the
 second has a mechanical answer the docs do not mention — `/varz` carries **`tls_cert_not_after`** for
-every listener at v2.14.6, and `nats account tls` walks the whole verified chain. Both are in
-[[rotate-tls-certificates]].
+every listener at v2.14.6, and `nats account tls` walks the whole verified chain, warning on anything
+expiring within **`--expire-warn`, default `1w`**, and exiting non-zero so it can be a monitoring check
+(source: [[s-natscli-account-tls]]). Both are in [[rotate-tls-certificates]].
+
+## The WebSocket listener is the odd one out
+
+Three ways the `websocket {}` block differs from every other listener's TLS
+(sources: [[s-docs-websocket-tls-and-proxies]], [[s-docs-websocket-leaf-nodes-over-websocket]]):
+
+- **TLS is required by default and must be opted out of explicitly.** With neither a `tls {}` block
+  nor `no_tls: true` the server exits 1 with `websocket requires TLS configuration` — the only
+  listener that refuses to run in the clear without being told to.
+- **Almost nothing in the block reloads.** `cert_file` and `key_file` do, for connections made
+  afterwards. Every other field — `verify_and_map`, `pinned_certs`, `allowed_origins`, the timeouts —
+  is **rejected, and a rejected field aborts the entire reload**, including changes in the same edit
+  that would have been accepted. See [[reload-server-config]] and [[run-nats-behind-a-proxy]].
+- **The client's scheme says nothing about the server's TLS.** `wss://` describes what the *client*
+  will do; behind a terminating proxy the listener itself may be plaintext with `no_tls: true`. The
+  two are configured independently and a mismatch fails at the handshake.
+
+**On a leafnode remote, `wss://` and a `tls {}` block are two independent ways to turn TLS on**, and
+either is enough alone — so a remote written `ws://` with a `tls {}` block beside it *is* encrypted,
+and the scheme is not a reliable reading of a config. A `wss://` remote whose hub certificate is not
+publicly trusted still performs a handshake and fails at verification:
+
+```
+[ERR] TLS leafnode handshake error: tls: failed to verify certificate:
+      x509: certificate signed by unknown authority
+```
+
+What fixes that is a `tls {}` block carrying the right `ca_file`, not one added to turn TLS on.
 
 ## Related
 
@@ -208,4 +237,6 @@ every listener at v2.14.6, and `nats account tls` walks the whole verified chain
 
 [[s-docs-encryption-and-tls]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] ·
 [[s-docs-hardening]] · [[s-docs-security-checklist]] · [[s-adr-40-nats-connection]] ·
-[[s-nats-server-tls-reload]]
+[[s-nats-server-tls-reload]] ·
+[[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
+[[s-natscli-account-tls]]

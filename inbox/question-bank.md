@@ -80,8 +80,8 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 57 | Which endpoints and metrics should I actually alert on for a JetStream cluster? | monitoring | [gh#6182](https://github.com/nats-io/nats-server/discussions/6182) | ★ runbook | [[monitoring-endpoints]] · [[advisories]] |
 | 58 | How do I find which consumer the server has flagged as slow? | monitoring | [gh#6605](https://github.com/nats-io/nats-server/discussions/6605) | ★ gotcha | [[slow-consumer-detected]] · [[monitoring-endpoints]] |
 | 59 | Are there metrics for acked, naked, terminated and redelivered messages? | monitoring jetstream | [gh#6962](https://github.com/nats-io/nats-server/discussions/6962) | monitoring | [[advisories]] · [[consumer]] |
-| 60 | How is CPU % in /varz measured, and why does it look wrong in containers? | monitoring | [gh#7483](https://github.com/nats-io/nats-server/discussions/7483) | gotcha | |
-| 61 | How are the RTT values in /routez and /connz measured? | monitoring | [gh#7362](https://github.com/nats-io/nats-server/discussions/7362) | monitoring | |
+| 60 | How is CPU % in /varz measured, and why does it look wrong in containers? | monitoring | [gh#7483](https://github.com/nats-io/nats-server/discussions/7483) | gotcha measured | [[monitoring-endpoints]] · [[jetstream-sizing]] |
+| 61 | How are the RTT values in /routez and /connz measured? | monitoring | [gh#7362](https://github.com/nats-io/nats-server/discussions/7362) | monitoring measured | [[monitoring-endpoints]] |
 | 62 | How do I read and act on JetStream warnings in the server log? | monitoring jetstream | [gh#6490](https://github.com/nats-io/nats-server/discussions/6490) | ★ gotcha | [[stream-has-high-message-lag]] |
 | 63 | How do I roll a cluster onto a new server version safely? | deploy | [gh#3778](https://github.com/nats-io/nats-server/discussions/3778) | ★ runbook | [[upgrade-a-cluster]] |
 | 64 | What are the data-integrity risks when upgrading across minor versions? | deploy | [gh#4781](https://github.com/nats-io/nats-server/discussions/4781) | ★ runbook | [[upgrade-a-cluster]] |
@@ -93,15 +93,15 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 70 | How do I count the keys in a KV bucket without fetching them all? | kv | [gh#7365](https://github.com/nats-io/nats-server/discussions/7365) | gotcha | [[key-value]] |
 | 71 | Does KV support a TTL per key, and since which version? | kv | [gh#7264](https://github.com/nats-io/nats-server/discussions/7264) | config | [[message-ttl]] · [[key-value]] |
 | 72 | Why doesn't deleting or purging keys reclaim disk space in a bucket? | kv | [gh#6015](https://github.com/nats-io/nats-server/discussions/6015) | ★ gotcha | [[key-value]] · [[filestore-layout]] |
-| 73 | When is KV or Object Store the wrong tool — where does Redis or a database win? | kv objectstore | [so#75576454](https://stackoverflow.com/questions/75576454/nats-object-store-or-key-value-store-vs-redis-cache) | concept | [[key-value]] |
+| 73 | When is KV or Object Store the wrong tool — where does Redis or a database win? | kv objectstore | [so#75576454](https://stackoverflow.com/questions/75576454/nats-object-store-or-key-value-store-vs-redis-cache) | concept | [[key-value]] · [[object-store]] |
 | 74 | How do I implement a distributed lock or lease with KV? | kv | [so#79400839](https://stackoverflow.com/questions/79400839/how-to-use-nats-kv-for-distributed-locking) | pattern | [[key-value]] |
-| 75 | Why is listing an object-store bucket slow (or timing out) while uploads run? | objectstore | [gh#6836](https://github.com/nats-io/nats-server/discussions/6836) | gotcha | |
+| 75 | Why is listing an object-store bucket slow (or timing out) while uploads run? | objectstore | [gh#6836](https://github.com/nats-io/nats-server/discussions/6836) | gotcha measured | [[object-store-list-is-slow]] |
 | 76 | Why is a KV mirror on file storage far slower than on memory storage? | kv | [gh#8417](https://github.com/nats-io/nats-server/discussions/8417) | gotcha internals | |
 | 77 | What does an unexpected `nats: timeout` actually mean, and how do I trace it? | core | [gh#5859](https://github.com/nats-io/nats-server/discussions/5859) | ★ gotcha | [[nats-timeout]] |
-| 78 | How many WebSocket connections can a single server sustain? | interop | [gh#2770](https://github.com/nats-io/nats-server/discussions/2770) | sizing | |
-| 79 | How do I run NATS WebSocket behind nginx or another proxy? | interop deploy | [gh#7375](https://github.com/nats-io/nats-server/discussions/7375) | runbook | |
-| 80 | How does MQTT QoS 1/2 map onto JetStream, and what does it cost? | interop | [gh#7641](https://github.com/nats-io/nats-server/discussions/7641) | concept | |
-| 81 | How do I restrict MQTT client ids per account with JWT? | interop security | [gh#7397](https://github.com/nats-io/nats-server/discussions/7397) | config | |
+| 78 | How many WebSocket connections can a single server sustain? | interop | [gh#2770](https://github.com/nats-io/nats-server/discussions/2770) | sizing no-public-answer | **[[websocket]]** |
+| 79 | How do I run NATS WebSocket behind nginx or another proxy? | interop deploy | [gh#7375](https://github.com/nats-io/nats-server/discussions/7375) | runbook | [[run-nats-behind-a-proxy]] · [[websocket]] |
+| 80 | How does MQTT QoS 1/2 map onto JetStream, and what does it cost? | interop | [gh#7641](https://github.com/nats-io/nats-server/discussions/7641) | concept measured | [[mqtt]] |
+| 81 | How do I restrict MQTT client ids per account with JWT? | interop security | [gh#7397](https://github.com/nats-io/nats-server/discussions/7397) | config no-public-answer | **[[mqtt]]** |
 | 82 | How do I track client connect and disconnect events? | monitoring core | [gh#6445](https://github.com/nats-io/nats-server/discussions/6445) | runbook | [[advisories]] |
 | 83 | How do I get consumer pending metrics out of nats-surveyor or the Prometheus exporter, and what are the series called? | monitoring jetstream | [gh#3857](https://github.com/nats-io/nats-server/discussions/3857) | monitoring | [[prometheus-nats-exporter]] · [[nats-surveyor]] |
 | 84 | Exporter or surveyor — which do I run for cluster-level alerts, and what does each need? | monitoring topology | [gh#6145](https://github.com/nats-io/nats-server/discussions/6145) | monitoring runbook | [[nats-surveyor]] · [[prometheus-nats-exporter]] |
@@ -125,6 +125,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 102 | Does a leafnode need its own JetStream domain, and what does setting one actually change? | jetstream topology | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | concept config | [[jetstream-domain]] |
 | 103 | Can a leaf region later become the hub, or a regular cluster be converted into a leaf cluster without losing data? | topology deploy | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ concept no-public-answer | **nobody has published an answer** — scouted 2026-08-31 across the docs, ADRs, GitHub and blogs; the two questions in the thread were never replied to. The finding is stated on [[choosing-a-topology]] |
 | 104 | Why does `nats-server -t` accept a config the server then refuses to start? | deploy | [learn/topologies/putting-it-together](https://docs.nats.io/learn/topologies/putting-it-together) | gotcha config | [[reload-server-config]] · [[build-a-3-node-cluster]] |
+| 105 | Why does `nats object ls <bucket>` fail on a **mirror** of an object-store bucket, and what does mirroring one across a leafnode with two JetStream domains actually give you? | objectstore topology | [gh#5106](https://github.com/nats-io/nats-server/issues/5106) | gotcha internals | |
 
 ## Thread titles behind the rows
 
@@ -300,3 +301,70 @@ a table of the **thirteen** neighbouring JetStream warnings read from `nats-serv
 with what it measures — which is the general answer, built from the server rather than claimed from
 the thread. The first reporter's own question, why it happened under no load and why only a restart
 cleared it, remains **unanswered upstream** and the page says so.
+
+**Row 75 is answered by measurement, not by a source.** The thread it comes from
+([gh#6836](https://github.com/nats-io/nats-server/discussions/6836)) has one comment — the asker's own
+follow-up — and no reply from anyone else, sixteen months on. `learn/object-store/watching-and-listing.md`,
+the docs page that covers listing, says only that "a list is cheap: it reads metadata, never chunks"
+and never mentions concurrency. So [[object-store-list-is-slow]] answers it from nine experiments on
+the v2.14.6 binary (`raw/nats-server-src/object-store-observed-v2.14.6.md`): object count is nearly
+free (25× the objects for 1.6× the time), concurrent writes to the same bucket cost 2–7×, and a list
+is an ephemeral `last_per_subject` consumer created and destroyed on every call. The `measured` flag
+marks rows answered this way.
+
+**Row 105 was added by step 4 of `inbox/plan-the-unread-chapters-2026-08-31.md`** and the wiki cannot
+answer it. The maintainer's reply in the thread — that the CLI assumes the metadata and chunk subjects
+align with the stream name, which a mirror breaks, and that listing streams by subject excludes
+mirrors — is on no page here. It is the nearest public question to a finding that has **no** public
+question behind it: that a JetStream domain isolates a KV bucket across a leafnode and does **not**
+isolate an object-store bucket. That finding is recorded on [[object-store]], [[jetstream-domain]],
+[[leafnode]] and [[streams-not-visible-across-a-leafnode]], and as docs issue #35 — deliberately
+without a bank row of its own, because nobody has been found asking it.
+
+**Rows 78 and 81 are closed as dead ends, not as answers**, and both cells are bold to say so.
+
+**Row 78** — how many WebSocket connections one server sustains. `learn/websocket` gives no number,
+the generated reference gives none, and `max_connections` bounds every connection kind together, so it
+is not an answer to the question as asked. Recorded once, on [[websocket]]'s *To verify*, rather than
+hedged across pages. It was not measured: a connection-count benchmark says more about the machine
+than about the server, and this wiki does not publish sizing numbers it cannot attribute.
+
+**Row 81** — restricting which MQTT client ids a user may present, via JWT/nsc. The thread has been
+open and **unanswered since 2025-10-06**, and `learn/mqtt/auth-and-clustering.md` — the page named for
+it — restricts a user to a *connection type* and hands devices a bearer JWT, but nothing there
+constrains a client id. **What this step could do instead was explain the problem behind the
+question.** The reporter's devices rotate client ids and publish at QoS 1, and they find "messages
+never get deleted since the stale clients block deletion". That is reproducible on 2.14.6:
+`$MQTT_msgs` uses **interest retention**, and a stale session's durable consumer still holds interest,
+so nothing is ever removed — reconnecting each dead client id once with the clean-session flag empties
+the stream. Both the mechanism and the remedy are on [[mqtt]]; the restriction the row asks for still
+has no public answer.
+
+**Row 80 is answered by measurement.** `learn/mqtt` describes the QoS contract in full and **never
+names a single stream**, so "what does it cost" was unanswerable from it. Fifteen runs on the v2.14.6
+binary named all five `$MQTT_*` streams and priced each level: QoS 0 costs nothing, QoS 1 and QoS 2
+cost **the same** stored bytes (194 for a 100-byte payload), and a retained message costs 174 bytes
+even at QoS 0 (`raw/nats-server-src/mqtt-websocket-observed-v2.14.6.md`).
+
+**Rows 60 and 61 were both answered from the server source, not from the chapter named for them.**
+`learn/monitoring` never states how either number is measured — profiling is about CPU *profiles*, not
+the `/varz` `cpu` field, and the endpoints page prints `rtt` values without saying what produces them.
+
+**Row 60**: `cpu` is a percentage of **one core** — `100.0` is one core fully consumed — and it is
+relative to neither the host's core count nor a container's CPU allocation. On Linux it is sampled once
+a second by a background timer over `/proc/<pid>/stat`. The asker's thread was **closed with zero
+comments**, and their `cpu: 10` on a 0.25 vCPU Fargate task is 40 % of their allocation, not 10 % of
+anything.
+
+**Row 61**: `rtt` is a PING/PONG measurement, floored at 1ns — but a **client's** refreshes only when
+`rtt == 0` or more than **an hour** has passed (`DEFAULT_RTT_MEASUREMENT_INTERVAL`), and its *first*
+value is the connection setup time rather than a ping at all. Routes, gateways and spoke leafnodes
+refresh at the ping interval instead. The public thread's chosen answer is correct and omits the
+period, and the reporter's follow-up — "I don't see these values getting updated, even if we wait
+minutes" — is right and never answered.
+
+**No profiling row was added.** `learn/monitoring/profiling.md` was ingested in the same step, and a
+search of `nats-io/nats-server` discussions for a public question about profiling returned **nothing**.
+`CLAUDE.md`'s scope test says a page needs a question behind it, so the material landed as sections on
+[[jetstream-sizing]] and [[monitoring-endpoints]] rather than as a runbook, and no question was
+invented to justify one.

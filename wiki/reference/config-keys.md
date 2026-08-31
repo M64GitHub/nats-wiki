@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -269,6 +269,38 @@ option because the server leaves it zero and fills it in at the use site. Record
 `max_ack_pending`, unrelated to a JetStream [[consumer]]'s (source:
 [[s-nats-server-defaults-sweep]]).
 
+**Three more keys in these blocks that change whether the server starts at all**, all confirmed on
+v2.14.6 (source: [[s-nats-server-mqtt-websocket-observed]]):
+
+| key | behaviour |
+|---|---|
+| `websocket.tls` / `websocket.no_tls` | one of them is **required**. Neither, and the server exits 1 with `websocket requires TLS configuration` (source: [[s-docs-websocket-your-first-websocket-connection]]) |
+| `mqtt.*` with no `jetstream {}` block | on a standalone server, exit 1 with `mqtt requires JetStream to be enabled if running in standalone mode`. The check does not apply once a `cluster`, `gateway` or `leafnode` block exists, and it applies **per account** too (source: [[s-docs-mqtt-your-first-mqtt-client]]) |
+| `server_name` with `mqtt` + a `cluster`/`gateway` block | **required**; otherwise exit 1 with `mqtt requires server name to be explicitly set` |
+
+**`mqtt.stream_replicas` has no default and is not simply 1.** Unset, the server derives the replica
+count from **the number of addresses in its own `routes` list**, clamped to 1–3 — so a node in a
+three-node cluster that lists its two peers creates MQTT state at `R=2` (observed). It announces the
+result: `Creating MQTT streams/consumers with replicas N for account "…"`.
+
+**Only certificate material in `websocket { … }` reloads.** `cert_file` and `key_file` take effect for
+later connections; every other field in the block — `verify_and_map`, `pinned_certs`,
+`allowed_origins`, the timeouts — is **rejected, and a rejected field aborts the whole reload**
+(source: [[s-docs-websocket-tls-and-proxies]]). See [[reload-server-config]], [[mqtt]], [[websocket]].
+
+## `prof_port` and `prof_block_rate`
+
+Two profiling keys whose **reload behaviour differs**, which is the whole operational point (source:
+[[s-docs-monitoring-profiling]]):
+
+| key | reloadable | note |
+|---|---|---|
+| `prof_port` | **no** | turning it on is a restart, so a rolling restart mid-incident. It has **no authentication** and binds to the same `host` as the client port — default `0.0.0.0`, with no separate profiling host to narrow |
+| `prof_block_rate` | **yes** | block profiling returns an empty profile until this is above zero; raise it with a SIGHUP, take the profile, drop it back. Block sampling slows the server |
+
+Prefer `nats server request profile` over `$SYS.REQ.SERVER.PING.PROFILEZ`, which needs neither key and
+no restart — [[monitoring-endpoints]], [[jetstream-sizing]].
+
 ## Account JetStream limits
 
 `accounts.<name>.jetstream.max_memory`, `.max_file`, `.max_streams`, `.max_consumers` — all
@@ -372,4 +404,7 @@ The tables above are the reload-relevant subset. The operator-facing keys and th
 [[s-docs-operator-mode]] · [[s-docs-auth-callout]] · [[s-nats-server-jetstream-resources]] ·
 [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] · [[s-docs-leaf-nodes]] · [[s-docs-super-clusters]] ·
 [[s-docs-config-management]] · [[s-nats-server-lame-duck]] ·
-[[s-docs-accounts-and-multitenancy]] · [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-hardening]] · [[s-docs-rolling-upgrades]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-nats-server-route-cluster-formation]] · [[s-nats-server-systemd-units]]
+[[s-docs-accounts-and-multitenancy]] · [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-hardening]] · [[s-docs-rolling-upgrades]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-nats-server-route-cluster-formation]] · [[s-nats-server-systemd-units]] ·
+[[s-nats-server-mqtt-websocket-observed]] · [[s-docs-websocket-tls-and-proxies]] ·
+[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] ·
+[[s-docs-monitoring-profiling]]

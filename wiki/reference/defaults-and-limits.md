@@ -6,7 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed,
+  s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins,
+  s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -276,6 +278,42 @@ The four "no default" rows contradict the generated config reference, which stat
 `max_ack_pending` is #28 (source: [[s-nats-server-defaults-sweep]]). See [[config-keys]] and
 [[leafnode]].
 
+## Interop — MQTT and WebSocket
+
+The listener defaults are in the table above. These are the behavioural limits the two protocols
+impose, all confirmed on **2.14.6** unless marked otherwise (sources:
+[[s-docs-mqtt-qos-sessions-and-retained]], [[s-docs-websocket-browsers-and-origins]],
+[[s-nats-server-mqtt-websocket-observed]]).
+
+| limit | value | note |
+|---|---|---|
+| MQTT protocol version | **v3.1.1 only** | a CONNECT at level 5 gets CONNACK return code **1** — observed |
+| `mqtt { port }` / `websocket { port }` | **no default**, and no listener and **no log line** without one | sources: [[s-docs-mqtt-your-first-mqtt-client]], [[s-docs-websocket-your-first-websocket-connection]] |
+| `mqtt { max_ack_pending }` per subscription | **1024**, range **0–65535** | **`0` means "use the default"**, not "none" |
+| MQTT in-flight total per **session** | **65535** across all subscriptions | over it, the subscription is refused with `0x80` in the SUBACK |
+| plain subscriptions per session at the default | **63** — the 64th is refused | observed exactly |
+| `#` subscriptions per session at the default | **31** — the 32nd is refused | a `#` filter creates two NATS subscriptions and counts twice; observed exactly |
+| `mqtt { stream_replicas }` | **derived from the number of addresses in the server's own `routes` list, clamped 1–3** | a 3-node cluster whose node lists 2 routes gets **R=2** — observed |
+| MQTT client-ID flap suppression | **~1s** before the session is handed over again | docs only; not measured |
+| characters refused in an MQTT topic | space, tab, LF, CR, FF, DEL | publishing **closes the connection**; subscribing returns `0x80` — observed |
+| `allowed_origins` matching | **exact string** on scheme, host and port | **skipped entirely when no `Origin` header is present** — observed |
+| WebSocket `user_cookie` / `pass_cookie` / `token_cookie` | since **2.11** | `jwt_cookie` has always existed |
+| `websocket { ping_interval }` | since **2.12**; before that the server-wide ping interval applies | docs only |
+| WebSocket under FIPS-140 | needs a build from **Go 1.26 or later** | earlier toolchains make the server refuse the listener |
+
+**The five streams MQTT creates on its own**, lazily on the first MQTT connection — no source names
+them, so these were read off the server (source: [[s-nats-server-mqtt-websocket-observed]]):
+
+| stream | subjects | retention | discard | `max_msgs_per_subject` |
+|---|---|---|---|---|
+| `$MQTT_sess` | `$MQTT.sess.>` | limits | old | 1 |
+| `$MQTT_msgs` | `$MQTT.msgs.>` | **interest** | old | -1 |
+| `$MQTT_out` | `$MQTT.out.>` | **interest** | old | -1 |
+| `$MQTT_qos2in` | `$MQTT.qos2.in.>` | limits | **new** | 1 |
+| `$MQTT_rmsgs` | `$MQTT.rmsgs.>` | limits | old | 1 |
+
+All five: `storage: file`, `max_age: 0`. What each QoS level costs is on [[mqtt]].
+
 ## Fast-producer stall
 
 The budget a publisher is slowed by when one of its destinations cannot keep up — including a
@@ -292,6 +330,29 @@ Observable as `/varz` → `stalled_clients`, `/connz` → `stalls`, and the log 
 `Producer was stalled for a total of %v` — [[monitoring-endpoints]],
 [[supercluster-slows-when-a-remote-subscriber-joins]].
 
+
+## Key-Value and Object Store
+
+These are **client-side** defaults on constructs the server knows only as streams, so they appear in
+no server constant and in no `nats-server` config key. They are here because they decide a stream's
+message count and therefore its sizing.
+
+| what | default | where it is stated | checked |
+|---|---|---|---|
+| object **chunk size** | **128 KiB** (`128 * 1024`) | ADR-20; `learn/object-store/chunking.md` states "128 KB" in prose | **observed**: a 3,145,728-byte file lands exactly 24 chunks, a 200 MiB object 1,600 |
+| object **digest** algorithm | `SHA-256`, no alternative | ADR-20 | observed, stored as `SHA-256=<base64url>` |
+| object bucket **name charset** | `A-Z a-z 0-9 - _` | ADR-20 (`restricted-term`) | observed: `.`, space and `>` each rejected client-side with `nats: invalid object-store name` |
+| object bucket backing stream | `discard: new`, `allow_rollup_hdrs: true`, `allow_direct: true`, `max_age: 0`, `max_bytes: -1` | ADR-20; `learn/object-store/under-the-hood.md` | observed field-for-field on 2.14.6, plus `duplicate_window: 2m` and `max_msgs_per_subject: -1` |
+
+(sources: [[s-adr-20-object-store]], [[s-docs-object-store-chunking]],
+[[s-docs-object-store-under-the-hood]], [[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
+[[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]]; the concept pages
+are [[object-store]] and [[key-value]].)
+
+**The chunk size has a hard ceiling and no stated floor.** A chunk must fit in one message, so
+`max_payload` (**1 MB** by default, above) bounds it — and on 2.14.6 a `--chunk-size` above
+`max_payload` is rejected **by the client**, before anything is published. The docs advise against
+tuning it at all.
 
 ## Guidance thresholds — not server limits
 
@@ -325,6 +386,10 @@ states neither the version they were measured against nor the method
   flags and the constants at a tag, and writes `inbox/check-defaults-<tag>.md`. On v2.14.6: 175 of
   the 216 documented defaults agree, 15 disagree and 26 need a human. Re-run it after a release and
   diff the report; every disagreement is still verified by hand before it is stated here.
+- **Object-store values** come from ADR-20 and `raw/nats-docs/learn/object-store/`, and each was
+  re-checked on the running v2.14.6 binary — the runs are in
+  `raw/nats-server-src/object-store-observed-v2.14.6.md`. They are client-side constants, so
+  `tools/check-defaults.py` does not and cannot sweep them.
 - **A value stated by neither is absent from this page**, not guessed.
 
 ## What is deliberately not here
@@ -340,7 +405,8 @@ states neither the version they were measured against nor the method
 ## Related
 
 [[config-keys]] · [[jetstream-sizing]] · [[stream]] · [[consumer]] · [[ack-and-redelivery]] ·
-[[replicas]] · [[priority-groups]] · [[slow-consumer-detected]] · [[js-api]]
+[[replicas]] · [[priority-groups]] · [[slow-consumer-detected]] · [[js-api]] ·
+[[object-store]] · [[key-value]] · [[mqtt]] · [[websocket]]
 
 ## Sources
 
@@ -351,4 +417,8 @@ states neither the version they were measured against nor the method
 [[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] ·
 [[s-nats-server-filestore-layout]] ·
 [[s-adr-31-direct-get]] · [[s-docs-auth-callout]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
-[[s-docs-advanced-publishing]] · [[s-docs-reading-back]]
+[[s-docs-advanced-publishing]] · [[s-docs-reading-back]] · [[s-adr-20-object-store]] ·
+[[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] ·
+[[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
+[[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
+[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]]

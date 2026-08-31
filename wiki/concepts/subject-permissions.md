@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [permissions, allow, deny, default_permissions, allow_responses, queue-group, _INBOX, "$JS.API"]
 aliases: [permissions, authorization, allow list, deny list, publish permissions, subscribe permissions, default_permissions, allow_responses]
-sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood]
+sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -153,8 +153,63 @@ to everything except the KV clients:
 publish: { deny: ["$KV.>"] }
 ```
 
-The same reasoning applies to `$O.>` for an [[object-store]] bucket. This is a case where the
-protective-looking stream setting and the protection an operator needs are two different mechanisms.
+The same reasoning applies to `$O.>` for an [[object-store]] bucket, and there it is sharper, because
+an object bucket has **two subject spaces with different sensitivities** (source:
+[[s-docs-object-store-under-the-hood]]):
+
+| subject space | holds | who needs it |
+|---|---|---|
+| `$O.<bucket>.C.>` | the chunk messages — the object bytes | only clients that put and get objects |
+| `$O.<bucket>.M.>` | one `ObjectInfo` per object — names, sizes, digests | anything that lists or watches |
+
+A reader that only needs to know *what* is in a bucket — a watcher, a dashboard — needs `.M.>` and
+**not** `.C.>`, because the object-store watch carries metadata and never the bytes. That is a real
+least-privilege split, not a theoretical one, and it is only available because the two spaces are
+separate subjects. The docs are explicit that this is an ordinary subject problem: "securing these
+subjects… is a security concern, not an object-store one."
+
+One caveat before writing that ACL: a **list** is not just a read of `.M.>`. It creates and deletes an
+ephemeral consumer, so it also needs `$JS.API.CONSUMER.CREATE.OBJ_<bucket>.>` and the matching
+`DELETE` ([[js-api-subjects]]). A grant of the metadata subject alone lets a client *watch* but not
+*list*.
+
+This is a case where the protective-looking stream setting and the protection an operator needs are
+two different mechanisms.
+
+## Interop: the transport is part of the permission
+
+Two things here are easy to get wrong because the rule is written against something other than what
+the client sent.
+
+**[[mqtt]] permissions are checked on the converted subject, never the topic.** The server converts
+first, then checks. A rule written `sensors/#` matches nothing; the rule is `sensors.>`. And because
+an MQTT filter ending in `#` makes the server create **two** NATS subscriptions — `sensors.>` and the
+parent `sensors` — both must be granted, or the whole filter is refused with `0x80` in the SUBACK and
+the subscription already created is torn down (source: [[s-docs-mqtt-topics-and-subjects]]):
+
+```
+subscribe: ["sensors.>", "sensors"]
+```
+
+**Leave `$MQTT.sub.>` out of the lists entirely.** From 2.12.3 an MQTT connection is implicitly
+allowed to subscribe to `$MQTT.sub.` and `$MQTT.deliver.pubrel.`; before that it had to be allowed
+explicitly. But **deny is still enforced**, so a restrictive rule that denies everything under
+`$MQTT.` breaks QoS 1 and 2 while QoS 0 keeps working — a fleet that looks half-broken (source:
+[[s-docs-mqtt-auth-and-clustering]]).
+
+**`allowed_connection_types` binds a credential to a transport**, which is the cheapest way to stop a
+dashboard or device credential also working from a shell on 4222. The full set is `STANDARD`,
+`WEBSOCKET`, `LEAFNODE`, `LEAFNODE_WS`, `MQTT`, `MQTT_WS`, `IN_PROCESS`; omitting it allows **every**
+type, which is the default. The `_WS` variants are separate values, so a browser-based MQTT client
+needs `MQTT_WS` and a leaf dialling in over WebSocket needs `LEAFNODE_WS` — using `LEAFNODE` refuses
+it. Aliases: `connection_types`, `clients`.
+
+**And a warning about the one control that looks like a permission and is not.** `allowed_origins` on
+a [[websocket]] listener is checked **only when an `Origin` header is present**, so it constrains
+browsers and nothing else. Confirmed on 2.14.6: a handshake with no `Origin` gets
+`101 Switching Protocols` from an origin-restricted listener, and the `nats` CLI publishes straight
+through one (sources: [[s-docs-websocket-browsers-and-origins]],
+[[s-nats-server-mqtt-websocket-observed]]). Permissions are what protect the port.
 
 ## Related
 
@@ -164,4 +219,6 @@ protective-looking stream setting and the protection an operator needs are two d
 ## Sources
 
 [[s-docs-authorization]] · [[s-docs-authentication-basics]] · [[s-gh-5044-restrict-durable-consumers]] ·
-[[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] · [[s-docs-kv-under-the-hood]]
+[[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] · [[s-docs-kv-under-the-hood]] ·
+[[s-docs-object-store-under-the-hood]] ·
+[[s-docs-mqtt-topics-and-subjects]] · [[s-docs-mqtt-auth-and-clustering]] · [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]]

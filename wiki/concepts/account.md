@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [account, multitenancy, "$G", "$SYS", system_account, no_auth_user, 10039, isolation]
 aliases: [account, accounts, tenant, multitenancy, "$G", "$SYS", system account, global account]
-sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls]
+sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -164,6 +164,27 @@ Three differences bite operationally:
 - **Config mode validates imports at startup and operator mode does not** — see
   [[cross-account-sharing]].
 
+## An account is also the JetStream boundary for MQTT
+
+Two account-level facts that only show up when [[mqtt]] is enabled (sources:
+[[s-docs-mqtt-your-first-mqtt-client]], [[s-docs-mqtt-auth-and-clustering]],
+[[s-docs-mqtt-topics-and-subjects]]):
+
+- **The JetStream requirement is per account, not just per server.** A standalone server without a
+  `jetstream {}` block refuses to start with `mqtt requires JetStream to be enabled if running in
+  standalone mode` — but an MQTT user whose *account* has no JetStream is refused **at connect time**,
+  on a server that started fine.
+- **MQTT permissions are account permissions on converted subjects.** A device's topic becomes a NATS
+  subject before authorization runs, so the account's `publish`/`subscribe` rules are written in NATS
+  notation — `sensors.>`, never `sensors/#` ([[subject-permissions]]).
+
+`allowed_connection_types` on a user narrows which transports its credential works on
+(`STANDARD`, `WEBSOCKET`, `LEAFNODE`, `LEAFNODE_WS`, `MQTT`, `MQTT_WS`, `IN_PROCESS`); omitted, every
+type is allowed. The `mqtt {}` block can also carry its own `authorization {}` and `no_auth_user`
+scoped to that listener, which is how a fleet whose firmware cannot send credentials is mapped onto
+one account user — though a listener-scoped username or token cannot be combined with a top-level
+`users` list, and `no_auth_user` does not work in [[operator-mode]].
+
 ## To verify
 
 - Per-account **limits** are named but not enumerated by the source read here; the field list is in
@@ -184,4 +205,5 @@ Three differences bite operationally:
 ## Sources
 
 [[s-docs-accounts-and-multitenancy]] · [[s-docs-cross-account]] · [[s-docs-operator-mode]] ·
-[[s-gh-4535-unauthenticated-connections]] · [[s-nats-server-auth-and-tls]]
+[[s-gh-4535-unauthenticated-connections]] · [[s-nats-server-auth-and-tls]] ·
+[[s-docs-mqtt-auth-and-clustering]] · [[s-docs-mqtt-topics-and-subjects]] · [[s-docs-mqtt-your-first-mqtt-client]]

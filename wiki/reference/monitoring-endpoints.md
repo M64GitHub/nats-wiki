@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -224,6 +224,104 @@ of every stream's `max_bytes`, counted as used from the moment the stream exists
 can leave the server at `GOMAXPROCS=1` on an 8-core host, which is one of the hypotheses on
 [[nats-timeout]].
 
+### `cpu` is a percentage of **one** core
+
+The single most misread number on the endpoint, and no public source says what it is relative to. Read
+from the source at v2.14.6 (source: [[s-nats-server-monitoring-observed]]):
+
+> **`cpu: 100.0` means one core fully consumed. `cpu: 250.0` means two and a half cores.** It is
+> relative to **neither** the host's core count nor any container CPU allocation — it is an absolute
+> "cores consumed × 100".
+
+On Linux the value is not computed when you call `/varz`: a background timer samples
+`utime + stime` from `/proc/<pid>/stat` **once a second**, takes the delta, and divides by elapsed
+seconds (`server/pse/pse_linux.go:49–86`); `ProcUsage` returns that figure `/10.0` (`:104`).
+
+**So a CPU alert threshold must be scaled by the container's CPU *allocation*, not by `cores`.** On a
+0.25 vCPU task, `cpu: 25` is the container saturated, and `cpu: 10` — the figure in
+[[s-gh-7483-varz-cpu-in-containers]] — is **40 % of allocation**, not 10 % of anything. `cores` is
+`runtime.NumCPU()` (`monitor.go:1727`) and nothing in the monitoring or process-stats code reads a
+cgroup CPU quota, so on a container `cores` reports the **host's** logical CPUs. That question was
+asked in public and **closed with no reply at all**.
+
+Two caveats from the same function, both Linux-only: `ticks` is **hardcoded to 100** rather than read
+from `sysconf(_SC_CLK_TCK)` — commented "Avoiding to generate docker image without CGO" — so a kernel
+with a different `CLK_TCK` is scaled wrong; and the elapsed-seconds term comes from
+`syscall.Sysinfo().Uptime`, the **host's** uptime.
+
+### `rtt` is a PING/PONG — and on a client it can be an hour old
+
+`rtt` appears in `/connz` and `/routez` and looks like a live latency measurement. It is not. `c.rtt`
+is written in exactly two places (`client.go`, v2.14.6; source:
+[[s-nats-server-monitoring-observed]]):
+
+| when | value |
+|---|---|
+| **at connect**, for a client | `computeRTT(c.start)` — the **connection setup time**, not a ping (`:2289`) |
+| **on every PONG** | `computeRTT(c.rttStart)`, stamped when the server sent the PING (`:2690`, `:2801`) |
+
+and it is floored at **1 nanosecond**, so it is never reported as zero once set (`:2262–2267`).
+
+**How often it refreshes is the part that decides whether the number is usable:**
+
+| connection kind | refresh |
+|---|---|
+| route, gateway, spoke leafnode | pinged on **every ping-timer tick** — default `2m` |
+| **client** | only when `rtt == 0` or **more than an hour** has passed (`DEFAULT_RTT_MEASUREMENT_INTERVAL = time.Hour`, `const.go:224`, used at `client.go:5844`) |
+| **MQTT** | **never** — `sendRTTPingLocked` returns false for MQTT connections (`client.go:2671–2673`), see [[mqtt]] |
+
+So a busy client's `/connz` `rtt` is the **connect-time estimate, then refreshed roughly hourly**. A
+maintainer's public answer — "periodic PING/PONG response times", "on initial setup of a connection and
+periodically as the connection ages" — is correct and omits the period; the reporter who then said "I
+don't see these values getting updated, even if we wait minutes" was right, and never got a reply
+([[s-gh-7362-routez-connz-rtt]]).
+
+**Practical consequences.** Do not read a client's `rtt` as current network latency, and do not chase a
+high one on a long-lived connection — force a fresh measurement with a new connection instead.
+`/routez` `rtt` *is* fresh to within the ping interval, which is why a climbing route `rtt` is a
+meaningful signal and a client one may not be.
+
+### The events the endpoints cannot give you
+
+Everything above is a **level you poll**. Two kinds of thing never appear in a scrape, because they are
+moments rather than levels (source: [[s-docs-monitoring-advisories-and-events]]):
+
+| pushed on | carries |
+|---|---|
+| `$JS.EVENT.ADVISORY.>` | JetStream advisories — max-deliveries, nak, leader-elected, quorum-lost ([[advisories]]) |
+| `$SYS.ACCOUNT.<account>.CONNECT` / `.DISCONNECT` | one message per client connect and disconnect, the account baked into the subject |
+| `$SYS.SERVER.<id>.STATSZ` | a periodic heartbeat carrying "the same kind of summary numbers as `/varz`, pushed instead of pulled" |
+
+`$SYS.ACCOUNT.*.CONNECT` is the push equivalent of polling `/connz` on a timer, and `STATSZ` of polling
+`/varz`. Both are published into the **system account**, so subscribing needs a system user, not the
+application account. Advisories are published **once** and stored nowhere — capture them in a stream if
+you need them after the fact.
+
+### The `/jsz` numbers that actually say "behind"
+
+`/jsz` counts streams and consumers; whether a consumer is *keeping up* comes from its state, and lag
+is arithmetic over two fields (source: [[s-docs-monitoring-jetstream-health]]):
+
+```
+lag = stream.last_seq − consumer.delivered.stream_seq
+```
+
+reported directly as **`num_pending`**. Read it beside `num_ack_pending` (in-flight) and `num_waiting`
+(outstanding pulls) — the three move for different reasons, and the combination
+`num_pending` climbing · `num_waiting` at 0 · `delivered.stream_seq` flat is the signature of a
+**crashed consumer pool** rather than a busy one. [[stream-has-high-message-lag]] has the full
+diagnostic; [[consumer]] has the field table.
+
+### `$SYS.REQ.SERVER.PING.PROFILEZ` — profiling without a restart
+
+The `$SYS` request behind `nats server request profile <heap|allocs|goroutine|cpu>`, which needs a
+system-account connection and no configuration change. Each answering server writes
+`<profile>-<timestamp>-<server>`; `--name`, `--host`, `--cluster` and `--tags` narrow who answers.
+**CPU sampling is capped at 15 seconds** on this route — the CLI reuses `--timeout` as the window,
+default `5s` — and a longer capture needs `prof_port`, which is **not reloadable** and has **no
+authentication** (source: [[s-docs-monitoring-profiling]]). Prefer the `$SYS` route; it is
+authenticated like any other `$SYS` request. See [[jetstream-sizing]].
+
 
 ## The two stall counters
 
@@ -356,6 +454,23 @@ curl -s localhost:8222/jsz | jq '{storage, reserved_storage, max: .config.max_st
 default), which is the cadence on which block compaction and the `index.db` snapshot run.
 
 
+## MQTT-aware fields
+
+The monitoring port knows about MQTT connections, which is the tool for a client-ID collision
+(source: [[s-docs-mqtt-auth-and-clustering]]).
+
+| where | field |
+|---|---|
+| `/connz?mqtt_client=truck-17` | filter connections by MQTT client id |
+| `/connz` connection record | `mqtt_client`, the client id holding that session |
+| `/varz` | an `mqtt` section with the listener's resolved settings, including the JetStream domain in use |
+
+Two log lines are worth grepping for alongside them, both confirmed on 2.14.6 (source:
+[[s-nats-server-mqtt-websocket-observed]]): `Listening for MQTT clients on mqtt://…`, whose **absence**
+means the `mqtt {}` block set no port; and
+`Creating MQTT streams/consumers with replicas N for account "…"`, which is the only place the server
+states the replica count it derived for MQTT state — see [[mqtt]].
+
 ## Related
 
 [[slow-consumer-detected]] · [[raft-in-nats]] · [[jetstream-sizing]] · [[js-api]] ·
@@ -366,4 +481,8 @@ default), which is the cadence on which block compaction and the `index.db` snap
 
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] · [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] · [[s-docs-putting-it-together]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-nats-server-filestore-layout]] ·
 [[s-docs-hardening]] ·
-[[s-docs-accounts-and-multitenancy]] · [[s-docs-encryption-and-tls]] · [[s-docs-kubernetes]] · [[s-docs-mirrors-as-dr]] · [[s-docs-prometheus-and-dashboards]] · [[s-docs-single-server]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7190-asymmetric-cluster]] · [[s-nats-server-tls-reload]]
+[[s-docs-accounts-and-multitenancy]] · [[s-docs-encryption-and-tls]] · [[s-docs-kubernetes]] · [[s-docs-mirrors-as-dr]] · [[s-docs-prometheus-and-dashboards]] · [[s-docs-single-server]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7190-asymmetric-cluster]] · [[s-nats-server-tls-reload]] ·
+[[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]] ·
+[[s-nats-server-monitoring-observed]] · [[s-gh-7362-routez-connz-rtt]] ·
+[[s-gh-7483-varz-cpu-in-containers]] · [[s-docs-monitoring-profiling]] ·
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]]

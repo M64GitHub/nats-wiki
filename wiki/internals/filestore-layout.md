@@ -6,7 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [filestore, block-size, index.db, tombstone, compaction, disk, sizing, psim, o.dat]
 aliases: [filestore, file store, blocks, blk, msg blocks, index.db, on-disk layout, storage overhead, bytes per message]
-sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources]
+sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources,
+  s-nats-server-object-store-observed, s-docs-object-store-chunking,
+  s-docs-object-store-under-the-hood]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -131,6 +133,33 @@ new messages arrive to roll a block behind it.
 block is started holding a single tombstone carrying the sequence floor. Measured: 1,340,150 bytes →
 30.
 
+**Whole-block removal is why a bulk delete feels instant, and the last-block guard is why it is not
+quite.** Deleting a 200 MiB object from an object-store bucket on 2.14.6 — 1,600 chunk messages
+purged in one operation — took the stream directory from **204,912 KB to 3,212 KB at the call**, and
+left it there through samples at 2, 10, 30 and 60 seconds. The residue was a single 3,279,785-byte
+`.blk`: the last block, which neither compaction path will touch. This is the mechanism behind a
+warning the docs give qualitatively — that after a delete "the on-disk space is reclaimed as the
+stream cleans up, not synchronously at the call" (source: [[s-docs-object-store-under-the-hood]]) —
+and the measurement narrows it: the part that is *not* synchronous is one block, not the object. So **98.4 % of the bytes returned
+synchronously**, and what lingered was bounded by one block rather than by the size of what was
+deleted (source: [[s-nats-server-object-store-observed]]). On a second bucket the residue was two
+blocks (13,460 KB), still present at +5 s and down to 4,760 KB when sampled roughly four minutes later
+with no other activity — the trailing blocks do go, on the sync path, once a block rolls behind them.
+
+The operator-facing version of this is on [[object-store]]: size an object bucket for one block of
+residue after a delete, not for the object.
+
+### Per-message overhead at object-store chunk sizes
+
+The record overhead here is what makes a chunk size choice a storage decision. At the object store's
+**128 KiB** default a 200 MiB object occupied **204,912 KB on disk for 209,819,520 bytes of payload —
+about 2.4 %**, because only 1,601 messages carry it. Halving the chunk size doubles the message count
+and doubles that share; the docs page that raises per-message overhead as a reason not to shrink the
+chunk size never states a figure, which is why this one is measured here (source:
+[[s-nats-server-object-store-observed]], and [[s-docs-object-store-chunking]] for the claim it
+quantifies). The arithmetic is the record format above: every chunk pays the same fixed record cost
+whatever its payload.
+
 ### `index.db`, the full-state snapshot
 
 Written by `flushStreamStateLoop` every **2 minutes plus up to 30 seconds of jitter**, and forced on
@@ -221,8 +250,8 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
 ## Related
 
 [[jetstream-sizing]] · [[stream]] · [[stream-compression]] · [[jetstream-out-of-disk]] ·
-[[key-value]] · [[consumer]] · [[ack-and-redelivery]] · [[monitoring-endpoints]] ·
-[[defaults-and-limits]] · [[retention-policies]]
+[[key-value]] · [[object-store]] · [[consumer]] · [[ack-and-redelivery]] ·
+[[monitoring-endpoints]] · [[defaults-and-limits]] · [[retention-policies]]
 
 ## Sources
 
@@ -230,3 +259,9 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
   v2.14.6, plus eleven runs on the v2.14.6 binary.
 - [[s-adr-35-filestore-compression]] — what compression does to the blocks described here.
 - [[s-nats-server-jetstream-resources]] — what `max_file_store` and the account quota compare.
+- [[s-nats-server-object-store-observed]] — the bulk-delete and per-chunk overhead measurements,
+  taken on an object-store bucket because it is the easiest way to make 1,600 uniform messages.
+- [[s-docs-object-store-chunking]] — the docs' unquantified per-message-overhead claim these
+  numbers answer.
+- [[s-docs-object-store-under-the-hood]] — the qualitative disk-reclamation warning the bulk-delete
+  measurement narrows.

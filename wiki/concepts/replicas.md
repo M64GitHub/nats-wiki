@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -232,6 +232,27 @@ Two constraints to read alongside them:
   replica count — [[multi-region-jetstream]].
 
 
+## One replica count nobody sets: MQTT's
+
+[[mqtt]] state lives in five streams the server creates for itself, and their `num_replicas` is
+**derived, not defaulted**: with `mqtt.stream_replicas` unset the server counts the addresses in its
+own `routes` list and clamps the result to 1–3.
+
+That is the number of routes **written in the config**, not the size of the cluster. Confirmed on
+2.14.6: a genuine three-node cluster (`/jsz?meta=1` reporting `cluster_size: 3`) whose node listed its
+two peers created all five MQTT streams at **R=2** — survivable for one node loss, and not what a
+three-node cluster implies. Setting `mqtt { stream_replicas: 3 }` on the same node gave R=3 (sources:
+[[s-docs-mqtt-auth-and-clustering]], [[s-nats-server-mqtt-websocket-observed]]).
+
+The server states what it chose, once, at the point the streams are created:
+
+```
+[INF] Creating MQTT streams/consumers with replicas 2 for account "$G"
+```
+
+Ask for more than the cluster has peers and the streams are never created, which surfaces as MQTT
+clients unable to connect — [[no-suitable-peers-for-placement]].
+
 ## Related
 
 [[stream]] · [[consumer]] · [[raft-in-nats]] · [[stream-placement]] · [[retention-policies]] ·
@@ -242,4 +263,5 @@ Two constraints to read alongside them:
 
 [[s-docs-surviving-node-loss]] · [[s-docs-replication-and-r3]] · [[s-docs-stream-config]] ·
 [[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-as-dr]] · [[s-docs-jetstream-in-a-cluster]] ·
-[[s-docs-single-server]] · [[s-docs-disaster-recovery]] · [[s-k8s-760-jetstream-pvc-per-replica]]
+[[s-docs-single-server]] · [[s-docs-disaster-recovery]] · [[s-k8s-760-jetstream-pvc-per-replica]] ·
+[[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]]

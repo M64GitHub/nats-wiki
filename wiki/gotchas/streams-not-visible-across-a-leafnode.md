@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [leafnode, jetstream-domain, system-account, extending-jetstream, verify_and_map, mapping]
 aliases: ["JetStream using domains", "JetStream not extended domains differ", "leafnode streams not visible", "extending JetStream", "js-domain"]
-sources: [s-gh-7834-leafnode-same-js-domain, s-nats-server-leafnode-js-domains, s-gh-5859-unexpected-nats-timeout, s-docs-accounts-and-multitenancy]
+sources: [s-gh-7834-leafnode-same-js-domain, s-nats-server-leafnode-js-domains, s-gh-5859-unexpected-nats-timeout, s-docs-accounts-and-multitenancy, s-nats-server-object-store-leafnode]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -60,6 +60,14 @@ So:
 | **any other account** | different | denied, plus the cross-domain mapping. Log: `JetStream using domains: local "…", remote "…"` |
 
 (source: [[s-nats-server-leafnode-js-domains]], `leafnode.go:2063–2110`, v2.14.6)
+
+**"Denied" means those four subject spaces, and the object store is not one of them.** An object
+bucket lives on `$O.<bucket>.C.>` and `$O.<bucket>.M.>`; the deny list says `$OBJ.>`, which matches
+neither. Measured on 2.14.6 across the fourth row's configuration, `$O.…` publishes crossed the link
+while `$KV.…` and `$OBJ.…` did not, and a same-named object bucket on both sides ended up holding the
+same object (source: [[s-nats-server-object-store-leafnode]]). If your symptom is the **opposite** of
+this page's — an object appearing on a server where nobody put it — that is the reason, and it is on
+[[object-store]].
 
 **The third row is the one people land on.** Setting the same `domain` on both ends looks like the
 way to join two JetStreams. It is not; without the system account on that connection, it is just two
@@ -188,3 +196,5 @@ to the cluster is lost?" — is the right question, and the wiki does not yet ha
 - [[s-gh-5859-unexpected-nats-timeout]] — an independent log showing
   `JetStream using domains: local "", remote "myjsdomain"` per leafnode connection.
 - [[s-docs-accounts-and-multitenancy]] — what `$SYS` is and why it is the account that crosses.
+- [[s-nats-server-object-store-leafnode]] — the deny list's `$OBJ.>` against the object store's
+  actual `$O.` prefix, run on a hub/leaf pair at v2.14.6.

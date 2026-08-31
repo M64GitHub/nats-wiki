@@ -29,7 +29,7 @@ and the docs tree fetched **2026-08-31**. Where a row says *observed*, the behav
 v2.14.6 binary**, not only read from the source at that tag; the configs and output are in
 `raw/nats-server-src/topology-observed-v2.14.6.md` and, for rows 30–31,
 `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`; for row 33,
-`raw/nats-server-src/filestore-observed-v2.14.6.md`. Row 34 was found while working step 1 of `inbox/plan-the-unread-chapters-2026-08-31.md` — the question-bank row **Q97** run on the binary rather than read — and its evidence is in `raw/nats-server-src/tls-reload-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
+`raw/nats-server-src/filestore-observed-v2.14.6.md`. Row 34 was found while working step 1 of `inbox/plan-the-unread-chapters-2026-08-31.md` — the question-bank row **Q97** run on the binary rather than read — and its evidence is in `raw/nats-server-src/tls-reload-observed-v2.14.6.md`. Row 35 was found while working step 4 of the same plan (the `learn/object-store` chapter): reading the leafnode deny lists next to the object store's real subject spaces raised the question, and a hub/leaf pair on the v2.14.6 binary settled it — `raw/nats-server-src/object-store-across-leafnode-observed-v2.14.6.md`, with the chapter's own claims checked in `raw/nats-server-src/object-store-observed-v2.14.6.md`. Row 36 was found while working step 6 of the same plan (`learn/monitoring`), and its evidence — including a **wire capture that upgrades row 1 from a source constant to an observed subject** — is in `raw/nats-server-src/monitoring-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
 the client repository at its current release plus the package registry, not the server — stated per
 row.
 
@@ -69,6 +69,8 @@ row.
 | 32 | Every `unsigned 64 bit integer` field in the generated JetStream reference publishes `Maximum: 18446744073709552000` — **385 more than uint64 can hold**, and a value the server cannot accept. 11 pages, all of them | `reference/jetstream/api/*`, `reference/jetstream/advisory/*`, `reference/jetstream/metric/consumer-ack.md` | wrong-value | low | wiki quotes no maximum from these pages |
 | 33 | The sizing chapter tells operators to pin `max_file_store` to the volume size, and never says that **every JetStream storage figure is logical, not physical** — a server set to `max_file_store: 4MB` was measured holding 3.79 MB on disk while reporting 133,000 bytes used. The per-message record overhead (`30 + len(subject)`) is also stated nowhere in the tree | `learn/deployment/sizing-and-resources.md`, `reference/config/jetstream/max_file_store.md` | missing | ★ high | wiki states the arithmetic and the slack, observed |
 | 34 | Six leafnode-remote TLS keys carry a bug note scoped to "2.11/2.12" and never say whether it still applies; on **2.14.6** `cert_file`, `key_file` and `ca_file` all reload correctly, so the note now reads as a standing warning against the supported rotation procedure | `reference/config/leafnodes/remotes/tls/cert_file.md` + 5 siblings | enhancement | medium | wiki states the observed 2.14.6 behaviour and names the three keys it did not test |
+| 35 | No page anywhere in the docs states what happens to **KV and Object Store subjects across a JetStream domain boundary** — and the two behave differently: the server's leafnode deny list blocks `$KV.>` but names `$OBJ.>`, which does not match the object store's actual `$O.` prefix, so object data crosses and same-named buckets converge | `learn/topologies/leaf-nodes.md`; `learn/object-store/under-the-hood.md`; `learn/key-value/under-the-hood.md` | missing | high | wiki states the observed 2.14.6 behaviour on four pages and flags the defect question as open |
+| 36 | The advisories chapter's own diagram caption drops `.CONSUMER.` from the max-deliveries advisory subject — `$JS.EVENT.ADVISORY.MAX_DELIVERIES.ORDERS.shipping`, three times — while the prose on the same page has it right; a subscription copied from the caption receives nothing | `learn/monitoring/advisories-and-events.md` | wrong-value | low | wiki states the observed subject and notes the page contradicts itself |
 
 ---
 
@@ -1650,6 +1652,130 @@ mention that it is also the compaction cadence.
 
 ---
 
+## 36 · The advisories chapter's diagram contradicts its own prose
+
+**Impact: small but silent.** A reader who copies the subject out of the page's diagram gets a
+subscription that matches nothing, with no error — the same failure mode as issue #1, from the same
+family of advisory-subject errors, in the hand-written tree rather than the generated one.
+
+**What the docs say.** The prose of `learn/monitoring/advisories-and-events.md` is **correct**:
+
+> "When a message on the `shipping` consumer exhausts its delivery attempts, the server publishes one
+> advisory here: `$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.ORDERS.shipping`"
+
+The animation caption on the same page drops `.CONSUMER.`, three times:
+
+> "publishes one advisory on $JS.EVENT.ADVISORY.MAX\_DELIVERIES.ORDERS.shipping"
+>
+> "* n2-east JetStream → $JS.EVENT.ADVISORY…\nMAX\_DELIVERIES.ORDERS.shipping"
+>
+> "* $JS.EVENT.ADVISORY…\nMAX\_DELIVERIES.ORDERS.shipping → monitor"
+
+**What the server does.** `server/jetstream_api.go:241` at v2.14.6:
+
+```go
+JSAdvisoryConsumerMaxDeliveryExceedPre = "$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES"
+```
+
+**Verified on the wire**, not only from the constant. A pull consumer with `--max-deliver 2 --wait 1s`
+was fetched repeatedly with `--no-ack` while `nats sub '$JS.EVENT.ADVISORY.>'` was attached
+(`raw/nats-server-src/monitoring-observed-v2.14.6.md`):
+
+```
+[#4] Received on "$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.ORDERS.shipping"
+{"type":"io.nats.jetstream.advisory.v1.max_deliver","id":"9lWb25w5SokA1gpeK2wgeB",
+ "timestamp":"2026-08-31T22:39:02.825838Z","stream":"ORDERS","consumer":"shipping",
+ "stream_seq":1,"deliveries":2}
+```
+
+**Suggested fix:** correct the three occurrences in the diagram caption to match the prose.
+
+**Two smaller things found in the same run**, neither filed as its own row:
+
+- The page's example advisory body shows `{type, stream, consumer, stream_seq, deliveries}`; the wire
+  also carries **`id`** (a NUID) and **`timestamp`** (RFC 3339). The example is abridged rather than
+  wrong, so this is a note, not a defect.
+- `$JS.EVENT.ADVISORY.API` fires for ordinary API calls — creating one stream and two consumers
+  produced three of them before the first interesting advisory. The chapter's
+  `nats subscribe '$JS.EVENT.ADVISORY.>'` example is therefore noisier in practice than it reads.
+
+**Why this is `low` and not `★`.** The correct subject is on the same page, in prose, immediately
+above the diagram. A reader who reads the page rather than only the picture gets the right value.
+
+## 35 · The docs never say what a JetStream domain does to KV and Object Store — and it does different things to each
+
+**Impact: an operator who reads "a domain isolates JetStream" and runs object buckets on both sides of
+a leafnode gets objects appearing on servers nobody put them on.** The put succeeds normally, nothing
+is logged on either side, and the two buckets converge silently. The KV equivalent is genuinely
+isolated, so the mental model an operator builds from the KV case is wrong for the object case.
+
+**What the docs say.** Nothing. `learn/topologies/leaf-nodes.md` covers leafnodes and domains and does
+not mention either store. `learn/object-store/under-the-hood.md` sends the reader to Security for
+"exporting the bucket to another account" and never mentions domains or leafnodes.
+`learn/key-value/under-the-hood.md` is the same. **`grep -rn '\$OBJ' raw/nats-docs/` returns nothing**
+— the prefix the server denies on does not appear anywhere in the 861-page tree.
+
+**What the server does.** `server/jetstream_api.go:323–324` at v2.14.6:
+
+```go
+var denyAllClientJs = []string{jsAllAPI, "$KV.>", "$OBJ.>"}
+var denyAllJs = []string{jscAllSubj, raftAllSubj, jsAllAPI, "$KV.>", "$OBJ.>"}
+```
+
+and the domain mapping table at `:347` carries `"$OBJ.>": "$OBJ.>"`.
+
+But the object store's subject spaces are **`$O.<bucket>.C.>`** and **`$O.<bucket>.M.>`** — ADR-20,
+`learn/object-store/under-the-hood.md`, and `nats stream info OBJ_INVOICES` on the running 2.14.6
+server all agree. `$OBJ.>` is a literal first token and matches none of them.
+
+**Verified by running it** (`raw/nats-server-src/object-store-across-leafnode-observed-v2.14.6.md`) —
+a hub and a leaf with domains `hub` and `leaf`, joined in a non-system account, the branch that logs
+`JetStream using domains: local "leaf", remote "hub"` and merges `denyAllClientJs` both ways:
+
+| published on the leaf | reached the hub? |
+|---|---|
+| `plain.subject` | yes — ordinary account traffic (connectivity control) |
+| `$KV.TEST.key1` | **no** — matches `$KV.>` |
+| `$OBJ.TEST.thing` | **no** — matches `$OBJ.>` |
+| `$O.TEST.C.abc` | **yes** |
+| `$O.TEST.M.abc` | **yes** |
+
+With an object bucket `SHARED` created on *each* server in the same account, one 600 KiB
+`nats object put` **on the leaf only**:
+
+| | leaf `OBJ_SHARED` | hub `OBJ_SHARED` |
+|---|---|---|
+| before | 0 msgs / 0 bytes | 0 msgs / 0 bytes |
+| after | 6 msgs / 615,040 bytes | **6 msgs / 615,040 bytes** |
+
+`nats object ls SHARED` on the hub then listed `payload.bin  600 KiB`, and `nats stream subjects`
+showed both `$O.SHARED.M.cGF5bG9hZC5iaW4=` and `$O.SHARED.C.kVUgvDAOdPXVz64dqECKBD` — a complete,
+gettable object on a server that was never asked to store it.
+
+The KV control, same servers and account: `kv put CONF k1` on the leaf left the hub's `KV_CONF` at
+**0 msgs**, and `nats kv get CONF k1` on the hub returned `nats: error: nats: key not found`.
+
+**Suggested fix**, in order of what the docs can do without waiting on the server:
+
+1. **State the rule at all.** `learn/topologies/leaf-nodes.md` should say what a differing domain does
+   to each of the four subject spaces — `$JS.API.>`, `$KV.>`, `$O.`, and the Raft/cluster subjects —
+   rather than leaving "JetStream is isolated" to be generalised by the reader.
+2. **Say that object-store data is not covered**, and give the `deny_exports` / `deny_imports` entry
+   for `$O.>` as the mitigation, until the server changes.
+3. **Reconcile `$OBJ` and `$O.`**. If `$OBJ.>` in the deny list is meant to be the object store, this
+   is a server defect and the fix is `$O.>`; if it is a legacy or reserved prefix, the docs should say
+   what uses it, because today nothing public does.
+
+**What is not established**, and is deliberately not asserted here: whether the mismatch is a defect
+or an intended asymmetry. No public issue, discussion or ADR read so far mentions `$OBJ` against
+`$O.`. The source comment at `jetstream_api.go:330–337` explains why `$KV` and `$OBJ` were made
+independent subject spaces but never says which prefix the object store uses. **The documentation gap
+is unambiguous and is what this entry reports**; the defect question is worth filing upstream
+separately, with the reproduction above.
+
+**Not tested**: the same-domain case, the system-account (`denyAllJs`) case, gateways, and clients
+other than the `nats` CLI.
+
 ## 34 · Six leafnode-remote TLS keys warn about a bug without saying which releases still have it
 
 **Impact: an operator reading the reference concludes a leaf's certificate cannot be rotated without
@@ -1758,3 +1884,5 @@ no caveat at all.
 | 32 | nowhere — the wiki quotes no maximum from these pages; recorded here so the generator bug is reported |
 | 33 | `wiki/internals/filestore-layout.md`; `wiki/operations/jetstream-sizing.md` — *Step 1* and *Step 1b*; `wiki/gotchas/jetstream-out-of-disk.md` — *The volume can fill while every JetStream number says there is room*; `wiki/reference/monitoring-endpoints.md` — *`storage` is a logical figure, not disk*; `wiki/operations/kubernetes-storage.md` — *Set `max_file_store` below the volume size*; `wiki/gotchas/jetstream-out-of-disk.md` — *Prevention* |
 | 34 | `wiki/concepts/leafnode.md` — *Rotating a remote's certificate*; `wiki/operations/rotate-tls-certificates.md` — *Settled by running it* and step 4; `wiki/summaries/s-nats-server-tls-reload.md` |
+| 35 | `wiki/concepts/object-store.md` — *A bucket is not isolated by a JetStream domain*; `wiki/concepts/jetstream-domain.md`; `wiki/concepts/leafnode.md` — *Limits and failure modes*; `wiki/gotchas/streams-not-visible-across-a-leafnode.md`; `wiki/summaries/s-nats-server-object-store-leafnode.md` |
+| 36 | `wiki/reference/advisories.md` — *A docs error worth knowing*; `wiki/summaries/s-docs-monitoring-advisories-and-events.md` |

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -232,6 +232,30 @@ With the defaults there is room — **1 MB against 64 MB** ([[defaults-and-limit
 the server logs a startup warning and keeps running: it is a warning threshold, not a limit, and the
 constant's comment flags that a future version may start rejecting.
 
+### Step 6 — if it is an object bucket, size it in messages first
+
+An [[object-store]] bucket is a stream and every step above applies to it, but the input changes: you
+do not know the message count from the message rate, you derive it from the **chunk size**.
+
+```
+messages = ceil(object_bytes / chunk_size) + 1        # +1 for the metadata message, per object
+```
+
+At the **128 KiB** default (source: [[s-docs-object-store-chunking]]) a 1 GiB object is **8,192 chunk
+messages**; a 200 MiB object is 1,600. Two things follow that catch people out:
+
+- **`max_msgs` on the backing stream counts chunks, not objects.** A `max_msgs` chosen for "how many
+  files should this bucket hold" is off by three or four orders of magnitude.
+- **The per-message overhead is a function of the chunk size you picked**, not of the data. Measured
+  at the default on 2.14.6, a 200 MiB object occupied 204,912 KB on disk — about **2.4 %**. Halve the
+  chunk size and that share doubles (source: [[s-nats-server-object-store-observed]];
+  [[filestore-layout]] has the record arithmetic).
+
+Two more figures for the disk budget. `discard: new` on an object bucket means a full bucket
+**rejects puts** rather than making room, so the volume headroom in Step 4 is not optional here. And
+after deleting a large object, expect **one trailing block** of residue rather than a slow drain: a
+200 MiB delete returned 98.4 % of the bytes at the call and left a single 3.2 MB block.
+
 ## Sizing RAM
 
 The docs' sizing page covers storage; it does not say what JetStream holds in memory. Four things
@@ -256,7 +280,53 @@ The levers, in the order Synadia gives them:
 - **Fewer subjects per stream** where the design allows.
 - **Prefer long-lived consumers**; short-lived ones cost more memory.
 - **Keep meta leadership off nodes carrying high-volume streams.**
-- If none of that explains it, **profile with Go's `pprof`**.
+- If none of that explains it, **profile with Go's `pprof`** — the method is below.
+
+#### Profiling, when none of the above explains it
+
+That pointer had no instructions attached for five plans. It does now (source:
+[[s-docs-monitoring-profiling]]).
+
+**Start with the system-account route**: it needs no config change and no restart, which matters
+mid-incident when a restart destroys the state you are chasing.
+
+```
+nats server request profile heap --name=n1-east      # writes heap-<timestamp>-n1-east
+nats server request profile goroutine --cluster=east
+```
+
+The request travels on `$SYS.REQ.SERVER.PING.PROFILEZ`, so the context must be connected to the
+**system account** — a normal account has no permission on `$SYS` and the request simply gets no
+replies ([[monitoring-endpoints]]). `--name`, `--host`, `--cluster` and `--tags` narrow who answers,
+which matters on a large cluster.
+
+| profile | ask for it when |
+|---|---|
+| `heap` | memory is growing and you want to know what still **holds** it |
+| `allocs` | memory **churn** — what allocates most, freed or not |
+| `goroutine` | the server looks stuck, or its goroutine count climbs |
+| `cpu` | a node is pinning a core |
+
+**CPU sampling is capped at 15 seconds on this route.** The CLI reuses the global `--timeout` as the
+window (default `5s`); ask for longer and the server returns an error instead of a profile.
+
+**A longer window needs `prof_port`, and it has two real costs.** It is **not reloadable**, so turning
+it on is a rolling restart; and it has **no authentication** and binds to the same `host` as the client
+port — default `0.0.0.0`, with no separate profiling host to narrow. A goroutine dump exposes subjects
+and internal state, so leave `prof_port` unset in production or firewall it
+([[install-nats-server]] covers the systemd hardening; the firewall rules are yours). Block profiling additionally needs `prof_block_rate` above zero — that one
+*is* reloadable, so raise it, take the profile, and drop it back.
+
+Read the result with `go tool pprof -top <file>`, or `go tool pprof -http=:8080 <file>` for the flame
+graph. If you are collecting it for someone else, send the file as it is.
+
+#### Reading `/varz` `cpu` while you size
+
+One number to get right before setting any CPU threshold: **`cpu` in `/varz` is a percentage of one
+core**, not of the host and not of a container's allocation, so `cpu: 250` is two and a half cores
+(source: [[s-nats-server-monitoring-observed]]). The 20–30 % headroom rule above is therefore a
+fraction of the **allocation**, and on a container `cores` reports the host's logical CPUs rather than
+the quota. [[monitoring-endpoints]] has the derivation.
 
 ### Consumers are a cluster-wide budget
 
@@ -508,7 +578,7 @@ wiki could contain.
 
 [[replicas]] · [[stream]] · [[consumer]] · [[raft-in-nats]] · [[filestore-layout]] ·
 [[monitoring-endpoints]] · [[jetstream-out-of-disk]] · [[config-keys]] · [[defaults-and-limits]] ·
-[[jetstream-slows-as-consumers-grow]]
+[[jetstream-slows-as-consumers-grow]] · [[object-store]]
 
 ## Sources
 
@@ -520,4 +590,7 @@ wiki could contain.
 [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-35-filestore-compression]] ·
 [[s-nats-server-systemd-units]] · [[s-nats-server-filestore-layout]] ·
 [[s-nats-helm-chart-values-2.14.6]] · [[s-gh-7749-hostpath-jetstream]] ·
-[[s-k8s-760-jetstream-pvc-per-replica]] · [[s-docs-shaping-the-stream]]
+[[s-k8s-760-jetstream-pvc-per-replica]] · [[s-docs-shaping-the-stream]] ·
+[[s-nats-server-object-store-observed]] · [[s-docs-object-store-chunking]] ·
+[[s-docs-monitoring-profiling]] · [[s-gh-7483-varz-cpu-in-containers]] ·
+[[s-nats-server-monitoring-observed]]

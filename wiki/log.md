@@ -1818,3 +1818,358 @@ TTL and the lock never expires again.** The composition is marked as this wiki's
 a result in itself — the ADR-derived table is correct against the docs — and the page's real
 contributions were the three things above plus the literal direct-get subject,
 `$JS.API.DIRECT.GET.KV_INVENTORY.$KV.INVENTORY.widget-blue`, now on [[direct-get]].
+
+## 2026-08-31 — unread-chapters plan step 4: `learn/object-store`, and a leak found by reading it
+
+**Operation:** plan step 4 — ingest the five `learn/object-store` articles (`where-next.md` skipped as
+a recap, though its production checklist supplied `ErrNoObjectsFound`). Then two things the plan did
+not ask for and the reading demanded: **Q75 run on the binary** because no public source answers it,
+and a **leafnode leak** found by reading the server's JetStream deny list next to the object store's
+real subject spaces.
+
+**Sources:** `raw/nats-docs/learn/object-store/{your-first-object,chunking,metadata-and-links,watching-and-listing,under-the-hood}.md`;
+`raw/gh-discussions/gh-6836.md` (new); `raw/nats-server-src/object-store-observed-v2.14.6.md` (new,
+nine experiments); `raw/nats-server-src/object-store-across-leafnode-observed-v2.14.6.md` (new, four
+experiments). Both raw runs are on **nats-server v2.14.6** with **nats CLI 0.4.0**, matching
+`verified-against`.
+
+**Summaries created (8, at the step's cap):** `s-docs-object-store-your-first-object`,
+`s-docs-object-store-chunking`, `s-docs-object-store-metadata-and-links`,
+`s-docs-object-store-watching-and-listing`, `s-docs-object-store-under-the-hood`,
+`s-gh-6836-object-store-list-slow`, `s-nats-server-object-store-observed`,
+`s-nats-server-object-store-leafnode`.
+
+**Page created:** [[object-store-list-is-slow]] (gotcha).
+
+**Pages updated:** [[object-store]] (substantially — six new sections), [[filestore-layout]],
+[[jetstream-sizing]] (new *Step 6*), [[js-api-subjects]], [[defaults-and-limits]] (new *Key-Value and
+Object Store* section), [[subject-permissions]], [[key-value]], [[cross-account-sharing]],
+[[jetstream-domain]], [[leafnode]], [[streams-not-visible-across-a-leafnode]], `wiki/index.md`,
+`raw/sources.md`.
+
+**Numbers.** Bank: 105 rows (was 104), **77 answered** (was 76), ★ **42 of 42** unchanged.
+Unlanded ripples **206 → 205** (peaked at 211 mid-step, from the new summaries' own `## Pages
+touched`); citation drift 0 → 0; lint clean; **233 → 242 pages**. `inbox/docs-issues.md` **34 → 35**.
+
+**Rows closed: Q75** ([[object-store-list-is-slow]]) and the object-store half of **Q73**
+([[object-store]] joins [[key-value]]). **Row added: Q105**, open.
+
+### Q75 had no public answer, so it was measured
+
+`learn/object-store/watching-and-listing.md` is the page the plan named for this row. Read for it, it
+is a **negative result**: it says "a list is cheap: it reads metadata, never chunks" and never
+mentions concurrency, contention or latency. And gh#6836 — the only public report — has **one comment,
+by the asker, and no reply from anyone else** since 2025-04-25. So the row was settled on the binary:
+
+- **Object count is nearly free.** 200 objects list in 0.027–0.034 s, 5,000 in 0.044–0.046 s — 25× the
+  objects for 1.6× the time. The obvious hypothesis is wrong, and saying so is half the answer.
+- **The effect has two separable layers.** Under a sustained upload, core NATS RTT moves +4 %; every
+  JetStream call pays a flat **server-wide +27–35 %** (an *unrelated* stream's `stream info` slows
+  exactly as much as the busy one's); and on top of that, **only on the bucket being written to**,
+  list latency runs **2× to 6.9×** and becomes jittery.
+- **The mechanism, traced on `$JS.API.>`:** one `nats object ls` is four API calls, the third an
+  **ephemeral `last_per_subject` push consumer created and destroyed on every call**. That also went
+  onto [[js-api-subjects]], with the ACL consequence — a grant of `$O.<bucket>.M.>` alone lets a
+  client *watch* but not *list*.
+- **A negative result kept deliberately:** `--timeout` does not bound the whole operation.
+  `nats object ls --timeout=1ms` completed successfully. The reporter's `>5 s` is the CLI's `5s`
+  default hitting one of the four round trips, not the listing running long.
+
+### The chapter's claims, checked rather than repeated
+
+Everything [[object-store]] carried from ADR-20 alone was confirmed on the running server, and three
+things gained numbers the docs never give:
+
+- **The default chunk size is exactly 128 KiB**, not "roughly": 3,145,728 bytes → exactly 24 chunks.
+- **The disk-reclamation pitfall is overstated.** The docs warn that space after a delete "is
+  reclaimed as the stream cleans up, not synchronously at the call". Measured: a 200 MiB delete took
+  the stream directory from 204,912 KB to **3,212 KB at the call** and held there through +60 s.
+  **98.4 % is synchronous**; the residue is one trailing block — which [[filestore-layout]] already
+  explains, because neither compaction path touches the last block. Both pages now say so.
+- **Per-message overhead has a figure at last.** `chunking.md` is the one page in the docs tree that
+  raises it and it states no number; at the 128 KiB default it is about **2.4 %**. On
+  [[filestore-layout]] and in [[jetstream-sizing]]'s new *Step 6*.
+
+Also settled: the raw metadata message shows `Nats-Rollup: sub`, the `SHA-256=<base64url>` digest, and
+**`mtime` as the zero time** — the observable proof of ADR-20's "modified time is never stored", which
+the wiki had asserted from the spec alone.
+
+### The finding the plan did not ask for: an object bucket is not isolated by a JetStream domain
+
+Reading `server/jetstream_api.go:323` while writing the chapter's ripple: the leafnode JetStream deny
+list is `["$JS.API.>", "$KV.>", "$OBJ.>"]`. **The object store does not use `$OBJ` — it uses `$O.`**,
+per ADR-20, the docs, and the running server. `$OBJ` appears nowhere in the 861-page docs tree.
+
+Run on a hub/leaf pair with domains `hub` and `leaf` in a non-system account: `$KV.TEST.key1` and
+`$OBJ.TEST.thing` were denied; **`$O.TEST.C.abc` and `$O.TEST.M.abc` crossed.** With a same-named
+object bucket on each side, one 600 KiB put **on the leaf only** left both streams at
+`6 msgs / 615,040 bytes` and the hub listing an object nobody put there — chunks and metadata both, a
+complete gettable object. The KV control in the same account stayed at 0 msgs on the hub; the
+connectivity control confirmed the link was up.
+
+Nothing is logged and the put looks normal. Recorded as **docs issue #35** (the documentation gap is
+unambiguous; whether the `$OBJ`/`$O.` mismatch is a defect or an intended asymmetry is **not**
+established, and the entry says so), and on four pages including the mitigation — a `deny` for `$O.>`
+on the leafnode remote, one of the few cases where [[leafnode]]'s deny-only keys are exactly right
+because there is nothing to allow.
+
+### One strike, named
+
+**`s-docs-object-store-your-first-object` → [[jetstream-sizing]]** was struck from that summary's
+`## Pages touched` at ingest time, with the reason recorded in the summary itself: the page is about
+the put/get contract and the two client error branches and carries no rate, size, count or overhead
+figure. The chunk-count arithmetic sizing actually needs comes from `s-docs-object-store-chunking`,
+which did land there.
+
+### Two `## To verify` items closed, three opened
+
+Closed on [[object-store]]: **Q75** (measured, above) and **chunk-size guidance** — the ADR gives none
+and `chunking.md` does, with both bounds. Opened, honestly: **no source states which nats-server
+version the object store shipped in**, so `since:` is left empty rather than guessed; **links and
+`UpdateMeta` were not run**, because the `nats` CLI has no `link` or `update-meta` subcommand, so those
+claims rest on the docs alone; and **`ErrDigestMismatch` was not observed**.
+
+## 2026-09-01 — unread-chapters plan step 5: `interop`, and fifteen runs to price QoS
+
+**Operation:** plan step 5 — ingest all eight articles of `learn/mqtt` and `learn/websocket`
+(both `where-next.md` pages skipped as recaps, though each supplied facts named below). The chapter
+that answers question-bank row **Q80** describes MQTT's JetStream state in prose and **never names a
+single stream**, so the plan's warning applied and the row was **run on the binary** instead.
+
+**Sources:** `raw/nats-docs/learn/mqtt/{your-first-mqtt-client,topics-and-subjects,qos-sessions-and-retained,auth-and-clustering}.md`;
+`raw/nats-docs/learn/websocket/{your-first-websocket-connection,browsers-and-origins,tls-and-proxies,leaf-nodes-over-websocket}.md`;
+`raw/nats-server-src/mqtt-websocket-observed-v2.14.6.md` (new, fifteen experiments) and
+`raw/nats-server-src/mqtt-probe-client-v3.1.1.py` (new, the instrument).
+
+**Summaries created: 9** — eight doc articles plus one observed run. That is **one over the step's
+~8 cap**, and the overrun is the observed run: the alternative was leaving Q80 answered from prose
+that names nothing, which the plan explicitly warned against.
+
+**Pages created:** [[mqtt]] and [[websocket]] (concepts), [[run-nats-behind-a-proxy]] (runbook,
+`kind: runbook`).
+
+**Pages updated:** [[defaults-and-limits]] (new *Interop* section), [[config-keys]],
+[[subject-permissions]], [[account]], [[operator-mode]], [[tls-in-nats]], [[leafnode]],
+[[reload-server-config]], [[replicas]], [[jetstream-domain]], [[monitoring-endpoints]],
+[[ack-and-redelivery]], [[no-suitable-peers-for-placement]], [[how-clients-reach-a-cluster]],
+`wiki/index.md`.
+
+**Numbers.** Bank: 105 rows, **81 answered** (was 77), ★ **42 of 42**. Unlanded ripples
+**205 → 203** (peaked at 230 mid-step); citation drift 0 → 0; lint clean; **242 → 254 pages**.
+`inbox/docs-issues.md` unchanged at 35 — the chapters were **accurate**, which is itself the result
+below.
+
+**Rows closed: Q79** ([[run-nats-behind-a-proxy]] · [[websocket]]) and **Q80** ([[mqtt]], measured).
+**Q78 and Q81 closed as dead ends**, both with `no-public-answer` and a bold cell.
+
+### `interop` now has pages, not scattered config keys
+
+The area was one entity page (`nats-js`) and **zero summaries**. It is now two concepts, a runbook,
+nine summaries, and an `Interop` section in [[defaults-and-limits]]. MQTT and WebSocket previously
+appeared in this wiki only as config keys — including two defaults corrected as docs issues #28 and
+#29, which made for a wiki that could tell you a default was wrong but not what the feature did.
+
+### Q80: the five streams nobody documents
+
+`nats stream ls -a` before any MQTT client connects says `No Streams defined`. After one CONNECT there
+are five, created **lazily on first connection**:
+
+| stream | subjects | retention | discard | `max_msgs_per_subject` |
+|---|---|---|---|---|
+| `$MQTT_sess` | `$MQTT.sess.>` | limits | old | 1 |
+| `$MQTT_msgs` | `$MQTT.msgs.>` | **interest** | old | -1 |
+| `$MQTT_out` | `$MQTT.out.>` | **interest** | old | -1 |
+| `$MQTT_qos2in` | `$MQTT.qos2.in.>` | limits | **new** | 1 |
+| `$MQTT_rmsgs` | `$MQTT.rmsgs.>` | limits | old | 1 |
+
+And the price, with a 100-byte payload: **QoS 0 costs nothing; QoS 1 and QoS 2 cost the same** — one
+message in `$MQTT_msgs`, 194 bytes — so **QoS 2's extra price is round trips and transient state, not
+stored bytes**. A retained message costs 174 bytes **even at QoS 0**, which is the concrete reason the
+account needs JetStream for a fleet that never uses QoS 1. A session record is 104 bytes bare and
+**791 bytes with one subscription**: the subscription is the expensive part.
+
+`$MQTT_out` turned out to hold the **outbound PUBREL state** for QoS 2 *delivery* — traced packet by
+packet: the subscriber's PUBREC drops `$MQTT_msgs` to zero and writes one record to `$MQTT_out`, then
+the server sends packet type 6.
+
+### Two findings the chapters do not contain
+
+**An abandoned QoS 2 handshake leaks a record.** A PUBLISH at QoS 2 whose PUBREL never arrives leaves
+a record in `$MQTT_qos2in` that survives the disconnect and never expires (`max_age: 0`); a completed
+handshake leaves nothing. The subject is `$MQTT.qos2.in.<client-id>.<packet-id>` with
+`max_msgs_per_subject: 1`, so the leak is **bounded at 65,535 per client id** and unbounded in the
+number of client ids.
+
+**Stale sessions pin QoS 1 messages forever — which is Q81's thread, explained.** `$MQTT_msgs` uses
+**interest retention**, so a vanished session's durable consumer still holds interest and nothing is
+removed. Three killed durable sessions plus five publishes left five messages that did not drain;
+reconnecting each dead client id **once with the clean-session flag** took the stream to zero. The
+reporter of gh#7397 has exactly this and has had no reply since 2025-10-06. **No public source
+connects the two facts.**
+
+### The chapters were right, which is a result
+
+Both are unusually accurate, and this step produced **no new docs issue**:
+
+- **All ten topic→subject conversion rules matched exactly**, including the four wildcard-passthrough
+  cases.
+- **The 63/31 subscription ceiling the chapter derives is exact** — subscription #64 refused with
+  `0x80` for plain filters, #32 for `#` filters.
+- **The origin table reproduced row for row**, one `101` and four `403`.
+- The six refused characters, the publish-closes/subscribe-`0x80` asymmetry, MQTT v5 refused with
+  CONNACK return code 1, `Nmqtt-Pub` carrying the QoS, and four startup errors verbatim — all as
+  documented.
+- **`stream_replicas` derived from the `routes` list is real**: a genuine three-node cluster whose
+  node listed two routes created all five MQTT streams at **R=2**, and the server says so once —
+  `Creating MQTT streams/consumers with replicas 2 for account "$G"`.
+
+That last one produced a bonus while the cluster was half up: asking for `stream_replicas: 3` on a
+two-node cluster makes **MQTT clients unable to connect at all**, with the device getting the TCP
+connection closed and **no CONNACK** — nothing an MQTT client can report — while the server logs
+`create sessions stream for account "$G": no suitable peers for placement (10005)`. That landed on
+[[no-suitable-peers-for-placement]] as a second way into an existing gotcha.
+
+### Method notes worth keeping
+
+**No MQTT client was installed for this.** `raw/nats-server-src/mqtt-probe-client-v3.1.1.py` is a
+~110-line stdlib-only MQTT 3.1.1 client written for the step, which is what made SUBACK `0x80` codes
+and the full QoS 2 handshake directly observable. Installing `mosquitto` would have changed the user's
+machine for one step's worth of verification.
+
+**One near-miss recorded in the raw file.** A first pass at the origin table reported `400` for every
+origin *including the allowed one*. That was a shell-quoting bug in the harness —
+`${1:+-H "Origin: $1"}` word-splits and hands curl a malformed header — not server behaviour. It was
+caught by re-running a single case by hand and getting `101`. The table was then rebuilt in Python.
+Recorded because a harness bug that produces a plausible finding is the most dangerous kind.
+
+### Two rows closed as dead ends
+
+**Q78** (WebSocket connections per server) — no source gives a number, and `max_connections` bounds
+all connection kinds together, so it does not answer the question. Deliberately **not** measured: a
+connection-count benchmark says more about the machine than the server, and this wiki does not publish
+sizing numbers it cannot attribute. Stated once, on [[websocket]]'s *To verify*.
+
+**Q81** (restrict MQTT client ids via JWT) — the page named for it restricts a *connection type*, not
+a client id, and the thread is unanswered. Closed with the mechanism behind the reporter's actual
+problem on [[mqtt]] instead, which is the more useful half.
+
+### Harvested from the two `where-next.md` recaps without ingesting them
+
+Cited by doc path, not by summary, so a later plan can tell the difference: **MQTT v3.1.1 only, v5
+rejected at connect** (confirmed on the binary), the **`MQTT_WS`** connection type for browser-based
+MQTT clients, and Sparkplug B being ordinary MQTT traffic to the server.
+
+## 2026-09-01 — unread-chapters plan step 6: `learn/monitoring`, and two rows answered from the source
+
+**Operation:** plan step 6 — ingest the three unread `learn/monitoring` articles
+(`where-next.md` skipped as a recap). The step was kept last because `advisories-and-events.md` is the
+best available cross-check on docs issues **#1–#3**; that cross-check is reported below, and it is a
+partial result.
+
+**Sources:** `raw/nats-docs/learn/monitoring/{advisories-and-events,jetstream-health,profiling}.md`;
+`raw/nats-server-src/monitoring-observed-v2.14.6.md` (new — `monitor.go`, `pse/pse_linux.go`,
+`client.go`, `const.go`, `jetstream_api.go` at v2.14.6, plus runs); `raw/gh-discussions/gh-7362.md` and
+`gh-7483.md` (new).
+
+**Summaries created: 6** — three doc articles, one source/observed, two threads. Within the ~8 cap.
+
+**Pages updated:** [[monitoring-endpoints]] (four new sections), [[advisories]],
+[[stream-has-high-message-lag]], [[consumer]], [[ack-and-redelivery]], [[jetstream-sizing]],
+[[raft-in-nats]], [[config-keys]], [[mqtt]], `wiki/index.md`. **No page created** — see below.
+
+**Numbers.** Bank: 105 rows, **83 answered** (was 81), ★ **42 of 42**. Unlanded ripples
+**203 → 202** (peaked at 211 mid-step); citation drift 0 → 0; lint clean; **254 → 260 pages**.
+`inbox/docs-issues.md` **35 → 36**.
+
+**Rows closed: Q60** and **Q61** — both from the server source, and neither from the chapter the plan
+named for them.
+
+### Q60 — what `/varz` `cpu` is relative to
+
+The chapter never says, and `profiling.md` is about CPU *profiles*, a different thing. From the source:
+`Varz.CPU` comes from `pse.ProcUsage`, and on Linux a background timer samples `utime + stime` from
+`/proc/<pid>/stat` **once a second**, takes the delta, divides by elapsed seconds, and stores
+`(total*1000/ticks)/seconds`, returned `/10.0`. So:
+
+> **`cpu: 100.0` is one core fully consumed.** It is relative to **neither** the host's cores nor a
+> container's allocation.
+
+The thread this row comes from was **closed with zero comments**. Its asker was building a
+`nats server check server` threshold on a 0.25 vCPU Fargate task and saw `"cores": 2, "cpu": 10` — that
+`cpu: 10` is **40 % of their allocation**. Two caveats came with it: `ticks` is **hardcoded to 100**
+rather than read from `sysconf(_SC_CLK_TCK)` (commented "Avoiding to generate docker image without
+CGO"), and the elapsed-seconds term uses the **host's** uptime.
+
+### Q61 — `rtt` is a PING/PONG that can be an hour old
+
+`c.rtt` is written in exactly two places: at connect it is `computeRTT(c.start)` — the **connection
+setup time, not a ping** — and thereafter on each PONG. It is floored at 1ns, so it is never zero once
+set. The refresh rule is the part that matters:
+
+- routes, gateways and spoke leafnodes are pinged **every ping-timer tick** (default `2m`);
+- a **client** is pinged only when `rtt == 0` or **more than an hour** has passed
+  (`DEFAULT_RTT_MEASUREMENT_INTERVAL = time.Hour`);
+- **MQTT connections never get an RTT ping at all**.
+
+The public thread has a chosen answer — "periodic PING/PONG response times" — which is correct and
+omits the period. Its reporter then said "I don't see these values getting updated, even if we wait
+minutes", which is **exactly right**, and the final reply was a referral to commercial support. Three
+fresh loopback clients here showed `rtt` of 314µs, 286µs and 177µs — hundreds of microseconds where a
+real loopback ping is tens, consistent with connect-time estimates.
+
+### The #1–#3 cross-check: a partial result, and an upgrade
+
+`advisories-and-events.md` **does not settle #2 and #3**. It names `nak`, `consumer_action` and
+`terminated` as *types* and never writes their subjects, and does not mention pinned or unpinned at
+all. Those two issues still rest on the server alone, and the page is recorded as having been checked
+so nobody re-reads it for that.
+
+**But #1 is now confirmed on the wire.** A message was NAK'd on a live 2.14.6 server with
+`nats sub '$JS.EVENT.ADVISORY.>'` attached:
+
+```
+$JS.EVENT.ADVISORY.CONSUMER.MSG_NAKED.ORDERS.naktest
+```
+
+against the generated reference's `…CONSUMER.MSG_NAK.{stream}.{consumer}`. That upgrades the evidence
+from a source constant to an observed subject, which is what the report needed before being sent
+upstream.
+
+### A new one: docs issue #36
+
+The same page's **prose** gives the max-deliveries subject correctly as
+`$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.ORDERS.shipping`, and its **animation caption drops
+`.CONSUMER.` three times**. The server and the wire both agree with the prose. Filed `low`, because the
+right value is on the same page immediately above the picture.
+
+Two smaller findings from the same run, recorded inside #36 rather than as rows: the advisory body
+carries **`id` and `timestamp`** beyond the fields the docs' example shows, and
+**`$JS.EVENT.ADVISORY.API` fires for ordinary API calls** — three arrived just from creating a stream
+and two consumers, so the chapter's `subscribe '$JS.EVENT.ADVISORY.>'` example is noisier in practice
+than it reads.
+
+### No profiling page, deliberately
+
+`profiling.md` is the method behind a pointer [[jetstream-sizing]] has carried for five plans —
+"profile with Go's `pprof`" with no instructions. The material landed there as a section, plus
+`$SYS.REQ.SERVER.PING.PROFILEZ` on [[monitoring-endpoints]] and the two reload behaviours on
+[[config-keys]].
+
+**It did not become a runbook.** No row in `inbox/question-bank.md` asks about profiling, and a search
+of `nats-io/nats-server` discussions for a public question about it returned **nothing**. `CLAUDE.md`'s
+scope test says a page needs a question behind it, so no page was created and **no question was
+invented to justify one**. Recorded here because "we chose not to write a page" is otherwise invisible.
+
+The section does carry the security point the docs make plainly: `prof_port` has **no authentication**,
+binds to the same `host` as the client port (default `0.0.0.0`), has no separate profiling host to
+narrow, and a goroutine dump exposes subjects and internal state.
+
+### Landed on the reader layer
+
+`jetstream-health.md` gave [[stream-has-high-message-lag]] what it lacked: lag as arithmetic
+(`last_seq − delivered.stream_seq`), the three numbers that get confused (`num_pending` /
+`num_ack_pending` / `num_redelivered`, with "rising in-flight means a stuck handler, rising lag means
+not enough handlers"), and the **crashed-worker signature** — `num_pending` climbing while
+`num_waiting` is 0 and `delivered.stream_seq` is flat. The field table went to [[consumer]].
+[[ack-and-redelivery]] gained the fact that **there is no dead-letter queue**: one advisory, published
+once, stored nowhere.

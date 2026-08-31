@@ -28,8 +28,16 @@ exists to answer live in `inbox/question-bank.md`.
 - [[key-value]] — a KV bucket is the stream `KV_<bucket>`: fixed properties, why a delete grows the
   bucket, no read-after-write, and what watch and key listing really are. Plus compare-and-swap, the
   lock-and-lease it composes into, and when a bucket is the wrong tool.
+- [[mqtt]] — `nats-server` **is** the MQTT broker: topics become subjects, the five `$MQTT_*` streams
+  it creates for itself, what each QoS level actually costs, and the replica count derived from your
+  `routes` list.
+- [[websocket]] — a WebSocket connection *is* a NATS connection; origin checking is not access
+  control, the four cookie settings, and the listener a leaf node can dial.
 - [[object-store]] — a bucket is the stream `OBJ_<bucket>` holding chunks and info in two subject
-  spaces; 128k chunks, SHA-256 digests, and the features that do not exist.
+  spaces; 128 KiB chunks, SHA-256 digests, and the features that do not exist. Plus the write
+  ordering that makes a failed put safe, links and the silent `UpdateMeta` discard, what a soft delete
+  really costs on disk, and the leafnode boundary an object bucket **crosses** when a KV bucket
+  does not.
 - [[ordered-consumer]] — the ephemeral, memory-backed, R1 client construct that rebuilds itself on a
   gap, and the consumer churn it produces.
 - [[priority-groups]] — `overflow`, `pinned_client` and `prioritized`; the `Nats-Pin-Id` protocol,
@@ -104,6 +112,8 @@ exists to answer live in `inbox/question-bank.md`.
   curve key, and the re-push into the server's resolver that a naive restore forgets.
 - [[set-up-operator-mode]] — operator, accounts, scoped keys, creds and a resolver, in the order that
   works; gated at every step, because the failures here produce no error anywhere.
+- [[run-nats-behind-a-proxy]] — the nginx block, the two timeouts that decide whether idle
+  subscriptions survive, `advertise`, and the `/leafnode` path a proxy has to route.
 - [[rotate-tls-certificates]] — replace a certificate before it expires, and find out how long you
   have: `tls_cert_not_after` per listener, and `nats account tls` across the whole chain.
 - [[cross-domain-sourcing]] — copy a stream between JetStream domains: the `external` block, the
@@ -162,6 +172,9 @@ exists to answer live in `inbox/question-bank.md`.
   bridging into a supercluster twice, and why `deny_imports` "fixing" it is the diagnosis.
 - [[supercluster-slows-when-a-remote-subscriber-joins]] — 80,000 msg/s becomes 2,000 in the *local*
   region. Geo-affinity covers queue groups only, and the producer is stalled by its slowest link.
+- [[object-store-list-is-slow]] — `nats object ls` blows out while uploads run. **No public source
+  answers this**; measured instead — object count is nearly free, concurrent writes are not, and a
+  list is an ephemeral consumer created per call.
 
 ## Reference
 
@@ -298,6 +311,39 @@ exists to answer live in `inbox/question-bank.md`.
   permanent; the three bucket limits reject rather than evict.
 - [[s-docs-kv-your-first-bucket]] — `--history 1` is the default, and bucket names have a narrower
   charset than keys.
+- [[s-docs-object-store-your-first-object]] — put writes chunks then metadata, and that ordering is
+  the durability contract: an interrupted put leaves no gettable object, never a truncated one.
+- [[s-docs-object-store-chunking]] — the 128 KB default with both its bounds, the guidance ADR-20
+  never gave, and orphan chunks: the store's one silent disk leak.
+- [[s-docs-object-store-metadata-and-links]] — `ObjectInfo`'s three caller-set fields, links as
+  snapshots that dangle, and the two fields `UpdateMeta` discards without telling you.
+- [[s-docs-object-store-watching-and-listing]] — watch carries metadata and never the bytes; and,
+  read for Q75, a **negative result**: the page says a list is cheap and never mentions concurrency.
+- [[s-docs-object-store-under-the-hood]] — `OBJ_<bucket>`, the two `$O.` subject spaces,
+  `Nats-Rollup: sub` as the whole latest-wins mechanism, and soft delete as a rollup.
+- [[s-docs-mqtt-your-first-mqtt-client]] — `nats-server` is the MQTT broker; JetStream is a startup
+  requirement and a per-account one, and an `mqtt {}` block with no port is a silent no-op.
+- [[s-docs-mqtt-topics-and-subjects]] — the full topic→subject escaping, the six refused characters,
+  and why a permission written `sensors/#` matches nothing.
+- [[s-docs-mqtt-qos-sessions-and-retained]] — the QoS contract, sessions keyed by client id, wills,
+  retained messages — and the 63/31 subscription ceiling `max_ack_pending` implies.
+- [[s-docs-mqtt-auth-and-clustering]] — `allowed_connection_types`, the bearer JWT an MQTT device
+  sends as its password, `$MQTT.sub.>` (allow nothing, deny nothing), and replicas derived from
+  `routes`.
+- [[s-docs-websocket-your-first-websocket-connection]] — the listener that requires TLS, the port
+  that has no default, and nats.js filling in a port that is never 4222.
+- [[s-docs-websocket-browsers-and-origins]] — `allowed_origins` is an exact string match **and is
+  skipped when no `Origin` header is sent**; the four cookie settings and what each is for.
+- [[s-docs-websocket-tls-and-proxies]] — the nginx block, the idle timeout against the ping interval,
+  `advertise`, and the reload rule that loses your whole edit.
+- [[s-docs-websocket-leaf-nodes-over-websocket]] — a leaf through the HTTPS ingress: the `/leafnode`
+  path, `LEAFNODE_WS`, and why the scheme does not tell you whether a link is encrypted.
+- [[s-docs-monitoring-advisories-and-events]] — advisories are published once and stored nowhere,
+  there is **no dead-letter queue**, and the `$SYS` connect/disconnect and `STATSZ` events.
+- [[s-docs-monitoring-jetstream-health]] — lag as arithmetic, the three numbers that get confused, and
+  the three-field signature of a crashed consumer pool.
+- [[s-docs-monitoring-profiling]] — `nats server request profile` over `$SYS` with its 15-second CPU
+  cap, against `prof_port` which needs a restart and has no authentication.
 - [[s-docs-policies]] — the nine stream and consumer policies and which five are fixed at creation.
 - [[s-docs-surviving-node-loss]] — R=1/R=3/R=5, odd counts, storage durability, consumer replica
   rules, replicas ≠ throughput.
@@ -355,6 +401,21 @@ exists to answer live in `inbox/question-bank.md`.
   a renewed certificate: it does, on a client listener and on a leafnode remote, in both shapes of
   the change — but the log lines, `config_digest` and the signal's exit status say nothing either
   way, and a refused reload looks identical to a successful one.
+- [[s-nats-server-object-store-observed]] — nine runs on the v2.14.6 binary: the 128 KiB default
+  derived from an exact chunk count, the raw metadata message with its rollup header and zero
+  `mtime`, a 200 MiB delete giving back **98.4 % of the disk at the call**, the four `$JS.API` calls
+  a list makes, and the Q75 measurement — object count is nearly free, concurrent writes are not.
+- [[s-nats-server-object-store-leafnode]] — the leafnode JetStream deny list names `$OBJ.>` and the
+  object store uses `$O.`, so object data crosses a domain boundary that KV data does not; a
+  same-named bucket on both sides of a leafnode silently converges. Docs issue #35.
+- [[s-nats-server-monitoring-observed]] — what `/varz` `cpu` and `/connz` `rtt` really measure, read
+  at v2.14.6 and run: `cpu` is a percentage of **one core**, a client's `rtt` is the connect-time
+  estimate refreshed at most **hourly**, and the nak advisory subject captured **on the wire**.
+- [[s-nats-server-mqtt-websocket-observed]] — fifteen runs on the v2.14.6 binary with a hand-written
+  MQTT 3.1.1 probe: the **five `$MQTT_*` streams** no source names, what QoS 0/1/2 each cost, the
+  dedup record an abandoned QoS 2 handshake leaks, stale sessions pinning QoS 1 messages forever, all
+  ten conversion rules, the 63/31 ceiling, the origin table including the no-`Origin` row, and MQTT
+  replicas derived from `routes`.
 - [[s-nats-server-defaults-sweep]] — all 216 documented defaults compared with the source at
   v2.14.6: leafnode compression is `s2_auto` and not `accept`, `mqtt.max_ack_pending` is 1024 and
   not 100, `mqtt.port` has no default at all, and why a use-site default is invisible in `/varz`.
@@ -455,6 +516,12 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-gh-6746-watch-many-keys]] — several KV keys on one watcher; self-answered in an hour.
 - [[s-gh-5243-kv-watchers-at-scale]] — 1000 watchers, a 118-byte bucket and a cluster that does not
   recover. **Unanswered.**
+- [[s-gh-6836-object-store-list-slow]] — object-store `ls` slow, sometimes timing out, while uploads
+  run. One comment, by the asker. **Unanswered since 2025-04-25**, which is why Q75 was measured.
+- [[s-gh-7362-routez-connz-rtt]] — the chosen answer ("periodic PING/PONG") omits the period; the
+  reporter's "it never updates, even after minutes" is right and gets no reply.
+- [[s-gh-7483-varz-cpu-in-containers]] — is `/varz` `cpu` relative to the container's vCPU or the
+  host's cores? **Closed with zero comments.** The answer is neither.
 - [[s-gh-5859-unexpected-nats-timeout]] — two reports of `nats: timeout`, a ping line that is not a
   symptom, one real routes defect and a `GOMAXPROCS` hypothesis. **Unresolved.**
 - [[s-gh-6328-jetstream-behind-gateways]] — "you don't even need a super-cluster": a maintainer

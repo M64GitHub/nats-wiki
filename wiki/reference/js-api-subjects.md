@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -169,6 +169,23 @@ import for the API subject) will cause silent failures."
 (source: [[s-adr-59-sourcing-and-mirroring]]; the configuration is on [[cross-account-sharing]] and
 [[cross-domain-sourcing]].)
 
+## What one high-level call costs, in subjects
+
+A "single" client operation is often several API subjects. Traced with `nats sub '$JS.API.>'` on
+2.14.6, one `nats object ls <bucket>` is four (source: [[s-nats-server-object-store-observed]]):
+
+| # | subject |
+|---|---|
+| 1 | `$JS.API.STREAM.INFO.OBJ_<bucket>` |
+| 2 | `$JS.API.DIRECT.GET.OBJ_<bucket>.$O.<bucket>.M.>` — the Subject-Appended form above |
+| 3 | `$JS.API.CONSUMER.CREATE.OBJ_<bucket>.<ephemeral>.$O.<bucket>.M.>` |
+| 4 | `$JS.API.CONSUMER.DELETE.OBJ_<bucket>.<ephemeral>` |
+
+Two things follow. **An ACL that grants only `$JS.API.STREAM.INFO.OBJ_X` cannot list bucket X** — the
+consumer create and delete are needed too, and they are on `CONSUMER.*` subjects. And the consumer is
+**created and destroyed on every call**, which is why listing a busy bucket is expensive:
+[[object-store-list-is-slow]].
+
 ## Conventions
 
 - An **empty request body** may be nil, an empty string, or `{}`.
@@ -229,4 +246,4 @@ domain back out of as the **second token** (`stream.go:432–437`). See [[jetstr
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
 [[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]] ·
 [[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]] ·
-[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]]
+[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]]
