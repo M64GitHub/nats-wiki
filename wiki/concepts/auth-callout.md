@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [auth_callout, issuer, auth_users, xkey, allowed_accounts, ADR-26, "$SYS.REQ.USER.AUTH", oidc, ldap]
 aliases: [auth callout, authorization callout, external auth, "$SYS.REQ.USER.AUTH", auth_callout]
-sources: [s-docs-auth-callout, s-gh-7505-auth-callout-nkey, s-nats-server-auth-and-tls]
+sources: [s-docs-auth-callout, s-gh-7505-auth-callout-nkey, s-nats-server-auth-and-tls, s-docs-security-checklist]
 created: 2026-08-31
 updated: 2026-08-31
 ---

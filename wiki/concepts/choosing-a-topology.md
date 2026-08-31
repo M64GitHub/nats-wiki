@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [topology, route, gateway, leafnode, supercluster, multi-region, decision, quorum]
 aliases: [which topology, cluster vs gateway vs leafnode, leafnode or gateway, topology decision, super-cluster or leafnode]
-sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology]
+sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation]
 created: 2026-08-31
 updated: 2026-08-31
 ---

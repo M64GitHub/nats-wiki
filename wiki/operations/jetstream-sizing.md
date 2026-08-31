@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -18,10 +18,9 @@ updated: 2026-08-31
 node needs, and how a replicated stream's bytes count twice — once against the node's disk, once
 against the account's quota.
 
-**What it does not answer:** IOPS. No public source read so far gives IOPS guidance for JetStream,
-and the per-message *storage overhead* (block, index and per-subject-state bytes on top of the
-payload) is likewise unstated — see [[filestore-layout]] and *What is still unknown*, below. Sizing
-disk from payload bytes alone will under-count by an amount this wiki cannot yet quantify.
+**What it does not answer:** IOPS. No public source read so far gives IOPS guidance for JetStream.
+The per-message storage overhead **is** now quantified — read at the tag and measured on the binary;
+it is Step 1 below and the mechanism is on [[filestore-layout]].
 
 ## Inputs you need
 
@@ -67,7 +66,7 @@ comfortably in a few hundred megabytes. What actually drives JetStream memory is
 **File descriptors.** Connections, routes and streams each consume them, and **JetStream spends
 roughly two FDs per stream**. The default per-process limit is fine on a small cluster and not on a
 large one; the unit the server repo ships sets **`LimitNOFILE=800000`**, with the reason in a comment —
-"JetStream requires 2 FDs open per stream" (source: [[s-nats-server-systemd-units]]). Setting it is
+"JetStream requires 2 FDs open per stream" (source: [[s-nats-server-systemd-units]] · [[s-nats-server-filestore-layout]]). Setting it is
 part of [[install-nats-server]].
 
 ## The calculation
@@ -77,12 +76,62 @@ part of [[install-nats-server]].
 Start from retention, not from rate:
 
 ```
-stream_bytes ≈ (messages retained) × (average message size) × (1 + per-message overhead)
+messages_retained = whichever of max_msgs, max_bytes or (max_age × rate) binds first
+
+record_bytes  = 30 + len(subject) + len(payload) + (headers ? 4 + len(headers) : 0)
+stream_bytes  = messages_retained × record_bytes
 ```
 
-where *messages retained* is whichever of `max_msgs`, `max_bytes` or `max_age × rate` binds first.
-**The overhead term is unknown** — see *What is still unknown*. Until a source gives it, size with
-`max_bytes` set to a number you have measured on a test stream, not one you derived.
+**The 30 bytes are exact**: a 22-byte record header (`total_len`, `seq`, `ts`, `subj_len`) plus an
+8-byte checksum, and the subject is stored verbatim on **every** message. This is also the figure the
+server reports, so `nats stream info` bytes, `max_bytes`, `/jsz storage` and an account's `MaxStore`
+are all counted in `record_bytes` — payload bytes are never reported anywhere
+(source: [[s-nats-server-filestore-layout]], `nats-server 2.14.6`). See [[filestore-layout]].
+
+What that costs, by message shape:
+
+| payload | subject | record bytes | overhead |
+|---|---|---|---|
+| 100 B | `orders.new` (10) | 140 | **+40%** |
+| 1 KB | `orders.new` (10) | 1,064 | +3.9% |
+| 100 KB | `orders.new` (10) | 102,440 | +0.04% |
+
+**Small messages are where this bites.** A stream of 100-byte events costs 40% more disk than the
+payload arithmetic says; a stream of 100 KB documents costs 0.04% more. A **memory** stream uses a
+different formula — `len(subject) + len(headers) + len(payload) + 16` — so its `bytes` figure is not
+comparable to a file stream's.
+
+### Step 1b — add the physical slack
+
+`stream_bytes` is what the server *accounts*. What the volume gives up is larger, and by a bounded
+amount:
+
+```
+disk_bytes ≈ stream_bytes + one block size + index.db + ~520 B of metadata
+index.db   ≈ Σ over distinct subjects (len(subject) + 4)
+```
+
+**Budget one whole block size per stream**, because the newest message block is never rewritten to
+drop the messages that have aged out of it — that is by design, not a bug
+(`filestore.go:6151`, `filestore.go:8039`). The block size is chosen for you:
+
+| the stream sets | block size |
+|---|---|
+| nothing, `limits` retention | **8MB** |
+| nothing, any other retention | 4MB |
+| `max_msgs_per_subject` (so **every KV bucket**) | 4MB |
+| `max_bytes` under ~128 KB | 32,000 B |
+| `max_bytes` between that and 32MB | **4MB** |
+| `max_bytes` at or over 32MB | 8MB |
+
+Measured worst case: a stream reporting **133,000 bytes** held **1,125,712 bytes** on disk — 8.5× —
+and stayed there across a sync interval and a restart, because it was idle and its whole content sat
+in the last block. Steady-state streams sit within a few percent; ten streams totalling 37,891,637
+reported bytes occupied 39,881,215 on disk, **+5.25%**
+(source: [[s-nats-server-filestore-layout]]).
+
+**Rule of thumb: size the volume at `stream_bytes × 1.1 + 8MB per stream`,** and never at
+`stream_bytes` exactly.
 
 ### Step 2 — multiply by replicas, per node
 
@@ -266,17 +315,23 @@ A three-node cluster, one R3 file stream, on an **un-tiered** account.
 | replicas | 3 |
 | account | un-tiered |
 
-**Payload bytes retained:** `500 msg/s × 800 B × 72 h × 3600 s/h` = 103,680,000,000 B ≈ **96.6 GiB**
-of raw payload.
+**Messages retained:** `500 msg/s × 72 h × 3600 s/h` = **129,600,000** messages.
 
-**Per node:** each of the three nodes stores the full stream once → **≈ 96.6 GiB of payload per
-node**, *plus* the unquantified filestore overhead. A 10 GiB volume is off by an order of
-magnitude; this stream needs a volume of at least ~120 GiB per node to leave headroom, and the real
-figure must be measured, not derived.
+**Payload bytes:** `129,600,000 × 800 B` = 103,680,000,000 B ≈ **96.6 GiB**. This is the number that
+looks like the answer and is not.
 
-**Against the account quota:** un-tiered, so `replicas × bytes` = `3 × 96.6 GiB` ≈ **290 GiB** of
-`MaxStore`. An account provisioned at 100 GiB will accept the stream at R1 and **fail to place the
-third replica**.
+**Record bytes:** the subject is `orders.created`, 14 characters, and there are no headers, so each
+message costs `30 + 14 + 800` = **844 B**. `129,600,000 × 844` = 109,382,400,000 B ≈ **101.9 GiB** —
+**5.5% more than the payload arithmetic**, and this is the figure `nats stream info`, `max_bytes` and
+the account quota all use.
+
+**Per node:** each of the three nodes stores the full stream once → **≈ 101.9 GiB per node**, plus
+8 MB of never-compacted last block and a negligible `index.db` (one subject). Size the volume at
+~112 GiB per node (`× 1.1 + 8MB`). A 10 GiB volume is off by an order of magnitude.
+
+**Against the account quota:** un-tiered, so `replicas × bytes` = `3 × 101.9 GiB` ≈ **305 GiB** of
+`MaxStore` — not the 290 GiB the payload arithmetic gives. An account provisioned at 300 GiB looks
+like it fits and does not.
 
 **`max_payload`:** 800 B average is far under the 1 MB default; no change needed.
 
@@ -292,6 +347,11 @@ Each with its source. Nothing here is inferred.
 
 | rule | source |
 |---|---|
+| A message costs **`30 + len(subject)` bytes** on disk beyond payload and headers | [[s-nats-server-filestore-layout]] |
+| The reported `bytes` **already include** that overhead; payload bytes are reported nowhere | [[s-nats-server-filestore-layout]] |
+| Budget **one block size (usually 8MB) of slack per stream** — the newest block is never compacted | [[s-nats-server-filestore-layout]] |
+| `index.db` costs **`len(subject) + 4` per distinct subject**, rewritten every 2 minutes | [[s-nats-server-filestore-layout]] |
+| Size the volume at **`stream_bytes × 1.1 + 8MB per stream`**, never at `stream_bytes` | [[s-nats-server-filestore-layout]] |
 | Overprovision CPU by **20–30%** above steady state | [[s-docs-sizing-and-resources]] |
 | JetStream spends **~2 file descriptors per stream** | [[s-docs-sizing-and-resources]] |
 | `max_memory_store` defaults to **75% of RAM**, `max_file_store` to **75% of available disk** | [[s-docs-sizing-and-resources]], verified [[s-nats-server-jetstream-resources]] |
@@ -344,6 +404,11 @@ Roughly in the order it bites:
    symptom of over-committing `max_file_store` is a **publish error mid-stream**, and of genuinely
    filling the device, `JetStream out of File resources, will be DISABLED` plus the
    `$JS.EVENT.ADVISORY.SERVER.OUT_OF_STORAGE` advisory.
+   **`max_file_store` does not protect the volume**: it bounds the same logical figure everything
+   else does. A server configured `max_file_store: 4MB` was measured holding **3.79 MB on disk while
+   reporting 133,000 bytes used** — 3% of its own ceiling (source:
+   [[s-nats-server-filestore-layout]]; recorded as docs issue #33). Setting it equal to the volume
+   size, as the docs' own example does, leaves the volume unprotected.
 4. **The meta leader** — memory, and Raft/API load that scales with **consumer count** rather than
    message count. Not on every node, and not in proportion to traffic.
 5. **File descriptors**, in the hundreds of streams, with a symptom that misleads: **connection
@@ -356,7 +421,8 @@ Roughly in the order it bites:
 ```
 nats account info                 # the live account ceilings: Memory, Storage, Streams, Consumers
 nats server info <server>         # this node's Maximum Payload, Maximum Connections, JetStream limits
-nats stream info <stream>         # the stream's real size and its replica states
+nats stream info <stream>         # the stream's LOGICAL size (record bytes) and its replica states
+du -sb /var/lib/nats/jetstream/<account>/streams/<stream>/   # what the volume actually gave up
 df -h /var/lib/nats/jetstream     # what the device says, which outranks what the config says
 curl -s localhost:8222/varz | jq '.jetstream.stats | {storage, reserved_storage, memory, reserved_memory}'
 ulimit -n                         # the FD ceiling the process will actually get
@@ -375,6 +441,10 @@ Deeper per-stream and per-account accounting lives on the `/jsz` endpoint — se
 
 ## Pitfalls
 
+- **Sizing the volume from payload bytes.** Every stored message also carries 30 bytes and its
+  subject. On 100-byte events that is 40% you did not budget; on 100 KB documents it is nothing.
+- **Sizing the volume from the *reported* bytes.** That figure is a floor, not a ceiling — see
+  Step 1b. `du` and `/jsz` will always disagree, and the gap is not a leak.
 - **Sizing the node and forgetting the tenant.** An account limit is enforced regardless of how
   much disk the node has.
 - **Treating 256MB / 1TB as the JetStream defaults.** They are fallbacks for when the server cannot
@@ -395,10 +465,12 @@ Deeper per-stream and per-account accounting lives on the `/jsz` endpoint — se
 Recorded here rather than guessed, because a wrong sizing number is the most damaging thing this
 wiki could contain.
 
-- **Per-message storage overhead** — how many bytes a stream spends on blocks, index and
-  per-subject state beyond the payload (question-bank Q2). No source ingested so far states it.
-  Until one does, measure it on a test stream.
-- **IOPS** — no public source read so far gives JetStream IOPS guidance (part of Q1).
+- ~~Per-message storage overhead~~ — **answered** (Q2): `30 + len(subject)` bytes per message in the
+  record, `len(subject) + 4` per distinct subject in `index.db`, and up to one block size of
+  never-compacted slack. Read at v2.14.6 and measured on the binary — Step 1 and Step 1b above, and
+  [[filestore-layout]].
+- **IOPS** — no public source read so far gives JetStream IOPS guidance (part of Q1). This is now
+  the only unanswered term in Q1: disk, RAM, CPU and file descriptors all have numbers above.
 - **A practical cap on messages in one stream, or a known-good `MaxMsgs`** (Q4, Q5) — unstated.
 - ~~How many consumers one stream or server supports (Q6)~~ — **answered**, as guidance rather
   than a limit: see *Consumers are a cluster-wide budget* above.
@@ -425,4 +497,4 @@ wiki could contain.
 [[s-nats-server-constants-2.14.6]] · [[s-docs-monitoring-endpoints]] ·
 [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] ·
 [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-35-filestore-compression]] ·
-[[s-nats-server-systemd-units]]
+[[s-nats-server-systemd-units]] · [[s-nats-server-filestore-layout]]

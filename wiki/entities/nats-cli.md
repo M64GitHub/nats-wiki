@@ -264,4 +264,5 @@ is in the docs (source: [[s-natscli-stream-external]]). See [[cross-domain-sourc
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] ·
 [[s-docs-prometheus-and-dashboards]] · [[s-natscli-account-tls]] ·
 [[s-docs-authentication-basics]] · [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]] ·
-[[s-natscli-stream-external]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]]
+[[s-natscli-stream-external]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]] ·
+[[s-natscli-backup-restore]]

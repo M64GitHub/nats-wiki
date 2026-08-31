@@ -97,4 +97,5 @@ so is the monitoring port.
 ## Sources
 
 [[s-nats-server-readme]] · [[s-github-repo-facts]] · [[s-docs-ecosystem]] ·
-[[s-docs-getting-started]] · [[s-nats-server-constants-2.14.6]]
+[[s-docs-getting-started]] · [[s-nats-server-constants-2.14.6]] ·
+[[s-nats-server-systemd-units]] · [[s-docs-hardening]]

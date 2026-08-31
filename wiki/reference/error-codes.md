@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -43,6 +43,17 @@ which is **2.15 only** and absent from the v2.14.6 source (source:
 ADR-7's status is **Partially Implemented**: "The current focus is JetStream APIs, we will as a
 followup do a refactor and generalization and move onto other areas of the server." **Outside
 JetStream and MQTT an error may carry no code at all.**
+
+Two failures an operator meets often carry no number, so there is nothing to look up. A cross-account
+config error stops the server at boot as plain text, with a file and line instead of a code:
+
+```
+nats-server: nats.conf:2:1: Error adding stream import "orders.shipped": stream import not authorized
+```
+
+and `No responders are available` is a core NATS status, not a JetStream error — an unmatched
+*export* is not an error at all: the server starts, the config is valid, and no messages move
+(source: [[s-docs-cross-account]]). See [[cross-account-sharing]].
 
 ## What the 2.14 table contains
 
@@ -206,3 +217,12 @@ reason to explain.
 [[s-gh-5606-cross-account-jetstream]] · [[s-nats-server-jetstream-resources]] ·
 [[s-adr-10-extended-purge]] ·
 [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-61-meta-quorum-rescue]]
+
+The rows in *The codes this wiki cites* are in the table because a page needed them; these are the
+summaries that put them there — [[s-adr-43-per-message-ttl]] (`10052`, `10165`, `10166`) ·
+[[s-docs-accounts-and-multitenancy]] (`10039`) · [[s-docs-cross-account]] (the failures with no code)
+· [[s-docs-disaster-recovery]] (`10065`) · [[s-docs-mirrors-and-sources]] (`10060`) ·
+[[s-docs-scaling-and-peers]] (`10075`, `10202`) · [[s-docs-single-server]] (`10074`) ·
+[[s-docs-stream-backup-restore]] (`10064`) · [[s-gh-7982-no-suitable-peers]] (`10005`) ·
+[[s-issue-4281-insufficient-storage]] (`10028`, `10047`) · [[s-nats-server-snapshot-restore]]
+(`10060`, `10064`, `10130`).

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, certificates, rotation, expiry, tls_cert_not_after, nats-account-tls, reload, SIGHUP]
 aliases: [certificate rotation, cert rotation, certificate expiry, tls renewal, rotate certs]
-sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units]
+sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units, s-docs-hardening]
 created: 2026-08-31
 updated: 2026-08-31
 ---

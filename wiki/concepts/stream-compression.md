@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [compression, s2, filestore, block, encryption, sizing, docs-issue-30]
 aliases: [compression, s2, "compression: s2", filestore compression, stream compression]
-sources: [s-adr-35-filestore-compression, s-docs-stream-config, s-docs-policies]
+sources: [s-adr-35-filestore-compression, s-docs-stream-config, s-docs-policies, s-nats-server-filestore-layout]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -121,6 +121,29 @@ The first is the logical size, the second what the disk actually holds — inclu
 tail block and the index files. On a stream that has never restarted since the setting changed, they
 will be the same, which is the symptom described above.
 
+### What the two numbers are, precisely
+
+The comparison above only means something once you know what each side counts
+(source: [[s-nats-server-filestore-layout]], `nats-server 2.14.6`):
+
+- **`nats stream info` bytes** is the sum of the *record* lengths of the live messages —
+  `30 + len(subject) + len(payload)` each, plus `4 + len(headers)` where present. It does not change
+  when compression is on.
+- **`du`** is the sum of the block files, which also hold deleted records, 30-byte tombstones, and
+  whatever the compressor did or did not achieve on each block.
+
+So an **uncompressed** stream does not give `du ÷ bytes = 1.00`. Ten uncompressed streams measured
+together came to **+5.25%**, and a single idle stream whose content sat entirely in its
+never-compacted last block came to **8.47×**. Compare a compressed stream against *the same stream
+uncompressed*, not against 1.00 — and take the measurement while the stream is being written to, not
+after it has gone idle.
+
+Only **full blocks** are compressed, when they roll (`newMsgBlockForWrite` kicks
+`recompressOnDiskIfNeeded` on the block it is closing). The block currently being written is always
+uncompressed, so the last 8MB of a `limits` stream — 4MB of a KV bucket — never counts toward the
+ratio. See [[filestore-layout]].
+
+
 ## Related
 
 [[stream]] · [[jetstream-sizing]] · [[retention-policies]] · [[tls-in-nats]] (encryption at rest) ·
@@ -132,4 +155,4 @@ will be the same, which is the symptom described above.
 - [[s-docs-stream-config]] — the `compression` field and its default
 - [[s-docs-policies]] — the docs' statement that a change waits for the store to restart
 - `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md` — the block sizes above,
-  observed on the v2.14.6 binary
+  observed on the v2.14.6 binary · [[s-nats-server-filestore-layout]]

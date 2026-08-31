@@ -154,4 +154,4 @@ Q56 (partly — the `$G` half is in [[unauthenticated-clients-still-connect]]).
 ## Pages touched
 
 [[subject-permissions]] · [[account]] · [[tls-in-nats]] · [[operator-mode]] · [[auth-callout]] ·
-[[nats-cli]] · [[config-keys]] · [[defaults-and-limits]]
+[[nats-cli]] · [[defaults-and-limits]]

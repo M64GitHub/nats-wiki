@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [operator, jwt, nkeys, ed25519, signing-keys, scoped, revocation, bearer, resolver, creds]
 aliases: [decentralized auth, decentralized authentication, jwt auth, operator, trust chain, nkeys, scoped signing key, resolver]
-sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls]
+sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist]
 created: 2026-08-31
 updated: 2026-08-31
 ---

@@ -381,11 +381,24 @@ violates the schema, duplicate pages under different slugs, and **question-bank
 rows with no `answered by`**.
 
 Start with `python3 tools/lint.py` (broken links, orphans, frontmatter, index
-coverage, unverified count, and a staleness warning line). Then
-`python3 tools/check-staleness.py` for the table of pages whose `verified-against`
-is behind the release they name — it checks each page against **the authority that
-page names**, and deliberately ignores pages stating none of the six versioned
-things. After a server release, also `python3 tools/check-defaults.py --tag <new
+coverage, unverified count, **citation drift**, **unlanded ripples**, and a
+staleness warning line). The last two exist because this wiki records the same
+thing twice, so the two halves can be diffed:
+
+- **citation drift** — a page's frontmatter `sources:` and its `## Sources`
+  section name different summaries. A defect; it fails `--strict`. Reconcile it
+  to the union, but only after checking the page really draws on the summary —
+  a citation the page does not use is a worse lie than a missing one.
+- **unlanded ripples** — a summary lists a page under `## Pages touched` but that
+  page never cites the summary: the ingest stopped at the summary layer and never
+  reached the reader. A **review** list, not a defect list, so it never fails the
+  build; it is the work queue for *Operation: consolidate*, printed
+  most-affected-first.
+
+Then run `python3 tools/check-staleness.py` for the table of pages whose
+`verified-against` is behind the release they name — it checks each page against
+**the authority that page names**, and deliberately ignores pages stating none of
+the six versioned things. After a server release, also `python3 tools/check-defaults.py --tag <new
 tag>` and diff its report against the previous one; that diff is the default
 change layer. Then read for the contradictions and drift no tool can see. Report
 findings. Fix mechanical issues (links, index, frontmatter) directly. Ask before
@@ -395,6 +408,84 @@ A contradiction between two **wiki pages** is a wiki bug — fix it. A contradic
 between a wiki page and its **source**, or between two sources, is a
 [docs issue](#operation-record-a-docs-issue) — verify it against the server and
 record it in `inbox/docs-issues.md`.
+
+## Operation: consolidate
+
+The counterweight to ingesting. Ingest adds inputs; consolidate turns summaries
+already in `wiki/summaries/` into the pages an operator actually opens under
+pressure. It needs no new sources and touches nothing in `raw/`.
+
+**When**: whenever the source layer has outgrown the reader layer. Measure it
+before deciding — count pages per folder and compare `summaries/` against the
+reader layer (`concepts/ + internals/ + operations/ + gotchas/ + reference/`;
+`entities/` is thin by design and does not count). Report the ratio, and report
+the unlanded-ripple and citation-drift counts before and after. More than a
+handful of summaries per reader-facing page means the ingests have outrun the
+synthesis.
+
+**What to work on**, in this order:
+
+1. **The unlanded-ripple list from `tools/lint.py`, top-down by count.** One page
+   per sitting; resist breadth.
+2. **The thinnest reader pages on the best-sourced topics** — sort reader pages
+   by size, grep the summaries for each one's config keys, subjects and symptoms.
+3. **Reader pages that should exist and do not**, where the material is spread
+   over many summaries with no page owning it — and a question in
+   `inbox/question-bank.md` needs it. No question, no page.
+
+**Method for one page** (this is the part a script cannot do):
+
+- `grep -inE '<the page's own keys, subjects, flags, error codes>'
+  wiki/summaries/<each named summary>.md` rather than reading whole summaries.
+- Decide **per summary: material, or merely relevant?** `## Pages touched`
+  sometimes means "relevant to". For merely-relevant ones write a single honest
+  pointer sentence that cites the summary and names the page where the material
+  actually lives.
+- **Never manufacture a section to absorb a citation.** That turns a real metric
+  into a fake one, and it is the only way this operation can do harm.
+- A page may be **struck from a summary's `## Pages touched`** when the summary
+  genuinely has nothing to say to it — the list was written at ingest time, as an
+  intention. Striking is the rare case, never the convenient one: prefer the
+  pointer sentence, and **name every strike in `wiki/log.md`** with the reason, so
+  a falling count can always be told apart from a shortened list.
+- A claim already on the page stays unless a source contradicts it. When two
+  sources disagree, **both go on the page** — and the disagreement goes to
+  `inbox/docs-issues.md`, verified against the server at a release tag
+  (*Operation: record a docs issue*). Consolidation is a common way to find these:
+  two ingests that never met on a page have not yet had the chance to contradict
+  each other.
+- Add every summary used to `sources:` **and** to `## Sources`, bump `updated:`,
+  and if the pass touched a default, a limit, a key or a subject, re-check
+  `verified-against` / `verified-on` rather than leaving an older date to imply
+  a check that did not happen.
+
+**Shapes worth looking for deliberately** — each is a way an ingest lands in the
+summary layer and stops:
+
+1. **A whole tool or surface missing from a runbook.** The page has `### nats CLI`
+   but no `### nsc`, `### server config` or `### Kubernetes / Helm`, though the
+   summaries cover them. The runbook template asks for one `###` per surface the
+   sources cover.
+2. **A forward reference that never landed** — the page names a mechanism ("the
+   meta layer decides…") and then never describes it, and no page does.
+3. **Server-source evidence cited on one page but not on the page it explains** —
+   an observation from `raw/nats-server-src/` reaching the internals page while
+   the gotcha it exists to explain still says "(unverified)".
+4. **No earliest version.** The page states current behaviour but never says when
+   it arrived, because the ADR or release-note summary was never harvested onto
+   it: empty `since:`, no "since 2.11 …" sentence. Version is existential here.
+5. **A release's notes are a source about the concept**, not only about the
+   release entity. Read end to end they are the record of a default changing, a
+   flag arriving, a behaviour being fixed — that belongs on the concept and the
+   reference table too.
+6. **An entity page with what the thing does but not what bites you.** Every
+   client, tool and product page owes the operator its notable behaviours and its
+   deprecations, not just its role and its repo.
+
+**Finish**: re-run `python3 tools/lint.py`, append to `wiki/log.md` with the
+before/after counts, fill any `answered by` cells the pass earned, and update the
+plan file with what is still open and in what order. Report the numbers; they
+should go down.
 
 ## Operation: scout <topic>
 

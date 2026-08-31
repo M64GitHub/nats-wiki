@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: ["$G", "$SYS", no_auth_user, accounts, auth_required, sysAccOnlyNoAuthUser, 2.10.2]
 aliases: [anonymous connections, no credentials required, unauthenticated access, "$G open", auth_required true but anyone connects]
-sources: [s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-accounts-and-multitenancy, s-docs-authentication-basics]
+sources: [s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-accounts-and-multitenancy, s-docs-authentication-basics, s-natscli-account-tls]
 created: 2026-08-31
 updated: 2026-08-31
 ---

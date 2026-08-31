@@ -160,4 +160,5 @@ reliable ephemeral consumer mode, and **durable consumers created with `AckFlowC
 ## Sources
 
 [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
-[[s-nats-server-jetstream-resources]]
+[[s-nats-server-jetstream-resources]] ·
+[[s-adr-60-reliable-sourcing]]

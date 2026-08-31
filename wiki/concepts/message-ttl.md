@@ -138,4 +138,5 @@ description field — which is exactly the case ADR-7 warns not to match on as t
 
 ## Sources
 
-[[s-adr-43-per-message-ttl]] · [[s-docs-stream-config]] · [[s-adr-8-key-value-store]]
+[[s-adr-43-per-message-ttl]] · [[s-docs-stream-config]] · [[s-adr-8-key-value-store]] ·
+[[s-adr-48-kv-ttl]]

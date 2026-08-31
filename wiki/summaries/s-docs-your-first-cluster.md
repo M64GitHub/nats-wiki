@@ -143,5 +143,4 @@ Q47 in part (a name mismatch is one documented cause of a cluster that will not 
 
 ## Pages touched
 
-[[build-a-3-node-cluster]] · [[install-nats-server]] · [[replicas]] · [[raft-in-nats]] ·
-[[config-keys]] · [[nats-cli]]
+[[build-a-3-node-cluster]] · [[install-nats-server]] · [[replicas]] · [[raft-in-nats]] · [[nats-cli]]

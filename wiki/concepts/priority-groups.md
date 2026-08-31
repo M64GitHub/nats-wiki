@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [priority-groups, overflow, pinned_client, prioritized, unpin, 423]
 aliases: [priority group, pinned client, overflow policy, PriorityPolicy]
-sources: [s-adr-42-priority-groups, s-docs-policies, s-nats-server-constants-2.14.6]
+sources: [s-adr-42-priority-groups, s-docs-policies, s-nats-server-constants-2.14.6, s-docs-upgrade-to-2.12]
 created: 2026-08-31
 updated: 2026-08-31
 ---

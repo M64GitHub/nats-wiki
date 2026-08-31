@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -234,4 +234,5 @@ when you retire it.
 
 [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] · [[s-docs-surviving-node-loss]] ·
 [[s-docs-placement]] · [[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] ·
-[[s-docs-upgrade-to-2.12]] · [[s-nats-server-jetstream-log-warnings]] · [[s-adr-61-meta-quorum-rescue]]
+[[s-docs-upgrade-to-2.12]] · [[s-nats-server-jetstream-log-warnings]] · [[s-adr-61-meta-quorum-rescue]] ·
+[[s-docs-rolling-upgrades]]

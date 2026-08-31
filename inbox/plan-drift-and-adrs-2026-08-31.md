@@ -1,5 +1,8 @@
 # Plan — drift detection, the docs-issue sweep, and the ADRs (proposed 2026-08-31)
 
+**Result (2026-08-31).** All five steps done. Two tools now exist that did not — `check-defaults.py` swept all 216 documented defaults against v2.14.6 and `check-staleness.py` is wired into lint — the generated config reference has been swept end to end (**docs issues #27–#33**, taking the report from 26 findings to 33), and the wiki went from 200 to **215 pages** with the question bank at **67 of 104 answered, ★ 36 of 42**.
+The last two open ★ sizing rows are closed: `filestore-layout` states the per-message record cost read at the tag *and* measured on the binary, so [[jetstream-sizing]] no longer has an unknown term except IOPS. **Next plan:** `inbox/plan-the-unread-chapters-2026-08-31.md` — written 2026-08-31 after auditing the bank and the docs tree, and **not** the `meta-layer` plan this line first proposed. The audit found two ★ rows already answered and never marked, and 13 more open rows whose answers are already sitting unread in `raw/nats-docs/` (the JetStream chapter is 9 of 22; `key-value`, `object-store`, `mqtt` and `websocket` are all zero). `meta-layer` and `stream-leader-keeps-moving` keep: they need `server/jetstream_cluster.go` read properly and the two rows they serve are not ★.
+
 Say **`start the plan`** to work this file; `CLAUDE.md` → *Operation: plan* says how. One step at a
 time, `status:` rewritten in place, `wiki/log.md` appended, lint run, question-bank cells filled, and
 each step reported before the next begins.
@@ -113,7 +116,7 @@ and the purge sweep produced a third against the generated reference (**#32**). 
 the three new pages that could be run was run on the v2.14.6 binary:
 `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`.
 
-## Step 5 — the sizing rows nobody has answered · status: open
+## Step 5 — the sizing rows nobody has answered · status: done 2026-08-31 — `filestore-layout` written; Q1 and Q2 answered; 8 pages rippled; docs issue #33
 
 **Q1** (size a 3-node R3 cluster for a given rate, size and retention) and **Q2** (what a stream costs
 on disk beyond the raw bytes) are the two oldest ★ rows in the bank and the only ones in the

@@ -18,8 +18,8 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 
 | # | question | area | asked at | flags | answered by |
 |---|---|---|---|---|---|
-| 1 | How do I size a 3-node R3 JetStream cluster (disk, RAM, IOPS) for a given message rate, size and retention? | jetstream deploy | [gh#6879](https://github.com/nats-io/nats-server/discussions/6879) | ★ sizing | |
-| 2 | How much disk does a stream actually use beyond the raw message bytes (blocks, index, per-subject state)? | jetstream | [gh#5742](https://github.com/nats-io/nats-server/discussions/5742) | ★ sizing internals | |
+| 1 | How do I size a 3-node R3 JetStream cluster (disk, RAM, IOPS) for a given message rate, size and retention? | jetstream deploy | [gh#6879](https://github.com/nats-io/nats-server/discussions/6879) | ★ sizing | [[jetstream-sizing]] · [[filestore-layout]] |
+| 2 | How much disk does a stream actually use beyond the raw message bytes (blocks, index, per-subject state)? | jetstream | [gh#5742](https://github.com/nats-io/nats-server/discussions/5742) | ★ sizing internals | [[filestore-layout]] · [[jetstream-sizing]] |
 | 3 | What does a stream actually cost in resources, and how do I run JetStream in the most resource-effective way? | jetstream | [gh#4227](https://github.com/nats-io/nats-server/discussions/4227) | ★ sizing | [[jetstream-sizing]] |
 | 4 | Is there a practical cap on the number of messages in a single stream? | jetstream | [gh#7147](https://github.com/nats-io/nats-server/discussions/7147) | sizing | |
 | 5 | What is the largest known-good value for MaxMsgs on a stream? | jetstream | [gh#7032](https://github.com/nats-io/nats-server/discussions/7032) | sizing config | |
@@ -64,7 +64,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 44 | Why do I get duplicate messages on a leafnode cluster connected to a supercluster? | topology | [gh#4823](https://github.com/nats-io/nats-server/discussions/4823) | gotcha | [[duplicate-messages-across-a-leafnode]] |
 | 45 | How do I get multi-region availability without paying for cross-region latency? | topology | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ pattern | [[multi-region-jetstream]] · [[choosing-a-topology]] |
 | 46 | What causes performance degradation in a global supercluster? | topology | [gh#7494](https://github.com/nats-io/nats-server/discussions/7494) | gotcha | [[supercluster-slows-when-a-remote-subscriber-joins]] · [[gateway]] |
-| 47 | Why does an asymmetric cluster configuration fail to form? | topology | [gh#7190](https://github.com/nats-io/nats-server/discussions/7190) | gotcha | [[build-a-3-node-cluster]] |
+| 47 | Why does an asymmetric cluster configuration fail to form? | topology | [gh#7190](https://github.com/nats-io/nats-server/discussions/7190) | gotcha | [[build-a-3-node-cluster]] · [[monitoring-endpoints]] |
 | 48 | How do I restrict which subjects a leafnode exports and imports? | topology security | [gh#5941](https://github.com/nats-io/nats-server/discussions/5941) | config | [[leafnode]] · [[cross-account-sharing]] |
 | 49 | How do I set up operator / account / user JWTs correctly? | security | [gh#7854](https://github.com/nats-io/nats-server/discussions/7854) | ★ runbook | [[set-up-operator-mode]] · [[operator-mode]] |
 | 50 | How do I rotate TLS certificates without downtime, and how do I detect expiry? | security | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ runbook | [[rotate-tls-certificates]] · [[tls-in-nats]] |
@@ -75,7 +75,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 55 | Which configuration changes actually take effect on reload, and which need a restart? | deploy | [gh#7126](https://github.com/nats-io/nats-server/discussions/7126) | ★ config gotcha | [[reload-server-config]] · [[config-keys]] |
 | 56 | How do I deny unauthenticated connections without breaking system users? | security | [gh#4535](https://github.com/nats-io/nats-server/discussions/4535) | gotcha | [[unauthenticated-clients-still-connect]] · [[account]] |
 | 57 | Which endpoints and metrics should I actually alert on for a JetStream cluster? | monitoring | [gh#6182](https://github.com/nats-io/nats-server/discussions/6182) | ★ runbook | [[monitoring-endpoints]] · [[advisories]] |
-| 58 | How do I find which consumer the server has flagged as slow? | monitoring | [gh#6605](https://github.com/nats-io/nats-server/discussions/6605) | ★ gotcha | |
+| 58 | How do I find which consumer the server has flagged as slow? | monitoring | [gh#6605](https://github.com/nats-io/nats-server/discussions/6605) | ★ gotcha | [[slow-consumer-detected]] · [[monitoring-endpoints]] |
 | 59 | Are there metrics for acked, naked, terminated and redelivered messages? | monitoring jetstream | [gh#6962](https://github.com/nats-io/nats-server/discussions/6962) | monitoring | [[advisories]] · [[consumer]] |
 | 60 | How is CPU % in /varz measured, and why does it look wrong in containers? | monitoring | [gh#7483](https://github.com/nats-io/nats-server/discussions/7483) | gotcha | |
 | 61 | How are the RTT values in /routez and /connz measured? | monitoring | [gh#7362](https://github.com/nats-io/nats-server/discussions/7362) | monitoring | |
@@ -89,7 +89,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 69 | How do I watch many KV keys at once without creating a watcher for each one? | kv | [gh#6746](https://github.com/nats-io/nats-server/discussions/6746) | ★ gotcha | [[key-value]] · [[kv-watchers-stall-the-cluster]] |
 | 70 | How do I count the keys in a KV bucket without fetching them all? | kv | [gh#7365](https://github.com/nats-io/nats-server/discussions/7365) | gotcha | [[key-value]] |
 | 71 | Does KV support a TTL per key, and since which version? | kv | [gh#7264](https://github.com/nats-io/nats-server/discussions/7264) | config | [[message-ttl]] · [[key-value]] |
-| 72 | Why doesn't deleting or purging keys reclaim disk space in a bucket? | kv | [gh#6015](https://github.com/nats-io/nats-server/discussions/6015) | ★ gotcha | [[key-value]] |
+| 72 | Why doesn't deleting or purging keys reclaim disk space in a bucket? | kv | [gh#6015](https://github.com/nats-io/nats-server/discussions/6015) | ★ gotcha | [[key-value]] · [[filestore-layout]] |
 | 73 | When is KV or Object Store the wrong tool — where does Redis or a database win? | kv objectstore | [so#75576454](https://stackoverflow.com/questions/75576454/nats-object-store-or-key-value-store-vs-redis-cache) | concept | |
 | 74 | How do I implement a distributed lock or lease with KV? | kv | [so#79400839](https://stackoverflow.com/questions/79400839/how-to-use-nats-kv-for-distributed-locking) | pattern | |
 | 75 | Why is listing an object-store bucket slow (or timing out) while uploads run? | objectstore | [gh#6836](https://github.com/nats-io/nats-server/discussions/6836) | gotcha | |
@@ -117,7 +117,7 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 97 | Does a config reload actually pick up a renewed certificate file, or do I need a restart? | security deploy | [gh#7684](https://github.com/nats-io/nats-server/discussions/7684) | ★ gotcha | |
 | 98 | Is there a limit on how many accounts one account can import from? | security topology | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | sizing | |
 | 99 | What happens when JetStream runs out of disk, and why does `insufficient storage resources available (10047)` appear on an almost empty volume? | jetstream deploy | [issue#4281](https://github.com/nats-io/nats-server/issues/4281) | ★ gotcha sizing | [[jetstream-out-of-disk]] |
-| 100 | Why does the auto-sized `max_file_store` get smaller every time the server restarts? | jetstream deploy | [issue#8322](https://github.com/nats-io/nats-server/issues/8322) | ★ gotcha config | [[jetstream-out-of-disk]] |
+| 100 | Why does the auto-sized `max_file_store` get smaller every time the server restarts? | jetstream deploy | [issue#8322](https://github.com/nats-io/nats-server/issues/8322) | ★ gotcha config | [[jetstream-out-of-disk]] · [[config-keys]] |
 | 101 | Why does a cluster stop recovering when a thousand clients each open a KV watcher? | kv topology | [gh#5243](https://github.com/nats-io/nats-server/discussions/5243) | ★ gotcha sizing | [[kv-watchers-stall-the-cluster]] |
 | 102 | Does a leafnode need its own JetStream domain, and what does setting one actually change? | jetstream topology | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | concept config | [[jetstream-domain]] |
 | 103 | Can a leaf region later become the hub, or a regular cluster be converted into a leaf cluster without losing data? | topology deploy | [gh#7438](https://github.com/nats-io/nats-server/discussions/7438) | ★ concept | |

@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -164,6 +164,25 @@ JetStream's memory footprint — see [[jetstream-sizing]].
 - **The docs never state this default.** The `StreamConfig` schema says only "0 for default" —
   recorded as issue 5 in `inbox/docs-issues.md`.
 
+## What a stream's reported `bytes` actually counts
+
+`nats stream info` reports **record bytes, not payload bytes**. Each stored message costs
+`30 + len(subject)` beyond its payload — a 22-byte record header (`total_len`, `seq`, `ts`,
+`subj_len`) plus an 8-byte checksum, with the subject written verbatim — and `4 + len(headers)` more
+when it carries headers (source: [[s-nats-server-filestore-layout]], `nats-server 2.14.6`).
+
+Everything that meters a stream uses that figure: `max_bytes`, `/jsz` `storage`, and an account's
+`MaxStore`. Payload bytes are reported nowhere.
+
+A **memory** stream counts differently — `len(subject) + len(headers) + len(payload) + 16` — so the
+same message reports 135 B in a file stream and 121 B in a memory stream. The two numbers are not
+comparable, and switching a stream's storage type changes its reported size.
+
+The physical file is larger again: deletes leave the record in place and add a 30-byte tombstone,
+and the newest message block is never compacted. See [[filestore-layout]] for the arithmetic and
+[[jetstream-sizing]] for what to do with it.
+
+
 ## Related
 
 [[consumer]] · [[retention-policies]] · [[replicas]] · [[stream-placement]] · [[raft-in-nats]] ·
@@ -181,4 +200,4 @@ JetStream's memory footprint — see [[jetstream-sizing]].
 [[s-nats-server-snapshot-restore]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]].
+[[nats-server-2.14]]. · [[s-nats-server-filestore-layout]]

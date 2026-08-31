@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10047, 10028, max_bytes, max_file_store, reserved_storage, out-of-space, OUT_OF_STORAGE]
 aliases: ["JetStream out of disk", "insufficient storage resources available", "insufficient memory resources available", "JetStream out of resources will be DISABLED", "10047", "10028", "out of storage"]
-sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources]
+sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -184,6 +184,42 @@ inside the container while the host has space (source: [[s-issue-4281-insufficie
   know how many resources will be ultimately available. This needs to be handled out of band"
   (`jetstream.go:2633–2635`). Capacity planning cannot lean on the server to catch it.
 
+## The volume can fill while every JetStream number says there is room
+
+Every storage figure the server enforces or reports — `max_file_store`, a stream's `max_bytes`, an
+account's `MaxStore`, `/jsz` `storage`, `/varz` `jetstream.stats.storage` — is the sum of the
+**live message records**. None of them is the size of the files
+(source: [[s-nats-server-filestore-layout]], `nats-server 2.14.6`).
+
+The gap comes from three places, all documented on [[filestore-layout]]:
+
+- deleted records stay in their block until it is compacted, and each delete **adds** a 30-byte
+  tombstone;
+- a block is only rewritten when **more than half of it is dead** — and only after `sync_interval`
+  (default `2m`) if it is under 2MB;
+- the **newest block is never compacted at all**, by design.
+
+Measured: a server configured `max_file_store: 4MB` held **3,786,236 bytes** in its store directory
+while `/jsz` reported **133,000 bytes** used — 3% of its own ceiling. Nothing was logged, and the
+server would have accepted another 4 MB of logical writes.
+
+**How to confirm on a running node**
+
+```
+curl -s localhost:8222/jsz | jq '{storage, reserved_storage, max: .config.max_storage}'
+du -sb  /var/lib/nats/jetstream/
+df -h   /var/lib/nats/jetstream
+```
+
+If `du` is far above `storage`, look for the stream that is idle and mostly-discarded rather than for
+a leak — and give any busy stream one `sync_interval` before concluding anything.
+
+**The fix** is to size the volume above `max_file_store`, not equal to it: `stream_bytes × 1.1` plus
+one block size (usually 8MB, 4MB for a KV bucket) per stream. See [[jetstream-sizing]] step 1b.
+This is recorded as **docs issue #33** — the docs' own sizing example sets `max_file_store` to the
+volume size.
+
+
 ## A docs error worth knowing
 
 The generated `reference/config/jetstream/max_file_store.md` says the key "Defaults to up to 1TB if
@@ -211,4 +247,4 @@ values.
 - [[s-issue-8322-dynamic-maxstore-shrinks]] — the shrinking dynamic limit and the 2.14.6 fix.
 - [[s-nats-server-jetstream-resources]] — every code path above, read at v2.14.6 with file and line.
 - [[s-gh-7463-jetstream-corruption]] — the log line appearing with a nearly empty disk.
-- [[s-docs-sizing-and-resources]] — the docs page that states the 75% default correctly.
+- [[s-docs-sizing-and-resources]] — the docs page that states the 75% default correctly. · [[s-nats-server-filestore-layout]]

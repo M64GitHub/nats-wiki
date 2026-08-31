@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -109,6 +109,13 @@ peer**. Health is therefore **presence, not count**: group by `remote_name` and 
 is still there. A vanished peer, or a climbing `rtt`, is the first sign a node has dropped off the
 mesh.
 
+**The check only means anything cluster-wide, and only after every node is up.** A lone healthy node
+legitimately has no routes, so `/routez` on one server proves nothing; what a partial split-brain
+looks like is the *same non-zero number on every row* failing to hold — every node still agreeing on
+the cluster name and appearing in the list, with only the connection counts differing. Confirmed on a
+2.11.7 cluster (source: [[s-gh-7190-asymmetric-cluster]]); see
+[[build-a-3-node-cluster]].
+
 ### `/jsz` — scope it or it will time out
 
 `/jsz` reports streams, consumers, `meta_cluster.leader`, and the per-stream and per-consumer
@@ -144,6 +151,26 @@ or one named stream or consumer. **`js-enabled` is deprecated in favour of `js-e
 Since **2.14** a filestore I/O error **freezes the affected stream and reports unhealthy here**,
 with the error text containing `write error`; the server keeps serving core traffic and needs a
 restart to recover (source: [[nats-server-2.14]]).
+
+**Which variant belongs on which Kubernetes probe** — the mapping the Helm chart renders, all three
+on the monitor port `8222` (source: [[s-docs-kubernetes]]; see [[nats-helm-charts]]):
+
+| probe | path | note |
+|---|---|---|
+| `startupProbe` | `/healthz` | the unqualified form, `failureThreshold: 90` — a JetStream server may take a long time to come up |
+| `readinessProbe` | `/healthz?js-server-only=true` | ready when *this* server is up, without waiting on the meta layer |
+| `livenessProbe` | `/healthz?js-enabled-only=true` | the loosest question, so a lagging stream never triggers a restart loop |
+
+The gradient is deliberate: the liveness probe must ask the *least*, or a slow-recovering stream
+restarts the pod that is recovering it.
+
+**An unhealthy answer is not always about the server.** A consumer that has fallen behind fails the
+check by name, which is how a KV watcher's ephemeral consumer can turn a node unhealthy — observed on
+2.10.12 (source: [[s-gh-5243-kv-watchers-at-scale]]):
+
+```
+[WRN] Healthcheck failed: "JetStream consumer '$G > KV_wincloud-sdc-delta > h0mGFs2q' is not current"
+```
 
 ### `/varz` — certificate expiry, per listener
 
@@ -252,12 +279,28 @@ The Leafnode Report's two columns worth reading carefully:
   all**, only field lists.
 - `DEFAULT_HTTP_PORT` is read from the server source at v2.14.6.
 
+## From an endpoint to a time series
+
+`prometheus-nats-exporter` runs **outside** NATS, scrapes this port and serves its own `/metrics`;
+it "holds no history of its own; it answers each scrape from a fresh read of the monitoring port".
+The rule worth knowing here is that **the metric names follow the wire fields** — `num_pending`
+becomes `nats_consumer_num_pending` — with `-jsz` turning on the JetStream collector and the default
+`jetstream_` prefix renamed to `nats_` by `-prefix nats`, "the same rename the NATS Helm chart
+applies". So any field named on this page can be found as a series, and the exporter's invocation,
+its labels and the metric list are on [[prometheus-nats-exporter]]
+(source: [[s-docs-prometheus-and-dashboards]]).
+
 ## What is deliberately not here
 
 **Response fields.** Each endpoint's response schema runs to dozens of fields and is generated; the
 docs' own pages are the place for them. The fields above are the ones this wiki has a reason to
 explain. `/raftz`'s field set, in particular, is referenced by [[raft-in-nats]] but **has not been
 ingested** — it is the next monitoring source worth taking.
+
+**Account visibility over `$SYS`.** What an account can see of itself does not travel over this port:
+`nats account info` asks `$SYS.REQ.USER.INFO`, and a narrow publish allow-list silently blanks the
+answer while `/accountz` keeps working. That surface is on [[account]] and [[js-api-subjects]]
+(source: [[s-docs-accounts-and-multitenancy]]).
 
 ## Seeing the internal replication consumers
 
@@ -274,10 +317,37 @@ curl -s 'http://127.0.0.1:8222/jsz?streams=true&consumers=true&direct-consumers=
 sequences can be compared against the upstream's state. The same `StreamDetail` carries `mirror` and
 `sources` (each a `StreamSourceInfo` with `lag`, `active` and `error`) whenever `streams=true`, and
 the identical data is available over NATS at `$SYS.REQ.SERVER.PING.JSZ`
-(source: [[s-adr-59-sourcing-and-mirroring]]).
+(source: [[s-adr-59-sourcing-and-mirroring]]). **`active` is the JSON name for what the `nats` CLI
+prints as `Last Seen`** — a growing value means the `lag` you just read is already stale
+(source: [[s-docs-mirrors-as-dr]]; the RPO reading is on [[mirrors-and-sources]]).
 
 Other `/jsz` selectors from the same spec: `acc`, `leader-only`, `stream-leader-only`, `raft`,
 `offset` and `limit`.
+
+
+## `storage` is a logical figure, not disk
+
+`/jsz` `storage`, `/varz` `jetstream.stats.storage` and every per-stream `state.bytes` under
+`/jsz?streams=1` report the same thing: the sum of the **live message record lengths**
+(`30 + len(subject) + len(payload)`, plus `4 + len(headers)`). None of them is the size of the files
+under `store_dir` (source: [[s-nats-server-filestore-layout]], `nats-server 2.14.6`).
+
+Measured on one node holding ten streams: `storage` **37,891,637**, exactly the sum of the ten
+`state.bytes`; the store tree on disk **39,881,215** — 5.25% more. On a single idle stream the gap
+reached **8.5×**. See [[filestore-layout]] for why, and [[jetstream-out-of-disk]] for what it costs.
+
+`reserved_storage` is a third figure again: the sum of every stream's `max_bytes`, counted whether
+or not anything is stored.
+
+**Monitor all three, and `df` as well.** No endpoint reports physical size, so a disk alert has to
+come from the node, not from NATS:
+
+```
+curl -s localhost:8222/jsz | jq '{storage, reserved_storage, max: .config.max_storage}'
+```
+
+`/jsz` also prints the effective **`config.sync_interval`** (nanoseconds; `120000000000` = the `2m`
+default), which is the cadence on which block compaction and the `index.db` snapshot run.
 
 
 ## Related
@@ -288,4 +358,6 @@ Other `/jsz` selectors from the same spec: `acc`, `leader-only`, `stream-leader-
 
 ## Sources
 
-[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] · [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] · [[s-docs-putting-it-together]] · [[s-adr-59-sourcing-and-mirroring]]
+[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-relnotes-2.14.0]] · [[s-nats-server-auth-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] · [[s-nats-server-jetstream-resources]] · [[s-issue-4281-insufficient-storage]] · [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] · [[s-docs-putting-it-together]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-nats-server-filestore-layout]] ·
+[[s-docs-hardening]] ·
+[[s-docs-accounts-and-multitenancy]] · [[s-docs-encryption-and-tls]] · [[s-docs-kubernetes]] · [[s-docs-mirrors-as-dr]] · [[s-docs-prometheus-and-dashboards]] · [[s-docs-single-server]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7190-asymmetric-cluster]]

@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [ack, nak, term, ack_wait, max_deliver, max_ack_pending, backoff, advisories]
 aliases: [acknowledgement, acknowledgment, ack, nak, term, at-least-once, AckWait, MaxDeliver]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies]
 created: 2026-08-31
 updated: 2026-08-31
 ---

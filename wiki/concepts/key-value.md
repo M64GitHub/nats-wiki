@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [kv, bucket, tombstone, watch, direct-get]
 aliases: [KV, key value, KV bucket, KV_]
-sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs]
+sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -235,6 +235,28 @@ over the account's whole JetStream control plane, not one bucket; narrowing it t
 - Whether a **mirror on file storage** is materially slower than on memory storage (Q76) is not
   covered.
 
+## What a bucket costs on disk
+
+A bucket is a stream with `max_msgs_per_subject` set to its history, and that single fact fixes its
+on-disk shape (source: [[s-nats-server-filestore-layout]], `nats-server 2.14.6`):
+
+- **Block size is 4MB**, always — `max_msgs_per_subject` takes the `defaultKVBlockSize` branch of
+  `autoTuneFileStorageBlockSize` (`stream.go:1412–1443`) regardless of how small the bucket is.
+  Budget 4MB of slack per bucket: the newest block is never compacted, so a small idle bucket can
+  hold several megabytes on disk while reporting a few hundred kilobytes.
+- **Each key costs `len($KV.<bucket>.<key>) + 4` bytes in `index.db`**, the stream's full-state
+  snapshot, rewritten every two minutes plus jitter. Measured at 40,000 keys: a 708,987-byte
+  `index.db`. A bucket with a million keys is tens of megabytes of `index.db` per replica, rewritten
+  on that cadence — this is the cost that scales with **key count**, not with value size.
+- **Each revision costs `30 + len(subject)` bytes** beyond the value, and `4 + len(headers)` more
+  for the headers KV puts on every entry.
+
+Above **1,000,000** subjects the periodic `index.db` write is skipped entirely
+(`highCardinalityThreshold`), so a very large bucket stops getting one.
+
+See [[filestore-layout]] for the mechanism and [[jetstream-sizing]] for sizing a volume from it.
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[ordered-consumer]] · [[message-ttl]] · [[direct-get]] ·
@@ -245,4 +267,4 @@ over the account's whole JetStream control plane, not one bucket; narrowing it t
 
 [[s-adr-8-key-value-store]] · [[s-adr-43-per-message-ttl]] · [[s-adr-17-ordered-consumer]] ·
 [[s-docs-stream-config]] · [[s-gh-7017-kv-across-accounts]] · [[s-gh-5606-cross-account-jetstream]] ·
-[[s-gh-6746-watch-many-keys]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-adr-48-kv-ttl]] · [[s-adr-57-kv-subject-transforms]] · [[s-adr-54-kv-codecs]]
+[[s-gh-6746-watch-many-keys]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-adr-48-kv-ttl]] · [[s-adr-57-kv-subject-transforms]] · [[s-adr-54-kv-codecs]] · [[s-nats-server-filestore-layout]]

@@ -72,6 +72,9 @@ exists to answer live in `inbox/question-bank.md`.
   `no suitable peers for placement` (10005).
 - [[js-api]] — `$JS.API` request-reply, paged listings, the `code` / `err_code` / `description`
   envelope, and why you must never match on error text.
+- [[filestore-layout]] — what a file stream writes under `store_dir`: the 30-byte record overhead,
+  the three block sizes the server picks for you, why a delete makes the file *bigger*, the last
+  block that is never compacted, and `index.db` at `len(subject) + 4` per subject.
 
 ## Operations
 
@@ -102,8 +105,9 @@ exists to answer live in `inbox/question-bank.md`.
 
 **Sizing**
 
-- [[jetstream-sizing]] — disk, RAM, CPU and FDs for a JetStream node; the JetStream storage
-  defaults, the `replicas × bytes` account rule, a worked example, and what is still unmeasurable.
+- [[jetstream-sizing]] — disk, RAM, CPU and FDs for a JetStream node; the `30 + len(subject)`
+  per-message record cost and the block-size slack, the JetStream storage defaults, the
+  `replicas × bytes` account rule, a worked example, and IOPS as the one term still unsourced.
 
 **Patterns**
 
@@ -304,6 +308,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-jetstream-resources]] — what "out of storage" actually means: the 75%-of-**free**
   disk default, `finalizeDynamicMaxStore` (new in 2.14.6), what `10047` compares, and the
   out-of-space handler's two callers.
+- [[s-nats-server-filestore-layout]] — the filestore read at v2.14.6 and then measured on the
+  binary: `30 + len(subject)` per message, the block-size clamps, the never-compacted last block
+  (8.5× on an idle stream), `index.db` per subject, and `max_file_store` bounding a logical figure.
 - [[s-nats-server-leafnode-js-domains]] — the three outcomes of a leafnode carrying JetStream, the
   `$JS.<domain>.API.>` mapping table, and the server's explicit guard against two identical domains.
 - [[s-nats-server-jetstream-log-warnings]] — every JetStream warning this wiki quotes, with its
@@ -536,7 +543,9 @@ These are deliberately unresolved links; ingest a source to fill them.
 Concepts: *(none — `leafnode` and `gateway` were written 2026-08-31, together with
 `jetstream-domain` and `choosing-a-topology`; see the Concepts section above)*
 
-Internals: [[filestore-layout]] · [[meta-layer]]
+Internals: [[meta-layer]]
+
+`filestore-layout` was written 2026-08-31 and is in the Internals section above.
 
 Operations: *(none — `rotate-tls-certificates` was written 2026-08-31; see the Operations section above)*
 

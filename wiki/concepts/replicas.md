@@ -233,4 +233,5 @@ Two constraints to read alongside them:
 ## Sources
 
 [[s-docs-surviving-node-loss]] · [[s-docs-replication-and-r3]] · [[s-docs-stream-config]] ·
-[[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-as-dr]] · [[s-docs-jetstream-in-a-cluster]]
+[[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-as-dr]] · [[s-docs-jetstream-in-a-cluster]] ·
+[[s-docs-single-server]] · [[s-docs-disaster-recovery]]

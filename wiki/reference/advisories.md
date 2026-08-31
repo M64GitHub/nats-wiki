@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -52,6 +52,9 @@ events. Source: `server/jetstream_api.go` at v2.14.6
 | snapshot complete | `$JS.EVENT.ADVISORY.STREAM.SNAPSHOT_COMPLETE` | 277 |
 | restore started | `$JS.EVENT.ADVISORY.STREAM.RESTORE_CREATE` | 280 |
 | restore complete | `$JS.EVENT.ADVISORY.STREAM.RESTORE_COMPLETE` | 283 |
+
+(The four snapshot and restore rows are read from the server at v2.14.6, source:
+[[s-nats-server-snapshot-restore]]; the operation they trace is [[backup-and-restore-jetstream]].)
 | stream leader elected | `$JS.EVENT.ADVISORY.STREAM.LEADER_ELECTED` | 289 |
 | **stream quorum lost** | `$JS.EVENT.ADVISORY.STREAM.QUORUM_LOST` | 292 |
 | batch abandoned | `$JS.EVENT.ADVISORY.STREAM.BATCH_ABANDONED` | 295 |
@@ -86,6 +89,19 @@ Connect and disconnect are published per account on `$SYS.ACCOUNT.<account>.CONN
 Separately, each server publishes a **`STATSZ` heartbeat on `$SYS.SERVER.<id>.STATSZ`** on a fixed
 interval, carrying the same kind of summary numbers as `/varz` — **pushed instead of polled**, so a
 listener has a steady pulse from every node (source: [[s-docs-monitoring-endpoints]]).
+
+A server also publishes per-account connection counts on
+**`$SYS.SERVER.ACCOUNT.<ACCOUNT>.CONNS`**, visible to a system-account user.
+
+**None of this is reachable without a system-account user, and that is easy to lose.** The moment a
+config declares its own `accounts` block without naming a `SYS` account, the system account has no
+user, "server events are unreachable" and the event tooling stops working — `nats server account
+info` included. Declare a `SYS` account, set `system_account`, and give it a user
+(source: [[s-docs-accounts-and-multitenancy]]); see [[account]] and [[config-keys]]. To watch them:
+
+```
+nats subscribe '$SYS.SERVER.>' --user sys-admin --password syspass
+```
 
 ### Coming in 2.15: the meta-rescue advisory
 
@@ -187,4 +203,6 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 
 [[s-nats-server-constants-2.14.6]] · [[s-adr-42-priority-groups]] · [[s-docs-acknowledgment]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-jetstream-resources]] ·
-[[s-nats-server-jetstream-log-warnings]]
+[[s-nats-server-jetstream-log-warnings]] ·
+[[s-adr-61-meta-quorum-rescue]] ·
+[[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]]

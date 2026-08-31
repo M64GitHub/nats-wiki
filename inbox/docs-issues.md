@@ -21,13 +21,15 @@ documented defaults** in `inbox/config-keys-table.md` against the option parser,
 flags and the constants of `nats-server` v2.14.6 (report: `inbox/check-defaults-v2.14.6.md`). That
 sweep re-derived #19, #22 and #23 from the source with no human input, found the three below, and
 left 26 keys it could not resolve — those are listed in the report for a human, not guessed at.
-Rows 30–32 were found while working step 4 of that plan (the remaining ★ ADRs): two are **ADR** errors
+Row 33 was found while working step 5 (the sizing rows), by reading `server/filestore.go` at v2.14.6 and
+then measuring the same claims on the binary. Rows 30–32 were found while working step 4 of that plan (the remaining ★ ADRs): two are **ADR** errors
 rather than docs errors, which is the direction that matters for client and tooling authors, and one
 is a generator bug that repeats on every page it touches. Verified against **nats-server v2.14.6**
 and the docs tree fetched **2026-08-31**. Where a row says *observed*, the behaviour was **run on the
 v2.14.6 binary**, not only read from the source at that tag; the configs and output are in
 `raw/nats-server-src/topology-observed-v2.14.6.md` and, for rows 30–31,
-`raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
+`raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md`; for row 33,
+`raw/nats-server-src/filestore-observed-v2.14.6.md`. Rows 8–10 concern **client** claims, so their authority is
 the client repository at its current release plus the package registry, not the server — stated per
 row.
 
@@ -65,6 +67,7 @@ row.
 | 30 | ADR-35 says a `compression` change applies to "newly minted blocks"; on a live stream the running store keeps writing with the algorithm it was **created** with, so nothing changes until the store re-opens | `nats-architecture-and-design` ADR-35 | wrong-value | medium | wiki states the observed behaviour and says the docs are right here |
 | 31 | The connection spec's **Servers discovery** section is two paragraphs, a truncated sentence and a `TODO`, in an ADR marked *Implemented* — so what a server advertises to clients is stated nowhere public; `max reconnects` also has no readable default (`**default: 3 / none`) | `nats-architecture-and-design` ADR-40 | missing | medium | wiki observes the `INFO` directly and records what the server sends |
 | 32 | Every `unsigned 64 bit integer` field in the generated JetStream reference publishes `Maximum: 18446744073709552000` — **385 more than uint64 can hold**, and a value the server cannot accept. 11 pages, all of them | `reference/jetstream/api/*`, `reference/jetstream/advisory/*`, `reference/jetstream/metric/consumer-ack.md` | wrong-value | low | wiki quotes no maximum from these pages |
+| 33 | The sizing chapter tells operators to pin `max_file_store` to the volume size, and never says that **every JetStream storage figure is logical, not physical** — a server set to `max_file_store: 4MB` was measured holding 3.79 MB on disk while reporting 133,000 bytes used. The per-message record overhead (`30 + len(subject)`) is also stated nowhere in the tree | `learn/deployment/sizing-and-resources.md`, `reference/config/jetstream/max_file_store.md` | missing | ★ high | wiki states the arithmetic and the slack, observed |
 
 ---
 
@@ -1508,6 +1511,101 @@ to be told that a uint64 field holds a uint64, and a wrong number is worse than 
 
 ---
 
+## 33 · The docs' own `max_file_store` advice does not protect the volume ★
+
+**Impact: an operator who follows the sizing chapter exactly can fill the disk while every NATS
+number says there is room.** This is the same failure shape as #22, one layer up: #22 was the wrong
+*default*; this is the missing fact that makes the *recommended setting* unsafe.
+
+**What the docs say.** `learn/deployment/sizing-and-resources.md` sets the key to the volume size
+and moves on:
+
+> "Pin `max_file_store` to what the volume can actually hold"
+
+```
+jetstream {
+  store_dir:      "/var/lib/nats/jetstream"
+  max_memory_store: 256MB
+  max_file_store:   10GB
+}
+```
+
+> "A 10 GiB `max_file_store` per node leaves ample room for an ORDERS stream sized to fit the default
+> 10 GiB volume the Kubernetes chapter provisions."
+
+**What the server does.** `max_file_store` is compared against the sum of the **live message record
+lengths**, the same figure `nats stream info`, `/jsz` `storage` and an account's `MaxStore` use.
+The files under `store_dir` are always larger, by three mechanisms in `server/filestore.go` at
+v2.14.6:
+
+- a delete leaves its record in the block **and appends a 30-byte tombstone** (`updateAccounting`,
+  `filestore.go:7696–7700`);
+- a block is only rewritten when **more than half of it is dead**, and only after `sync_interval`
+  (default `2m`) if it is under 2MB (`filestore.go:6254–6264`);
+- the **last block is never compacted at all** — `!isLastBlock` at `filestore.go:6151` and
+  `mb != lmb` under the comment `// Do not compact last mb.` at `filestore.go:8037–8039`.
+
+**Observed, on the v2.14.6 binary** (full run in
+`raw/nats-server-src/filestore-observed-v2.14.6.md`, §11). A server configured deliberately small:
+
+```
+jetstream { store_dir: "<store>"  max_file_store: 4MB  max_memory_store: 1MB }
+```
+
+```
+[INF]   Max Storage:     4.00 MB
+```
+
+One stream, `max_msgs_per_subject: 1000`, 60,000 messages published to one subject, then idle:
+
+```
+$ nats stream info CAP --json | jq '.state | {messages, bytes}'
+{ "messages": 1000, "bytes": 133000 }
+
+$ curl -s http://127.0.0.1:8233/jsz | jq '{storage, max: .config.max_storage}'
+{ "storage": 133000, "max": 4194304 }
+
+$ find <store> -type f -exec stat -f "%z %N" {} \;
+       508  .../streams/CAP/meta.inf
+        16  .../streams/CAP/meta.sum
+   3785712  .../streams/CAP/msgs/2.blk
+```
+
+**JetStream reports 3% of its ceiling used. The directory holds 90% of it.** Nothing is logged and
+nothing is wrong with the stream. Scale that to the documented example and a 10 GiB
+`max_file_store` on a 10 GiB volume has no margin at all.
+
+**The second half: the per-message overhead is nowhere in the tree.** A stored message costs
+`30 + len(subject)` bytes beyond payload and headers (`fileStoreMsgSizeRaw`,
+`filestore.go:9821–9828`), plus `4 + len(headers)` when headers are present. That is **+40% on a
+100-byte message** with a ten-character subject. A grep of all 861 pages for `emptyRecordLen`,
+`index.db`, "per-message overhead", "storage overhead" and "bytes per message" returns **one hit** —
+`learn/object-store/chunking.md`, which mentions "per-message overhead" qualitatively without a
+number. The sizing chapter, whose subject is exactly this, contains none of it.
+
+**Sweep of the neighbours.** Checked every page in the tree that states a JetStream storage number:
+`learn/deployment/sizing-and-resources.md`, `reference/config/jetstream.md` and its four
+`max_file_store` / `max_memory_store` / `store_dir` / `sync_interval` property pages,
+`learn/jetstream/shaping-the-stream.md`, `learn/jetstream/policies.md` and
+`reference/jetstream/api/stream/create.md`. **None of the nine states that the figure is logical**,
+and none gives the record overhead. `sync_interval` is documented as a durability knob with no
+mention that it is also the compaction cadence.
+
+**Suggested fix**, in the order that helps most:
+
+1. In `learn/deployment/sizing-and-resources.md`, one sentence: *"`max_file_store`, `max_bytes` and
+   `MaxStore` all count message records, not disk. Size the volume above `max_file_store`."*
+2. A worked overhead line in the same chapter: `record bytes = 30 + len(subject) + len(payload)
+   (+ 4 + len(headers))`.
+3. On `reference/config/jetstream/sync_interval.md`, say that this is also the interval at which
+   dead message blocks are compacted.
+
+**This wiki's handling:** [[filestore-layout]] states the layout and the arithmetic;
+[[jetstream-sizing]] step 1b gives the slack rule (`stream_bytes × 1.1 + 8MB per stream`);
+[[jetstream-out-of-disk]] carries the symptom.
+
+---
+
 ## Where the wiki records each of these
 
 | # | wiki page |
@@ -1541,3 +1639,4 @@ to be told that a uint64 field holds a uint64, and a wrong number is worse than 
 | 30 | `wiki/concepts/stream-compression.md` — *Changing it on a live stream does nothing until the store restarts*; `wiki/concepts/stream.md`; `wiki/summaries/s-adr-35-filestore-compression.md` |
 | 31 | `wiki/operations/how-clients-reach-a-cluster.md` — *What the server actually advertises*; `wiki/summaries/s-adr-40-nats-connection.md`; `wiki/operations/build-a-3-node-cluster.md` |
 | 32 | nowhere — the wiki quotes no maximum from these pages; recorded here so the generator bug is reported |
+| 33 | `wiki/internals/filestore-layout.md`; `wiki/operations/jetstream-sizing.md` — *Step 1* and *Step 1b*; `wiki/gotchas/jetstream-out-of-disk.md` — *The volume can fill while every JetStream number says there is room*; `wiki/reference/monitoring-endpoints.md` — *`storage` is a logical figure, not disk* |

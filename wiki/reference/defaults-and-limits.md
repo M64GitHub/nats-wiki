@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -45,6 +45,10 @@ From `server/const.go` at **v2.14.6** (source: [[s-nats-server-constants-2.14.6]
 
 † Quoted from `raw/nats-server-src/const-lame-duck-v2.14.6.md`, the range
 `constants-v2.14.6.md` stops short of; the docs agree (`reference/config.md` gives `2m` and `10s`).
+Both defaults are **confirmed in the field as well as in the source** — a 2026 report running stock
+`lame_duck_duration: 2m` and `lame_duck_grace_period: 10s` quotes them back
+(source: [[s-gh-6070-lame-duck-under-systemd]]).
+
 Both matter to a service unit: `TimeoutStopSec` must exceed `lame_duck_duration` or systemd kills the
 drain half-finished (source: [[s-nats-server-systemd-units]], [[install-nats-server]]). Both are also
 **enforced**: a duration under `30s` is rejected at parse time, and a grace period **≥** the duration
@@ -75,6 +79,12 @@ bound the Raft stepdown or JetStream shutdown that precede it (source:
 headroom — but `max_pending` **requires a restart** to change while `max_payload` is **hot
 reloadable**, so raising the payload ceiling past 64 MB is a two-stage change.
 
+**`max_pending` is also the ceiling on an unbounded Direct Get batch.** A batched
+`$JS.API.DIRECT.GET` request has **no flow control**: the server sends up to `max_bytes`, and when
+`max_bytes` is unset it uses `max_pending` — "the server default (currently 64MB)", which ADR-31
+states independently of the constant above (source: [[s-adr-31-direct-get]]). So this key bounds a
+read path as well as a connection's write queue; see [[direct-get]].
+
 ## JetStream — server
 
 | setting | default | source | explained by |
@@ -97,12 +107,41 @@ reloadable**, so raising the payload ceiling past 64 MB is a two-stage change.
 system's memory or disk size. This is the most commonly mis-stated pair of numbers in NATS sizing —
 and the generated `reference/config/jetstream/max_file_store.md` states the fallback as the default,
 which is **docs issue #22**. Every value in this block is now read from the server at **v2.14.6**
-rather than from a docs page (source: [[s-nats-server-jetstream-resources]]).
+rather than from a docs page (source: [[s-nats-server-jetstream-resources]]). The upstream issue
+behind #22 is where the maintainers state the auto-sizing rule twice and an operator asks whether it
+is documented anywhere (source: [[s-issue-8322-dynamic-maxstore-shrinks]]).
 
 **The two 75% figures are not the same kind of number.** Memory is 75% of the machine's *total* RAM;
 file storage is 75% of what is *free* under `store_dir` at the moment the server starts, so it falls
 as JetStream fills the volume. Before 2.14.6 that made the limit shrink at every restart — see
 [[jetstream-out-of-disk]].
+
+### The filestore's own constants
+
+Not configuration — these are compiled in, and they decide how much disk a stream really takes
+(source: [[s-nats-server-filestore-layout]], all `nats-server 2.14.6`). See [[filestore-layout]].
+
+| constant | value | source | explained by |
+|---|---|---|---|
+| record header + checksum per message (`emptyRecordLen`) | **30 B** (`msgHdrSize` 22 + `checksumSize` 8), plus `len(subject)`, plus `4 + len(headers)` when headers are present | `filestore.go:1119–1121`, `filestore.go:9821–9828` | [[filestore-layout]] · [[jetstream-sizing]] |
+| delete tombstone | **30 B**, appended on every message delete | `filestore.go:7396–7398` | [[filestore-layout]] |
+| memory-store per-message overhead | **16 B**, and no header-length field — a *different* formula | `memstore.go:2334–2336` | [[stream]] |
+| default block size, `limits` retention | **8MB** (`defaultLargeBlockSize`) | `filestore.go:361–362`, `filestore.go:844–846` | [[filestore-layout]] |
+| default block size, any other retention | **4MB** (`defaultMediumBlockSize`) | `filestore.go:363–364`, `filestore.go:847–849` | [[filestore-layout]] |
+| block size when `max_msgs_per_subject` is set — **every KV bucket** | **4MB** (`defaultKVBlockSize`) | `stream.go:1422–1424` | [[key-value]] |
+| minimum block size (`FileStoreMinBlkSize`) | **32,000 B** | `filestore.go:379–380` | [[filestore-layout]] |
+| maximum block size (`FileStoreMaxBlkSize`, `maxBlockSize`) | **8MB** | `filestore.go:375–376`, `filestore.go:381–382` | [[filestore-layout]] |
+| block size cap when encryption is on | **2MB** (`maximumEncryptedBlockSize`) | `filestore.go:371–372` | [[filestore-layout]] |
+| inline compaction floor (`compactMinimum`) | **2MB**, *and* the block must be more than half dead | `filestore.go:377–378`, `filestore.go:6254–6256` | [[filestore-layout]] |
+| the last message block | **never compacted**, on either path | `filestore.go:6151`, `filestore.go:8039` | [[filestore-layout]] |
+| `index.db` write cadence | **2m plus up to 30s of jitter**, forced on purge and clean stop | `filestore.go:11904–11906` | [[filestore-layout]] |
+| `index.db` cost | **`len(subject) + 4` per distinct subject**, plus ~8 per block | `filestore.go:12050–12056` | [[filestore-layout]] · [[key-value]] |
+| high-cardinality cut-off (`highCardinalityThreshold`) | **1,000,000** subjects or interior deletes — above it the periodic `index.db` write is skipped | `filestore.go:388–390`, `filestore.go:12006–12009` | [[filestore-layout]] |
+| per-block subject-state idle expiry (`defaultFssExpiration`) | `2m` | `filestore.go:337` | — |
+| bad-record-length guard (`rlBadThresh`) | `32MB` | `filestore.go:383–384` | — |
+
+**None of these is settable from a stream's config.** `nats stream info --json` reports no block
+size, and there is no monitoring field for one.
 
 ## Stream configuration
 
@@ -187,7 +226,8 @@ Two consequences worth carrying:
 - **`authorization { timeout }` is also the auth callout deadline.** The server uses it both as the
   authorization request's expiry and as the wait for a reply (`auth_callout.go:371`, `:447`), so an
   auth service's latency budget is this key — 3 seconds on a TLS-enabled server, not the 2 the docs
-  state. See [[auth-callout]].
+  state. The docs page for the feature repeats the 2-second figure without the TLS case
+  (source: [[s-docs-auth-callout]]). See [[auth-callout]].
 - **`tls { timeout }` accepts a float in seconds *or* a duration string** (`opts.go:5222–5232`);
   `timeout: 2` and `timeout: "2s"` are the same value. The reference's type says `duration` only.
 
@@ -299,4 +339,6 @@ states neither the version they were measured against nor the method
 [[s-docs-connection-limits-config]] · [[s-docs-acknowledgment]] · [[s-docs-pull-consumers]] ·
 [[s-docs-policies]] · [[s-docs-raft-and-leaders]] · [[s-docs-upgrade-to-2.12]] ·
 [[s-synadia-jetstream-anti-patterns]] · [[s-docs-consumer-config]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] · [[s-docs-authentication-basics]] ·
-[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]]
+[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] ·
+[[s-nats-server-filestore-layout]] ·
+[[s-adr-31-direct-get]] · [[s-docs-auth-callout]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]]

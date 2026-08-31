@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [exports, imports, stream-export, service-export, prefix, to, external, api-prefix, 10021, 10022, 10024]
 aliases: [exports, imports, export, import, cross-account, account import, account export, activation token, api prefix, external]
-sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls]
+sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources]
 created: 2026-08-31
 updated: 2026-08-31
 ---

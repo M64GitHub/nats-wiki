@@ -89,4 +89,4 @@ The symptom behind [[supercluster-slows-when-a-remote-subscriber-joins]], and th
 ## Pages touched
 
 [[supercluster-slows-when-a-remote-subscriber-joins]] · [[gateway]] · [[monitoring-endpoints]] ·
-[[slow-consumer-detected]] · [[choosing-a-topology]] · [[config-keys]]
+[[slow-consumer-detected]] · [[choosing-a-topology]]

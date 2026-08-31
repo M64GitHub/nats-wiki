@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -16,7 +16,8 @@ updated: 2026-08-31
 Every JetStream administrative operation is a request-reply on one of these subjects. The table
 covers the **32 documented API pages in the 2.14 docs tree**; it does not cover the `$JS.ACK`,
 `$JS.FC` or `$JS.EVENT.ADVISORY` subject spaces — those are [[ack-and-redelivery]] and
-[[advisories]].
+[[advisories]]. The one exception is below: `$JS.FC.>` needs an export of its own when replication
+crosses an account, so it appears in the export-type table and nowhere else.
 
 The **System Account** column is the docs' own, and it is the column that matters for
 [[account|permissions]]: a `Yes` means the request must come from the system account.
@@ -95,6 +96,7 @@ if you are building ACLs from that tree alone:
 | **`$JS.API.DIRECT.GET.<stream>.>`** | **Subject-Appended** Direct Get: the tokens after the stream name *are* the `last_by_subj`. Exists so subject-level permissions and cross-account grants can restrict which subjects are readable. A request payload here is a `408` | [[s-adr-31-direct-get]] |
 | **`$JS.API.META.RESCUE`** | **2.15 only** (not in 2.14.6): broadcast on the **system account**, body `{"quorum_needed": <n>}`, temporarily lowering each surviving server's effective meta quorum for 5 minutes so a leader can be elected and dead peers removed. Rejects with `10224`; a request on any other account is silently ignored — [[disaster-recovery]] | [[s-adr-61-meta-quorum-rescue]] |
 | **`$JS.API.CONSUMER.RESET.<stream>.<consumer>`** | consumer delivery-state reset, **added in 2.14**. Empty payload = reset the delivery state, leaving the ack floor's *stream* sequence where it is; `{"seq":<n>}` = move that floor to one below `<n>`, so the next delivery is `msg.seq >= n`. Allowed only on `DeliverPolicy` `all`, `by_start_sequence` or `by_start_time`, and for the latter two only forward of what the start policy allowed. The reply is shaped like a consumer-create response plus the `ResetSeq` used | [[s-relnotes-2.14.0]] · [[s-adr-60-reliable-sourcing]] |
+| **`$JS.API.CONSUMER.DURABLE.CREATE.<stream>.<consumer>`** | the **legacy** durable-create subject. Modern clients do not send it: they create durables on `$JS.API.CONSUMER.CREATE.<stream>.<name>` with the durable name in the **request body**. It matters for ACLs precisely because it is gone — a rule written against `DURABLE.CREATE` catches only clients that still send it | [[s-gh-5044-restrict-durable-consumers]] |
 
 Both Direct Get subjects exist **only when the stream sets `allow_direct`** — otherwise there is no
 responder and a request times out with no error. Mirrors with `mirror_direct` join the *upstream's*
@@ -128,6 +130,11 @@ Two permission facts follow from this table:
   every user**, the auth service included. That stops forgery; it does not stop a subscriber reading
   every credential presented to the server.
 
+The `$SYS.REQ.SERVER.PING.*` family is not listed here: it carries the monitoring endpoints over NATS
+rather than HTTP — a mirror or source error, for instance, is readable over
+`$SYS.REQ.SERVER.PING.JSZ` as well as at `/jsz` (source: [[s-adr-59-sourcing-and-mirroring]]). The
+endpoints, their fields and that equivalence are on [[monitoring-endpoints]].
+
 
 ## Why the tokens matter
 
@@ -140,6 +147,27 @@ ADR-1 is explicit that the per-object tokens exist for authorisation
 
 So `$JS.API.STREAM.INFO.ORDERS` can be granted without granting `$JS.API.STREAM.INFO.*`. The
 mechanics are on [[js-api]].
+
+**The coarse grant is `$JS.API.>`**, and it appears in three different roles. As an
+[[subject-permissions|authorization]] rule it is the whole JetStream API for that user — and
+`allow: [">"]` grants the server, `$JS.API.>` included (source: [[s-docs-authorization]]). As an
+account **export** it is how one account reaches another's JetStream
+([[s-gh-5606-cross-account-jetstream]]), and the same export is what a supercluster needs so its
+leafnodes can use the API (source: [[s-gh-7881-cross-domain-sourcing]]). See
+[[cross-account-sharing]].
+
+**Cross-account replication needs three subjects with the right export *type*,** and the wrong type
+fails silently — ADR-59 says so in as many words: "Getting the type wrong (e.g., using a stream
+import for the API subject) will cause silent failures."
+
+| subject | type | purpose |
+|---|---|---|
+| `$JS.API.CONSUMER.>` | **service** | consumer create/delete (request/reply) |
+| the delivery prefix, e.g. `deliver.mirror.>` | **stream** | one-way delivery of replicated messages |
+| `$JS.FC.>` | **service** | flow control back to the origin |
+
+(source: [[s-adr-59-sourcing-and-mirroring]]; the configuration is on [[cross-account-sharing]] and
+[[cross-domain-sourcing]].)
 
 ## Conventions
 
@@ -200,4 +228,5 @@ domain back out of as the **second token** (`stream.go:432–437`). See [[jetstr
 
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
 [[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]] ·
-[[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]]
+[[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]] ·
+[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]]

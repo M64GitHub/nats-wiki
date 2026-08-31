@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -212,6 +212,30 @@ nats consumer info ORDERS shipping
 nats consumer rm FULFILLMENT shippers --force
 ```
 
+## What a consumer costs on disk
+
+A durable consumer on a file-storage stream gets its own directory,
+`streams/<stream>/obs/<consumer>/`, holding `meta.inf` (its config, ~330 B), `meta.sum` (16 B) and
+`o.dat` — its position (source: [[s-nats-server-filestore-layout]], `nats-server 2.14.6`).
+
+`o.dat` holds the delivered sequence, the ack floor, the pending set and redelivery counts, so its
+size follows **`max_ack_pending`, not the size of the stream**. Measured on a 70,000-message stream:
+
+| state | `o.dat` |
+|---|---|
+| freshly created | 8 B |
+| 50 delivered, unacked | 213 B |
+| 500 delivered, unacked | 2,762 B |
+
+Roughly 5–6 bytes per outstanding message, varint-encoded, so the real figure depends on how the
+pending sequences are spread. The practical point is that consumer state is *small* and bounded:
+raising `max_ack_pending` costs kilobytes of disk, not megabytes. What consumers actually cost is
+RAFT traffic and meta-leader load — see [[jetstream-sizing]] and
+[[jetstream-slows-as-consumers-grow]].
+
+See [[filestore-layout]] for the rest of the directory.
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
@@ -222,4 +246,5 @@ nats consumer rm FULFILLMENT shippers --force
 [[s-docs-delivery-and-acknowledgment]] · [[s-docs-pull-consumers]] · [[s-docs-policies]] ·
 [[s-docs-consumer-config]] · [[s-docs-acknowledgment]] · [[s-docs-surviving-node-loss]] ·
 [[s-docs-retention-policies]] · [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] ·
-[[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-constants-2.14.6]]
+[[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-filestore-layout]] ·
+[[s-adr-60-reliable-sourcing]]

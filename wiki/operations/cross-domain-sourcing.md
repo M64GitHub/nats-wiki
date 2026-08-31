@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [external, api-prefix, deliver-prefix, jetstream-domain, sourcing, mirror, service-import, 10021, 10022, 10024]
 aliases: [cross-domain sourcing, cross domain mirror, source from another domain, external stream, api prefix, deliver prefix]
-sources: [s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-gh-5606-cross-account-jetstream, s-docs-cross-account, s-gh-7438-multi-region-availability, s-adr-59-sourcing-and-mirroring]
+sources: [s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-gh-5606-cross-account-jetstream, s-docs-cross-account, s-gh-7438-multi-region-availability, s-adr-59-sourcing-and-mirroring, s-docs-mirrors-as-dr]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -222,7 +222,8 @@ added only for this.
 [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]] ·
 [[s-nats-server-leafnode-js-domains]] · [[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] ·
 [[s-gh-5606-cross-account-jetstream]] · [[s-docs-cross-account]] ·
-[[s-gh-7438-multi-region-availability]]
+[[s-gh-7438-multi-region-availability]] ·
+[[s-adr-59-sourcing-and-mirroring]]
 
 ## To verify
 

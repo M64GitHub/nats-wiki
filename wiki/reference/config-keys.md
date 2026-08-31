@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -41,7 +41,16 @@ server and its cluster bind, or where JetStream keeps its data) — an identity 
 [[upgrade-a-cluster]] (source: [[s-docs-config-management]]).
 
 The asterisk is not decoration. `cluster.routes` is `reloadable*`, `tls.cert_file` is
-`reloadable*` — for both, read the key's page before relying on a reload in production.
+`reloadable*` — for both, read the key's page before relying on a reload in production. For the
+certificate pair the caveat resolves well: the server **re-reads `cert_file` and `key_file` on
+reload**, and new handshakes present the new certificate while existing connections keep the old one
+(source: [[s-docs-hardening]]; the procedure is [[rotate-tls-certificates]]).
+
+**How the signal is actually sent.** Under the packaged unit it is `systemctl reload nats-server`,
+wired as `ExecReload=/bin/kill -s HUP $MAINPID` (source: [[s-nats-server-systemd-units]]); a
+restart-only change is a node-at-a-time rolling restart, not a reload
+(sources: [[s-docs-rolling-upgrades]], [[s-gh-6070-lame-duck-under-systemd]]). Both are on
+[[reload-server-config]] and [[upgrade-a-cluster]].
 
 **A failed reload cannot break a running server.** The server validates the new config and, on a parse
 or validation failure, keeps the old one — the reload is atomic. What the dry-run does *not* prove is
@@ -121,6 +130,11 @@ The duration governs **client disconnects only** — see [[upgrade-a-cluster]].
 
 **Four of the values above were wrong in the docs and are corrected here from the server at
 v2.14.6** (source: [[s-nats-server-jetstream-resources]], recorded as **docs issue #22**):
+**The dynamic value is recomputed at every start, not remembered**, so a server whose disk has
+filled comes back with a *smaller* `max_file_store` than it had — the streams it already holds can
+exceed the new ceiling (source: [[s-issue-8322-dynamic-maxstore-shrinks]]; see
+[[jetstream-out-of-disk]]).
+
 `max_file_store`'s generated page calls `1TB` the default rather than the `statfs`-failure fallback;
 `max_buffered_msgs` is `streamDefaultMaxQueueMsgs = 100_000` (`stream.go:441`);
 `max_outstanding_catchup` is `defaultMaxTotalCatchupOutBytes = 64 * 1024 * 1024`
@@ -155,7 +169,8 @@ changed without a restart — which is the practical argument for the documented
 | `compression` | string / object | — | reloadable |
 | `connect_backoff` | boolean | `false` | reloadable — **2.12+**; when `true`, 1s growing to 30s |
 
-**`pool_size: 3`** is why a three-node cluster shows eight `/routez` entries per node rather than
+**`pool_size: 3`** — two peers × (3 pooled + 1 system) — is why a three-node cluster shows eight
+`/routez` entries per node rather than
 two — see [[monitoring-endpoints]]. The same arithmetic is what the `Routes` column of
 `nats server list` counts — [[build-a-3-node-cluster]] reads it.
 
@@ -171,6 +186,13 @@ two — see [[monitoring-endpoints]]. The same arithmetic is what the `Routes` c
 
 Also `isolate_leafnode_interest` and per-remote `disabled: true`, both **2.12+**
 (source: [[s-docs-upgrade-to-2.12]]).
+
+**`leafnodes { authorization { users } }` is not the global `authorization.users` block.**
+`parseLeafUsers` (`opts.go:3005–3064`) is "a trimmed down version of parseUsers" and accepts exactly
+four fields — `user`, `pass`, `account`, `proxy_required`. **`permissions` there is a parse error**,
+`unknown field "permissions"`, so a leaf connection cannot be restricted this way in config mode at
+all; in operator mode the permissions travel in the leaf's user JWT instead
+(source: [[s-gh-5941-restrict-leafnode-subjects]]). See [[subject-permissions]] and [[leafnode]].
 
 **Leafnode compression is on by default.** Both the listener and every remote default to
 **`s2_auto`**, not to the `accept` the generated reference publishes — `opts.go:6082–6089` and
@@ -206,7 +228,8 @@ accepts a float in seconds or a duration string.
 ## `authorization { … }`
 
 `token` (reloadable\*), `users` (reloadable), `auth_callout` (see [[auth-callout]]), and `timeout`
-(reloadable\*).
+(reloadable\*). This block predates accounts and still works: its users land in an
+**implicit `$G` account** unless one is named (source: [[s-gh-4535-unauthenticated-connections]]).
 
 **`timeout` has two defaults, not one**: **2 seconds** when the listener has no TLS, and
 **`tls_timeout + 1`** — 3 seconds at stock settings — when it does (`getDefaultAuthTimeout`,
@@ -219,7 +242,9 @@ The `auth_callout { … }` sub-block is exactly five keys — `issuer`, `account
 ## Operator mode keys
 
 Set together, and all **restart-only** in practice — a config reload cannot introduce or change a
-trusted operator ([[reload-server-config]]).
+trusted operator ([[reload-server-config]]). What each holds — the operator JWT the server trusts, the
+`SYSTEM` account preload and the resolver directory the account JWTs land in — is
+[[s-docs-config-and-jwt-backup|the backup set worth keeping]].
 
 | key | what it takes |
 |---|---|
@@ -297,10 +322,11 @@ family that is right.
 Recorded as `inbox/docs-issues.md` #23 (the three topology listeners) and #29 (MQTT). Write the
 port on every one of these blocks, every time.
 
-## Two option checks `nats-server -t` will not catch
+## Three option checks `nats-server -t` will not catch
 
 `-t` parses the file; it does not run `validateOptions`, which happens inside `NewServer`
-(`server.go:729`). Both of these pass the dry run and then stop the server on start:
+(`server.go:729`). All three pass the dry run, and then stop the server on start or refuse the
+reload:
 
 - **A composed server needs a system account.** A server with both a `leafnodes { listen }` and a
   `gateway {}` block fails with `leaf nodes and gateways (both being defined) require a system
@@ -309,7 +335,12 @@ port on every one of these blocks, every time.
 - **`gateway.name` must equal `cluster.name`** — a *conflicting* pair is
   `cluster name conflicts between cluster and gateway definitions` (`errors.go:192`). An **unset**
   `cluster.name` is instead **adopted from `gateway.name`** (`server.go:1118–1124`), the same shape
-  as the route-side adoption in `inbox/docs-issues.md` #11.
+  as the route-side adoption in `inbox/docs-issues.md` #11 — a server whose `cluster.name` is unset
+  **silently adopts its peer's** over a route (source: [[s-nats-server-route-cluster-formation]]).
+- **`no_auth_user` cannot be introduced or changed by a reload.** The reload fails with `config
+  reload not supported for NoAuthUser` and **the old config stays active**, so an anonymous client
+  keeps landing where it did; plan a restart. `-t` does not catch this either
+  (source: [[s-docs-accounts-and-multitenancy]]). See [[account]].
 
 See [[reload-server-config]] for what this means for a config-validation gate.
 
@@ -339,4 +370,6 @@ The tables above are the reload-relevant subset. The operator-facing keys and th
 [[s-docs-sizing-and-resources]] · [[s-docs-placement]] · [[s-docs-upgrade-to-2.12]] ·
 [[s-docs-replication-and-r3]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] ·
 [[s-docs-operator-mode]] · [[s-docs-auth-callout]] · [[s-nats-server-jetstream-resources]] ·
-[[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] · [[s-docs-leaf-nodes]] · [[s-docs-super-clusters]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] · [[s-docs-leaf-nodes]] · [[s-docs-super-clusters]] ·
+[[s-docs-config-management]] · [[s-nats-server-lame-duck]] ·
+[[s-docs-accounts-and-multitenancy]] · [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-hardening]] · [[s-docs-rolling-upgrades]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-nats-server-route-cluster-formation]] · [[s-nats-server-systemd-units]]

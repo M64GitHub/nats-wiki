@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, gossip, reject_unknown_cluster, 7222, stalled_clients]
 aliases: [gateways, super-cluster, supercluster, super cluster, cluster of clusters, geo-affinity, geo affinity]
-sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster]
+sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates]
 created: 2026-08-31
 updated: 2026-08-31
 ---

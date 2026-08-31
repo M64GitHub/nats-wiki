@@ -1205,3 +1205,279 @@ are pre-existing and untouched.
 
 `python3 tools/lint.py`: **213 pages, clean** — no broken links, no orphans, no frontmatter issues,
 nothing missing from the index; staleness 0.
+
+## 2026-08-31 — drift plan step 5: the filestore, read and then measured
+
+**Operation:** ingest (`inbox/plan-drift-and-adrs-2026-08-31.md` step 5 — the last step).
+**Sources:** `nats-server` v2.14.6 `server/filestore.go`, `server/stream.go`, `server/memstore.go`
+(ranges in `raw/nats-server-src/filestore-v2.14.6.md`) **and eleven experiments run on the v2.14.6
+binary** with **nats CLI 0.4.0** (`raw/nats-server-src/filestore-observed-v2.14.6.md`).
+
+The plan said this step was **"a `filestore-layout` internals page or nothing"** — write it, then
+decide whether Q1 and Q2 could be answered *honestly*. They can, and the arithmetic closes.
+
+**Created:** [[filestore-layout]] (internals) · [[s-nats-server-filestore-layout]] (summary).
+
+**What the source gives.** A stored message costs `30 + len(subject)` bytes beyond payload, plus
+`4 + len(headers)` when headers are present — a 22-byte record header and an 8-byte highwayhash,
+`emptyRecordLen` (`filestore.go:1119–1121`, `fileStoreMsgSizeRaw` at `filestore.go:9821–9828`). That
+figure is *also* what `nats stream info` reports (`updateAccounting`, `filestore.go:7696–7700`), so
+`max_bytes`, `/jsz storage` and an account's `MaxStore` are all counted in record bytes and **payload
+bytes are reported nowhere**. A memory stream uses a different formula entirely — `+16` and no
+header-length field (`memstore.go:2334–2336`) — so the two `bytes` figures are not comparable.
+
+**What only running it gives.** Reading settles arithmetic; it does not settle what a volume holds.
+Eleven runs, all on the same v2.14.6 binary the pages cite:
+
+- A block file is **exactly** the sum of its record lengths — 10,000 × 134 B produced a 1,340,000-byte
+  `1.blk`, with no file header and no padding. The first record was decoded byte-for-byte out of the
+  file and matches the format comment at `filestore.go:7502–7506`.
+- **A delete makes the file bigger.** Five `nats stream rmm` dropped the reported bytes by 670 and
+  **grew** `1.blk` by 150 — the dead records stay, and each delete appends a 30-byte tombstone.
+- **A purge frees the disk at once**: 1,340,150 → 30 bytes, plus a forced `index.db`.
+- The block size is picked for the operator and clamps to exactly **32,000 / 4MB / 8MB**; confirmed by
+  watching where blocks roll on **seven** stream shapes. A stream with `max_bytes: 1MB` gets a **4MB**
+  block, and **every KV bucket** gets 4MB via `defaultKVBlockSize`.
+- **The last message block is never compacted** — `!isLastBlock` (`filestore.go:6151`) and `mb != lmb`
+  under `// Do not compact last mb.` (`filestore.go:8037–8039`). An idle stream reporting 133,000
+  bytes held **1,125,712** on disk — **8.47×** — and stayed there across a full `sync_interval` **and**
+  a restart. A busy stream's overshoot is transient: one that measured 4.44× converged to 1.00 after
+  a single sync pass.
+- `index.db` costs **`len(subject) + 4` per subject**, landing on 4.0 on two independent streams
+  (20,000 and 40,000 subjects).
+- **Recovery is the honest negative.** 279,653 messages recovered in **22.1 ms** with `index.db` and
+  **24.6 ms** without it. No measurable difference at this size; recorded so that nobody derives a
+  claim about the tens-of-millions case from a 39 MB lab.
+
+**Rippled (8 pages):** [[jetstream-sizing]] — Step 1 rewritten with the record formula and a new
+**Step 1b** for physical slack (`stream_bytes × 1.1 + 8MB per stream`), the worked example redone
+(96.6 GiB of payload is **101.9 GiB** of records, and the un-tiered R3 quota 305 GiB not 290), five
+new rules of thumb, two new pitfalls, and Q2 struck from *What is still unknown*, leaving **IOPS as
+the only unsourced term**; [[stream]] — what the reported `bytes` counts and the memory-store
+difference; [[key-value]] — a bucket's 4MB blocks and its per-key `index.db` cost;
+[[stream-compression]] — what the two numbers in its own `du` recipe actually are, and that an
+uncompressed stream is **not** a 1.00 baseline; [[jetstream-out-of-disk]] — the volume filling while
+every JetStream number says there is room; [[defaults-and-limits]] — a new *filestore's own
+constants* table, 16 rows; [[monitoring-endpoints]] — `storage` is logical, and the three figures to
+watch together; [[consumer]] — `o.dat` measured against `max_ack_pending`, not stream size.
+
+**Docs issue #33** (`missing`, ★ high) — and it is the one with the most operational bite so far.
+The docs' sizing chapter says *"Pin `max_file_store` to what the volume can actually hold"* and then
+sets `10GB` on a 10 GiB volume. `max_file_store` bounds the **logical** figure, so that configuration
+does not protect the volume. Observed on a second server deliberately set to `max_file_store: 4MB`:
+`/jsz` reported **133,000 bytes used of 4,194,304** while the store directory held **3,786,236** —
+3% by the server's accounting, 90% of the ceiling in reality, with nothing logged. The
+per-message record overhead is likewise stated nowhere: a grep of all 861 pages for `emptyRecordLen`,
+`index.db`, "per-message overhead", "storage overhead" and "bytes per message" returns **one** hit,
+`learn/object-store/chunking.md`, which mentions the idea without a number. Neighbours swept: **all
+nine** pages in the tree that state a JetStream storage number, and none says the figure is logical.
+
+**Question bank: 104 rows, 67 answered** (was 65); **★ 36 of 42** (was 34). **Q1** and **Q2** — the
+two oldest ★ rows in the bank and the last open ones in the *jetstream sizing* cluster — are now
+filled, and **Q72** (why deleting keys does not reclaim disk in a bucket) gains the block mechanism
+behind it. **Q9** is deliberately left open: the page gives the *storage* cost of a high-cardinality
+subject space and the 1,000,000-subject `index.db` cut-off, not the latency figure the question asks
+for. **No rows added** — a source read and a binary run reveal facts, not people asking questions;
+the disk-versus-reported gap is worth a scout for a public thread before it becomes a row.
+
+**Housekeeping:** citation drift unioned on the three touched pages that had it
+([[consumer]], [[defaults-and-limits]], [[monitoring-endpoints]]), taking the wiki from 25 drifting
+pages to **22**; the other 22 are pre-existing and untouched. Two `(unverified)` items were added
+deliberately on [[filestore-layout]] and are listed under its `## To verify`: whether an encrypted
+stream that sets `max_bytes` bypasses the 2MB block cap, and what `thw.db` / `sched.db` / the
+subject-delete-marker state cost.
+
+`python3 tools/lint.py`: **215 pages, clean** — no broken links, no orphans, no frontmatter issues,
+nothing missing from the index; staleness 0.
+
+## 2026-08-31 — next plan proposed: the last ★ rows, and the chapters nobody has read
+
+**Operation:** plan (proposal only — no page changed).
+**Written:** `inbox/plan-the-unread-chapters-2026-08-31.md`, six steps, all `status: open`.
+
+`inbox/plan-drift-and-adrs-2026-08-31.md` is closed and its result line rewritten. It had proposed
+`meta-layer` next; an audit of the bank against the docs tree before writing the new plan changed the
+answer, and the audit itself is the finding worth recording:
+
+- **Two ★ rows are answered and were never marked.** **Q51** (share a stream or KV bucket between
+  accounts) is answered in full on [[cross-account-sharing]] — both routes, cited, with what no public
+  source states named as such. **Q58** (find which consumer the server flagged as slow) is answered on
+  [[slow-consumer-detected]] with `/connz?sort=pending` and the docs' own wording. The scoreboard has
+  been under-reporting, and the fix is a re-read, not an ingest.
+- **The docs tree is 861 pages and roughly 60 have been read.** The production chapters are done —
+  `security` **9/9**, `topologies` **6/7**, `deployment` **5/6**, `clustering` **5/6**,
+  `backup-recovery` **4/5** — but the **JetStream chapter, this wiki's declared centre of gravity, is
+  9 of 22**, and `key-value` **0/6**, `object-store` **0/6**, `mqtt` **0/5**, `websocket` **0/5**,
+  `monitoring` **2/6**. Coverage was computed by matching every `learn/**.md` against the
+  `source-path` / `source-url` of all 47 `s-docs-*` summaries, not by memory.
+- **13 of the 31 open non-★ rows are answered by pages already in `raw/`.** Q23, Q24, Q29, Q30, Q60,
+  Q61, Q73, Q74, Q75, Q76, Q78, Q79, Q80, Q81 — the highest ratio of *answers already fetched* to
+  *work required* anywhere in the repo. `mqtt/qos-sessions-and-retained.md` and
+  `mqtt/auth-and-clustering.md` are named for Q80 and Q81; `websocket/tls-and-proxies.md` for Q79;
+  `object-store/watching-and-listing.md` for Q75.
+- **`interop` is a declared area with one page and zero summaries.** MQTT and WebSocket exist here
+  only as config keys — including the two MQTT defaults corrected as docs issues **#28** and **#29**.
+  A wiki that can tell you a default is wrong but not what the feature does has the ordering backwards.
+- **`meta-layer` keeps.** `server/jetstream_cluster.go` is a large read and the two rows it serves
+  (Q37 quorum loss, Q40 evicting a sick node) are **not ★**. It is the plan after this one, and it
+  will be better for having the monitoring chapter's `/healthz` and advisory material read first.
+
+**One step is a re-run, not a read.** Q97 — *does a config reload actually pick up a renewed
+certificate file?* — is a behavioural claim that [[rotate-tls-certificates]] currently takes from the
+docs, with its own `## To verify` admitting the server was never asked. Step 1 settles it on the
+v2.14.6 binary and records the configs and output in `raw/`, the way step 5 of the last plan did.
+
+**Target:** 104 rows, **67 answered → 83–86**, **★ 36 → 40–42 of 42**. Three of the 19 rows the plan
+names are flagged doubtful up front (Q78 is a sizing number the docs rarely give; Q65 and Q103 depend
+on a scout finding a public thread), and a row closed with a written *"nobody has published this"* is
+recorded as work done rather than as a miss.
+
+## 2026-08-31 — lint gains two checks from `llm-wiki-starter`, and the debt they found
+
+**Operation:** lint (mechanical half) + plan.
+**Tools:** `tools/lint.py` was already the starter's current version — commits `7a50866` (citation
+drift, unlanded ripples) and `c5d3508` (optional staleness warning) had arrived via
+`update-tools.sh`. Nothing in this repo told the maintainer what to do with their output; that is
+what this entry fixes.
+
+**Before → after:**
+
+| check | before | after |
+|---|---:|---:|
+| citation drift (a defect) | **22 pages / 25 rows** | **0** |
+| unlanded ripples (a review queue) | **252 claims / 63 pages** | 252 — the queue, now planned |
+| unverified markers | 9 across 6 pages | 9 |
+| broken links · orphans · frontmatter · index | 0 | 0 |
+| staleness | 0 behind 2.14.6, 1 authority unknown | unchanged |
+
+**Citation drift, all 25 rows reconciled to the union — verified per row, not swept.** 17 rows
+already cited the summary inline in the page body; 8 named it in `## Sources` only, which
+`CLAUDE.md` permits, with the frontmatter half missing. The two least obvious were read before being
+added: [[config-keys]] ← `s-docs-replication-and-r3` (the page's R3 storage-accounting claim traces
+to it) and [[cross-account-sharing]] ← `s-docs-mirrors-and-sources` (the page's whole "mirror or
+source the stream" route). 32 pages touched; no `updated:` bump needed — all already read
+`2026-08-31`.
+
+**`wiki.json`** now states the four lint keys explicitly (`source_type`, `touched_heading`,
+`sources_key`, `sources_heading`). They already resolved correctly by default; stating them stops a
+later folder rename from switching a check off in silence.
+
+**`CLAUDE.md`** gains **`## Operation: consolidate`** — the counterweight to ingest — and
+*Operation: lint* now names both new checks and says which is a defect and which is a queue. The
+operation is adapted from the starter's template to this wiki: its six "shapes to look for" are
+recast for NATS (a runbook missing a `###` surface; a forward reference never landed;
+`raw/nats-server-src/` evidence on the internals page but not on the gotcha it explains; a page with
+no earliest version; release notes as a source about the *concept*, not only the release entity; an
+entity page without the behaviours that bite), and it carries two rules the sibling wiki's experience
+argues for: never manufacture a section to absorb a citation, and **name every strike from a
+`## Pages touched` list in this log**, so a falling count can be told apart from a shortened list.
+
+**What the measurement says.** 116 summaries against a 63-page reader layer — **1.84 per page**, not
+the 6:1 that drove the sibling wiki's consolidation. The thinnest reader page is 652 words
+([[ordered-consumer]]); there are no stubs. So the debt here is not under-synthesis in general, it is
+252 specific ripples that stopped at the summary layer, concentrated in ten pages that hold 127 of
+them — [[account]] (21), [[stream]] (16), [[replicas]] (15), [[config-keys]] (14),
+[[error-codes]] (11), [[raft-in-nats]] (11), [[nats-cli]] (11), [[install-nats-server]] (10),
+[[monitoring-endpoints]] (9), [[mirrors-and-sources]] (9).
+
+**Four pairs sampled before planning, because the count would be dishonest without knowing its
+shape:** [[ack-and-redelivery]] ← `s-docs-worker-pool` and [[error-codes]] ←
+`s-issue-4281-insufficient-storage` are **citation-only** (the material is on the page; `10028` and
+`10047` are already in the table), [[account]] ← `s-gh-7854-jwt-push-timeout` is a **genuine gap**
+(`$SYS.REQ.CLAIMS.UPDATE` and the push timeout appear nowhere on the page), and [[nats-cli]] ←
+`s-gh-6605-which-consumer-is-slow` was inconclusive from grep. The list cannot be worked down
+mechanically.
+
+**Upstream: `llm-wiki-starter/template/tools/lint.py` patched, and pulled back here.** Both sections
+were located with a plain substring split, which fails two ways: an earlier lookalike heading matches
+first (this wiki's [[message-ttl]] has `## Sources and mirrors`), and the unbounded read to end of
+file swallows what follows — 8 pages here carry a `## To verify` *after* `## Sources`, whose inline
+citations were counting as though they were in the list. Both checks now share one `section()` helper
+that anchors the heading to its own line and stops at the next heading of the same or higher level.
+It tolerates a configured heading with or without its `#` markers, which is not cosmetic: the sibling
+wiki runs on the older default `"Pages touched"`, and a strictly anchored match would have reported
+zero unlanded ripples there without saying anything. `tools/selftest.sh` gained a fixture that fails
+on the old code — a decoy summary cited in a `## Sources and notes` section before the list and a
+`## To verify` after it — so `citation drift: 0` only holds when both halves are right. This wiki's
+counts are unchanged by the patch and `--strict` still passes.
+
+**The patch immediately found a row on the sibling wiki.** Against `../chiptune-wiki` (676 pages) it
+reports **1 citation drift the old check could not see**: `entities/hermit` lists `s-duet-readme` in
+`sources:` but not in its `## Sources` section. It was invisible because that page has a
+`## Sources released` heading at line 28, and the split from there to end of file picked up the
+inline `(source: s-duet-readme)` citation on line 30. Unlanded ripples there are unchanged at 80/59 —
+worth re-running that wiki's own lint after `update-tools.sh`.
+
+**Plan written:** `inbox/plan-consolidation-2026-08-31.md`, eight steps, step 1 done. It is the
+unlanded queue, ordered by count and grouped so that a summary naming five pages is read once —
+`s-docs-security-checklist` alone names five.
+
+## 2026-08-31 — consolidation step 4: the reference layer, landed
+
+**Operation:** consolidate (plan `inbox/plan-consolidation-2026-08-31.md`, step 4).
+**Before → after:** unlanded ripples **252 across 63 pages → 206 across 57**; citation drift **0 → 0**;
+`--strict` passes; question bank **67 → 68 answered, ★ 36 → 37**. No `verified-against` moved — every
+touched page already read `2.14`/`2.14.6` on `2026-08-31`.
+
+**Pages updated:** [[error-codes]] (11 claims) · [[monitoring-endpoints]] (9) · [[js-api-subjects]] (6) ·
+[[config-keys]] (14) · [[defaults-and-limits]] (4) · [[advisories]] (2 — not in the step, taken because
+it finished the layer). **No reference page carries an unlanded ripple now.**
+
+**The mix, which is the finding worth carrying into the rest of the plan.** Of 46 pairs, **33 were
+citation-only** (the material had landed; only the record was missing), **10 were real additions**, and
+**3 were neither**. Grep settled the citation-only ones in bulk: every `10xxx` code named in all 11
+`error-codes` summaries was already in the table, and all 14 `config-keys` summaries named only keys
+the generated table already carries. So the queue is roughly **7 parts bookkeeping to 2 parts writing**
+on reference pages — the pages where a table can be diffed. Expect a worse ratio on concepts.
+
+**Every real addition was a behaviour, not a table row** — which is the shape a reference page's own
+derivation script cannot produce:
+
+- **`/healthz`** — the Kubernetes probe mapping the Helm chart renders (`startupProbe` unqualified with
+  `failureThreshold: 90`, `readinessProbe` `?js-server-only=true`, `livenessProbe`
+  `?js-enabled-only=true`), and why the gradient runs that way: liveness must ask the least or a
+  slow-recovering stream restarts the pod recovering it. Plus the failure text a lagging KV watcher
+  produces, `Healthcheck failed: "JetStream consumer … is not current"`, observed on **2.10.12**.
+- **`/routez`** — the check means nothing on one node and nothing before every node is up; a partial
+  split-brain shows as *unequal counts with every node still in the list*, confirmed on **2.11.7**.
+- **`/jsz`** — **`active` is the JSON name for what the CLI prints as `Last Seen`**.
+- **Endpoint → metric**: the names follow the wire fields, `num_pending` → `nats_consumer_num_pending`,
+  `jetstream_` renamed to `nats_` by `-prefix nats`.
+- **`$JS.API.CONSUMER.DURABLE.CREATE.<stream>.<consumer>`** — the *legacy* subject, added precisely
+  because it is gone: an ACL written against it catches only clients that still send it, since modern
+  clients put the durable name in the body of `$JS.API.CONSUMER.CREATE`. Also the coarse `$JS.API.>`
+  grant in its three roles (permission, account export, supercluster export) and the three export
+  **types** cross-account replication needs, where the wrong type fails **silently**.
+- **`no_auth_user` cannot be introduced or changed by a reload** — `config reload not supported for
+  NoAuthUser`, the old config stays active, and `-t` does not catch it. That section is now *three*
+  option checks, not two.
+- **`leafnodes { authorization { users } }` is a trimmed parser** — `user`, `pass`, `account`,
+  `proxy_required` only; `permissions` there is a **parse error** (`unknown field "permissions"`), so
+  a leaf cannot be restricted that way in config mode at all.
+- **`max_file_store` is recomputed at every start**, so a server whose disk filled comes back with a
+  ceiling below the streams it already holds.
+- **Failures that carry no `err_code` at all** — a cross-account config error stops the server with a
+  file and line, and `No responders are available` is a core status, not a JetStream error.
+- **Advisories are unreachable without a system-account user** — declaring your own `accounts` block
+  without a `SYS` account silently takes the event surface away, `nats server account info` included.
+
+**Three strikes from `## Pages touched`**, recorded here as the rule requires, so the falling count is
+not mistaken for work:
+
+| summary | struck from | why |
+|---|---|---|
+| [[s-docs-authentication-basics]] | `config-keys` | its config-shaped claim is a CLI behaviour — `nats server passwd` refusing passwords under 10 characters — not a key |
+| [[s-docs-your-first-cluster]] | `config-keys` | every key it uses is already in the generated table; the worked config it shows is material for [[build-a-3-node-cluster]], not for a key reference |
+| [[s-gh-7494-supercluster-degradation]] | `config-keys` | its one identifier, `stalled_clients`, is a `/varz` field, not a config key |
+
+**One scope bug caught mid-step.** A `$JS.FC.>` row was added to [[js-api-subjects]] before noticing
+that page's own intro excludes the `$JS.FC` space. The row was removed and the intro now names the one
+exception — the export-type table — rather than the page quietly contradicting itself. A reminder that
+landing a ripple can introduce a wiki bug, so the page's stated scope is worth re-reading before adding
+to it.
+
+**Question bank:** **Q58** (which consumer the server flagged as slow) filled with
+[[slow-consumer-detected]] · [[monitoring-endpoints]] — the audit in
+`inbox/plan-the-unread-chapters-2026-08-31.md` had spotted it as answered-but-unmarked and this step
+confirmed it. **Q47** gains [[monitoring-endpoints]] for the `/routez` check, **Q100** gains
+[[config-keys]] for the recomputed ceiling.
