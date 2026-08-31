@@ -35,6 +35,12 @@ exists to answer live in `inbox/question-bank.md`.
   the `423`, and the `failover` option that does nothing on 2.14.
 - [[message-ttl]] — `Nats-TTL`, subject delete markers, the silent TTL clamp, and the marker kinds
   that are documented but unimplemented.
+- [[account]] — the absolute boundary: `$G` and `$SYS`, per-account JetStream, why a cross-account
+  request fails as `No responders`, and the three `no_auth_user` traps.
+- [[direct-get]] — the point read answered by any replica: `allow_direct`, the two subjects, batch
+  and `EOB`, and why it can never confirm a write.
+- [[mirrors-and-sources]] — exact read-only copy vs merged aggregate; `Lag` as your RPO, the four
+  `mirror_direct` rules, and the two failures that are completely silent.
 
 ## Internals
 
@@ -57,6 +63,9 @@ exists to answer live in `inbox/question-bank.md`.
   defaults, the `replicas × bytes` account rule, a worked example, and what is still unmeasurable.
 
 **Patterns**
+
+- [[worker-pool]] — many processes on one consumer: demand-based distribution, `max_ack_pending` as a
+  *shared* ceiling, and why this is not a queue group.
 
 ## Gotchas
 
@@ -223,6 +232,8 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-adr-8-key-value-store]] — the stream a KV bucket is, and its delete/purge/watch mechanics.
 - [[s-adr-17-ordered-consumer]] — the ordered consumer's forced configuration and restrictions.
 - [[s-adr-20-object-store]] — the stream an object-store bucket is, chunking and digests.
+- [[s-adr-31-direct-get]] — the Direct Get spec: subjects, the `_sys_` queue group, headers, status
+  codes, and the four `mirror_direct` alignment rules.
 - [[s-adr-42-priority-groups]] — the three priority policies and the pinned-client protocol.
 - [[s-adr-43-per-message-ttl]] — `Nats-TTL`, markers, the clamp, and seven error codes.
 
@@ -258,6 +269,22 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-docs-prometheus-and-dashboards]] — the exporter's real invocation, the metric names, and the
   health check that passes with no quorum.
 
+**docs.nats.io — JetStream (continued)**
+
+- [[s-docs-get-direct]] — the point read, `allow_direct`, batch with `Nats-Num-Pending`, and the
+  three ways it is misused.
+- [[s-docs-worker-pool]] — one consumer many workers, the shared `MaxAckPending` cap, and the queue
+  group comparison.
+- [[s-docs-mirrors-and-sources]] — mirror vs source, the comparison table, and the export type that
+  fails silently.
+- [[s-docs-mirrors-as-dr]] — `Lag` as RPO, what an upstream delete really does to a mirror, and why a
+  mirror is not a backup.
+
+**docs.nats.io — Security (learn)**
+
+- [[s-docs-accounts-and-multitenancy]] — accounts as isolated subject spaces, `$G` and `$SYS`,
+  per-account JetStream, and the `no_auth_user` traps.
+
 **GitHub, CNCF and the repositories**
 
 - [[s-github-repo-facts]] — 32 repos and 24 READMEs: versions, licences, archived flags, and the
@@ -269,13 +296,12 @@ exists to answer live in `inbox/question-bank.md`.
 
 These are deliberately unresolved links; ingest a source to fill them.
 
-Concepts: [[account]] · [[leafnode]] · [[gateway]] · [[direct-get]] · [[mirrors-and-sources]]
+Concepts: [[leafnode]] · [[gateway]]
 
 Internals: [[filestore-layout]] · [[meta-layer]]
 
 Operations: [[install-nats-server]] · [[build-a-3-node-cluster]] ·
-[[rotate-tls-certificates]] · [[backup-and-restore-jetstream]] · [[upgrade-a-cluster]] ·
-[[worker-pool]]
+[[rotate-tls-certificates]] · [[backup-and-restore-jetstream]] · [[upgrade-a-cluster]]
 
 Gotchas: [[consumer-keeps-redelivering]] · [[jetstream-out-of-disk]] ·
 [[stream-leader-keeps-moving]] · [[kv-watcher-misses-updates]]

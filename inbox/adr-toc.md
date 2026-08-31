@@ -33,7 +33,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 26 | ADR-26.md | NATS Authorization Callouts | Implemented | core | server | ★ implemented |  |
 | 28 | ADR-28.md | JetStream RePublish | Implemented | core jetstream | jetstream, server | ★ implemented |  |
 | 30 | ADR-30.md | Subject Transform | Implemented | core | server | ★ implemented |  |
-| 31 | ADR-31.md | JetStream Direct Get | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 |  |
+| 31 | ADR-31.md | JetStream Direct Get | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 | [[s-adr-31-direct-get]] |
 | 32 | ADR-32.md | Service API | Implemented | clients | client, spec | implemented |  |
 | 33 | ADR-33.md | Metadata for Stream and Consumer | Approved | clients core jetstream | jetstream, client, server | approved |  |
 | 34 | ADR-34.md | JetStream Consumers Multiple Filters | Approved | clients core jetstream | jetstream, client, server | approved |  |

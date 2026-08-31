@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources]
+sources: [s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr]
 created: 2026-08-31
 updated: 2026-08-31
 ---
@@ -160,6 +160,27 @@ Reads from the **leader** are read-after-write; reads from a follower can be cor
   times the storage and write traffic", and none gives the **per-message storage overhead** on top
   of the payload bytes — see *What is still unknown* on [[jetstream-sizing]].
 
+## Reads can be served from outside the cluster
+
+Replicas spread reads within a cluster. A **mirror** extends that beyond it: with `mirror_direct` set,
+the mirror's peers join the *upstream's* [[direct-get]] responder queue group, so a read addressed to
+the upstream stream can be answered by a server in another cluster or region. Because mirrors "need
+not be in the same cluster as the upstream", this places read responders near distant clients and
+keeps reads available "when the upstream is offline" (source: [[s-adr-31-direct-get]]).
+
+Two limits on that, both easy to miss:
+
+- a mirror **joins the read pool only after it has caught up** to within a small lag window, so a
+  freshly created mirror contributes nothing yet;
+- `mirror_direct` is **captured at create time and never refreshed**, so toggling the upstream's
+  `allow_direct` silently desynchronises every mirror until each is updated in turn.
+
+And the distinction that matters when a whole site fails: **R=3 protects against losing one node, not
+one cluster.** "The R3 replication that protects you from losing *one node* does nothing when you lose
+the *whole cluster*" — that is what a mirror at a second site is for (source:
+[[s-docs-mirrors-as-dr]]). See [[mirrors-and-sources]].
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[raft-in-nats]] · [[stream-placement]] · [[retention-policies]] ·
@@ -168,4 +189,4 @@ Reads from the **leader** are read-after-write; reads from a follower can be cor
 ## Sources
 
 [[s-docs-surviving-node-loss]] · [[s-docs-replication-and-r3]] · [[s-docs-stream-config]] ·
-[[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]]
+[[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-as-dr]]

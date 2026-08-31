@@ -405,3 +405,49 @@ Append-only. One entry per operation: date, operation, source, pages created / u
   cite, so it is not in the bank.
 - `python3 tools/lint.py`: **97 pages, clean** — no frontmatter issues, no orphans, no broken links,
   nothing missing from the index.
+
+## 2026-08-31 — plan step 0: the four most-cited wanted pages
+Step 0 was **added to `inbox/plan-runbooks-and-security-2026-08-31.md` after measuring the wiki**
+rather than reading a source: the link graph showed four pages already cited by six to nine other
+pages each and resolving to nothing, with every source local. Paying them off first was the cheapest
+real improvement available.
+
+- **Four pages written**, from six ingests:
+  - [[direct-get]] (11 inbound links from 9 pages) — `allow_direct` (default **false**, opt-in), the
+    two subjects and the `_sys_` queue group, the request fields, batch with `Nats-Num-Pending` and
+    the `204 EOB` sentinel, the four status codes, and the response headers. The operator line is
+    blunt: **a missing `allow_direct` is a timeout, not an error**, and Direct Get can never confirm
+    a write.
+  - [[account]] (11 from 7) — the absolute boundary, `$G` and `$SYS`, per-account JetStream
+    (`10039`), the `No responders are available` symptom that is really an account-boundary fact, and
+    the three `no_auth_user` traps (no reload, `-t` will not catch it, rejected in operator mode).
+  - [[worker-pool]] (10 from 7, `kind: pattern`) — demand-based distribution, `max_ack_pending` as a
+    ceiling **shared across the consumer, not per worker**, `ack_wait` as the window in which a crash
+    is invisible, and the queue-group comparison.
+  - [[mirrors-and-sources]] (7 from 6) — the mirror/source table, `Lag` as **RPO**, the four
+    `mirror_direct` alignment rules, and the two silent failures (a wrong cross-domain export *type*,
+    and a desynchronised `mirror_direct`).
+- **Six summaries**: [[s-docs-get-direct]], [[s-adr-31-direct-get]], [[s-docs-worker-pool]],
+  [[s-docs-mirrors-and-sources]], [[s-docs-mirrors-as-dr]], [[s-docs-accounts-and-multitenancy]].
+  ADR-31 was ingested beyond the plan's list because the docs page names it as the authoritative spec
+  and it carries everything the docs page omits — subjects, headers, status codes and `mirror_direct`.
+  Its row in `inbox/adr-toc.md` now links the summary (**8 of 54 ADRs read**).
+- **Ripple.** [[js-api-subjects]] — the two Direct Get subjects rewritten with the payload/appended
+  distinction, the `_sys_` queue group, the `allow_direct` precondition and the fact that Direct Get
+  answers are **plain messages with headers, not the `$JS.API` JSON envelope**.
+  [[error-codes]] — `10060 JSStreamNotMatchErr` added. [[replicas]] — a new section on reads served
+  from outside the cluster via `mirror_direct`, and the R3-is-not-a-second-site point.
+  [[key-value]], [[stream]], [[consumer]], [[ack-and-redelivery]], [[retention-policies]],
+  [[object-store]] and [[jetstream-slows-as-consumers-grow]] needed no edit — they already linked
+  these four pages, which is what made them the right ones to write.
+- **One error caught in review before it shipped**: the `10060` row was first written with an
+  invented Go constant (`JSStreamMismatchErr`). The real name is **`JSStreamNotMatchErr`**, verified
+  against `raw/nats-docs/reference/jetstream/errors.md:166`. Recorded here because inventing a
+  constant is exactly what `CLAUDE.md` forbids, and the fix came from checking rather than from luck.
+- **No new docs issues.** All six sources were checked against the ADR and the generated reference;
+  the docs and ADR-31 agree, including on the retracted `allow_direct` auto-promotion, which ADR-31
+  documents as a superseded revision rather than leaving stale.
+- **`inbox/question-bank.md`**: rows **88–91** added, each with a public thread; Q15 and Q22 extended
+  with [[worker-pool]]. **89 and 91 are deliberately left unanswered** — cross-domain sourcing setup
+  and mirror catch-up contention are not in any source read. **91 rows, 26 answered.**
+- Wanted pages down from **17 to 13**. `python3 tools/lint.py`: **107 pages, clean.**

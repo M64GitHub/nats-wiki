@@ -32,14 +32,14 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 12 | What breaks if I raise max_payload above 8MB, and what is the real limit? | core | [gh#7068](https://github.com/nats-io/nats-server/discussions/7068) | ★ config sizing | [[jetstream-sizing]] · [[defaults-and-limits]] |
 | 13 | Why is JetStream startup and recovery slow with tens of millions of messages? | jetstream | [gh#8001](https://github.com/nats-io/nats-server/discussions/8001) | gotcha sizing | |
 | 14 | Why does my consumer keep redelivering messages that were acknowledged? | jetstream | [so#78603662](https://stackoverflow.com/questions/78603662/nats-jetstream-messages-being-processed-multiple-times-by-my-consumer-even-when) | ★ gotcha | [[ack-and-redelivery]] |
-| 15 | What does max_ack_pending actually do, and what happens when it is reached? | jetstream | [gh#5211](https://github.com/nats-io/nats-server/discussions/5211) | ★ config gotcha | [[ack-and-redelivery]] · [[consumer]] |
+| 15 | What does max_ack_pending actually do, and what happens when it is reached? | jetstream | [gh#5211](https://github.com/nats-io/nats-server/discussions/5211) | ★ config gotcha | [[ack-and-redelivery]] · [[consumer]] · [[worker-pool]] |
 | 16 | How do ack_wait and the duplicate window interact? | jetstream | [gh#6628](https://github.com/nats-io/nats-server/discussions/6628) | gotcha config | |
 | 17 | Does JetStream support exponential backoff for redelivery? | jetstream | [gh#6350](https://github.com/nats-io/nats-server/discussions/6350) | config | |
 | 18 | Why doesn't a NAK cause an immediate redelivery? | jetstream | [gh#5631](https://github.com/nats-io/nats-server/discussions/5631) | gotcha | |
 | 19 | Does NakWithDelay hold a max_ack_pending slot and block other messages? | jetstream | [gh#4972](https://github.com/nats-io/nats-server/discussions/4972) | gotcha | |
 | 20 | What happens when several consumers share a durable name with different filter subjects on a WorkQueue stream? | jetstream | [gh#6044](https://github.com/nats-io/nats-server/discussions/6044) | ★ gotcha | [[retention-policies]] |
 | 21 | What does "disjoint filter subjects" mean for a WorkQueue stream? | jetstream | [gh#3637](https://github.com/nats-io/nats-server/discussions/3637) | config | [[retention-policies]] |
-| 22 | How do I inspect which messages are still pending in a work-queue stream? | jetstream monitoring | [gh#4778](https://github.com/nats-io/nats-server/discussions/4778) | ★ monitoring | [[consumer]] |
+| 22 | How do I inspect which messages are still pending in a work-queue stream? | jetstream monitoring | [gh#4778](https://github.com/nats-io/nats-server/discussions/4778) | ★ monitoring | [[consumer]] · [[worker-pool]] |
 | 23 | Does JetStream give exactly-once delivery, and how does the dedup window work? | jetstream | [so#72814502](https://stackoverflow.com/questions/72814502/nats-jetstream-exactly-once-delivery) | ★ concept | |
 | 24 | What ordering does JetStream guarantee, and per what — stream, subject, key? | jetstream | [so#68984906](https://stackoverflow.com/questions/68984906/does-nats-jetstream-provide-message-ordering-by-a-key) | concept | |
 | 25 | What ordering guarantees does core NATS give? | core | [gh#7577](https://github.com/nats-io/nats-server/discussions/7577) | concept | |
@@ -105,6 +105,10 @@ described in `inbox/plan-first-ingests-2026-08-31.md`.
 | 85 | What is the ideal way to set metrics up at all — exporter, surveyor, Prometheus, Grafana, checks? | monitoring | [gh#6224](https://github.com/nats-io/nats-server/discussions/6224) | monitoring runbook | [[prometheus-nats-exporter]] · [[nats-surveyor]] · [[monitoring-endpoints]] |
 | 86 | Are partitioned consumer groups a server feature, or a client-side construct? | jetstream clients | [gh#7296](https://github.com/nats-io/nats-server/discussions/7296) | concept clients | [[orbit]] |
 | 87 | The Orbit docs show `orbit.go` — is the same module available for my language (C#, Java, Python…)? | clients | [gh#7296](https://github.com/nats-io/nats-server/discussions/7296) | clients | [[orbit]] |
+| 88 | Are there trade-offs to turning on `allow_direct` for a stream? | jetstream | [gh#3984](https://github.com/nats-io/nats-server/discussions/3984) | config | [[direct-get]] |
+| 89 | How do I set up cross-domain JetStream sourcing or mirroring? | jetstream topology security | [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) | ★ config runbook | |
+| 90 | How do I manage streams and KV buckets across several accounts with one user? | security jetstream | [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) | config | |
+| 91 | Why does mirror catch-up slow down when a consumer reads the mirror at the same time? | jetstream | [gh#8444](https://github.com/nats-io/nats-server/discussions/8444) | gotcha internals | |
 
 ## Thread titles behind the rows
 
@@ -199,3 +203,12 @@ The exact title of the linked thread, so a row can be checked against its source
 
 All three metrics threads (83–85) are **Q&A discussions with no accepted answer** as of 2026-08-31,
 which is why they are worth answering here.
+88. [gh#3984](https://github.com/nats-io/nats-server/discussions/3984) — Are there tradeoffs with `AllowDirect: true`?
+89. [gh#7881](https://github.com/nats-io/nats-server/discussions/7881) — Cross-domain JetStream sourcing, how do I set that up?
+90. [gh#5606](https://github.com/nats-io/nats-server/discussions/5606) — Manage streams / KVs across multiplea accounts with one user
+91. [gh#8444](https://github.com/nats-io/nats-server/discussions/8444) — Mirror Stream sync is ~2.9× slower when a Consumer cold-scans the mirror during catch-up
+
+Rows 89 and 91 are **open on purpose**: [[mirrors-and-sources]] names the three subjects a
+cross-domain `external` block needs and the export type each requires, but no source read so far
+gives the setup itself; and nothing read explains mirror catch-up contention. Both are the most
+valuable kind of row — a question the wiki cannot yet answer, with the thread that asks it.

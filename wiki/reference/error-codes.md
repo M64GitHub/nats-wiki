@@ -81,6 +81,7 @@ Two structural notes from the table's own appendix:
 | **10039** | `JSNotEnabledForAccountErr` | 503 | JetStream not enabled for account | [[account]] |
 | **10052** | `JSStreamInvalidConfigF` | 500 | `{err}` | [[message-ttl]] |
 | **10059** | `JSStreamNotFoundErr` | 404 | stream not found | [[js-api]] |
+| **10060** | `JSStreamNotMatchErr` | 400 | expected stream does not match | [[mirrors-and-sources]] |
 | **10071** | `JSStreamWrongLastSequenceErrF` | 400 | wrong last sequence: `{seq}` | [[stream]] |
 | **10099** | `JSConsumerWQMultipleUnfilteredErr` | 400 | multiple non-filtered consumers not allowed on workqueue stream | [[retention-policies]] |
 | **10100** | `JSConsumerWQConsumerNotUniqueErr` | 400 | filtered consumer not unique on workqueue stream | [[retention-policies]] |

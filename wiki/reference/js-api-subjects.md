@@ -84,9 +84,16 @@ if you are building ACLs from that tree alone:
 
 | subject | what it is | source |
 |---|---|---|
-| **`$JS.API.DIRECT.GET.<stream>.<subject>`** | Direct Get — the read path for KV, answerable by **any replica** | `learn/key-value/under-the-hood.md`; [[s-adr-8-key-value-store]] |
+| **`$JS.API.DIRECT.GET.<stream>`** | [[direct-get]] — criteria in the request payload (`seq`, `last_by_subj`, `next_by_subj`, `batch`, `multi_last`, …). Queue group **`_sys_`** | [[s-adr-31-direct-get]] |
+| **`$JS.API.DIRECT.GET.<stream>.>`** | **Subject-Appended** Direct Get: the tokens after the stream name *are* the `last_by_subj`. Exists so subject-level permissions and cross-account grants can restrict which subjects are readable. A request payload here is a `408` | [[s-adr-31-direct-get]] |
 | **`$JS.API.CONSUMER.RESET.<stream>.<consumer>`** | consumer delivery-state reset, **added in 2.14** | [[s-relnotes-2.14.0]] |
-| `$JS.API.DIRECT.GET` batch form | Batch Get, **2.11+** | [[s-synadia-jetstream-anti-patterns]] |
+
+Both Direct Get subjects exist **only when the stream sets `allow_direct`** — otherwise there is no
+responder and a request times out with no error. Mirrors with `mirror_direct` join the *upstream's*
+queue group for both forms, which is how a read can be answered from another cluster
+([[mirrors-and-sources]]). Direct Get answers are plain NATS messages with `Nats-Stream`,
+`Nats-Sequence`, `Nats-Time-Stamp` and `Nats-Subject` headers, and status codes `204` (EOB), `404`,
+`408` and `413` — not the JSON envelope the rest of `$JS.API` uses ([[js-api]]).
 
 ## Why the tokens matter
 
