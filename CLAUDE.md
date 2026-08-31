@@ -34,6 +34,17 @@ production problem or a design decision, and wants the answer plus the reason �
 not a tour. Pages are written to be read by a human in a hurry and by an agent
 answering that human.
 
+## Sources are checked, and their errors are recorded
+
+Treat every source as **fallible**. The docs are generated from the server, the ADRs are written
+ahead of the server, and both drift. When a claim matters — a subject, a default, a limit, a version
+— and two sources disagree, or one source states something the server contradicts, **the server at a
+release tag wins**, and the disagreement is **recorded in `inbox/docs-issues.md`**, not silently
+resolved.
+
+This is not optional bookkeeping and not a side quest: finding these is a normal product of reading
+sources closely, and the report is one of this wiki's outputs. See *Operation: record a docs issue*.
+
 ## Sources must be public
 
 This wiki is built **from public sources only**: the docs, the repos and their
@@ -56,6 +67,8 @@ nats-wiki/
     sources.md       manifest: origin URL/path, date fetched, license notes
   inbox/             question bank, triage tables, scout results, plans — not wiki
     question-bank.md   the questions this wiki must answer; the scope test and the scoreboard
+    docs-issues.md     errors and gaps found in the public docs, verified against the
+                       server source — a report to send upstream, not a wiki page
     adr-toc.md         one row per ADR of nats-architecture-and-design
     config-keys-table.md  every documented config key, generated from raw/nats-docs/
     plan-*.md          the step list a session works through (see Operation: plan)
@@ -286,9 +299,37 @@ filterable table (`Questions` in the nav).
 7. Update `wiki/index.md` (new pages under the right group, one line each).
 8. Update `inbox/question-bank.md`: fill `answered by` for every question the
    ingest now answers; add new questions the source revealed.
-9. Append to `wiki/log.md`: date, operation, source, pages created / updated.
-10. Run `python3 tools/lint.py`; fix what it reports. Rebuild the viewer with
+9. **Record what the source got wrong.** If it contradicted the server, contradicted
+   another doc page, or stated "the default" without ever giving it, add it to
+   `inbox/docs-issues.md` — verified, with file and line. See *Operation: record a
+   docs issue*. Most ingests add nothing here; that is fine. Never skip the check.
+10. Append to `wiki/log.md`: date, operation, source, pages created / updated, and
+    any `inbox/docs-issues.md` rows the ingest added.
+11. Run `python3 tools/lint.py`; fix what it reports. Rebuild the viewer with
     `python3 tools/build-site.py` when the user wants to look.
+
+## Operation: record a docs issue
+
+When ingesting turns up something **wrong or missing in a public source** — a doc page that
+contradicts the server, two doc pages that contradict each other, a default that is documented as
+"the default" without ever being stated — that finding is an output of this wiki, not a private
+annoyance. Record it in **`inbox/docs-issues.md`** (a report, not a wiki page, so it can be sent to
+the maintainers or filed as an issue upstream).
+
+- **Verify before recording.** The authority is normally `nats-io/nats-server` at a release tag,
+  read directly: quote the constant or the code with **file and line**, and quote the doc page
+  verbatim next to it. A discrepancy you have not checked against the source is a suspicion, not an
+  issue.
+- **Prefer the server over the docs** on the wiki page itself, and say on the page that the two
+  disagree — see the *A docs error worth knowing* section of `wiki/reference/advisories.md`.
+- **Separate wrong from terse.** `wrong-value` and `missing` are defects; `enhancement` is a page
+  that is correct but unhelpful. Do not inflate the second into the first.
+- **Sweep the neighbours.** One wrong generated value usually means more: when a page is wrong,
+  cross-check every sibling page of the same kind against the same authority, and say in the entry
+  how many you checked and how many were wrong.
+- Add the row to the table, a `## <n> · <title>` detail section with evidence and a suggested fix,
+  and a line in the *Where the wiki records each of these* table. Register nothing new in
+  `wiki.json` — the file is already a TOC table (`Docs issues` in the nav).
 
 ## Operation: triage <collection>
 
@@ -330,6 +371,11 @@ Start with `python3 tools/lint.py` (broken links, orphans, frontmatter, index
 coverage, unverified count), then read for contradictions, staleness and
 version drift. Report findings. Fix mechanical issues (links, index,
 frontmatter) directly. Ask before rewriting or merging major pages.
+
+A contradiction between two **wiki pages** is a wiki bug — fix it. A contradiction
+between a wiki page and its **source**, or between two sources, is a
+[docs issue](#operation-record-a-docs-issue) — verify it against the server and
+record it in `inbox/docs-issues.md`.
 
 ## Operation: scout <topic>
 
@@ -379,5 +425,8 @@ them there and push them here with that repo's `tools/update-tools.sh`.
 - Never invent facts; mark anything unverified. Especially: config keys,
   defaults, subjects, flags, error codes, metric names and versions.
 - Nothing non-public enters this repo (see *Sources must be public*).
+- Never quietly work around a wrong or missing fact in a source. Prefer the server,
+  say on the page that the sources disagree, and record the finding in
+  `inbox/docs-issues.md`.
 - Keep pages renderer-agnostic (plain Markdown + `[[wikilinks]]`).
 - Do not commit or push unless asked.
