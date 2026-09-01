@@ -2855,3 +2855,37 @@ conditional: **no public question, no page**, and the refusal gets logged if the
 
 **Bank unchanged at 105/83.** A scout adds no answers; it says where they would come from. Expected at
 the end of the plan: **105/88**, or 105/87 with row 18 as a stated dead end.
+
+## 2026-09-01 — a standing scout backlog
+
+Not an operation of its own: `inbox/scout-backlog.md`, so the next session can pick a scout without
+re-deriving the grouping. The bank's 22 open rows split three ways — **6** taken by
+`plan-delivery-timing-2026-09-01.md`, **2** by `plan-the-meta-layer-2026-09-01.md`, and the remaining
+**14** grouped into three scouts, ordered by how likely each is to produce a finding rather than a
+summary:
+
+1. **Mirror and replication internals** (76, 91, 105) — first, because it is runnable and because row
+   105 sits directly next to `SI-1`, the `$OBJ.>` / `$O.` deny-list mismatch already recorded in
+   `inbox/server-issues.md`. Expect a second `SI-` entry, and check the two are not the same finding.
+2. **Stream scale ceilings and the filestore** (4, 5, 9, 13) — row 9's mechanism may already be on
+   [[filestore-layout]] and merely unconnected to the question (`index.db` at `len(subject) + 4` per
+   subject is a per-subject cost that a high-cardinality space multiplies); row 13 is runnable.
+3. **Throughput and memory under load** (8, 10, 11, 68, plus 66) — flagged as the most
+   **environment-bound** group in the bank, to be scouted for mechanisms and what to measure rather
+   than for figures.
+
+**Two rows are recorded as *not* scouts**, with the reason, so nobody spends a session on them twice:
+37 and 40 are ingested by the meta-layer plan's step 2 by URL, and 98's thread is **already ingested**
+— `s-gh-5606-cross-account-jetstream` records that the import-ceiling question went unanswered — so it
+is a short source read or an honest `no-public-answer`, not a scout.
+
+**Two things were checked rather than assumed** while writing it. Row 25 looked answered — [[publishing]]
+has an `## Ordering, and what breaks it` section — but that section is about *JetStream* publish
+ordering, and row 25 asks what **core** NATS guarantees, which no page states; it stays open, and is
+too thin for its own scout. And row 98's premise was verified against
+`raw/nats-server-src/constants-v2.14.6.md`, which holds no import ceiling.
+
+The note the file ends on is the one worth keeping: the easy rows were answered first, so what remains
+is disproportionately **the questions nobody public has answered**. `no-public-answer` will be the
+right result more often from here, and per the bank's own convention a stated dead end with a date on
+it is the most valuable row in the table.

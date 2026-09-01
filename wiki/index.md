@@ -694,6 +694,10 @@ names now have pages — see the Entities section above. People: none yet.)*
 - `inbox/plan-drift-and-adrs-2026-08-31.md` — **finished** 2026-08-31, all 5 steps; kept as the record
 - `inbox/plan-the-unread-chapters-2026-08-31.md` — **finished** 2026-09-01, all 6 steps; kept as the
   record
+- `inbox/scout-backlog.md` — **standing list**, not a scout: the 14 bank rows that still want one,
+  grouped into three scouts with the reason each group holds together, plus the two rows that are
+  *not* scouts because another plan or an ingested thread already owns them. Update it when a scout is
+  run
 - `inbox/scout-delivery-timing-2026-09-01.md` — **scout**, 2026-09-01. Eleven candidates on
   redelivery timing and the message scheduler, for bank rows 16–19 and 29–30. Carries two findings the
   plan below exists to settle: the docs and a Synadia post **disagree on whether a consumer backoff
