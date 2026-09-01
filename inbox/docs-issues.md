@@ -96,6 +96,7 @@ row.
 | 34 | Six leafnode-remote TLS keys carry a bug note scoped to "2.11/2.12" and never say whether it still applies; on **2.14.6** `cert_file`, `key_file` and `ca_file` all reload correctly, so the note now reads as a standing warning against the supported rotation procedure | `reference/config/leafnodes/remotes/tls/cert_file.md` + 5 siblings | nats-docs | enhancement | medium | not filed | wiki states the observed 2.14.6 behaviour and names the three keys it did not test |
 | 35 | No page anywhere in the docs states what happens to **KV and Object Store subjects across a JetStream domain boundary** — and the two behave differently, so a reader who generalises from the KV case is wrong about the Object Store one. (The *behaviour* is `inbox/server-issues.md` **SI-1**; this row is the documentation gap alone) | `learn/topologies/leaf-nodes.md`; `learn/object-store/under-the-hood.md`; `learn/key-value/under-the-hood.md` | nats-docs | missing | high | not filed | wiki states the observed 2.14.6 behaviour on four pages and flags the defect question as open |
 | 36 | The advisories chapter's own diagram caption drops `.CONSUMER.` from the max-deliveries advisory subject — `$JS.EVENT.ADVISORY.MAX_DELIVERIES.ORDERS.shipping`, three times — while the prose on the same page has it right; a subscription copied from the caption receives nothing | `learn/monitoring/advisories-and-events.md` | nats-docs | wrong-value | low | not filed | wiki states the observed subject and notes the page contradicts itself |
+| 37 | ADR-42 states that a consumer's priority policy and groups cannot be changed after creation ("Only `PriorityTimeout` is updatable today") and that more than one group per consumer is an error; at 2.14.6 all three forbidden transitions are accepted and two groups are accepted and stored. `learn/jetstream/policies.md` says the opposite of the ADR and is right | `nats-architecture-and-design` ADR-42 | ADR repo | wrong-value | medium | not filed | wiki states the observed behaviour and says the ADR and the docs disagree |
 
 ---
 
@@ -1727,6 +1728,82 @@ was fetched repeatedly with `--no-ack` while `nats sub '$JS.EVENT.ADVISORY.>'` w
 **Why this is `low` and not `★`.** The correct subject is on the same page, in prose, immediately
 above the diagram. A reader who reads the page rather than only the picture gets the right value.
 
+
+## 37 · ADR-42's update rules do not hold at 2.14.6, and the docs contradict them
+
+**Found by consolidation, not by ingest.** [[consumer]] carried the docs' claim ("Priority
+policy — can change") and [[priority-groups]] carried the ADR's ("you cannot … switch
+policy. Only `PriorityTimeout` is updatable"). Two pages of this wiki disagreed because two public
+sources do. This is the second ADR-42 row, after **#7**.
+
+**What ADR-42 says.** Status *Approved*, tagged `2.11`, eight revisions to 2026-04-29:
+
+> "**You cannot update a consumer from having groups to not having them, or vice versa, and you
+> cannot switch between policies.** Only `PriorityTimeout` is updatable today."
+
+> "**The initial implementation allows exactly one group per consumer**; more than one is an error."
+
+**What the docs say.** `learn/jetstream/policies.md`, in its *what can be changed on a live consumer*
+table:
+
+> | Priority policy | Can change; `nats consumer edit` has no flag for it, so pass a config file with `--config` |
+
+and `learn/jetstream/priority-groups.md` says the server accepts more than one group and silently
+uses only the first.
+
+**What the server does.** Run on **nats-server v2.14.6** with **nats CLI 0.4.0**, 2026-09-01, full
+transcript in `raw/nats-server-src/priority-groups-observed-v2.14.6.md`. Every transition the ADR
+forbids is accepted with no error:
+
+```
+# 1. created with priority_policy=overflow, priority_groups=["g1"]
+priority_policy=overflow  priority_groups=['g1']  priority_timeout=None
+
+# 2. "you cannot switch between policies"  ->  edit to pinned_client
+(accepted, no error)
+priority_policy=pinned_client  priority_groups=['g1']  priority_timeout=120000000000
+
+# 3. "you cannot update a consumer from having groups to not having them"  ->  edit them away
+(accepted, no error)
+priority_policy=None  priority_groups=None  priority_timeout=None
+
+# 4. "...or vice versa"  ->  give them back
+(accepted, no error)
+priority_policy=overflow  priority_groups=['g1']  priority_timeout=None
+
+# 5. "more than one is an error"  ->  create with two groups
+(accepted, no error)
+priority_policy=overflow  priority_groups=['g1', 'g2']
+```
+
+**The neighbour sweep.** Four of ADR-42's hard rules were checked against the same binary, not just
+the one that started this. **Two are wrong and two hold**, and the two that hold do so with their
+error codes:
+
+| ADR-42 rule | v2.14.6 |
+|---|---|
+| policy and groups are not updatable; only `PriorityTimeout` is | **wrong** — all three transitions accepted |
+| exactly one group per consumer; more is an error | **wrong** — two accepted and both stored |
+| group name matches `limited-term` and is capped at 16 characters | **holds** — `10162 Valid priority group name must match A-Z, a-z, 0-9, -_/=)+ and may not exceed 16 characters` |
+| priority groups are pull-only; a push consumer is an error | **holds** — `10178 priority groups can not be used with push consumers` |
+
+A fifth observation, not a defect: setting `pinned_client` with no explicit `priority_timeout` fills
+the field with **`120000000000` ns (2 minutes)**, matching the ADR's example value — and
+`priority_timeout` is indeed updatable, which is the one thing the sentence gets right.
+
+**Suggested fix.** ADR-42 already carries exactly the right shape of note for this, on `failover`:
+*"As of NATS Server 2.14 the `failover` option is not implemented; the server silently ignores the
+field and does not enforce the bounds described above."* Add the same kind of note to the update rule
+and the one-group rule — or, if the restrictions are still intended, they are unimplemented and the
+ADR should say which release will carry them.
+
+**Why this is `medium` and not `★`.** Nothing is corrupted and nothing is silently wrong on the wire:
+the ADR describes a restriction that is *absent*, so a reader designs around a constraint that does
+not exist (recreating a consumer, and losing its position, to change a policy that could have been
+edited). The one-group claim is the more dangerous half in the other direction — a design that
+configures two groups is accepted by the server, and `learn/jetstream/priority-groups.md` says only
+the first is used, which this run did **not** test.
+
 ## 35 · The docs never say what a JetStream domain does to KV and Object Store — and it does different things to each
 
 **Impact: an operator who reads "a domain isolates JetStream" and runs object buckets on both sides of
@@ -1921,3 +1998,4 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 34 | `wiki/concepts/leafnode.md` — *Rotating a remote's certificate*; `wiki/operations/rotate-tls-certificates.md` — *Settled by running it* and step 4; `wiki/summaries/s-nats-server-tls-reload.md` |
 | 35 | `wiki/concepts/object-store.md` — *A bucket is not isolated by a JetStream domain*; `wiki/concepts/jetstream-domain.md`; `wiki/concepts/leafnode.md` — *Limits and failure modes*; `wiki/gotchas/streams-not-visible-across-a-leafnode.md`; `wiki/summaries/s-nats-server-object-store-leafnode.md` |
 | 36 | `wiki/reference/advisories.md` — *A docs error worth knowing*; `wiki/summaries/s-docs-monitoring-advisories-and-events.md` |
+| 37 | `wiki/concepts/priority-groups.md` — *Hard rules* and *What the ADR says that the server does not do*; `wiki/concepts/consumer.md` — *Priority policy*; `wiki/summaries/s-adr-42-priority-groups.md` |

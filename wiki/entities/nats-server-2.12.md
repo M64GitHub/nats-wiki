@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.12, strict-mode, elastic-pointers, offline-assets, GOMEMLIMIT]
 aliases: ["2.12", v2.12, v2.12.0, v2.12.15]
-sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing]
+sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing, s-gh-7463-jetstream-corruption]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nats-server 2.12
@@ -124,6 +124,16 @@ jetstream {
 
 See [[js-api]].
 
+### It is also the floor maintainers will help you from
+
+2.12 is where the project's own support answer lands. Asked about a JetStream store that had gone
+inconsistent on **2.9.8**, a maintainer's whole reply was: "2.9.x is now very old, unsupported and
+100s of bug fixes behind, we have invested a lot of time on the storage layer since… You need to
+upgrade to **2.12.x**, we can't help with such old versions." The asker upgraded and reported the
+problem gone (source: [[s-gh-7463-jetstream-corruption]]). No public source read states a formal
+support or end-of-life policy — this is the closest thing to one, and it is a maintainer's sentence in
+a thread, not a document. See [[disaster-recovery]] and [[upgrade-a-cluster]].
+
 ### The downgrade floor is v2.11.9
 
 Downgrading 2.12 → 2.11 **rebuilds the on-disk stream state files**, because the format changed.
@@ -144,4 +154,4 @@ anything older gives up that protection.
 
 ## Sources
 
-[[s-docs-upgrade-to-2.12]] · [[s-docs-advanced-publishing]]
+[[s-docs-upgrade-to-2.12]] · [[s-docs-advanced-publishing]] · [[s-gh-7463-jetstream-corruption]]

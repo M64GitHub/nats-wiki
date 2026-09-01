@@ -7,9 +7,9 @@ verified-against: nats-architecture-and-design @ main, 2026-08-31
 verified-on: 2026-08-31
 tags: [repo, adr, design, specification, cross-client]
 aliases: [adr, adrs, "nats-io/nats-architecture-and-design", architecture and design]
-sources: [s-github-repo-facts, s-adr-1-jetstream-json-api, s-adr-7-server-error-codes]
+sources: [s-github-repo-facts, s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-adr-31-direct-get]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nats-architecture-and-design (the ADR repo)
@@ -49,6 +49,13 @@ to (`2.11`, `2.12`, `2.14`, `2.15`) and the audience (`server`, `client`, `spec`
 - **Revisions accumulate under one version tag.** The metadata `Tags` row carries a single version
   while the revision table records several, so a feature can arrive years after the ADR's date. Read
   the revision table, not the header.
+- **An ADR can retract its own earlier text, in place, with no version bump.** ADR-31 does exactly
+  that: "Earlier revisions of this document described the server auto-promoting `allow_direct: true`
+  when [`max_msgs_per_subject` was set] … servers leave `allow_direct` untouched regardless of
+  `max_msgs_per_subject`" (source: [[s-adr-31-direct-get]]). `main` is the state and there are no
+  releases, so an ADR quoted from a copy taken at an older date can be quoting a claim the repo has
+  since withdrawn — which is why this wiki mirrors the tarball with a fetch date and cites the
+  summary, not the URL. See [[direct-get]].
 - **ADRs specify client behaviour the server cannot enforce.** [[ordered-consumer]] is the clearest
   case: it is a construct clients build, so the ADR is the contract and the server sees only ordinary
   consumers.
@@ -58,8 +65,12 @@ to (`2.11`, `2.12`, `2.14`, `2.15`) and the audience (`server`, `client`, `spec`
 ## The ADRs this wiki has read
 
 [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]] · [[s-adr-8-key-value-store]] ·
-[[s-adr-17-ordered-consumer]] · [[s-adr-20-object-store]] · [[s-adr-42-priority-groups]] ·
-[[s-adr-43-per-message-ttl]] — 7 of 54. The rest are triaged in `inbox/adr-toc.md`.
+[[s-adr-10-extended-purge]] · [[s-adr-17-ordered-consumer]] · [[s-adr-20-object-store]] ·
+[[s-adr-31-direct-get]] · [[s-adr-35-filestore-compression]] · [[s-adr-40-nats-connection]] ·
+[[s-adr-42-priority-groups]] · [[s-adr-43-per-message-ttl]] · [[s-adr-48-kv-ttl]] ·
+[[s-adr-54-kv-codecs]] · [[s-adr-57-kv-subject-transforms]] · [[s-adr-59-sourcing-and-mirroring]] ·
+[[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]] — **17 of 54** (2026-09-01). The rest
+are triaged in `inbox/adr-toc.md`.
 
 ## Related
 
@@ -68,4 +79,5 @@ to (`2.11`, `2.12`, `2.14`, `2.15`) and the audience (`server`, `client`, `spec`
 
 ## Sources
 
-[[s-github-repo-facts]] · [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]]
+[[s-github-repo-facts]] · [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]] ·
+[[s-adr-31-direct-get]]

@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [install, systemd, docker, kubernetes, http_port, store_dir, LimitNOFILE, lame-duck]
 aliases: [install, installation, "install NATS", "set up a server", "first server", nats-server service]
-sources: [s-docs-getting-started, s-nats-server-signals, s-gh-6070-lame-duck-under-systemd, s-docs-single-server, s-docs-hardening, s-nats-server-systemd-units, s-docs-kubernetes]
+sources: [s-docs-getting-started, s-nats-server-signals, s-gh-6070-lame-duck-under-systemd, s-docs-single-server, s-docs-hardening, s-nats-server-systemd-units, s-docs-kubernetes, s-docs-config-management, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-rolling-upgrades, s-docs-your-first-cluster, s-gh-3569-connect-to-route-port, s-gh-5924-filestore-dirs-vanished, s-nats-helm-chart-values-2.14.6, s-nats-server-lame-duck, s-nats-server-route-cluster-formation]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Install nats-server
@@ -34,7 +34,10 @@ A running server with:
 - A host with a filesystem you are willing to give JetStream (`store_dir` is where the data lives),
   or Docker, or a Kubernetes cluster with a default storage class.
 - Ports you can bind: **4222** clients, **8222** monitoring, and — if this node will ever cluster —
-  **6222** routes (source: [[s-docs-hardening]]).
+  **6222** routes (source: [[s-docs-hardening]]). What that route port then does — seed routes, the
+  INFO gossip that turns one configured peer into a full mesh, and the cluster-name check on both
+  ends — is [[build-a-3-node-cluster]]'s subject (sources: [[s-docs-your-first-cluster]],
+  [[s-docs-forming-a-cluster]], [[s-nats-server-route-cluster-formation]]).
 - Decide the JetStream store path **now**. Changing it later moves the data, and on Kubernetes it is
   a PVC you cannot casually re-point ([[s-docs-kubernetes]]).
 - If this server will hold JetStream data and later become part of a cluster, **read
@@ -103,15 +106,60 @@ jetstream {
   [[jetstream-sizing]] before assuming what they are. **Both halves of this line matter.** Leaving
   `store_dir` out puts the whole store under the system temp directory, with one warning at startup
   (`Temporary storage directory used, data could be lost on system reboot`) and a real risk that a
-  distribution's `tmpwatch`/`systemd-tmpfiles` reaps it — [[stream-directories-disappear]]. Leaving
+  distribution's `tmpwatch`/`systemd-tmpfiles` reaps it — reported in the field as 45 of 50 stream
+  directories gone weeks after deployment, with `nats stream info` still listing every stream
+  (source: [[s-gh-5924-filestore-dirs-vanished]]; [[stream-directories-disappear]]). Leaving
   `max_file_store` out gives a limit that shrinks at every restart on anything before 2.14.6 —
   [[jetstream-out-of-disk]]. Set both.
+
+**Split it with `include` once it grows, and know the two rules.** An `include` path is resolved
+"relative to the directory of the config file that contains it, not to the directory you launch the
+server from", so a unit that starts from `/` still resolves it. And **an unquoted `$NAME` is a
+variable** — it resolves a config-defined variable and then an environment variable, and an unset one
+is a parse error — while a quoted `"$NAME"` is the literal string. That inversion is why **bcrypt
+hashes, full of `$`, are the values you do quote** (source: [[s-docs-config-management]]).
+
+**Test the file before you start or reload it:**
+
+```
+nats-server -c /etc/nats-server.conf -t
+```
 
 Start it:
 
 ```
 nats-server -c /etc/nats-server.conf
 ```
+
+**Know what a reload will and will not accept before you rely on it.** The principle the docs state:
+"A reload can change *policy* (who connects, what they may do, how much they may store), but it can't
+change *identity* (the addresses the server and its cluster bind, or where JetStream keeps its
+data)." So `port` / `listen`, the cluster's listen host and port and the JetStream `store_dir` need a
+restart, while accounts, users, permissions, `max_connections`, `max_payload`, TLS certificate paths,
+cluster routes and even the `jetstream` enable flag do not — with `max_subscriptions` as the odd one
+out, rejected by a reload despite sitting among reloadable limits (source:
+[[s-docs-config-management]]; [[reload-server-config]], [[config-keys]]).
+
+### TLS, if this server is reachable by anything but localhost
+
+Three TLS blocks exist, one per kind of peer, and **they are independent** — turning on TLS for
+clients leaves cluster routes and gateway links in plaintext until each block is configured too
+(source: [[s-docs-encryption-and-tls]]). A single server only needs the first:
+
+```
+tls {
+  cert_file: "/var/lib/nats/certs/server-cert.pem"
+  key_file:  "/var/lib/nats/certs/server-key.pem"
+  ca_file:   "/var/lib/nats/certs/ca.pem"
+  verify:    true
+}
+```
+
+`verify: true` on the **client** block is what makes the link mTLS; without it the server proves
+itself to the client and never checks the client's certificate. On routes it is redundant — the
+server forces mutual verification there whether or not you set it. Certificate paths are reloadable,
+which is what makes [[rotate-tls-certificates]] a reload rather than a restart. The full treatment is
+[[tls-in-nats]].
 
 ### Run it under systemd
 
@@ -168,6 +216,11 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now nats-server
 ```
 
+Upgrading this binary later is `systemctl stop` (which drains, via the `ExecStop` above), replace the
+binary, `systemctl start`. On a **cluster** the order matters — non-leaders first, the meta-leader
+last and drained — and that procedure is [[upgrade-a-cluster]] (source:
+[[s-docs-rolling-upgrades]]).
+
 **The three lines that matter operationally:**
 
 | line | what it buys |
@@ -175,6 +228,11 @@ sudo systemctl enable --now nats-server
 | `ExecReload=/bin/kill -s HUP $MAINPID` | `systemctl reload nats-server` applies a config change **without dropping connections** — the reloadable half of [[config-keys]] |
 | `ExecStop=/bin/kill -s SIGUSR2 $MAINPID` | `systemctl stop` is a **lame-duck drain**, not a kill: the server stops advertising itself and spreads disconnects so clients reconnect elsewhere |
 | `TimeoutStopSec=150` | `lame_duck_duration` (**`2m`**) plus buffer. Raise one and you must raise the other, or systemd kills the drain half-finished |
+
+`TimeoutStopSec` has to cover more than that timer: on SIGUSR2 the server first steps down **every**
+Raft group it leads and shuts JetStream down, and only then starts spreading client disconnects over
+`lame_duck_duration` — the timer governs client eviction and nothing else (source:
+[[s-nats-server-lame-duck]], `Server.lameDuckMode()` at v2.14.6).
 
 **The signals the unit wires, and the two it does not** (source: [[s-nats-server-signals]], read from
 `server/signal.go` at v2.14.6):
@@ -238,6 +296,20 @@ Two chart facts that bite: the release name names the pods (`helm install nats �
 **you must not bind the monitor port to `127.0.0.1` here** — the kubelet's probes connect to the pod
 IP, so a loopback bind fails every probe and no pod goes ready (source: [[s-docs-hardening]]). See
 [[nats-helm-charts]].
+
+Two more, read from the chart at tag **nats-2.14.6** rather than from a doc page (source:
+[[s-nats-helm-chart-values-2.14.6]]):
+
+- **The shipped drain arithmetic has no slack.** The chart's own comment gives the rule —
+  `terminationGracePeriodSeconds` ≥ `lameDuckGracePeriod` + `lameDuckDuration` + 20s overhead — and
+  its defaults satisfy it *exactly*: `10s + 30s + 20s = 60`. Raise `lameDuckDuration` by one second
+  without raising `terminationGracePeriodSeconds` and the kubelet's SIGKILL lands **inside** the
+  drain window. The chart's `30s` is also the server's documented **minimum** and a third of the
+  server's own `2m` default, while [[upgrade-a-cluster]] advises against running at the minimum.
+- **The config-reloader sidecar ships enabled and only watches `/etc/`.**
+  `natsVolumeMountPrefixes: [/etc/]` means a config file or a certificate mounted anywhere else is
+  never seen by the reloader, so its change never produces a SIGHUP and the server keeps running the
+  old one — silently. Mount under `/etc/`, or extend the list.
 
 ## Verify
 
@@ -318,6 +390,18 @@ accounting limit checked as messages arrive and `GOMEMLIMIT` is a soft GC target
 anything. systemd logs `Main process killed (oom-kill)` (source: [[s-docs-hardening]]). The shipped
 unit leaves every resource cap commented out for exactly this reason.
 
+**Clients connect to 4222, never to 6222.** Pointing a client at the route port half-works and logs
+
+```
+[ERR] 192.168.0.3:57824 - rid:10 - attempted to connect to route port
+```
+
+The `rid:` prefix is a *route* connection id — the server logged your client as a route because it
+arrived on the route listener. "`cluster` routes are meant to be used only for other nodes (servers)
+to connect and form a cluster. Clients should connect to the listen URL of one of the nodes"
+(source: [[s-gh-3569-connect-to-route-port]]). If you want a hub-and-spoke shape, the answer is
+leafnodes, not routes — [[leafnode]], [[choosing-a-topology]].
+
 **Running from flags instead of a file costs you the reload.** `nats-server -js -m 8222` is fine for a
 demo; a config file is what makes `systemctl reload` meaningful ([[config-keys]]).
 
@@ -327,10 +411,15 @@ demo; a config file is what makes `systemctl reload` meaningful ([[config-keys]]
 [[nats-cli]] · [[nats-box]] · [[nats-helm-charts]] · [[replicas]] ·
 [[streams-deleted-when-clustering-a-standalone-server]] · [[nats-server]] · [[error-codes]] ·
 [[reload-server-config]] · [[upgrade-a-cluster]] · [[tls-in-nats]] · [[subject-permissions]] ·
-[[unauthenticated-clients-still-connect]] · [[rotate-tls-certificates]]
+[[unauthenticated-clients-still-connect]] · [[rotate-tls-certificates]] · [[leafnode]] ·
+[[choosing-a-topology]] · [[stream-directories-disappear]] · [[jetstream-out-of-disk]]
 
 ## Sources
 
 [[s-docs-getting-started]] · [[s-docs-single-server]] · [[s-docs-hardening]] ·
 [[s-nats-server-systemd-units]] · [[s-nats-server-signals]] ·
-[[s-gh-6070-lame-duck-under-systemd]] · [[s-docs-kubernetes]]
+[[s-gh-6070-lame-duck-under-systemd]] · [[s-docs-kubernetes]] · [[s-docs-config-management]] ·
+[[s-docs-encryption-and-tls]] · [[s-docs-forming-a-cluster]] · [[s-docs-rolling-upgrades]] ·
+[[s-docs-your-first-cluster]] · [[s-gh-3569-connect-to-route-port]] ·
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-nats-helm-chart-values-2.14.6]] ·
+[[s-nats-server-lame-duck]] · [[s-nats-server-route-cluster-formation]]

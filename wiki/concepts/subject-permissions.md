@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [permissions, allow, deny, default_permissions, allow_responses, queue-group, _INBOX, "$JS.API"]
 aliases: [permissions, authorization, allow list, deny list, publish permissions, subscribe permissions, default_permissions, allow_responses]
-sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed]
+sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Subject permissions
@@ -63,7 +63,26 @@ authorization {
 The same block sits inside an account's `users` array once you have accounts, and inside a JWT once
 you are in [[operator-mode]] — where the recommended form is a **scoped signing key** whose template
 carries the lists, leaving the user's own JWT with `"pub": {}, "sub": {}`. "The server enforces the
-same two rules either way."
+same two rules either way" (source: [[s-docs-authorization]]).
+
+**A scoped key changes where permissions live, and that has three operational consequences**
+(source: [[s-docs-decentralized-auth]]):
+
+```
+nats auth account keys add ORDERS order-writer --pub-allow 'orders.>' --sub-allow '_INBOX.>'
+```
+
+- **Editing the template re-permissions every user signed by that key** on the next account push,
+  with no credentials re-issued. That is the point of it, and it is also how a careless edit changes
+  more than one service at once.
+- **A scoped key is invisible until the account is pushed** — before the push, creds minted against
+  it simply fail.
+- **Removing a scoped key is mass revocation, not an edit.** "The CLI has no command to edit a scope
+  in place, so the only way to change one is to remove its key… That creates a new key, and every
+  user signed by the old one is locked out at the next push."
+
+The alternative is the account's identity key, and the reason to avoid it is a permission argument:
+"whoever holds the account's seed can issue a user with any permissions".
 
 | field | what it does |
 |---|---|
@@ -124,6 +143,26 @@ in the server log either**. A subscriber that seems to miss messages is the symp
   `$JS.API.CONSUMER.CREATE.<stream>.*.<subject>` and denying the unfiltered
   `$JS.API.CONSUMER.CREATE.<stream>`, but the durable/ephemeral distinction is not reachable from a
   subject rule. Per-account JetStream limits are the enforceable control.
+- **An import that renames must be permitted under its *local* name.** An import may land on a
+  different subject with `prefix:` or `to:`, and the rule is to "subscribe to the name the import
+  lands on, not the name the exporter published" — so the subscribing user's `allow` list must carry
+  the local name too. Import and export themselves are **account** properties, not user ones: no
+  permission edit opens a boundary, and none closes one (sources: [[s-docs-cross-account]],
+  [[s-docs-authorization]]; [[cross-account-sharing]]).
+- **A user with no `permissions` block can do anything, and that is how servers get left open.** The
+  question was asked directly on gh#4535 — "What are a user's permissions when no `permissions` block
+  is defined for the user and no `defaultPermissions` block is defined, either?" — and went
+  unanswered there; the docs settle it as unrestricted. The community's pre-fix lock-down for
+  anonymous clients was to point `no_auth_user` at a user denied everything:
+
+  ```
+  { user: no_auth_user, password: foobar,
+    permissions: { publish: { deny: ["*"] }, subscribe: { deny: ["*"] } } }
+  ```
+
+  Note `*`, not `>`: that denies one token only. `>` is the form that denies everything (sources:
+  [[s-gh-4535-unauthenticated-connections]], [[s-docs-authorization]];
+  [[unauthenticated-clients-still-connect]]).
 - **A restricted user cannot see its own account.** `nats account info` asks the server over
   `$SYS.REQ.USER.INFO`; a narrow publish allow-list blocks the request and the field comes back empty
   (see [[account]]).
@@ -176,6 +215,41 @@ ephemeral consumer, so it also needs `$JS.API.CONSUMER.CREATE.OBJ_<bucket>.>` an
 This is a case where the protective-looking stream setting and the protection an operator needs are
 two different mechanisms.
 
+## Two places the permission model changes shape
+
+**On a leafnode, config mode has no user permissions at all.** A leafnode connection authenticates
+against `leafnodes { authorization }`, which is a *different* block from the top-level one, and
+`parseLeafUsers` (`opts.go:3005–3064`) is "a trimmed down version of parseUsers" accepting exactly
+`user`, `pass`, `account` and `proxy_required`. Adding `permissions` there is a **parse error**:
+`unknown field "permissions"`. What you have instead is:
+
+- **`deny_exports` and `deny_imports` on the leaf's own remote** — `deny_exports` is a publish deny,
+  `deny_imports` is a subscribe deny. **Deny only**: "deny everything, allow one subject" is not
+  expressible;
+- **the account the leaf is bound to**, whose imports and exports then decide what crosses — the real
+  boundary in config mode ([[account]]).
+
+In **[[operator-mode]]** the model comes back: the leaf presents a `.creds` file, the permissions
+travel in the user JWT, and they do reach the connection — reversed on the hub side and pushed back
+to the leaf for local enforcement (`leafnode.go:2307–2318`, `2423–2424`). The two ends **compose**:
+the hub's permissions arrive in the INFO and the leaf's local `deny_imports` / `deny_exports` are
+merged on top, so restricting at one end does not stop you restricting at the other (source:
+[[s-gh-5941-restrict-leafnode-subjects]]; [[leafnode]]).
+
+**With [[auth-callout]], the permissions are minted per connection by a service you write.** The
+callout returns a user JWT carrying the lists, so the two rules above still hold — they are just
+decided at connect time rather than in a config file. Two permission facts belong here:
+
+- **The server denies publishing to `$SYS.REQ.USER.AUTH` for every user on the callout's account**,
+  including `auth-svc` itself, which is why ADR-26 recommends giving the callout an account of its
+  own — "with nothing else in that account, no other user can" reach the subject
+  (source: [[s-docs-auth-callout]]).
+- **Nothing the client sent is verified before your service runs.** Every field of `connect_opts` —
+  `nkey` included — is an unverified claim, so issuing permissions based on one is a spoofing bug:
+  "you evaluate on what you got from the client, if you don't like it you reject". The detail, and
+  the nonce a service can verify for itself, is on [[auth-callout]] (source:
+  [[s-gh-7505-auth-callout-nkey]]).
+
 ## Interop: the transport is part of the permission
 
 Two things here are easy to get wrong because the rule is written against something other than what
@@ -214,11 +288,16 @@ through one (sources: [[s-docs-websocket-browsers-and-origins]],
 ## Related
 
 [[account]] · [[operator-mode]] · [[auth-callout]] · [[tls-in-nats]] · [[cross-account-sharing]] ·
-[[js-api-subjects]] · [[unauthenticated-clients-still-connect]] · [[config-keys]] · [[nats-cli]]
+[[js-api-subjects]] · [[unauthenticated-clients-still-connect]] · [[config-keys]] · [[nats-cli]] ·
+[[leafnode]] · [[consumer]]
 
 ## Sources
 
 [[s-docs-authorization]] · [[s-docs-authentication-basics]] · [[s-gh-5044-restrict-durable-consumers]] ·
 [[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] · [[s-docs-kv-under-the-hood]] ·
 [[s-docs-object-store-under-the-hood]] ·
-[[s-docs-mqtt-topics-and-subjects]] · [[s-docs-mqtt-auth-and-clustering]] · [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]]
+[[s-docs-mqtt-topics-and-subjects]] · [[s-docs-mqtt-auth-and-clustering]] ·
+[[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
+[[s-docs-auth-callout]] · [[s-docs-cross-account]] · [[s-docs-decentralized-auth]] ·
+[[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
+[[s-gh-7505-auth-callout-nkey]]

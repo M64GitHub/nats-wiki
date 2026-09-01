@@ -7,9 +7,9 @@ verified-against: nsc v2.15.0
 verified-on: 2026-08-31
 tags: [tool, nsc, operator-mode, jwt, nkeys, accounts, users]
 aliases: [nsc, "nats-io/nsc"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-docs-config-and-jwt-backup]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nsc
@@ -55,6 +55,17 @@ nsc update                                                       # self-update
 - **Creating an account is not deploying it.** Account JWTs must be **pushed** to the server
   (`nats auth account push … --creds sys.creds`) or served by a resolver; a locally created account
   the cluster has never seen does not exist.
+- **Two copies of every account JWT exist, and only one of them is yours.** The store on your
+  workstation is authoritative for *you*; the server's resolver directory is what the running cluster
+  actually reads. They drift silently, the resolver directory needs no backup of its own —
+  "re-pushing the accounts rebuilds it" — and a restored store does **not** refill it. The symptom of
+  forgetting is an `Authorization Violation` while every local listing looks perfect (source:
+  [[s-docs-config-and-jwt-backup]]; [[backup-and-restore-identity]]).
+- **`resolver_preload` of the system account is the bootstrap, and it belongs in the backup set.**
+  It is what lets a system user connect before anything has been pushed — so "without `server.conf`
+  in the backup set there is no way in to push the other accounts". Back up the server config
+  alongside the store, and date both: an operator rotation orphans an older archive, leaving you with
+  "an operator nobody signs accounts under anymore" (source: [[s-docs-config-and-jwt-backup]]).
 
 ## Cheat sheet
 
@@ -126,4 +137,5 @@ sends, and `nsc push --prune` needs `allow_delete: true` on the resolver.
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]] · [[s-gh-7854-jwt-push-timeout]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-operator-mode]] ·
+[[s-docs-decentralized-auth]] · [[s-gh-7854-jwt-push-timeout]] · [[s-docs-config-and-jwt-backup]]

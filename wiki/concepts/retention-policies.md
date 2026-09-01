@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Retention policies
@@ -25,6 +25,18 @@ purposes, the choice is permanent.
 | **`limits`** (default) | `max_msgs`, `max_bytes` or `max_age` removes it, whichever comes first. Consumers reading and acking has **no effect** on what the stream keeps | an audit log or event history you want to replay from any point |
 | **`interest`** | **every** consumer whose filter covers it has acked it. A message published on a subject **no consumer is interested in is dropped immediately** | a fan-out where every consumer must process each message, without an ever-growing log |
 | **`workqueue`** | **one** consumer acks it — the first ack removes it for everyone | a job queue where each message is work for exactly one worker |
+
+**On `limits` and `interest`, an ack advances a position; it does not remove a message.** This is the
+sentence that makes the table above make sense, and the docs state it while explaining a worker pool:
+"the workers share a *position*, not the messages" — the acknowledgment floor advances the same
+whether one process pulls or three, "so `billing` and `analytics` still see every order"
+(source: [[s-docs-worker-pool]]). `workqueue` is the exception that inverts it: there the first ack
+removes the message for everyone, which is why the server refuses overlapping consumers rather than
+letting two of them race for the same work (below). Splitting work across a *stream* rather than a
+core NATS queue group is what survives a worker dying — a queue-group subscriber that is offline when
+a message arrives "misses it for good", where a worker on a consumer "just leaves its share for the
+others": "**only the stream-backed split survives a worker dropping out or a restart**". See
+[[worker-pool]] and [[ack-and-redelivery]].
 
 **Limits still apply under all three.** Retention removes a message when consumers are done with
 it; the stream's limits remove it when the stream grows too old or too large. On an `interest` or
@@ -86,6 +98,11 @@ it memorable: overlap *between* consumers is not merely allowed on `limits` and 
 it is the point — "two separate consumers whose filters match the same subject each get their own
 full copy of those messages". **Work-queue retention is the one exception**
 (source: [[s-docs-filtering]]).
+
+**Match on the numbers, not on those strings.** `10099` and `10100` are the contract; the
+`description` beside them is not, and the canonical list is generated from `server/errors.json`
+rather than written by hand (source: [[s-adr-7-server-error-codes]]; the mechanics are on
+[[js-api]] and every code is in [[error-codes]]).
 
 A wildcard filter such as `fulfill.>` overlaps `fulfill.us` and `fulfill.eu` and is rejected. Two
 valid shapes exist (source: [[s-docs-retention-policies]]):
@@ -190,4 +207,5 @@ interest, and new messages were removed before they could be copied
 
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
 [[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
-[[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]]
+[[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
+[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]]

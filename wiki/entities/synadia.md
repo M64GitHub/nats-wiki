@@ -7,9 +7,9 @@ verified-against: synadia.com site chrome captured 2026-08-31
 verified-on: 2026-08-31
 tags: [org, synadia, maintainer, tier-1, orbit, commercial]
 aliases: [synadia, "Synadia Communications, Inc.", synadia-io]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-synadia-jetstream-anti-patterns, s-synadia-jetstream-memory-patterns]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-synadia-jetstream-anti-patterns, s-synadia-jetstream-memory-patterns, s-cncf-nats-project, s-nats-server-readme]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Synadia
@@ -22,7 +22,7 @@ itself is a [[cncf]] project under Apache-2.0 — those two facts sit side by si
 
 | what | who |
 |---|---|
-| the project, trademark and neutrality | **[[cncf]]** — Incubating since 2018-03-15 |
+| the project, trademark and neutrality | **[[cncf]]** — Incubating since 2018-03-15 (source: [[s-cncf-nats-project]]) |
 | the maintainers, the docs, the release cadence | **Synadia** |
 | the licence | Apache-2.0, for [[nats-server]] and effectively all of `nats-io` |
 | commercial offerings | [[synadia-products]] |
@@ -42,7 +42,17 @@ itself is a [[cncf]] project under Apache-2.0 — those two facts sit side by si
 
 - **"Official" means Synadia-maintained.** Every tier 1 and tier 2 client on [[s-docs-ecosystem]] is
   a Synadia commitment; community clients are not. When a client lags a server release, that is a
-  Synadia scheduling question, not a community one.
+  Synadia scheduling question, not a community one. The scale of the gap is in the server's own
+  README: "NATS has over **40 client language implementations**" against the **twelve** Synadia
+  maintains (source: [[s-nats-server-readme]]) — so most of the ecosystem carries no such commitment.
+- **Incubating is a governance status, not a verdict on production-readiness**, and it is the row an
+  architect gets asked about. CNCF's own definitions put *Incubating* at "used successfully in
+  production by a small number users with a healthy pool of contributors", below *Graduated*. What
+  speaks to production-readiness is elsewhere: the release history, and the **Trail of Bits** security
+  audit commissioned through **OSTIF**, full report April 2025
+  (sources: [[s-cncf-nats-project]], [[s-nats-server-readme]]). CNCF membership is also what fixes the
+  trademark and neutrality question that Synadia's ownership would otherwise raise — see [[cncf]] and
+  [[nats-server]].
 - **The `synadia-io` org is a deliberate boundary.** [[orbit]] lives there rather than in `nats-io`
   precisely so that its API guarantees can be weaker than a core client's. Read the org name in a
   dependency URL as a stability signal.
@@ -62,6 +72,6 @@ itself is a [[cncf]] project under Apache-2.0 — those two facts sit side by si
 ## Sources
 
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-synadia-jetstream-anti-patterns]] ·
-[[s-synadia-jetstream-memory-patterns]]. Company name, self-description and product names are read
+[[s-synadia-jetstream-memory-patterns]] · [[s-cncf-nats-project]] · [[s-nats-server-readme]]. Company name, self-description and product names are read
 from the site navigation and footer captured verbatim in
 `raw/synadia-blog/nats-jetstream-high-ram-usage.txt` (lines 1–12 and 138–145).

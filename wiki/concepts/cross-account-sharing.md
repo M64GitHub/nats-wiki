@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [exports, imports, stream-export, service-export, prefix, to, external, api-prefix, 10021, 10022, 10024]
 aliases: [exports, imports, export, import, cross-account, account import, account export, activation token, api prefix, external]
-sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood]
+sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Cross-account sharing
@@ -43,6 +43,14 @@ subscriber must use the **new** name.
 
 **An account's `exports` array is a complete inventory** of what can leave it — which is the property
 that makes the boundary auditable.
+
+**Import and export permissions are a property of the account, not of a user** (source:
+[[s-docs-authorization]]). No permission edit on a user opens or closes a boundary; the three rules
+worth checking on every share are the security checklist's: pair every export with its import, match
+the **type** to the flow (`stream` one way, `service` request/reply), and subscribe to the remapped
+subject when an import uses `prefix:` or `to:` — plus the negative rule, "Never rely on a shared
+subject name to bridge accounts; use an explicit export/import" (source:
+[[s-docs-security-checklist]]).
 
 ## What configures it
 
@@ -136,6 +144,32 @@ prefix's second token — which is why a domain prefix is written `$JS.<domain>.
 This gives the second account a **copy**, with the mirror's lag, not the same asset: a write there
 does not reach the original. See [[mirrors-and-sources]].
 
+**The `nats` CLI's two interactive branches are the clearest statement of what the block needs**, and
+they differ in exactly the way that matters here (source: [[s-natscli-stream-external]], natscli
+v0.4.0):
+
+| | across a **domain** | across an **account** |
+|---|---|---|
+| API prefix | mechanical — the CLI composes `$JS.<domain>.API` from the domain name | **required**, and it is "the prefix where the foreign account JetStream API **has been imported**" — a *local* subject |
+| delivery prefix | optional | **required**, likewise a local subject |
+
+So the account branch states the precondition the docs never do: **the `external` block does not
+create the import, it names the local prefix an existing import already lives under.** Route 1 is not
+an alternative to Route 2 here — for the cross-account case it is a *prerequisite*.
+
+**And the error you get without it names the missing half.** From a supercluster-plus-leafnodes setup
+whose accounts had the shape right but no export on the far side:
+
+```
+Error adding service import "$JS.leaf01a.API.CONSUMER.CREATE.tank": service import not authorized
+```
+
+`CONSUMER.CREATE` is request/reply, so it must be a **service** export — the type rule above, failing
+in the loud direction for once. That thread has **no maintainer reply** and its one community
+suggestion ("export the `$JS.API.>` subjects … import those subjects into the same account") is
+unaccepted, which is the honest state of this whole area (source:
+[[s-gh-7881-cross-domain-sourcing]]; [[cross-domain-sourcing]]).
+
 Three things must line up, and the docs say so without documenting the fields: "the `external` block
 plus matching exports and imports on both sides, and each of the three subjects has a required type.
 The consumer API and flow-control subjects are *service* exports… The delivery subject is a *stream*
@@ -158,6 +192,14 @@ Three error codes guard the prefixes:
   account provides JetStream as a service to all enabled accounts", so it is an overview, never a
   management plane.
 - **A shared subject name.** Two accounts using the same string are two different subjects.
+
+**Where this turns up unexpectedly: leafnodes.** In config mode a leafnode's `authorization` users
+cannot carry permissions at all, so the only boundary available is the account — bind the leaf remote
+to an account (`leafnodes.remotes[].account`) and the hub-side leaf user to the matching account
+(`leafnodes.authorization.users[].account`), and **that account's imports and exports decide what
+crosses the link**. Everything on this page is therefore the answer to "how do I restrict which
+subjects a leafnode shares", in config mode (source: [[s-gh-5941-restrict-leafnode-subjects]];
+[[leafnode]], [[subject-permissions]]).
 
 ## Limits and failure modes
 
@@ -202,4 +244,6 @@ Three error codes guard the prefixes:
 
 [[s-docs-cross-account]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7017-kv-across-accounts]] ·
 [[s-nats-server-auth-and-tls]] · [[s-docs-mirrors-and-sources]] ·
-[[s-docs-object-store-under-the-hood]]
+[[s-docs-object-store-under-the-hood]] · [[s-docs-authorization]] ·
+[[s-docs-security-checklist]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
+[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]]

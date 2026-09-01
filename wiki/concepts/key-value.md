@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [kv, bucket, tombstone, watch, direct-get]
 aliases: [KV, key value, KV bucket, KV_]
-sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-object-store-watching-and-listing, s-docs-object-store-metadata-and-links, s-adr-20-object-store]
+sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-object-store-watching-and-listing, s-docs-object-store-metadata-and-links, s-adr-20-object-store, s-adr-31-direct-get, s-docs-get-direct, s-docs-mirrors-and-sources, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Key-Value
@@ -148,6 +148,20 @@ Quoting the spec directly:
 A healthy cluster will *mostly* return consistent values, "but this should not be relied on to be
 true." Read-after-write existed historically and is **deprecated**. This follows directly from
 Direct Get being answerable by any replica — see [[replicas]].
+
+**The mechanism, exactly.** Direct Get is served by a **queue group of stream peers** named `_sys_`,
+so "the number of servers eligible to respond to read requests is the same as the replica count of
+the stream" (source: [[s-adr-31-direct-get]]). A KV read is therefore load-balanced across R replicas
+by design, and the stale read is the price of that. The read itself has no KV-specific machinery: the
+docs put it plainly — "This is the read a key-value lookup is built on: **'the latest value for a key'
+is 'the last message on its subject'**" (source: [[s-docs-get-direct]]). Which means a KV get is
+inspectable as a stream read, without a KV client:
+
+```
+nats stream get KV_INVENTORY --last-for '$KV.INVENTORY.widget-blue'
+```
+
+See [[direct-get]].
 
 ## Deletes do not remove data
 
@@ -323,6 +337,20 @@ conforming client writes a specific stream config, and knowing it makes `nats st
 - **A KV source gets a subject transform generated for it**: `$KV.<source>.>` → `$KV.<bucket>.>`, so
   keys land in the destination bucket's own subject space. Sourcing `ORDERS` into `NEW_ORDERS` with
   a key filter `NEW.>` produces `{"src": "$KV.ORDERS.NEW.>", "dest": "$KV.NEW_ORDERS.>"}`.
+- **`Lag` is the staleness number, and a sourced bucket needs one alert per upstream.** A mirror or
+  source reports its own `Lag` and `Last Seen` in `nats stream info`, "because each source replicates
+  on its own" — a lag that climbs and stays high is the signal, not a lag that moves
+  (source: [[s-docs-mirrors-and-sources]]). For a bucket this is the honest bound on how old a
+  replicated read can be, where the [[replicas]] case is bounded only by catch-up.
+- **The maintainer-recommended shape for a regional read replica is a leafnode, not a gateway.**
+  Asked for regional read replicas of a KV bucket holding auth sessions across four continents, a
+  maintainer answered: "You don't even need a super-cluster, you could simply have your 3 node cluster
+  in the US and have each of your 1 nodes in other parts of the world connect to the cluster as Leaf
+  Nodes. Then you can enable JS on those leaf nodes and create read replica streams that source from
+  streams located in the cluster" (source: [[s-gh-6328-jetstream-behind-gateways]]). A stream's
+  replicas never leave their cluster, so crossing a JetStream boundary is a mirror-or-source operation
+  whatever the connection type — which makes the choice a network and isolation question. See
+  [[choosing-a-topology]] and [[leafnode]].
 - **Supplying your own transform turns the automation off entirely** — including the `KV_` prefix on
   the source name. That is how an **ordinary stream becomes a KV source**
   (`events.processed.>` → `$KV.EVENT_CACHE.>`, a bucket as a materialised view) and how keys can be
@@ -433,6 +461,37 @@ The restrictions half is the part with no public answer at all. A service export
 over the account's whole JetStream control plane, not one bucket; narrowing it to a single
 `KV_<bucket>` is not documented and this wiki has not verified it.
 
+**One narrow route is at least specified, and it is read-only.** ADR-31 gives Direct Get a second,
+*Subject-Appended* request subject — **`$JS.API.DIRECT.GET.<stream>.>`**, where the tokens after the
+stream name *are* the `last_by_subj` — and says it exists for exactly this: "so that environments may
+choose to apply subject-based interest restrictions (user permissions within an account and/or
+cross-account export/import grants) such that only specific subjects in stream may be read"
+(source: [[s-adr-31-direct-get]]). For a bucket that makes per-key read access expressible as an
+ordinary subject grant on `$JS.API.DIRECT.GET.KV_<bucket>.<key…>` — see [[subject-permissions]].
+Sending a payload to that subject "is an error (408)". Two caveats: it covers **reads only**, leaving
+writes and the control plane where they were, and **this wiki has not verified the grant end to end**
+against a running server.
+
+## Across a leafnode or a domain, `$KV.>` is its own subject space
+
+A bucket does not live under `$JS.API.>`, and that has consequences no KV documentation states. The
+server's own deny list for a leafnode that does not extend JetStream is
+**`["$JS.API.>", "$KV.>", "$OBJ.>"]`** (`denyAllClientJs`, `jetstream_api.go:323–324` at v2.14.6) —
+three separate entries, because `$KV` and `$OBJ` are independent subject spaces
+(source: [[s-nats-server-leafnode-js-domains]]). So:
+
+- **Any deny or allow list that means to cover KV must name `$KV.>` itself.** Writing `$JS.API.>` and
+  stopping there covers the control plane and leaves the data path open — or, on a leafnode, denies
+  the API while the bucket's own subjects were never in question. See [[subject-permissions]].
+- **Addressing a bucket in another JetStream domain needs the mapping the server installs for you**:
+  `$JS.<domain>.API.$KV.>` → `$KV.>`, added to every non-system account when `domain` is set. The
+  source's comment on that mapping table is "This set of mappings is very very very ugly", and it says
+  why: because `$KV` and `$OBJ` were made independent rather than living under `$JS.API`.
+- **Over a leafnode where the domains differ, `$KV.>` is denied in both directions** unless you
+  address the far side by domain (`nats --js-domain <name> …`). Matching domains alone extend nothing.
+
+See [[jetstream-domain]] and [[streams-not-visible-across-a-leafnode]].
+
 
 ## Version notes
 
@@ -496,4 +555,6 @@ See [[filestore-layout]] for the mechanism and [[jetstream-sizing]] for sizing a
 [[s-docs-kv-under-the-hood]] · [[s-docs-kv-watching]] · [[s-docs-kv-history-and-revisions]] ·
 [[s-docs-kv-ttl-and-limits]] · [[s-docs-kv-your-first-bucket]] ·
 [[s-docs-object-store-watching-and-listing]] · [[s-docs-object-store-metadata-and-links]] ·
-[[s-adr-20-object-store]]
+[[s-adr-20-object-store]] · [[s-adr-31-direct-get]] · [[s-docs-get-direct]] ·
+[[s-docs-mirrors-and-sources]] · [[s-gh-6328-jetstream-behind-gateways]] ·
+[[s-nats-server-leafnode-js-domains]]

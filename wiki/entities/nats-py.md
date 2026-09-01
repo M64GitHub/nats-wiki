@@ -7,9 +7,9 @@ verified-against: nats.py v2.15.0 · PyPI nats-py 2.15.0 / nats-core 0.2.0
 verified-on: 2026-08-31
 tags: [client, tier-1, python, asyncio, nats-py, nats-core]
 aliases: [nats.py, "nats-io/nats.py", python client, nats-py, nats-core]
-sources: [s-docs-ecosystem, s-github-repo-facts]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-gh-4535-unauthenticated-connections, s-docs-getting-started]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nats.py
@@ -53,6 +53,16 @@ pip install nats-core[websocket]    # the new core package, WebSocket transport 
 - **WebSocket is an optional extra in the new package.** "plain `pip install nats-core` can't open a
   `ws://` connection — install `nats-core[websocket]`"
   (`learn/websocket/your-first-websocket-connection.md`).
+- **It once refused to send credentials the server did not ask for.** When a server's `INFO` omitted
+  `auth_required` — the shape `no_auth_user` produces — the Python client sent no credentials at all,
+  so an authenticated user silently landed as the anonymous one; **fixed in `nats-py` v2.4.0**, and
+  the Go client never had the bug (source: [[s-gh-4535-unauthenticated-connections]]). Worth knowing
+  because the server-side symptom is an account boundary that appears not to hold — see
+  [[account]] and [[subject-permissions]].
+- **The docs give no Python install line at all.** Five languages get one on
+  `learn/getting-started`; Python, C, Zig, Swift, Ruby and Elixir get a repo link instead, which is why
+  the `pip` lines above are read from the repo and PyPI rather than quoted from the docs
+  (source: [[s-docs-getting-started]]).
 - **Treat `nats-core` as early.** Version 0.2.0, no mention in the repo README, one mention in the
   docs. `nats-py` is what the docs' examples and this wiki's other pages assume.
 
@@ -68,4 +78,5 @@ pip install nats-core[websocket]    # the new core package, WebSocket transport 
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-gh-4535-unauthenticated-connections]] ·
+[[s-docs-getting-started]]

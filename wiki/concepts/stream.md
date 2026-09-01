@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Stream
@@ -36,6 +36,12 @@ subjects, assigns each one a monotonically increasing sequence number, and keeps
   [[replicas]] and [[raft-in-nats]].
 - Reads are independent of writes: each [[consumer]] keeps its own cursor over the one shared copy
   of the data (source: [[s-docs-delivery-and-acknowledgment]]).
+- **A stream lives in exactly one [[account]], and the account owns the namespace.** Each account
+  gets its own JetStream store, a stream created in `$G` before the accounts existed does not follow
+  its users into a new account, and the server checks a new stream's subjects against **every stream
+  in that account** — an overlap is refused with `subjects overlap with an existing stream`
+  (**10065**) (sources: [[s-docs-accounts-and-multitenancy]], [[s-docs-disaster-recovery]]). That
+  check is why promoting a DR mirror needs the dead stream's assignment removed first.
 
 ## What configures it
 
@@ -73,14 +79,19 @@ given where it differs. All defaults are from the 2.14 schema reference
 `no_ack` (disable publish acknowledgements) · `sealed` (no deletion via limits or API, cannot be
 unsealed, settable only on an existing stream via the Update API) · `deny_delete` and `deny_purge`
 (cannot be changed once `true`) · `allow_rollup_hdrs` (enables the `Nats-Rollup` header) ·
-`allow_direct` and `mirror_direct` (direct per-message reads) · `allow_atomic` (atomic batched
+`allow_direct` and `mirror_direct` (direct per-message reads — the API default is `false`, but
+"the CLI enables it for new streams", so a stream added with `nats stream add` has it on and one
+created through a client library may not; check with `nats stream info` and turn it on later with
+`nats stream edit ORDERS --allow-direct`, source: [[s-docs-get-direct]]) · `allow_atomic` (atomic batched
 publishes, **2.12**) · `allow_batched` (fast batch publishing, **2.14**) · `allow_msg_counter`
 (counter CRDT semantics, **2.12**) · `allow_msg_schedules` (delayed scheduling **2.12**; recurring
 and cron schedules, subject sampling and scheduled rollups **2.14**) · `allow_msg_ttl`
 (per-message TTL via headers, **2.11**) · `subject_delete_marker_ttl` (**2.11**) ·
 `compression` (`none` | `s2`) · `duplicate_window` (nanoseconds, default `0` — see *The deduplication window* below) ·
 `persist_mode` (`""` | `default` | `async`) · `pedantic` (default `false`; the server applies no
-defaults and does not rewrite the request).
+defaults and does not rewrite the request) · `republish` (re-emit every stored message onto a second
+subject on the way out — the fields, the five headers and the `10052` cycle check are on
+[[subject-transforms]]).
 
 **Compression.** `s2` makes a file-storage stream compress message blocks on disk, spending CPU to
 cut disk usage — repetitive payloads such as JSON compress well, already-compressed payloads such
@@ -108,6 +119,8 @@ stream and move the data (source: [[s-docs-policies]]).
 | `retention` | `limits` ↔ `interest` allowed, and the switch re-applies to messages already stored; to or from `workqueue` refused with `stream configuration update can not change retention policy to/from workqueue` |
 | `discard` | can change |
 | `compression` | can change, but only takes effect after a server or leader restart |
+| `mirror` | **fixed at creation** — "You can't point a mirror at a different upstream or change what it copies in place"; `sources`, by contrast, can be added, dropped or re-filtered by updating the stream (sources: [[s-docs-mirrors-and-sources]], [[s-docs-mirrors-as-dr]]) |
+| `allow_msg_ttl` | can be **enabled** on an existing stream and **never disabled**; setting it (or `subject_delete_marker_ttl`) requires stream API level `1`, and `subject_delete_marker_ttl` may not be set on a mirror at all (source: [[s-adr-43-per-message-ttl]], 2.11) |
 
 `deny_delete` and `deny_purge` cannot be changed once set to `true`, and a `sealed` stream cannot
 be unsealed (source: [[s-docs-stream-config]]).
@@ -137,6 +150,26 @@ across, but a mirror is read-only and turning it into a publishable replacement 
   **on top of** `discard: new`, and then a publish past the ceiling fails with
   `maximum messages per subject exceeded` — the third rejection string alongside the whole-stream
   `maximum bytes exceeded` and `maximum messages exceeded` ([[maximum-messages-exceeded]]).
+- **`max_bytes` is a reservation, not just a ceiling.** "`max_bytes` will reserve that for you
+  against the jetstream limits for the servers and the account", so a stream that stores 5 MB but
+  declares `--max-bytes=10G` has spent 10 GB of the budget the next stream is checked against — and
+  the refusal is `insufficient storage resources available` (**10047**), which does *not* mean the
+  disk is full. Streams left at `-1` reserve nothing and still consume real disk, which is what makes
+  a mixed deployment's arithmetic surprising (source: [[s-issue-4281-insufficient-storage]];
+  [[jetstream-out-of-disk]], [[jetstream-sizing]]).
+- **A stream costs more than its bytes.** JetStream spends roughly **two file descriptors per
+  stream**, and on an un-tiered account an R3 stream counts `replicas × bytes` — a 10 GiB stream at
+  R3 spends 30 GiB of the account's `MaxStore` (source: [[s-docs-sizing-and-resources]];
+  [[jetstream-sizing]] does the arithmetic).
+- **Since 2.14 a filestore I/O error freezes the stream** rather than being logged and passed over:
+  "each stream affected by it will stop making progress", and it is surfaced in logs and health
+  checks. Other streams on the same server are unaffected, and on a replicated stream another replica
+  picks up the work transparently (source: [[s-docs-upgrade-to-2.14]]).
+- **`nats stream info` can list a stream whose data directory is gone.** Stream *metadata* lives in
+  the meta layer while message *blocks* live under `jetstream { store_dir }`, so the two can
+  disagree — the pairing of "all streams listed" with "most directories missing" is itself the
+  diagnostic, and a `store_dir` left under `os.TempDir()` is the usual reason (source:
+  [[s-gh-5924-filestore-dirs-vanished]]; [[stream-directories-disappear]]).
 - **A `PubAck` on a replicated stream means a quorum holds the write, not that it is on disk.**
   JetStream batches disk syncs on `sync_interval`, which defaults to `2m`. See [[replicas]] and
   [[raft-in-nats]] (source: [[s-docs-replication-and-r3]]).
@@ -145,6 +178,12 @@ across, but a mirror is read-only and turning it into a publishable replacement 
   a stream's on-disk files, and a memory stream has none, so `nats stream backup` fails with
   `snapshot failed: no impl` (**10064**) — [[backup-and-restore-jetstream]]. Since `storage` is fixed
   at creation, this is decided once and for good.
+- **A restore is a recreate, and it is strict about identity.** The snapshot directory holds
+  `backup.json` (the stream's configuration and state) and `stream.tar.s2` (the messages); a restore
+  rebuilds the stream from it, will **not** merge into a live one, and refuses a rename — the CLI's
+  message is `stream names may not be changed during restore`. So a real recovery is: confirm the
+  broken stream is gone, then restore (source: [[s-docs-stream-backup-restore]];
+  [[backup-and-restore-jetstream]] has the runbook).
 
 ## Sequences are addresses, and they are never reused
 
@@ -178,10 +217,43 @@ slower for it. **The only difference the server sees is a single `no_erase` flag
 request** (source: [[s-docs-altering-stream-state]]). If you are deleting a message *because* of what
 it contained, make sure you used the erasing form.
 
+## Purging is a request with options
+
+`$JS.API.STREAM.PURGE.<stream>` **with no payload purges the whole stream**. With a JSON body it
+takes three options, and they are the difference between an outage and a recovery (source:
+[[s-adr-10-extended-purge]] — a 2021 spec that is still exactly what 2.14.6 implements):
+
+| option | CLI | effect |
+|---|---|---|
+| `filter` | `--subject=<subject>` | purge one subject only — how you evict one tenant, key space or partition out of a shared stream |
+| `seq` | `--seq=<sequence>` | purge everything below a sequence |
+| `keep` | `--keep=<messages>` | keep the newest *n* messages, purge the rest |
+
+`seq` and `keep` are **mutually exclusive**; sending both returns `10003 bad request`
+(`jetstream_api.go:3726`). A **sealed** stream refuses with `10109 invalid operation on sealed
+stream`, and a stream configured `deny_purge: true` with `10110 stream purge not permitted`
+(`jetstream_api.go:3748`).
+
+**`--keep` is the recovery tool for a stream at its limit** — the only form that guarantees the
+stream is still usable afterwards, and unlike raising `max_msgs` it takes effect immediately. A purge
+removes messages; it does not renumber, as *Sequences are addresses* above says.
+
 ## The API
 
 `$JS.API.STREAM.CREATE.<stream>` creates a stream (source: [[s-docs-stream-config]]). The full
 subject set will live in [[js-api-subjects]].
+
+**Every stream operation has its own subject** — `$JS.API.STREAM.INFO.%s`,
+`$JS.API.STREAM.PURGE.%s`, `$JS.API.STREAM.MSG.GET.%s`, `$JS.API.STREAM.PEER.REMOVE.%s`,
+`$JS.API.STREAM.LEADER.STEPDOWN.%s` among them — and that is deliberate: "every API has a unique
+subject and generally the subject includes the Stream or Consumer name, this facilitates ACLs giving
+people access to either subsets of API or even down to a single Stream or Consumer" (source:
+[[s-adr-1-jetstream-json-api]]). [[subject-permissions]] is where that gets used.
+
+Two commands make the wire form readable rather than guessed at: `nats schema show
+io.nats.jetstream.api.v1.stream_create_request --yaml` prints the request schema, and **`--trace` on
+any `nats` command logs every JetStream API subject and body unmodified** — the fastest way to see
+what a client library actually sent (source: [[s-adr-1-jetstream-json-api]]).
 
 ## The deduplication window
 
@@ -211,10 +283,41 @@ message IDs in RAM, so a long window on a high-cardinality publisher is paid for
 deduplicate externally, shortening or disabling it per stream is one of the named ways to cut
 JetStream's memory footprint — see [[jetstream-sizing]].
 
+## Streams you did not create by hand
+
+A KV bucket and an Object Store bucket are each **one stream with fixed properties**, so everything
+above applies to them — and a few of the properties are not yours to choose:
+
+| | KV bucket (source: [[s-adr-8-key-value-store]]) | Object Store bucket (source: [[s-adr-20-object-store]]) |
+|---|---|---|
+| stream name | `KV_<bucket>` | `OBJ_<bucket>` |
+| subjects | `$KV.<bucket>.>` | `$O.<bucket>.C.>` (chunks) and `$O.<bucket>.M.>` (metadata) — **two subject spaces in one stream** |
+| `discard` | always `new` | `new` |
+| `allow_rollup_hdrs` | always `true` | `true` — the object's info subject is always rolled up per subject |
+| `allow_direct` | always `true`, "modifiable out-of-band only, never through a KV bucket update" | `true` |
+| `deny_delete` | always `true` | — |
+| history / retention | `max_msgs_per_subject`, **maximum 64, minimum 1** | `max_age: 0`, `max_bytes: -1` in the ADR's example config |
+| key/object TTL | the stream's `max_age` | `TTL → max_age` |
+| size caps | `max_msg_size` per value, `max_bytes` per bucket | `MaxBytes → max_bytes` |
+
+`placement`, `republish`, `metadata` and `compression` stay available on both. Two consequences worth
+carrying: **deleting a bucket deletes the stream**, and a bucket's per-key **history cannot exceed
+64** because it is `max_msgs_per_subject`. See [[key-value]] and [[object-store]].
+
+**Consumers are not the only way to read one.** A `republish` policy re-emits stored messages onto
+core subjects for subscribers that do not need delivery guarantees, and Direct Get serves "specific
+messages from streams" with no consumer at all — both are named as the fix when a stream has grown
+too many consumers (source: [[s-synadia-jetstream-anti-patterns]];
+[[jetstream-slows-as-consumers-grow]], [[direct-get]]).
+
 ## To verify
 
 - The `duplicate_window` clamps in **pedantic mode** are read from the source; no run has confirmed
   which of the two clamps errors first when both apply.
+- The `republish` policy's **inner field names**. [[subject-transforms]] carries the CLI flags
+  (`--republish-source`, `--republish-destination`); the JSON in
+  [[s-synadia-jetstream-anti-patterns]] writes them as `source` / `destination`, and no read of the
+  server has confirmed the wire names here.
 
 ## What a stream's reported `bytes` actually counts
 
@@ -240,7 +343,10 @@ and the newest message block is never compacted. See [[filestore-layout]] for th
 [[consumer]] · [[retention-policies]] · [[replicas]] · [[stream-placement]] · [[raft-in-nats]] ·
 [[ack-and-redelivery]] · [[jetstream-sizing]] · [[jetstream-out-of-disk]] ·
 [[stream-directories-disappear]] · [[stream-has-high-message-lag]] · [[stream-compression]] ·
-[[maximum-messages-exceeded]]
+[[maximum-messages-exceeded]] · [[account]] · [[key-value]] · [[object-store]] ·
+[[subject-transforms]] · [[direct-get]] · [[mirrors-and-sources]] · [[publishing]] ·
+[[backup-and-restore-jetstream]] · [[subject-permissions]] · [[js-api-subjects]] ·
+[[jetstream-slows-as-consumers-grow]] · [[message-ttl]]
 
 ## Sources
 
@@ -254,6 +360,13 @@ and the newest message block is never compacted. See [[filestore-layout]] for th
 [[s-nats-server-filestore-layout]] · [[s-docs-publishing]] · [[s-docs-advanced-publishing]] ·
 [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] · [[s-docs-subject-mapping]] ·
 [[s-docs-reading-back]] · [[s-docs-kv-history-and-revisions]]
+
+[[s-adr-1-jetstream-json-api]] · [[s-adr-8-key-value-store]] · [[s-adr-10-extended-purge]] ·
+[[s-adr-20-object-store]] · [[s-adr-43-per-message-ttl]] · [[s-docs-accounts-and-multitenancy]] ·
+[[s-docs-disaster-recovery]] · [[s-docs-get-direct]] · [[s-docs-mirrors-and-sources]] ·
+[[s-docs-mirrors-as-dr]] · [[s-docs-sizing-and-resources]] · [[s-docs-stream-backup-restore]] ·
+[[s-docs-upgrade-to-2.14]] · [[s-gh-5924-filestore-dirs-vanished]] ·
+[[s-issue-4281-insufficient-storage]] · [[s-synadia-jetstream-anti-patterns]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
 [[nats-server-2.14]].

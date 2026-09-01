@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ordered-consumer, ephemeral, heartbeats, gap-detection]
 aliases: [ordered consumer, OrderedConsumer]
-sources: [s-gh-5243-kv-watchers-at-scale, s-adr-17-ordered-consumer, s-adr-8-key-value-store, s-docs-reading-back, s-docs-kv-watching]
+sources: [s-gh-5243-kv-watchers-at-scale, s-adr-17-ordered-consumer, s-adr-8-key-value-store, s-docs-reading-back, s-docs-kv-watching, s-gh-6746-watch-many-keys]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Ordered consumer
@@ -71,6 +71,16 @@ key produced a flood of `Consumer assignment for '<acc> > <stream> > <name>' not
 on a bucket holding a **single 118-byte message**, with all three nodes pinned at their CPU limit
 (source: [[s-gh-5243-kv-watchers-at-scale]]). See [[kv-watchers-stall-the-cluster]].
 
+**The lever that removes whole consumers is one watcher over several filters.** A consumer may carry
+**multiple filter subjects** since **2.10**, which is the server-side capability behind the
+client-side "watch multiple keys on one watcher" option (`KvWatchOptions` in nats.js). A client on an
+older server, or one that has not implemented it, **falls back to one consumer per key** — so the same
+application code is one ordered consumer on 2.10+ and N of them below it
+(source: [[s-gh-6746-watch-many-keys]]). It is not free either: disjoint filters have their own
+threshold, so a wildcard that covers the keys beats a long filter list
+([[jetstream-slows-as-consumers-grow]]). The asker never posted a measurement, so treat this as a
+documented capability rather than a confirmed number.
+
 **A stuck ordered consumer will not look like a redelivery problem.** With `ack_policy: none` there
 are no acks to be outstanding, and the ~22-hour `ack_wait` means nothing times out. It will look
 idle instead. Watch the `idle_heartbeat` instead of the ack counters.
@@ -111,4 +121,5 @@ is a fan-out, not a pool; to share work use a named consumer and a [[worker-pool
 ## Sources
 
 [[s-adr-17-ordered-consumer]] · [[s-adr-8-key-value-store]] · [[s-gh-5243-kv-watchers-at-scale]] ·
-[[s-docs-reading-back]] · [[s-docs-kv-watching]]
+[[s-docs-reading-back]] · [[s-docs-kv-watching]] ·
+[[s-gh-6746-watch-many-keys]]

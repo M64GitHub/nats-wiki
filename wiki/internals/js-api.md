@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [js-api, err_code, schemas, paging, acl, errors.json]
 aliases: ["$JS.API", js api, err_code, ApiError, error envelope]
-sources: [s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-docs-stream-config, s-docs-consumer-config, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-relnotes-2.14.0]
+sources: [s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-docs-stream-config, s-docs-consumer-config, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-jetstream-log-warnings, s-gh-5859-unexpected-nats-timeout]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # The JetStream API and its errors
@@ -152,6 +152,46 @@ monitoring poller hammering `$JS.API.STREAM.INFO.*` on a busy server will see it
 before it slows anyone's stream creation down — which is the intended trade, and worth knowing
 before tuning a scrape interval. See [[monitoring-endpoints]].
 
+### There are two queues, and a full one drops every request without replying
+
+The deprioritisation above is not a scheduling hint — the server keeps **two separate queues**, named
+`JetStream API queue` and `JetStream API info queue` (`jetstream_api.go:955–956` at v2.14.6). Each is
+bounded, and when one fills the server does not shed the newest request: it **drains the whole
+queue** (`jetstream_api.go:876–890`, source: [[s-nats-server-jetstream-log-warnings]]):
+
+```go
+pending, _ := queue.push(&jsAPIRoutedReq{…})
+if pending >= int(limit) {
+    s.rateLimitFormatWarnf("%s limit reached, dropping %d requests", queue.name, pending)
+    drained := int64(queue.drain())
+    …
+    s.publishAdvisory(nil, JSAdvisoryAPILimitReached, JSAPILimitReachedAdvisory{…})
+}
+```
+
+```
+JetStream API queue limit reached, dropping 10000 requests
+JetStream API info queue limit reached, dropping 10000 requests
+```
+
+The bounds are **`request_queue_limit`** (default **10,000**) and **`info_queue_limit`**, which
+defaults to `request_queue_limit`; `$JS.API.STREAM.INFO`-style requests use the second one. See
+[[config-keys]].
+
+**This is the sharpest server-side cause of a client-side `nats: timeout`.** `drain()` discards the
+requests entirely, so **no reply of any kind is sent — not even an error envelope**. Nothing in the
+sections above applies: there is no `err_code` to match, because there is no response. The only two
+traces are the rate-limited log line and the advisory
+**`$JS.EVENT.ADVISORY.API.LIMIT_REACHED`**, which carries the `Dropped` count — so alert on the
+advisory, never on log-line frequency ([[advisories]]).
+
+The client's side of this is deliberately quiet: `nats: timeout` "is a **client-side** error: the
+reply never arrived inside the client's deadline. The server does not send it and does not log it",
+which is why two independent reporters went hunting through server logs and found nothing
+(source: [[s-gh-5859-unexpected-nats-timeout]]). Distinguish it from
+`no responders available for request`, which the server *does* produce and which means the opposite —
+nothing was subscribed at all. See [[nats-timeout]].
+
 ### Units and types on the wire
 
 | type | wire form |
@@ -247,4 +287,5 @@ done with subject permissions on `$JS.API.*.<stream>`, not with a JetStream-spec
 
 [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]] · [[s-docs-stream-config]] ·
 [[s-docs-consumer-config]] · [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] ·
-[[s-relnotes-2.14.0]]
+[[s-relnotes-2.14.0]] ·
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-5859-unexpected-nats-timeout]]

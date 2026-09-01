@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [consumer-count, consumer-info, meta-leader, raft-traffic, subject-filters, republish]
 aliases: ["too many consumers", "100k consumers", "consumer info is slow", "throughput collapses with many consumers"]
-sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders]
+sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # JetStream slows down as the consumer count grows
@@ -105,6 +105,14 @@ The recap gives the working number as **~300 per consumer**. The mechanism:
 *Fix:* split into separate consumers with fewer filters each, **or re-work the subject hierarchy so
 wildcards do the job** — the second is the better answer and the harder one.
 
+**Watch out for the client feature that turns this into cause 1.** "Watch multiple keys on one
+watcher" is a *client-side* name (`KvWatchOptions` in nats.js) for this same server-side capability,
+and it needs **2.10 or later**. A client on an older server, or one that has not implemented it,
+falls back to **one consumer per key** — so the same application code is a filter problem on 2.10+
+and a consumer-count problem below it (source: [[s-gh-6746-watch-many-keys]]). One watcher over
+thousands of keys is not the answer either; a wildcard that covers them is. The asker never posted a
+measurement, so treat it as a documented client capability rather than a confirmed number.
+
 ### 4. Churn from short-lived consumers
 
 An [[ordered-consumer]] deletes and recreates itself on every detected gap or missed heartbeat, and
@@ -112,7 +120,21 @@ KV watches, KV history and KV key listing are all ordered consumers
 (source: [[s-adr-17-ordered-consumer]], [[key-value]]). A fleet of KV watchers therefore generates
 consumer create/delete traffic against the meta leader **by construction**, not by misuse.
 
-*Confirm:* consumer names appearing and vanishing in `nats consumer ls` between runs.
+*Confirm:* consumer names appearing and vanishing in `nats consumer ls` between runs — and, in the
+server log, the line that tells churn apart from count:
+
+```
+Consumer assignment for '<account> > <stream> > <name>' not cleaned up, retrying
+```
+
+That is the meta layer failing to land the *deletion* of an assignment. Its companion tell is a
+stream report showing **`Consumers: 0`** while the log floods with per-consumer lines: nothing is
+running, everything is being created and destroyed. On the client side of the same event the server
+logs how long it spent inside one connection's read loop —
+`Readloop processing time: 2m11s` — which is the slow-consumer starvation shape seen from the other
+end (source: [[s-gh-5243-kv-watchers-at-scale]]; the format string is verified at v2.14.6 in
+[[s-nats-server-jetstream-log-warnings]]). The reported case was **1,000 KV watchers on one key**,
+one per client. See [[kv-watchers-stall-the-cluster]] and [[slow-consumer-detected]].
 
 *Fix:* prefer long-lived consumers where the design allows; Synadia names consumer lifecycle as one
 of the three things memory follows ([[jetstream-sizing]]).
@@ -140,6 +162,13 @@ than consumers", and is the right tool for a client that wants the latest value 
 than a stream position. Called out for mobile and IoT clients. **Batch Get, in 2.11, returns
 multiple messages from multiple subject filters.** See [[direct-get]].
 
+Two things to know before designing on it. **`allow_direct` is off by default and its absence is
+silent**: with the setting unset no server answers the Direct Get subject and "the request times out
+with nothing returned" — no error, no code, nothing to grep for, which is the worst shape for a first
+deployment. And **`--last-per-subject` / `multi_last` is a point-in-time snapshot across a whole
+subject space**, which is precisely "the cheap alternative to standing up a consumer just to read
+current state" (source: [[s-docs-get-direct]]).
+
 ## Prevention
 
 - **Budget consumers as a cluster-wide resource with a ~100k ceiling**, and count them the way you
@@ -148,6 +177,14 @@ multiple messages from multiple subject filters.** See [[direct-get]].
 - **Keep disjoint filters under ~300 per consumer.**
 - Before adding consumers, ask whether the delivery guarantee is actually required — republish and
   Direct Get cost nothing per client.
+- **Put a hard backstop under the guidance: the account's `max_consumers`.** Subject permissions
+  cannot stop a client creating consumers — a durable and an ephemeral both use
+  `$JS.API.CONSUMER.CREATE.<stream>.<name>` and the difference is in the request body — so per-account
+  JetStream limits are the only enforceable control, and they bound the resource regardless of who
+  creates what (source: [[s-gh-5044-restrict-durable-consumers]]; see [[account]] and
+  [[subject-permissions]]). The same thread reaches this page's conclusion from the security side:
+  **not exposing the JetStream API at all** — Direct Get plus a republish subject give untrusted
+  clients history with no consumer to create.
 
 ## A note on the numbers
 
@@ -175,4 +212,6 @@ not make the info call cheap.
 ## Sources
 
 [[s-synadia-jetstream-anti-patterns]] · [[s-adr-17-ordered-consumer]] · [[s-relnotes-2.14.0]] ·
-[[s-docs-raft-and-leaders]]
+[[s-docs-raft-and-leaders]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6746-watch-many-keys]] ·
+[[s-gh-5044-restrict-durable-consumers]] · [[s-docs-get-direct]] ·
+[[s-nats-server-jetstream-log-warnings]]

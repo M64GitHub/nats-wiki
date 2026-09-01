@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [topology, route, gateway, leafnode, supercluster, multi-region, decision, quorum]
 aliases: [which topology, cluster vs gateway vs leafnode, leafnode or gateway, topology decision, super-cluster or leafnode]
-sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation]
+sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-4823-leafnode-supercluster-duplicates]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Choosing a topology
@@ -98,7 +98,14 @@ domain (source: [[s-gh-7438-multi-region-availability]]) — [[multi-region-jets
   and slows the local leg too — [[supercluster-slows-when-a-remote-subscriber-joins]].
 - **A leafnode** costs a hub-and-spoke shape that nobody has published a way out of — see
   *Choosing the hub is a one-way decision* below. It also requires naming a domain on every JetStream
-  operation that leaves the local one.
+  operation that leaves the local one. And it constrains how a leaf may **address** a super-cluster:
+  a remote's `urls` list is a **reconnect pool for one NATS system**, not one entry per cluster.
+  Listing two clusters of a super-cluster builds two bridges into the same system and the two bridges
+  feed each other, duplicating messages; the server catches "normal mis-configuration loops" at
+  connection time and does not catch this one. Reach a super-cluster through **DNS** — a CNAME per
+  cluster and a geo-aware record over the whole thing — rather than through a longer list
+  (source: [[s-gh-4823-leafnode-supercluster-duplicates]]; the symptom is
+  [[duplicate-messages-across-a-leafnode]]).
 - **Composing them on one server** costs a `system_account` you must remember to set, or the server
   will not start — and `nats-server -t` will tell you the config is valid first
   (source: [[s-nats-server-topology]]).
@@ -152,7 +159,8 @@ question-bank row **Q103**.
 [[s-docs-putting-it-together]] · [[s-docs-super-clusters]] · [[s-docs-leaf-nodes]] ·
 [[s-docs-jetstream-in-a-cluster]] · [[s-gh-6328-jetstream-behind-gateways]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]]
+[[s-gh-7494-supercluster-degradation]] ·
+[[s-gh-4823-leafnode-supercluster-duplicates]]
 
 ## To verify
 

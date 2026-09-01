@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, mtls, verify, verify_and_map, handshake_first, tls_timeout, encryption-at-rest, prev_key, tls_cert_not_after]
 aliases: [tls, mtls, mutual tls, verify_and_map, handshake_first, encryption at rest, tls block, certificates]
-sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls]
+sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # TLS in NATS
@@ -73,6 +73,20 @@ duration string. `WebsocketOpts` has no TLS timeout at all; it carries a whole-h
 Validate the config before restarting anything: `nats-server -t -c nats.conf`. The boot log then says
 `TLS required for client connections`, and "A plaintext client gets refused at the handshake; it never
 reaches authentication."
+
+### Where TLS sits among the credential styles
+
+TLS is not an alternative to authentication — but with mTLS it can *be* one. Config mode's three
+credential styles are a password (in the clear, which is the argument for the link encryption on this
+page), an **NKey** ("a signature over a server nonce; nothing secret crosses the wire") and a
+server-wide **token**; the fourth is this page's own: "A client certificate can also be a credential:
+the server can map a certificate identity straight to a user with mTLS, so the cert *is* the
+credential" (source: [[s-docs-authentication-basics]]). Note the consequence when it is the *only*
+credential — a certificate-mapped user has no password to hand to something that needs one, which an
+operator hit on a leafnode remote into a system account: "it seems impossible to be able to specify a
+password for a user on the `system_account` when using TLS." An account can hold both a
+password user and a certificate-mapped one (source: [[s-gh-7834-leafnode-same-js-domain]];
+[[operator-mode]], [[leafnode]]).
 
 ### The certificate as the identity
 
@@ -160,6 +174,15 @@ The docs also suggest weighing this against block-layer encryption, which runs "
 of processes such as the nats-server, and do so at high performance without impacting upon server
 CPU".
 
+**Encryption at rest is why stream compression exists.** "Use of filestore encryption can almost
+completely prevent host filesystem compression" — an encrypted stream is incompressible to everything
+underneath it: the filesystem, the volume, the backup target. So the server **compresses before it
+encrypts**, "the only place in the stack where that ordering is available", and a stream's
+`compression: s2` is the way to get compression back once `jetstream { key }` is set. Turning on
+encryption at rest without turning on compression is the combination that quietly costs the most disk
+(source: [[s-adr-35-filestore-compression]], written for the 2.10 cycle; [[stream-compression]],
+[[jetstream-sizing]]).
+
 ## Limits and failure modes
 
 - **Cluster and gateway certificates need both `serverAuth` and `clientAuth` extended key usages.**
@@ -231,7 +254,7 @@ What fixes that is a `tls {}` block carrying the right `ca_file`, not one added 
 [[rotate-tls-certificates]] · [[account]] · [[subject-permissions]] · [[operator-mode]] ·
 [[auth-callout]] · [[monitoring-endpoints]] · [[build-a-3-node-cluster]] · [[install-nats-server]] ·
 [[reload-server-config]] · [[config-keys]] · [[defaults-and-limits]] · [[leafnode]] · [[gateway]] ·
-[[how-clients-reach-a-cluster]]
+[[how-clients-reach-a-cluster]] · [[stream-compression]] · [[jetstream-sizing]]
 
 ## Sources
 
@@ -239,4 +262,5 @@ What fixes that is a `tls {}` block carrying the right `ca_file`, not one added 
 [[s-docs-hardening]] · [[s-docs-security-checklist]] · [[s-adr-40-nats-connection]] ·
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-natscli-account-tls]]
+[[s-natscli-account-tls]] · [[s-adr-35-filestore-compression]] ·
+[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]]

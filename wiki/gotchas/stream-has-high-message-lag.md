@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [message-lag, log-warnings, publish, backpressure, puback, replicas, raft]
 aliases: ["has high message lag", "high message lag", "JetStream warnings in the log", "streamLagWarnThreshold"]
-sources: [s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-replication-and-r3, s-docs-monitoring-jetstream-health]
+sources: [s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-replication-and-r3, s-docs-monitoring-jetstream-health, s-gh-5859-unexpected-nats-timeout]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # "JetStream stream … has high message lag"
@@ -27,6 +27,12 @@ times out.
 
 repeating every few seconds, usually alongside an application publish failing with `timeout`, and
 sometimes a consumer leader election in between (source: [[s-gh-6490-high-message-lag]]).
+
+**Do not go looking for the timeout half in the server log — it is not there.** `nats: timeout` is a
+**client-side** error: the reply never arrived inside the client's deadline, and "the server does not
+send it and does not log it", which is why reporters chasing it hunt server logs and find nothing
+(source: [[s-gh-5859-unexpected-nats-timeout]]). The warning above is the server's side of the same
+event; the two have to be correlated by time, not by grep. See [[nats-timeout]].
 
 ## What it measures — exactly
 
@@ -211,4 +217,5 @@ waiting." Compare it against the stream's per-subject counts, not against `last_
   table above, at v2.14.6 with file and line.
 - [[s-nats-server-jetstream-resources]] — the out-of-resources line's two callers.
 - [[s-docs-replication-and-r3]] — quorum commit and what a `PubAck` promises.
-- [[s-docs-monitoring-jetstream-health]]
+- [[s-docs-monitoring-jetstream-health]] ·
+[[s-gh-5859-unexpected-nats-timeout]]

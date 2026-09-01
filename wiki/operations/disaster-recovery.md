@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [disaster-recovery, promotion, failover, mirror, lag, rpo, 10065, meta-quorum, dr]
 aliases: [DR, failover, "promote a mirror", "site loss", "recover a stream", RPO]
-sources: [s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-docs-stream-backup-restore, s-natscli-backup-restore, s-docs-surviving-node-loss, s-adr-61-meta-quorum-rescue]
+sources: [s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-docs-stream-backup-restore, s-natscli-backup-restore, s-docs-surviving-node-loss, s-adr-61-meta-quorum-rescue, s-nats-server-snapshot-restore, s-docs-config-and-jwt-backup, s-gh-7463-jetstream-corruption]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Disaster recovery
@@ -142,6 +142,12 @@ nats consumer ls ORDERS_DR                   # the consumers that survived
 After a **restore**: `nats stream info ORDERS` — `Messages` and `Last Sequence` against what the
 snapshot claimed, and `Active Consumers` if it carried them.
 
+**Subscribe to the restore advisories rather than watching the CLI.** The server emits
+`$JS.EVENT.ADVISORY.STREAM.RESTORE_CREATE.<stream>` and
+`$JS.EVENT.ADVISORY.STREAM.RESTORE_COMPLETE.<stream>` (source: [[s-nats-server-snapshot-restore]]) —
+free monitoring for an operation that rewrites a stream, and the way to alert on a restore **nobody
+authorised**. They need a system-account user; see [[advisories]] and [[monitoring-endpoints]].
+
 Either way, record the RPO: the frozen lag, or the snapshot's timestamp.
 
 ## Rollback
@@ -172,7 +178,23 @@ itself is what you lost* below, and peer-remove servers when you switch them off
 archive. Rehearse restores on a schedule; quarterly is the docs' minimum.
 
 **Forgetting the identity plane.** A restored stream nobody can authenticate against is not a
-recovery — [[backup-and-restore-identity]].
+recovery — [[backup-and-restore-identity]]. The specific trap is that the workstation store and the
+server's resolver directory are **separate copies**: restoring the operator backup rebuilds the first
+and leaves the second empty, so every client fails with
+`nats: error: nats: Authorization Violation` while every local listing looks correct. The step that
+finishes the recovery is a push — `nats auth account push ORDERS --operator ACME --creds sys.creds` —
+and it can authenticate into an empty resolver only "because `server.conf` preloads the `SYSTEM`
+account JWT. **That preload is the bootstrap path for the whole recovery**"
+(source: [[s-docs-config-and-jwt-backup]]). So `server.conf` belongs in the backup set next to the
+operator archive, and creds files — which live outside the store — are re-minted, not restored.
+
+**Assuming a fresh replica resyncs clean.** It is the natural move and it can reproduce the damage: on
+a 3-node cluster whose Raft WAL had gone corrupt, **deleting the PVC entirely** and letting the pod
+sync from the two healthy replicas hit the same `Critical write error: malformed or corrupt message`,
+after restarting the pod and recreating the stream CRD had both changed nothing. The server was
+2.9.8, there was no resource pressure behind it, and the fix the maintainer gave — confirmed by the
+reporter — was to **upgrade**, not to recover (source: [[s-gh-7463-jetstream-corruption]]). Check the
+version before you spend an outage on recovery steps; see [[upgrade-a-cluster]].
 
 ## When the meta group itself is what you lost
 
@@ -224,4 +246,6 @@ logs".
 ## Sources
 
 [[s-docs-disaster-recovery]] · [[s-docs-mirrors-as-dr]] · [[s-docs-stream-backup-restore]] ·
-[[s-natscli-backup-restore]] · [[s-docs-surviving-node-loss]] · [[s-adr-61-meta-quorum-rescue]]
+[[s-natscli-backup-restore]] · [[s-docs-surviving-node-loss]] · [[s-adr-61-meta-quorum-rescue]] ·
+[[s-nats-server-snapshot-restore]] · [[s-docs-config-and-jwt-backup]] ·
+[[s-gh-7463-jetstream-corruption]]

@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [timeout, request-reply, no-responders, gomaxprocs, request_queue_limit, routes, kubernetes]
 aliases: ["nats: timeout", "Future cancelled, response not registered in time", "request timeout", "no responders available for request", "publish timeout"]
-sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster]
+sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # "nats: timeout"
@@ -186,7 +186,12 @@ connection.
 
 If the timeout is on a **publish** rather than a request, and the server log carries
 `has high message lag`, the ingest path is the problem, not the network — [[stream-has-high-message-lag]].
-The first reporter in this very thread had exactly that pairing.
+That pairing — an application publish failing with `timeout` while the leader logged the lag warning
+every few seconds — is exactly what the first reporter of that thread saw
+(source: [[s-gh-6490-high-message-lag]]). The maintainer's two named causes are both on the publishing
+side rather than the server's: **a core NATS publish into a stream's subject**, and **async JetStream
+publishes from many publishers at once**. Both remove the backpressure a synchronous `PubAck`
+provides, so check the publisher before you check anything else.
 
 ### 6. The request never left the domain it needed to
 
@@ -226,4 +231,5 @@ often they are the answer — there is no public evidence for that ordering.
   at v2.14.6.
 - [[s-gh-7190-asymmetric-cluster]] — the same single-DNS-name route defect, independently reported.
 - [[s-docs-monitoring-endpoints]] — `slow_consumers` and `/connz?sort=pending`.
-- [[s-docs-forming-a-cluster]] — what the `Routes` column counts.
+- [[s-docs-forming-a-cluster]] — what the `Routes` column counts. ·
+[[s-gh-6490-high-message-lag]]

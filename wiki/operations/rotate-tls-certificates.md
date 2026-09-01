@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, certificates, rotation, expiry, tls_cert_not_after, nats-account-tls, reload, SIGHUP]
 aliases: [certificate rotation, cert rotation, certificate expiry, tls renewal, rotate certs]
-sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units, s-docs-hardening, s-nats-server-tls-reload]
+sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units, s-docs-hardening, s-nats-server-tls-reload, s-docs-security-checklist]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Rotate TLS certificates
@@ -19,6 +19,15 @@ many days you have left, on every listener, without opening a TLS connection by 
 
 Two facts shape the whole procedure: the server reads its certificate files **once, at startup**, and
 a rotated certificate reaches **only new connections** (source: [[s-docs-encryption-and-tls]]).
+
+The docs' security checklist compresses this whole runbook into one line — "**Rotate certificates
+ahead of expiry and send `nats-server --signal reload` afterwards; certificate files are read once at
+startup**" — and the four preconditions below are the checklist's other TLS items read as
+prerequisites rather than as review questions: TLS on the cluster, leafnode and gateway blocks too;
+both `serverAuth` and `clientAuth` on a cluster certificate; the mapped user string matched against
+the certificate identity (`openssl x509 -noout -subject`); and a TLS-first migration done with a
+duration before `true` (source: [[s-docs-security-checklist]]). Nothing on this page contradicts it;
+what the page adds is what each of those costs when you are the one doing it at 2am.
 
 ## Preconditions
 
@@ -286,4 +295,5 @@ Both of this page's open questions were answered on the v2.14.6 binary on 2026-0
 
 [[s-docs-encryption-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] ·
 [[s-nats-server-auth-and-tls]] · [[s-docs-config-management]] · [[s-docs-hardening]] ·
-[[s-nats-server-systemd-units]] · [[s-nats-server-tls-reload]]
+[[s-nats-server-systemd-units]] · [[s-nats-server-tls-reload]] ·
+[[s-docs-security-checklist]]

@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [auth_callout, issuer, auth_users, xkey, allowed_accounts, ADR-26, "$SYS.REQ.USER.AUTH", oidc, ldap]
 aliases: [auth callout, authorization callout, external auth, "$SYS.REQ.USER.AUTH", auth_callout]
-sources: [s-docs-auth-callout, s-gh-7505-auth-callout-nkey, s-nats-server-auth-and-tls, s-docs-security-checklist]
+sources: [s-docs-auth-callout, s-gh-7505-auth-callout-nkey, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-authentication-basics]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Auth callout
@@ -112,14 +112,26 @@ which other accounts `auth-svc` may bind clients to".
 
 - **The service is on the connection path.** If it is down, slow or crashed, "the server gets no
   reply, waits out the `timeout` … and rejects the client" — every new connection pays the full
-  timeout and then fails. Run more than one instance and keep its directory lookups fast.
+  timeout and then fails. Run more than one instance and keep its directory lookups fast. **And it is
+  every *re*connection too**: credentials are offered once per connection and re-offered on every
+  reconnect — "the authentication happens again, midway through a session, to authenticate this new
+  connection" (source: [[s-docs-authentication-basics]]). So a node going down does not only produce a
+  reconnect storm at the surviving servers, it produces a callout storm at your service, at exactly
+  the moment it is least wanted ([[upgrade-a-cluster]]).
 - **What the client prints depends on which deadline fires first.** With the callout timeout below the
   client's connect deadline the client sees `Authorization Violation`; with both near 2s it usually
   sees `read tcp ...: i/o timeout`. "In both cases the reason lives only in the server log":
-  `[ERR] ... authentication error - Token "[REDACTED]"`.
+  `[ERR] ... authentication error - Token "[REDACTED]"`. `Authorization Violation` is also
+  **indistinguishable from every other authentication failure** — a wrong password, an unknown user
+  and an unauthenticated connect all produce that exact string, by design, so "a failed login doesn't
+  reveal which half was wrong" (source: [[s-docs-authentication-basics]]). A client cannot tell your
+  service rejected it from the server never having heard of it.
 - **Credentials cross `$SYS.REQ.USER.AUTH` in the clear.** The request is a JWT, and "base64 is
   encoding, not encryption" — `connect_opts.auth_token` (or a password, or a seed) decodes in one
-  line. The server redacts `client_info.user` and nothing else. Two mitigations, and you want both:
+  line. Hashing the config does not help: config-mode passwords are stored bcrypt-hashed but **the
+  client still sends the plaintext**, because "bcrypt protects only the config file at rest"
+  (source: [[s-docs-authentication-basics]]). All three config-mode credential styles — user/password,
+  NKey and token — arrive at the service in whatever form the client sent them. The server redacts `client_info.user` and nothing else. Two mitigations, and you want both:
   run the service in a **dedicated account** so nothing else can subscribe, and set `xkey` so even a
   leaked subscription reads nothing.
 - **The server's automatic deny stops forgery, not eavesdropping.** On the callout account,
@@ -151,4 +163,5 @@ spoofable, and the spoof succeeds silently with the wrong permissions attached.
 ## Sources
 
 [[s-docs-auth-callout]] · [[s-gh-7505-auth-callout-nkey]] · [[s-nats-server-auth-and-tls]] ·
-[[s-docs-security-checklist]]
+[[s-docs-security-checklist]] ·
+[[s-docs-authentication-basics]]

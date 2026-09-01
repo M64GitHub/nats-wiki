@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [repo, server, cncf, apache-2.0, security-audit, docker, single-binary]
 aliases: [nats-server, "nats-io/nats-server", the server, nats server]
-sources: [s-nats-server-systemd-units, s-docs-hardening, s-nats-server-readme, s-github-repo-facts, s-docs-ecosystem, s-docs-getting-started, s-nats-server-constants-2.14.6]
+sources: [s-nats-server-systemd-units, s-docs-hardening, s-nats-server-readme, s-github-repo-facts, s-docs-ecosystem, s-docs-getting-started, s-nats-server-constants-2.14.6, s-nats-server-signals, s-cncf-nats-project]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nats-server
@@ -33,7 +33,7 @@ a release of it.
 | created | 2012-10-29 |
 | latest release | **v2.14.6**, 2026-08-27 |
 | licence | **Apache-2.0** |
-| foundation | **CNCF** — "NATS is part of the Cloud Native Computing Foundation" |
+| foundation | **CNCF** — "NATS is part of the Cloud Native Computing Foundation", **Incubating** since **2018-03-15** and still Incubating rather than Graduated (source: [[s-cncf-nats-project]]) |
 | language | Go (v2.14.0 built with Go 1.26.2) |
 | Docker | the Docker Official Image **`_/nats`** |
 | Helm | Artifact Hub, `helm/nats/nats` — see [[nats-helm-charts]] |
@@ -65,6 +65,28 @@ Ports, all four of which have a documented default and none of which listens unl
 (beyond 4222): **4222** clients, **6222** cluster routes, **7222** gateways, **8222** HTTP monitoring
 (source: [[s-docs-getting-started]], [[s-docs-hardening]]). JetStream is off until you turn it on, and
 so is the monitoring port.
+
+### Signals
+
+The complete table, read from `server/signal.go:57–86`, `:148–166` and `server/const.go:23–35` at tag
+**v2.14.6** (source: [[s-nats-server-signals]]):
+
+| signal | `--signal` name | what the server does |
+|---|---|---|
+| `SIGINT` | `quit` | `Shutdown()`, wait, `os.Exit(0)` — **immediate, no drain** |
+| `SIGTERM` | `term` *(private)* | the same, **unless a drain is already in progress — then it is ignored** |
+| `SIGUSR1` | `reopen` | re-open the log file: this is log rotation |
+| `SIGUSR2` | `ldm` *(private)* | `go s.lameDuckMode()` — the drain |
+| `SIGHUP` | `reload` | `s.Reload()`; on failure logs `Failed to reload server configuration: <err>` |
+| — | `stop` | **`SIGKILL`** — no handler, the kernel kills the process |
+
+Two of these bite. **`nats-server --signal stop` is not a graceful stop**: it sends `SIGKILL`, and the
+graceful names are `ldm` (drain) and `quit` (orderly shutdown, no drain) — see [[upgrade-a-cluster]].
+And **`SIGTERM` is ignored once a drain has started**, which is what makes a `preStop` hook running
+`--signal ldm` survive the kubelet's termination sequence rather than being cut short by it
+([[nats-helm-charts]]). Every signal is logged before it is acted on — `s.Noticef("Trapped %q
+signal", sig)` — so `Trapped "user defined signal 2" signal` in a log is the record of what a node was
+actually asked to do, and the first line to read when a shutdown did not behave.
 
 **The repo ships its own systemd units** — `util/nats-server.service` and
 `util/nats-server-hardened.service` — and they, not the docs' extract, are what
@@ -98,4 +120,5 @@ so is the monitoring port.
 
 [[s-nats-server-readme]] · [[s-github-repo-facts]] · [[s-docs-ecosystem]] ·
 [[s-docs-getting-started]] · [[s-nats-server-constants-2.14.6]] ·
-[[s-nats-server-systemd-units]] · [[s-docs-hardening]]
+[[s-nats-server-systemd-units]] · [[s-docs-hardening]] · [[s-nats-server-signals]] ·
+[[s-cncf-nats-project]]

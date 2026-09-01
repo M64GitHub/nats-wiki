@@ -7,9 +7,9 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # natscli (the nats CLI)
@@ -33,6 +33,7 @@ stream matches theirs exactly.
 | licence | Apache-2.0 |
 | binary | **`nats`** (the repo is `natscli`; the command is `nats`) |
 | contexts stored in | `~/.config/nats/context` — JSON, one file per context |
+| `nats auth` store | `$XDG_DATA_HOME/nats` (default `~/.local/share/nats`) — **nsc-compatible**: `stores/<OPERATOR>/…` holds JWTs, `keys/keys/O\|A\|U/…/*.nk` holds seeds |
 | under it | [[jsm-go]] |
 | bundled in | [[nats-box]] |
 
@@ -53,7 +54,11 @@ scoop bucket add extras && scoop install extras/natscli           # Windows
 - **Contexts are the difference between safe and terrifying.** A context bundles server URLs and
   credentials under a name — "You can also add authentication configuration here, such as `user` and
   `password` or `creds`" — and `nats context select` switches the target of every later command. Running
-  a `purge` against the wrong cluster is a context mistake, not a typo.
+  a `purge` against the wrong cluster is a context mistake, not a typo. The docs' own single-server
+  walkthrough writes `--server nats://localhost:4222` on every line instead, which is the honest form
+  for a one-off: no stored state to be wrong about (source: [[s-docs-single-server]] — the same page's
+  `--replicas 3` refusal, `replicas > 1 not supported in non-clustered mode`, is a server rule and
+  lives on [[replicas]]).
 - **`nats server check` is the alerting surface**, not a human one — it emits Nagios-style exit codes
   and a Prometheus `textfile` format. **A check with no explicit threshold never fires**
   (source: [[s-docs-prometheus-and-dashboards]]).
@@ -63,6 +68,41 @@ scoop bucket add extras && scoop install extras/natscli           # Windows
 - **`--defaults` in the docs' examples means "accept every unspecified value"** — convenient in a
   tutorial, dangerous in production, where the unspecified values are exactly the ones
   [[defaults-and-limits]] exists for.
+- **A permissions failure reaches the CLI as a timeout, not as a denial.** Every JetStream API call is
+  a request under the hood, so a locked-down user running `nats stream info` fails with
+  `context deadline exceeded` rather than a permission error — the publish is denied, no responder
+  ever sees it, and the CLI just waits (source: [[s-docs-authorization]]; see
+  [[subject-permissions]]). The evidence is server-side, and it names the CLI: `[ERR] … -
+  "v1.51.0:go:NATS CLI Version v0.4.0" - "$G/user:order-svc" - Publish Violation - Subject
+  "billing.charge"`. The same shape appears one level up: **`nats account info` printing an info block
+  with no `Account:` line at all** is a permissions symptom, not a server problem — the CLI asks the
+  server over `$SYS.REQ.USER.INFO` and the user's publish allow list blocks that request
+  (source: [[s-docs-accounts-and-multitenancy]]).
+- **Every `nats server …` command needs a system-account user, and most tutorials' configs do not
+  have one.** The docs say it plainly of their own cluster walkthrough: the commands "query the system
+  account (`$SYS`), which these configs don't set up; add one … and connect with its credentials
+  before you run them" (source: [[s-docs-forming-a-cluster]]). Declaring your own `accounts` block is
+  what takes the user away — see [[account]]. `nats server account info SYS` and
+  `nats account info` both report `System Account: true`/`false`, which is the quickest check that the
+  credentials you are holding are the ones the `server` commands need
+  (source: [[s-docs-accounts-and-multitenancy]]).
+- **The `Routes` column of `nats server list` counts connections, not peers.** "Each link to a peer is
+  a small pool of connections (three by default) plus a dedicated system-account route, so a
+  three-server cluster shows several per server" — two peers × (3 pooled + 1 system) = the 8 a healthy
+  three-node cluster prints. **What confirms the mesh is that the count is the same on every row and
+  non-zero**, never its absolute value (source: [[s-docs-forming-a-cluster]]; `cluster.pool_size`
+  defaults to 3 — see [[build-a-3-node-cluster]]).
+- **Under Kubernetes, pick one owner per stream: the CLI or the CRD, never both.** [[nack]] re-creates
+  a stream that has been deleted (it notices on its ~30-second resync) but does **not** revert a manual
+  `nats stream edit` — the change sticks until the CRD itself next changes. Run NACK with
+  `--control-loop` and it also enforces config drift, reverting your edit on about a one-minute cycle
+  (source: [[s-docs-kubernetes]]). Verification from inside the cluster is
+  `kubectl exec -it deploy/nats-box -- sh` and then `nats stream info ORDERS`; see [[nats-box]].
+- **`nats-top` is a different binary, and it is not a reliable way to find a flagged slow consumer.**
+  There is no `nats top` subcommand — see [[nats-top]] — and the community's suggested
+  `nats-top -sort pending` was reported not to work, with `Pending: 0` on every connection while the
+  counter still reported slow consumers (source: [[s-gh-6605-which-consumer-is-slow]]). The symptom and
+  what is actually known about it live on [[slow-consumer-detected]].
 
 ## Cheat sheet
 
@@ -87,7 +127,14 @@ printf '%s\n' '{"line":"sku-1"}' '{"line":"sku-2"}' \
   | nats pub --atomic --send-on=newline --force-stdin orders.created
 nats bench js pub async orders.created --batch 1000                # the only async path in the CLI
 nats bench js pub fast                                             # fast-ingest, benchmark only
+nats pub orders.created "order {{Count}}" --count 100 --sleep 1s --trace   # watch client failover
 ```
+
+**`--trace` on a long `--count` run is the cheapest demonstration of server-driven failover**: kill the
+server the CLI is attached to and it prints `>>> Disconnected due to: EOF, will attempt reconnect`
+followed by `>>> Reconnected to nats://localhost:4223` — a server you never named, learned from the
+`INFO` the first one sent. `no_advertise: true` is the one control that turns that off
+(source: [[s-docs-your-first-cluster]]; see [[build-a-3-node-cluster]]).
 
 **A plain `nats pub` is a core publish** and prints `Published N bytes` whether or not a stream stored
 the message. Only `--jetstream` reads the `PubAck` and surfaces a missed subject as
@@ -142,6 +189,15 @@ nats stream restore ./b --cluster west --tag ssd --replicas 1        # restore e
 nats stream cluster step-down ORDERS --preferred n2-east
 nats stream cluster peer-remove ORDERS n4-east   # move ONE replica off a server
 ```
+
+**What `--chunk-size` and `--window-size` are actually tuning.** The server cuts the tarball into
+chunks and pushes them to an inbox subject, keeping a window's worth of unacknowledged chunks in
+flight — **8 MiB by default, which is 64 of the default 128 KiB chunks** — and **if no ack arrives for
+about five seconds the backup aborts**. That five-second abort, not throughput, is why a slow or
+distant link needs the smaller chunk and window (source: [[s-docs-stream-backup-restore]], numbers
+confirmed against the server in [[s-nats-server-snapshot-restore]]). Consumer state is included by
+default and **nothing warns you** when `--no-consumers` drops it — until the consumer is missing in
+production. See [[backup-and-restore-jetstream]].
 
 **Consumers**
 
@@ -234,19 +290,51 @@ nats auth account push  ORDERS -s nats://127.0.0.1:4222 --creds sys.creds
 nats auth account query ORDERS -s nats://127.0.0.1:4222 --creds sys.creds
 nats auth account exports add Shipments "orders.shipped" ORDERS
 nats auth account imports add Shipments "orders.shipped" ANALYTICS --source <ORDERS-key> --local orders.shipped
-nats auth operator backup ACME acme-operator.backup --key backup-curve.nk
+nats auth nkey gen curve --output backup-curve.nk                    # the seal key: a CURVE key
+nats auth operator backup  ACME acme-operator.backup --key backup-curve.nk
+nats auth operator restore ACME acme-operator.backup --key backup-curve.nk
 nats auth nkey gen account --output issuer.nk
 nats auth nkey show issuer.nk
 nats server generate ./acme-server
 ```
 
+**Backup and restore of the identity plane, and the three things that catch people out.** An
+unsealed `nats auth operator backup` prints its own warning — "the output file is unencrypted and
+contains secrets, consider encrypting it with `nats auth nkey seal`" — and whoever holds that one file
+*is* the operator. `--key` takes a **file path, not the key string**. `restore` keeps the original
+keys, so **every creds file you handed out before the disaster keeps working**, and it refuses to run
+over an existing operator (`nats: error: operator ACME already exist`) — move the old store aside
+first. Neither backup nor restore touches the server: the resolver directory is still empty until you
+`nats auth account push`, and until then a client gets `nats: error: nats: Authorization Violation`
+(source: [[s-docs-config-and-jwt-backup]]). See [[backup-and-restore-identity]].
+
+**`SYSTEM` is pre-created and its user is not.** `nats auth operator add` makes the `SYSTEM` account
+for you, but there is no user inside it, so `nats auth user add sys SYSTEM --defaults` and
+`nats auth user credential sys.creds sys SYSTEM` come **before** any push — a push with no system user
+is one of the ways `$SYS.REQ.CLAIMS.UPDATE` has nothing listening. `nats auth operator select` is
+required too and the docs' own walkthrough omits it. `nats server generate` is interactive: choose
+*"'nats auth' managed NATS Server configuration"* to get a `server.conf` that already trusts the
+operator (source: [[s-gh-7854-jwt-push-timeout]]). See [[set-up-operator-mode]].
+
 **`push` is not optional and `query` is how you check it.** An `edit`, a `keys add` or a
 `user rm --revoke` changes only the local store; the running server keeps validating against the copy
 its resolver holds ([[operator-mode]]).
 
+**Permissions, in the JWT world**
+
+```
+nats auth user edit order-svc ORDERS --pub-allow "orders.>"
+```
+
+**Each flag replaces that entire list**, so always pass the complete set of subjects — a second
+`--pub-allow` run is not additive (source: [[s-docs-authorization]]). See [[subject-permissions]].
+
 **Certificates and account data**
 
 ```
+nats account info --user analytics-reader --password an4lytics
+nats server account info SYS --user sys-admin --password syspass
+nats sub '$SYS.SERVER.>' --user sys-admin --password syspass
 nats account tls --expire-warn 30d
 nats account tls --ocsp --no-pem
 nats account backup ./acct-backup --check --consumers
@@ -255,7 +343,12 @@ nats server passwd --pass "s3cr3t-rotate-me-later"
 ```
 
 `nats account tls` reports **every certificate of every verified chain** on the connection the CLI
-already has — no `handshake_first`, no monitoring port, no `openssl`. `--expire-warn` defaults to
+already has — no `handshake_first`, no monitoring port, no `openssl`. That last one is the point
+rather than a convenience: `openssl s_client -connect host:4222` normally fails against NATS, because
+the server sends its plaintext `INFO` line before the TLS handshake, so the CLI's own connection is
+the shortest path to an expiry date on a server you cannot reconfigure
+(source: [[s-gh-7684-certificate-expiry]]; `/varz` exposes `tls_cert_not_after` as the other route —
+[[monitoring-endpoints]]). `--expire-warn` defaults to
 **`1w`** (`0` disables it) and the command **exits non-zero** when anything is expired or expiring, so
 it drops straight into cron. Its `#   Expiration:` line is emitted for every certificate deliberately,
 "to have a stable grep pattern" (source: [[s-natscli-account-tls]]). See
@@ -307,4 +400,8 @@ is in the docs (source: [[s-natscli-stream-external]]). See [[cross-domain-sourc
 [[s-natscli-stream-external]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-natscli-backup-restore]] · [[s-docs-publishing]] ·
 [[s-docs-altering-stream-state]] · [[s-docs-subject-mapping]] · [[s-docs-kv-ttl-and-limits]] ·
-[[s-docs-kv-your-first-bucket]]
+[[s-docs-kv-your-first-bucket]] · [[s-docs-accounts-and-multitenancy]] · [[s-docs-authorization]] ·
+[[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-kubernetes]] ·
+[[s-docs-single-server]] · [[s-docs-stream-backup-restore]] · [[s-docs-your-first-cluster]] ·
+[[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7684-certificate-expiry]] ·
+[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]]

@@ -7,9 +7,9 @@ verified-against: cncf.io/projects/nats, fetched 2026-08-31
 verified-on: 2026-08-31
 tags: [org, cncf, governance, incubating, foundation, linux-foundation]
 aliases: [cncf, "Cloud Native Computing Foundation"]
-sources: [s-cncf-nats-project, s-nats-server-readme]
+sources: [s-cncf-nats-project, s-nats-server-readme, s-github-repo-facts]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # CNCF
@@ -30,7 +30,7 @@ statements and both are true.
 | NATS accepted | **2018-03-15** |
 | maturity level | **Incubating** |
 | what the server README says | "NATS is part of the Cloud Native Computing Foundation ([CNCF](https://cncf.io))" |
-| licence this implies | Apache-2.0 for [[nats-server]] and almost every repo around it |
+| licence this implies | Apache-2.0 for [[nats-server]] and almost every repo around it — **30 of the 32** `nats-io`/`synadia-io` repos this wiki has surveyed; the two exceptions are `nats-io/nats.ex` and `nats-io/nats-top`, both **MIT** (source: [[s-github-repo-facts]]) |
 | project page | `https://www.cncf.io/projects/nats/` |
 
 CNCF's own definitions of the three levels, from the same page:
@@ -60,4 +60,4 @@ CNCF's own definitions of the three levels, from the same page:
 
 ## Sources
 
-[[s-cncf-nats-project]] · [[s-nats-server-readme]]
+[[s-cncf-nats-project]] · [[s-nats-server-readme]] · [[s-github-repo-facts]]

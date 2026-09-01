@@ -7,9 +7,9 @@ verified-against: nats-io/k8s chart nats-2.14.6
 verified-on: 2026-08-31
 tags: [tool, helm, kubernetes, statefulset, probes, config-reloader, artifacthub]
 aliases: [k8s, "nats-io/k8s", helm chart, nats helm chart, nats-helm-charts]
-sources: [s-nats-helm-chart-values-2.14.6, s-docs-rolling-upgrades, s-docs-ecosystem, s-github-repo-facts, s-docs-kubernetes]
+sources: [s-nats-helm-chart-values-2.14.6, s-docs-rolling-upgrades, s-docs-ecosystem, s-github-repo-facts, s-docs-kubernetes, s-docs-hardening, s-docs-config-management, s-docs-prometheus-and-dashboards, s-gh-7190-asymmetric-cluster]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # NATS Helm charts (nats-io/k8s)
@@ -84,6 +84,29 @@ helm install nats nats/nats -f values.yaml
   is for WebSocket. External clients therefore need a per-pod address and `client_advertise` — the
   chart defines no `advertise` section of its own (source: [[s-nats-helm-chart-values-2.14.6]]).
   See [[how-clients-reach-a-cluster]].
+- **Never bind the monitoring port to loopback in this chart.** `http: "127.0.0.1:8222"` is the
+  standard host-level hardening answer and on Kubernetes it is an outage: "the kubelet's startup,
+  readiness, and liveness probes connect to the pod's IP, not its loopback, so a `127.0.0.1` bind
+  fails every probe and the pods never go ready". Keep the chart's default bind and restrict the port
+  with a NetworkPolicy instead (source: [[s-docs-hardening]]; [[monitoring-endpoints]]).
+- **What the reloader actually does, and its two limits.** It watches the mounted config file with
+  **inotify**, reads the server PID from **`/var/run/nats/nats.pid`** and sends SIGHUP, retrying
+  **30 times four seconds apart** if the server is briefly unreachable. Where inotify is unavailable
+  it needs `--force-poll`, added through **`reloader.merge` — which replaces the container's args
+  wholesale**, so the chart's own args have to be repeated alongside it
+  (source: [[s-docs-config-management]]). Together with the `/etc/` prefix rule above, these are the
+  two ways "reload doesn't work" on Kubernetes turns out not to be a server problem.
+- **The chart renames the JetStream metrics, and your dashboards depend on it.**
+  [[prometheus-nats-exporter]] emits the JetStream collector under the prefix `jetstream_` by default;
+  `-prefix nats` renames it to `nats_`, "the same rename the NATS Helm chart applies". Community
+  dashboards and anything built against a Helm-deployed cluster expect `nats_`, so an exporter you run
+  yourself without the flag produces panels that silently find no data
+  (source: [[s-docs-prometheus-and-dashboards]]).
+- **The chart enumerates its peers, and that is why it works.** Each pod's routes are the individual
+  headless-service DNS names, not one multi-value name — a single name that resolves to a rotating
+  subset of the cluster gives every node a *different* first peer and is a reported cause of
+  asymmetric cluster formation on hand-rolled deployments. Copy the enumeration, not the shortcut
+  (source: [[s-gh-7190-asymmetric-cluster]]; [[build-a-3-node-cluster]]).
 - **`podTemplate.configChecksumAnnotation: true` is the other door**: it hashes the ConfigMap into a
   pod annotation so a config change **rolls the StatefulSet** instead of hot-reloading. Right for a
   change that is not reloadable at all, wrong for a routine policy edit ([[upgrade-a-cluster]]).
@@ -147,4 +170,5 @@ livenessProbe:  { httpGet: { path: "/healthz?js-enabled-only=true", port: 8222 }
 
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]] ·
 [[s-nats-helm-chart-values-2.14.6]] ·
-[[s-docs-rolling-upgrades]]
+[[s-docs-rolling-upgrades]] · [[s-docs-hardening]] · [[s-docs-config-management]] ·
+[[s-docs-prometheus-and-dashboards]] · [[s-gh-7190-asymmetric-cluster]]

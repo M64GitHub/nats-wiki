@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [jwt, nkey, seed, creds, operator, resolver, resolver_preload, nats-auth, curve-key, backup]
 aliases: ["backup JWTs", "backup nkeys", "operator backup", "restore the operator", "identity backup", "clean-room rebuild"]
-sources: [s-docs-config-and-jwt-backup, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery]
+sources: [s-docs-config-and-jwt-backup, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-decentralized-auth, s-docs-operator-mode]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Back up and restore identity
@@ -36,6 +36,11 @@ procedure you have **rehearsed once** — because a backup you cannot open is no
 - Somewhere to keep the archive, and **somewhere different** to keep the key that opens it.
 
 ## What has to be backed up
+
+The subtree in question is the `nats auth` / `nsc` store under **`$XDG_DATA_HOME/nats`** — JWTs in
+`stores`, seeds in `keys`. It is **nsc-compatible on disk**, so either tool can read a restored copy,
+and it "holds every private key in the trust chain, which is why you run the tool on a trusted
+machine and never on the server" (source: [[s-docs-operator-mode]]; [[nsc]], [[nk]]).
 
 | group | where | why it matters |
 |---|---|---|
@@ -175,7 +180,21 @@ rotation.
 store; `server.conf` must be backed up separately. The resolver directory itself needs no backup —
 re-pushing rebuilds it.
 
-**An unencrypted backup in object storage is a full compromise**, not a leak. Always `--key`.
+**An unencrypted backup in object storage is a full compromise**, not a leak. Always `--key`. What
+the archive actually is, in the docs' words: "a JSON document holding the operator's keys and JWTs,
+so an unencrypted backup contains the operator seed in cleartext" — and "Whoever holds this one file
+*is* the `ACME` operator" (sources: [[s-docs-decentralized-auth]], [[s-docs-config-and-jwt-backup]]).
+
+**If a backup did leak, restoring is not the remedy — revoking is.** Two properties decide the
+cleanup, and neither is obvious:
+
+- **A `user add` JWT never expires**, so a leaked creds file "is valid until you revoke it". Mint
+  credentials with a deliberate expiry so this is bounded.
+- **Revocation is an entry in the account JWT**, written by `nats auth user rm … --revoke` as a
+  `revocations` map from the user's public key to a timestamp — which means it, too, only takes
+  effect on a **push** (step 4). Removing a *scoped signing key* is the blunter instrument: it is
+  "mass revocation, not an edit", locking out every user signed by the old key at the next push
+  (source: [[s-docs-decentralized-auth]]; [[operator-mode]]).
 
 ## Related
 
@@ -185,4 +204,5 @@ re-pushing rebuilds it.
 
 ## Sources
 
-[[s-docs-config-and-jwt-backup]] · [[s-docs-accounts-and-multitenancy]] · [[s-docs-disaster-recovery]]
+[[s-docs-config-and-jwt-backup]] · [[s-docs-accounts-and-multitenancy]] ·
+[[s-docs-disaster-recovery]] · [[s-docs-decentralized-auth]] · [[s-docs-operator-mode]]

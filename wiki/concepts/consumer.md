@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Consumer
@@ -91,7 +91,13 @@ long quiet wait (source: [[s-docs-policies]]).
 
 **Priority policy**: `none` (default), `overflow`, `pinned_client`, `prioritized`. It *can* be
 changed on a live consumer, but `nats consumer edit` has no flag for it — pass a config file with
-`--config` (source: [[s-docs-policies]]).
+`--config` (source: [[s-docs-policies]]). **ADR-42 says the opposite** — "you cannot switch between
+policies", only `PriorityTimeout` is updatable — and the server sides with the docs: at 2.14.6
+`overflow` → `pinned_client`, removing groups and adding them back are all accepted with no error
+(observed 2026-09-01, `raw/nats-server-src/priority-groups-observed-v2.14.6.md`; recorded as
+`inbox/docs-issues.md` #37, source: [[s-adr-42-priority-groups]]). So priority policy is **not** one
+of the fixed policies below. The rest of the feature — the three policies, the pull fields, the
+`Nats-Pin-Id` handshake and the group-name rules — is [[priority-groups]].
 
 **Ack policy**: `explicit`, `none`, `all`, `flow_control` — see [[ack-and-redelivery]].
 
@@ -129,6 +135,34 @@ consumers named **`JS_MIRROR_<suffix>`** or **`JS_SRC_<suffix>`**, carrying meta
 yours to delete while the replication exists — and are yours to delete if it no longer does, because
 their removal is best-effort ([[mirrors-and-sources]], source: [[s-adr-60-reliable-sourcing]] · [[s-docs-reading-back]] · [[s-docs-filtering]]).
 
+### The ordered consumer is a client construct, not a server one
+
+An [[ordered-consumer]] is not a consumer type the server offers; it is an **ephemeral push
+subscription the client rebuilds**. When the client sees a gap in the consumer sequence it "closes
+the subscription, releases its consumer, and creates a new one starting at the proper stream
+sequence", and it does the same when heartbeats stop, because the consumer may have been deleted or
+lost to a restart (source: [[s-adr-17-ordered-consumer]]).
+
+It is therefore **deliberately restricted** — it cannot be a pull consumer, a durable, a bound or
+"direct" subscription, or used with queue/deliver groups — and the client **forces** the config
+rather than accepting yours: `durable_name` and `deliver_subject` must not be given, `ack_policy` is
+`none`, `max_deliver` is `1`, `flow_control` is `true`, `mem_storage` is `true`, `num_replicas` is
+`1`, `idle_heartbeat` defaults to **5 seconds** and `ack_wait` to "something large like **22
+hours**". A supplied config that conflicts must be **rejected**, not silently adjusted.
+
+That is why an ordered consumer disappearing and reappearing in `nats consumer ls` is normal, and
+why its settings never match what your code asked for.
+
+**Every KV read pattern is one of these consumers**, which is why a bucket with many watchers is a
+bucket with many consumers (source: [[s-adr-8-key-value-store]]; [[key-value]],
+[[jetstream-slows-as-consumers-grow]]):
+
+| KV operation | the consumer underneath |
+|---|---|
+| **watch** | an ephemeral **ordered** consumer starting at `last_per_subject`, so it opens with the latest value for every matching key; watching several keys is several **filter subjects** on one consumer |
+| **history** | an ephemeral consumer filtered by subject, reading with `deliver_all` |
+| **keys** | a **headers-only** consumer set to deliver `last_per_subject` — the way to count keys without moving values |
+
 ### Fixed at creation
 
 `deliver_policy`, `ack_policy` and `replay_policy` are **fixed at creation**. The server refuses
@@ -150,8 +184,24 @@ consumer leader does all the work and the followers only stand by.
   batch of 100 the server delivers 10 and stops until the worker acks, however large a batch is
   asked for. Keep it at or above the batch size (source: [[s-docs-pull-consumers]]).
 - **A worker pool shares one `max_ack_pending`** across every worker on the consumer, so the limit
-  matters more, not less, as the pool grows (source: [[s-docs-pull-consumers]]). See
-  [[worker-pool]].
+  matters more, not less, as the pool grows (sources: [[s-docs-pull-consumers]],
+  [[s-docs-worker-pool]] — "five workers get 1000 between them, not 1000 each"). See
+  [[worker-pool]], and note the two things a pool does **not** change: the server serves pull
+  requests in arrival order so "a faster worker pulls more often and ships more", and the read
+  position "belongs to the consumer, not to each worker", advancing identically whether one process
+  pulls or three.
+- **You cannot tell a durable from an ephemeral at the subject level.** Modern clients create both
+  on `$JS.API.CONSUMER.CREATE.<stream>.<name>` and the difference lives in the request *body*, so a
+  permission rule written against the legacy `$JS.API.CONSUMER.DURABLE.CREATE.>` subject catches only
+  clients that still send it. The enforceable control is the account's `max_consumers`, not a
+  subject grant (source: [[s-gh-5044-restrict-durable-consumers]]; [[subject-permissions]],
+  [[account]]).
+- **"Slow Consumer Detected" is usually not about a JetStream consumer at all.** The line reports a
+  *client connection* that failed to accept data within `write_deadline` —
+  `Slow Consumer Detected: WriteDeadline of 10s exceeded with 2 chunks of 645 total bytes` — and it
+  names neither a connection nor a stream. Whether the two senses of "consumer" are being conflated
+  is the open half of the thread that asked; [[slow-consumer-detected]] carries what is established
+  and what is not (source: [[s-gh-6605-which-consumer-is-slow]]).
 - **Deliver policy `new` does not skip the backlog on every restart.** It applies once, at
   creation; a client that re-attaches to the durable resumes from its saved position, backlog
   included (source: [[s-docs-policies]]).
@@ -310,7 +360,9 @@ that separates them from a crashed pool.
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
-[[worker-pool]]
+[[worker-pool]] · [[ordered-consumer]] · [[priority-groups]] · [[key-value]] ·
+[[jetstream-slows-as-consumers-grow]] · [[slow-consumer-detected]] · [[subject-permissions]] ·
+[[account]] · [[mirrors-and-sources]]
 
 ## Sources
 
@@ -319,4 +371,9 @@ that separates them from a crashed pool.
 [[s-docs-retention-policies]] · [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] ·
 [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-filestore-layout]] ·
 [[s-adr-60-reliable-sourcing]] · [[s-docs-reading-back]] · [[s-docs-filtering]] ·
-[[s-docs-monitoring-jetstream-health]]
+[[s-docs-monitoring-jetstream-health]] · [[s-adr-8-key-value-store]] ·
+[[s-adr-17-ordered-consumer]] · [[s-adr-42-priority-groups]] · [[s-docs-worker-pool]] ·
+[[s-gh-5044-restrict-durable-consumers]] · [[s-gh-6605-which-consumer-is-slow]]
+
+Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
+v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37.

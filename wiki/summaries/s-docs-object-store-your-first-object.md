@@ -88,9 +88,10 @@ Q73 (partly — the object-store half of "when is this the wrong tool").
 
 [[object-store]]
 
-*(Struck at ingest: [[jetstream-sizing]]. The page is about the put/get contract and the two client
-error branches; it carries no rate, size, count or overhead figure, so there is nothing here for a
-sizing page to hold. The chunk-count arithmetic sizing needs comes from
+*(Struck at ingest: `operations/jetstream-sizing` — named without a wikilink, so the strike is
+visible here without the page still counting as an unlanded ripple. The page is about the put/get
+contract and the two client error branches; it carries no rate, size, count or overhead figure, so
+there is nothing here for a sizing page to hold. The chunk-count arithmetic sizing needs comes from
 [[s-docs-object-store-chunking]] instead.)*
 
 ## Sources

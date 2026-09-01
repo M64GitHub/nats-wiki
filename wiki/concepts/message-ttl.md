@@ -7,9 +7,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ttl, Nats-TTL, subject_delete_marker_ttl, tombstone, markers]
 aliases: [Nats-TTL, per-message TTL, message TTL, subject delete marker, limit marker]
-sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits]
+sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits, s-docs-mirrors-and-sources]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Per-message TTL
@@ -107,7 +107,13 @@ deliberate: it lets a replication topology keep an audit trail of messages that 
 TTLed upstream.
 
 **Sources may set `subject_delete_marker_ttl`; mirrors may not** — inserting new messages into a
-mirror would make it impossible to match sequences against the mirrored stream.
+mirror would make it impossible to match sequences against the mirrored stream. That reason rests on
+the mirror contract itself: a mirrored message "keeps the **same sequence number, the same timestamp,
+and the same subject** it had upstream", while a sourced stream gives its messages "**fresh sequence
+numbers** as they arrive" (source: [[s-docs-mirrors-and-sources]]). The same contract explains the
+audit-trail behaviour above — **a mirror keeps its own retention**, so the upstream may keep seven
+days while the mirror keeps forever, and a message the upstream would have expired simply does not
+expire in the copy.
 
 ## Error codes
 
@@ -157,4 +163,5 @@ the marker's `MaxAge` reason ([[key-value]]).
 ## Sources
 
 [[s-adr-43-per-message-ttl]] · [[s-docs-stream-config]] · [[s-adr-8-key-value-store]] ·
-[[s-adr-48-kv-ttl]] · [[s-docs-kv-ttl-and-limits]]
+[[s-adr-48-kv-ttl]] · [[s-docs-kv-ttl-and-limits]] ·
+[[s-docs-mirrors-and-sources]]

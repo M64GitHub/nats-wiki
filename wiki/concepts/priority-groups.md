@@ -3,13 +3,13 @@ title: Priority groups
 type: concept
 area: [jetstream]
 since: [2.11]   # overflow and pinned_client; the prioritized policy is 2.12
-verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-against: nats-server 2.14.6
+verified-on: 2026-09-01
 tags: [priority-groups, overflow, pinned_client, prioritized, unpin, 423]
 aliases: [priority group, pinned client, overflow policy, PriorityPolicy]
-sources: [s-adr-42-priority-groups, s-docs-policies, s-nats-server-constants-2.14.6, s-docs-upgrade-to-2.12]
+sources: [s-adr-42-priority-groups, s-docs-policies, s-nats-server-constants-2.14.6, s-docs-upgrade-to-2.12, s-docs-worker-pool]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Priority groups
@@ -17,6 +17,13 @@ updated: 2026-08-31
 Priority groups let the server decide **which client of a pull [[consumer]] gets served**, rather
 than serving pulls round-robin as they arrive. Introduced for **nats-server 2.11**
 (source: [[s-adr-42-priority-groups]]).
+
+**Why you would reach for them**, in the docs' own words on the plain worker pool they replace: a
+pool sharing one consumer distributes by demand, so a redelivered message can arrive at a second
+worker and nothing decides *which* worker gets what. Priority groups are the answer to that — "send
+everything to one worker until it fails, or keep a standby worker idle until the pool falls behind"
+(source: [[s-docs-worker-pool]]). Those two sentences are `pinned_client` and `overflow` respectively,
+described from the problem rather than from the mechanism. See [[worker-pool]].
 
 ## What configures it
 
@@ -30,18 +37,33 @@ PriorityPolicy: "overflow" | "pinned_client" | "prioritized"
 Hard rules:
 
 - **Pull consumers only.** Configuring it on a push consumer is an error.
-- **`PriorityGroups` needs at least one entry**, and the initial implementation allows **exactly
-  one group per consumer** — more is an error. **The CLI does not stop you asking for more, and the
-  server does not error either**: `--overflow-groups` and `--pinned-groups` take a comma-separated
-  list, "so passing two looks legal, and the server accepts it, but it uses only the first group and
-  ignores the rest" (source: `learn/jetstream/priority-groups.md`, spot-checked 2026-08-31 — that
-  page has not been ingested). To split work by region or tier today, run **separate consumers** on
-  the same stream, each with its own group.
+- **`PriorityGroups` needs at least one entry.** ADR-42 says the initial implementation allows
+  **exactly one group per consumer** and that more is an error; **at 2.14.6 that is not what
+  happens.** Two groups are accepted at creation and both are stored and reported back
+  (`priority_groups=['g1', 'g2']`, observed 2026-09-01 —
+  `raw/nats-server-src/priority-groups-observed-v2.14.6.md`), which matches
+  `learn/jetstream/priority-groups.md`: `--overflow-groups` and `--pinned-groups` take a
+  comma-separated list, "so passing two looks legal, and the server accepts it, but it uses only the
+  first group and ignores the rest" (spot-checked 2026-08-31 — that page has not been ingested).
+  **The run confirmed acceptance, not the "uses only the first" half**, so the docs' warning stands
+  unverified and is the safer assumption. To split work by region or tier today, run **separate
+  consumers** on the same stream, each with its own group. The sources disagree: recorded as
+  `inbox/docs-issues.md` #37.
 - Group names must match `limited-term` (`A-Z a-z 0-9 - _ / =`) and are **capped at 16 characters**.
 - **Every pull request must carry `"group": "<name>"`.** A pull outside a valid group errors.
-- **You cannot add groups to a consumer that has none, remove them, or switch policy.** Only
-  `PriorityTimeout` is updatable. Treat the policy as create-time, like the fixed policies on
-  [[consumer]].
+- **The policy is editable, whatever ADR-42 says.** The ADR states "You cannot update a consumer
+  from having groups to not having them, or vice versa, and you cannot switch between policies. Only
+  `PriorityTimeout` is updatable today." **All three transitions are accepted at 2.14.6**, with no
+  error and immediate effect: `overflow` → `pinned_client`, groups removed from a consumer that had
+  them, and groups given back to one that had none (observed 2026-09-01 with nats CLI 0.4.0 —
+  `raw/nats-server-src/priority-groups-observed-v2.14.6.md`). `learn/jetstream/policies.md` agrees
+  with the server and lists priority policy under *can change*, noting that `nats consumer edit` has
+  no flag for it, so you pass a config file with `--config`. The disagreement is
+  `inbox/docs-issues.md` #37; prefer the server. Unlike the genuinely fixed policies on [[consumer]],
+  this one does **not** cost you a recreate.
+- **`priority_timeout` defaults to 2 minutes** when `pinned_client` is set with no explicit value
+  (`120000000000` ns, observed 2026-09-01), and it is updatable — the one part of the ADR's sentence
+  that holds.
 
 ## The three policies
 
@@ -148,3 +170,7 @@ stored ID and keep pulling.
 
 [[s-adr-42-priority-groups]] · [[s-docs-policies]] · [[s-docs-upgrade-to-2.12]] ·
 [[s-nats-server-constants-2.14.6]]
+
+Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
+v2.14.6 with nats CLI 0.4.0, 2026-09-01. Behind `inbox/docs-issues.md` #37. ·
+[[s-docs-worker-pool]]

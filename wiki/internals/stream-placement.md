@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [placement, server_tags, no-suitable-peers, 10005, meta-leader]
 aliases: [placement, server_tags, tags, "no suitable peers for placement"]
-sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers]
+sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Stream placement
@@ -59,7 +59,20 @@ nats: error: could not create Stream: no suitable peers for placement, tags not 
 ```
 
 The message names the tag no server carried, in brackets. Error `10005` is
-`JSClusterNoPeersErrF` in `reference/jetstream/errors.md`; see [[error-codes]].
+`JSClusterNoPeersErrF` in `reference/jetstream/errors.md`; see [[error-codes]]. The trailing **`F`**
+is not decoration — a constant ending `…ErrF` takes printf-style interpolation, which is why this one
+can name your tag at all, and `nats error 10005` looks the whole entry up locally
+(source: [[s-adr-7-server-error-codes]]).
+
+**`10005` is a class of failure, not one cause** — an unmatched tag is only the case the message can
+describe; storage capacity is another, and the response names at most the tag. The only thing that
+says which peers were rejected and why is debug logging, one line per candidate:
+
+```
+[DBG] Peer selection: discard ** reason: not target cluster **
+```
+
+(source: [[s-gh-7982-no-suitable-peers]], observed on 2.12.5; [[no-suitable-peers-for-placement]]).
 
 ### Placement cannot name a leader
 
@@ -107,6 +120,28 @@ nats stream edit ORDERS --cluster east --tag region:us-east --tag disk:ssd
 to servers matching the new constraint, which is the supported way to move a stream onto a different
 set of peers.
 
+**Two other commands land on the same decision, and confusing them is the usual mistake**
+(source: [[s-docs-scaling-and-peers]]):
+
+```
+nats stream cluster peer-remove ORDERS n4-east     # move one replica off one server
+nats stream edit ORDERS --replicas=4               # change how many replicas there are
+```
+
+The docs put it in one line: "`peer-remove` moves a replica between servers; `--replicas` sets how
+many replicas there are." A `peer-remove` evicts the replica and the meta leader **re-places it on
+another server that qualifies**, so the stream keeps its count — *unless placement leaves nowhere to
+put it*, in which case an `R>1` stream still loses the peer, the command returns `peer remap failed`
+(**10075** `JSPeerRemapErr`) and the group is left a replica short. Only a single-replica stream is
+spared. Removing a *server* from the **meta** group is a third command,
+`nats server cluster peer-remove`, and it serialises: a second request while one is in flight answers
+`cluster member change is in progress` (**10202** `JSClusterServerMemberChangeInflightErr`).
+
+**A restore is a placement decision too.** `nats stream restore` takes `--cluster`, `--tag` and
+`--replicas`, so recovering a snapshot is the third way a stream lands on a chosen set of peers —
+and `--replicas` on restore is the documented way to bring a stream back at a different count
+(source: [[s-natscli-backup-restore]], nats CLI 0.4.0; [[backup-and-restore-jetstream]]).
+
 ## Why an operator cares
 
 **`no suitable peers for placement` has two causes, and the message only points at one.** Either a
@@ -153,9 +188,11 @@ only the streams that need the strongest durability placed onto it by tag
 ## Related
 
 [[replicas]] · [[raft-in-nats]] · [[stream]] · [[error-codes]] · [[js-api-subjects]] ·
-[[stream-leader-keeps-moving]] · [[no-suitable-peers-for-placement]]
+[[stream-leader-keeps-moving]] · [[no-suitable-peers-for-placement]] ·
+[[backup-and-restore-jetstream]] · [[rebalance-streams]]
 
 ## Sources
 
 [[s-docs-placement]] · [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] ·
-[[s-gh-7982-no-suitable-peers]]
+[[s-gh-7982-no-suitable-peers]] · [[s-adr-7-server-error-codes]] · [[s-docs-scaling-and-peers]] ·
+[[s-natscli-backup-restore]]

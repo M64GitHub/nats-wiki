@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [backup, restore, snapshot, memory-streams, chunk-size, window-size, 10064, 10130, consumers]
 aliases: [backup, restore, snapshot, "nats stream backup", "nats stream restore", "back up a stream"]
-sources: [s-docs-stream-backup-restore, s-nats-server-snapshot-restore, s-gh-4342-memory-stream-backup, s-natscli-backup-restore, s-docs-disaster-recovery, s-docs-mirrors-as-dr]
+sources: [s-docs-stream-backup-restore, s-nats-server-snapshot-restore, s-gh-4342-memory-stream-backup, s-natscli-backup-restore, s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-natscli-account-tls, s-gh-7831-standalone-to-cluster]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Back up and restore JetStream
@@ -61,6 +61,28 @@ consumers back *at their saved delivery position* rather than at the start of th
 (source: [[s-natscli-backup-restore]]).
 
 **Date the directory.** A snapshot is a point in time; `2026-06-04` says which one.
+
+### The whole account in one command
+
+`nats stream backup` takes one stream. The account-level analogue backs up **all** of them
+(source: [[s-natscli-account-tls]]):
+
+```
+nats account backup  ./acct-backup --check --consumers
+nats account restore ./acct-backup --cluster east
+```
+
+`backup` (alias `snapshot`) "creates a backup of all JetStream Streams over the NATS network"; its
+flags mirror the per-stream ones — `--check` (health-check each stream first, off by default),
+`--consumers` (**`true`** by default, same silent trap as above), `--force`/`-f` to skip the prompt,
+and `--critical-warnings`/`-w` to treat warnings as failures. `restore` takes `--cluster` and
+`--tag` for placement, and **the target directory must already exist**.
+
+Two properties decide when to reach for it. It is **per connected account** — it acts on whatever
+account the current context authenticates into, so a multi-tenant server needs one run per tenant
+([[account]]). And it is the **maintainer-documented route for moving JetStream assets into a newly
+created account**: `nats account backup` then `nats account restore`. That is a *copy*, not a sharing
+mechanism — see [[cross-account-sharing]].
 
 ### Verify the messages while you copy them
 
@@ -224,6 +246,27 @@ gone.
 **Restoring into a cluster whose meta group has no quorum will not work.** Restore goes through
 `$JS.API`, which needs the meta leader ([[raft-in-nats]]).
 
+## The migration this runbook exists for: standalone → cluster
+
+**A standalone server cannot be clustered in place, and finding that out by trying costs you every
+stream.** Adding a cluster block and restarting marks the existing streams orphaned and **deletes
+them immediately, before there is any chance to raise their replica counts** — the reporter's words
+are "This results in complete data loss" (source: [[s-gh-7831-standalone-to-cluster]]). The deletion
+happens on restart; there is no window to react in.
+
+The maintainers' answer is this runbook: "You'll likely need to take a backup of your streams and then
+restore them in the clustered setup." The reason it cannot be a flag is structural — "a clustered
+setup uses consensus and **stores on which servers those streams/consumers are hosted separately**. A
+single-server setup doesn't have/need that" — and in-place migration "is not planned at the moment".
+
+There is a second, lower-downtime path, called "the most 'native' way to do this migration with
+minimal to no downtime" by the same maintainer: **leafnode-connect the standalone server to the
+cluster, create mirrors of its streams there, then unplug the leafnode and stop the streams being
+mirrors** ([[leafnode]], [[mirrors-and-sources]], and the promotion procedure in
+[[disaster-recovery]]).
+
+Neither path is a flag, and both have to be planned **before** the restart, not after.
+
 ## Related
 
 [[disaster-recovery]] · [[backup-and-restore-identity]] · [[mirrors-and-sources]] · [[stream]] ·
@@ -234,4 +277,5 @@ gone.
 ## Sources
 
 [[s-docs-stream-backup-restore]] · [[s-nats-server-snapshot-restore]] · [[s-natscli-backup-restore]] ·
-[[s-gh-4342-memory-stream-backup]] · [[s-docs-disaster-recovery]] · [[s-docs-mirrors-as-dr]]
+[[s-gh-4342-memory-stream-backup]] · [[s-docs-disaster-recovery]] · [[s-docs-mirrors-as-dr]] ·
+[[s-natscli-account-tls]] · [[s-gh-7831-standalone-to-cluster]]

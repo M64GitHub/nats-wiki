@@ -7,9 +7,9 @@ verified-against: nats.js v3.4.0
 verified-on: 2026-08-31
 tags: [client, tier-1, javascript, typescript, deno, bun, websocket, monorepo]
 aliases: [nats.js, "nats-io/nats.js", javascript client, typescript client, nats.deno, nats.ws, nats.node]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-get-direct]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nats.js
@@ -52,6 +52,10 @@ npm install @nats-io/transport-node @nats-io/jetstream   # the v3 modular path
   does not match the hostname; "The check only applies when the request carries an `Origin` header,
   which browsers send and non-browser clients generally do not"
   (`reference/config/websocket/same_origin.md`).
+- **It is the only client that sends a batched Direct Get itself.** "`nats.js` sends a batched Direct
+  Get directly; Go, Rust, Java, and C# reach it through the Synadia Orbit helper libraries"
+  (source: [[s-docs-get-direct]]). So a batched point read that is one dependency here is an
+  [[orbit]] dependency elsewhere — see [[direct-get]].
 - **Migration between v2 and v3 is documented in-repo** (`migration.md`), which is where a version
   jump on an existing service should start.
 
@@ -61,4 +65,4 @@ npm install @nats-io/transport-node @nats-io/jetstream   # the v3 modular path
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-docs-get-direct]]

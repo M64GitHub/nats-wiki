@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # JetStream sizing
@@ -282,6 +282,24 @@ The levers, in the order Synadia gives them:
 - **Keep meta leadership off nodes carrying high-volume streams.**
 - If none of that explains it, **profile with Go's `pprof`** — the method is below.
 
+**Neither memory control reserves anything at startup**, which is why a cap set from the wrong number
+gets the process OOM-killed rather than throttled: "`max_memory_store` is an accounting limit checked
+as messages arrive, and `GOMEMLIMIT` is a soft target the Go garbage collector aims for". The docs'
+hardened unit sizes the two against each other with the store as the floor — `MemoryMax` above
+expected use, `GOMEMLIMIT` "somewhat below `MemoryMax` so GC reins memory in before the cgroup kills
+the process", and both above `max_memory_store` plus buffers
+(source: [[s-docs-hardening]]):
+
+```
+# With jetstream { max_memory_store: 4Gi }, size for the store plus buffers.
+MemoryMax=6G
+Environment=GOMEMLIMIT=5500MiB
+```
+
+One systemd interaction is easy to miss when hardening the same unit: `ProtectSystem` makes paths
+read-only, and the JetStream `store_dir` — plus the pid and ports-file directories — must be listed as
+writable or the server cannot start. See [[install-nats-server]].
+
 #### Profiling, when none of the above explains it
 
 That pointer had no instructions attached for five plans. It does now (source:
@@ -550,6 +568,22 @@ example uses. The same paragraph is the reason the sizing input on this page is 
   understand them.
 - **Adding replicas to get throughput.** They cost write throughput rather than adding it — see
   [[replicas]].
+- **Sizing a problem that is not a sizing problem.** `has high message lag` looks like undersized
+  disk or network and usually is not: a maintainer's answer to two independent reports is "you are
+  sending faster then the system can process and store messages into the stream. This can happen if
+  you use a core publish into a stream or if you use async Jetstream publishes with many publishers"
+  (source: [[s-gh-6490-high-message-lag]]). Both causes **remove the backpressure a synchronous
+  `PubAck` provides**, so no amount of hardware fixes them. Ask "did a publisher switch to core NATS
+  or to async?" before you re-size anything — see [[stream-has-high-message-lag]].
+- **Reaching for tmpfs to make the disk term go away.** A `store_dir` on a RAM disk is **not** a
+  memory stream: a maintainer's response to streams whose directories had silently vanished under a
+  tmpfs `store_dir` was "we don't support running the JetStream file store on RAM disks and cannot
+  rely on RAM disks being anything other than temporary", naming a **memory** stream as the supported
+  alternative and noting the server already does "in-memory caching of filestore blocks to help speed
+  up accesses" (source: [[s-gh-5924-filestore-dirs-vanished]]). The related trap costs nothing to
+  avoid: **with no `jetstream { store_dir }` set the default is under `os.TempDir()`**, exactly where
+  `tmpwatch`, `tmpreaper`, `systemd-tmpfiles` and container image cleaners look. Set `store_dir`
+  explicitly — see [[jetstream-out-of-disk]] and [[filestore-layout]].
 
 ## What is still unknown
 
@@ -593,4 +627,5 @@ wiki could contain.
 [[s-k8s-760-jetstream-pvc-per-replica]] · [[s-docs-shaping-the-stream]] ·
 [[s-nats-server-object-store-observed]] · [[s-docs-object-store-chunking]] ·
 [[s-docs-monitoring-profiling]] · [[s-gh-7483-varz-cpu-in-containers]] ·
-[[s-nats-server-monitoring-observed]]
+[[s-nats-server-monitoring-observed]] · [[s-docs-hardening]] ·
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]]

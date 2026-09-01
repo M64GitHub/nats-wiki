@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Leafnode
@@ -91,6 +91,7 @@ leafnodes {
 | `leafnodes.remotes[].urls` / `url` | where to dial; scheme `nats-leaf` or `ws` | – | reload |
 | `leafnodes.remotes[].account` (alias `local`) | the **local** account whose traffic this remote carries | – | reload |
 | `leafnodes.remotes[].credentials` (alias `creds`) | `.creds` file proving the leaf's identity to the hub | – | reload |
+| `leafnodes.remotes[].nkey` | an NKey **seed** proving the leaf's identity instead of a creds file — the form a device fleet uses, one seed per leaf (source: [[s-gh-7505-auth-callout-nkey]]) | – | reload |
 | `leafnodes.remotes[].deny_exports` | subjects this leaf will **not publish** to the hub | – | restart\* |
 | `leafnodes.remotes[].deny_imports` | subjects this leaf will **not subscribe** for on the hub | – | restart\* |
 | `leafnodes.remotes[].no_randomize` | try `urls` in order instead of shuffled | `false` | restart |
@@ -201,6 +202,19 @@ So:
 - The two ends **compose**: the hub's permissions arrive in the INFO and the remote's local denies are
   merged on top (`leafnode.go:1715–1735`).
 
+**If the hub mints those permissions with auth callout, verify the NKey yourself.** The pattern is a
+natural one — each leaf holds a unique seed, dials with `nkey:`, and the hub's callout service "looks
+up a device id corresponding to the incoming public key in a database and returns JWT claims giving
+the leafnode permission to publish on e.g. `devices.${id}.foo`". The trap is that **the server
+verifies nothing the client presented**: every field of `connect_opts`, `nkey` included, is copied
+straight from the connection. Treating it as an identity is a spoofing bug, and a quiet one — the
+connection succeeds and the wrong device gets the wrong permissions. The challenge-response is still
+available, but the *service* has to do it: when the client supplied a signature the server puts the
+nonce it issued into `client_info.nonce`, so the service can verify `connect_opts.signed_nonce` over
+that nonce against `connect_opts.nkey` (source: [[s-gh-7505-auth-callout-nkey]]). Both maintainer
+replies on the thread point at a hardened callout library rather than a hand-rolled handler. See
+[[auth-callout]].
+
 ## Dialling the hub over WebSocket
 
 A leaf can reach its hub through the `websocket {}` listener instead of the leafnode port, which is
@@ -262,6 +276,20 @@ decline, and the link works either way. See [[websocket]].
   [[s-nats-server-object-store-leafnode]]). Until that changes, the mitigation on this page's own
   terms is a `deny_exports` / `deny_imports` entry for `$O.>` on the remote — one of the few cases
   where the deny-only keys are exactly the right tool, because there is nothing to allow.
+- **Cross-domain JetStream over a leaf fails as a missing *export*, and the error names the subject.**
+  Sourcing a stream from the hub's JetStream domain needs the hub account to export `$JS.API.>` and
+  the leaf account to import it under a prefix; without the matching export the leaf logs
+
+  ```
+  Error adding service import "$JS.leaf01a.API.CONSUMER.CREATE.tank": service import not authorized
+  ```
+
+  Read the subject to learn which of the three prefixes is missing. **`CONSUMER.CREATE` is
+  request/reply, so the export must be a `service` export, not a stream export** — getting that type
+  wrong is one of the two silent failures on [[mirrors-and-sources]]. Config-file (non-JWT)
+  cross-domain sourcing with TLS has **no public worked example**
+  (source: [[s-gh-7881-cross-domain-sourcing]]); [[cross-domain-sourcing]] writes it from the server
+  source and says which steps are unverified.
 - **No public source describes converting a leaf region into a non-leaf cluster**, or what happens if
   a leaf outgrows its hub. Both were asked in [[s-gh-7438-multi-region-availability]] and neither was
   answered. Treat the choice of hub as hard to reverse.
@@ -301,7 +329,8 @@ Needs the system account. `Spoke` is a property of **where you ran the command**
 [[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-gh-6328-jetstream-behind-gateways]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]] ·
 [[s-nats-server-object-store-leafnode]] ·
-[[s-docs-websocket-leaf-nodes-over-websocket]]
+[[s-docs-websocket-leaf-nodes-over-websocket]] ·
+[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]]
 
 ## To verify
 

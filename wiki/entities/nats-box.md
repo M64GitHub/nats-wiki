@@ -7,9 +7,9 @@ verified-against: nats-box v0.19.7
 verified-on: 2026-08-31
 tags: [tool, container, kubernetes, docker, toolbox]
 aliases: [nats-box, "nats-io/nats-box", "natsio/nats-box"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-kubernetes]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-kubernetes, s-nats-server-readme]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nats-box
@@ -44,6 +44,11 @@ The docs' ecosystem page names three tools (`nats`, `nsc`, `nk`); the image's ow
 - **Mount a volume for `nsc`.** `docker run --rm -it -v $(pwd)/nsc:/nsc natsio/nats-box:latest`
   keeps accounts, nkeys and creds on the host — otherwise the identity store dies with the
   container, which is a very bad way to lose an operator key.
+- **It is not a Docker Official Image, and the server is.** `nats-server` ships as the Docker Hub
+  library image **`_/nats`** — which is why `docker run … nats:latest` needs no registry prefix
+  (source: [[s-nats-server-readme]]) — while nats-box lives under the **`natsio/`** namespace. On a
+  cluster that mirrors or allow-lists images by provenance, the two are governed by different rules,
+  and the toolbox is the one that will be missing.
 - **A shell in the cluster is a privilege.** Anything reachable from that pod's credentials is
   reachable by anyone who can `exec` into it; on a hardened cluster, treat nats-box as an admin
   surface, not a utility.
@@ -71,4 +76,4 @@ nsc init -d /nsc
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]] · [[s-nats-server-readme]]

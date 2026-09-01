@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [reload, SIGHUP, dry-run, include, reloader, configmap, accounts, max_subscriptions]
 aliases: [reload, SIGHUP, "config reload", "reload config", "add an account", "nats-server --signal reload"]
-sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry]
+sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry, s-docs-cross-account, s-docs-putting-it-together]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Reload server config
@@ -80,13 +80,21 @@ quote.
 - TLS `cert_file` / `key_file` paths — the server re-reads the files on reload;
 - cluster `routes`, and logging;
 - since **2.14**, leafnode `remotes` can be added and removed by reload with no restart
-  ([[nats-server-2.14]]).
+  ([[nats-server-2.14]]);
+- **cross-account exports and imports** — the docs' own walkthrough ends "apply with a reload:
+  `nats-server --signal reload=<pid>` (or a restart)", and neither side of the share observes the
+  wiring: the exporting service publishes exactly as before, and a third account sees nothing unless
+  it too imports (source: [[s-docs-cross-account]]). See [[cross-account-sharing]].
 
 **Not reloadable**: `port` / `listen`; the cluster's listen host and port; the JetStream `store_dir`.
 **Gateway routes are not reloadable either** — a reload can only refresh their TLS material.
 
 **In operator mode, account limits are not in this file at all.** They live in the account JWT the
-resolver holds; edit and push the JWT ([[account]], [[nsc]]). No reload moves them.
+resolver holds; edit and push the JWT ([[account]], [[nsc]]). No reload moves them. **The same is
+true of shares**: `nats auth account exports add` / `imports add` change only the local store, and
+"both changed account JWTs must then be pushed to the server; until then the share silently doesn't"
+take effect (source: [[s-docs-cross-account]]). Reaching for SIGHUP after an `nsc` or `nats auth` edit
+is the reflex to unlearn — the operation you want is `push`.
 
 ### 3. Validate, then signal
 
@@ -236,6 +244,16 @@ That distinction is worth stating because the public thread this was investigate
 reload defect and is not one: the reporter's certificate had already expired, and a reload that
 changes nothing looks identical to one that worked (source: [[s-gh-7684-certificate-expiry]]).
 
+**`-t` is a parse check, not a start check.** A config can validate and still refuse to boot: the
+docs' own composed example — `cluster {}`, `gateway {}`, `leafnodes { listen }` and `jetstream {}` on
+one server — has no `system_account`, and `validateLeafNodeOptions` stops the server with
+`leaf nodes and gateways (both being defined) require a system account to also be configured`
+(`server/leafnode.go:343–350` at v2.14.6; source: [[s-docs-putting-it-together]], recorded as
+`inbox/docs-issues.md` #24). On a *reload* this is the harmless direction — the old config stays
+active — but it means a change that passed review and passed `-t` can still turn the next restart
+into an outage. Startup-only failures like this one are why the verify step below reads the log, not
+the exit code. See [[account]] and [[build-a-3-node-cluster]].
+
 **A reload applied on one node is not applied on the cluster.** Signal every node, and on Kubernetes
 confirm the sidecar actually watched the path you changed.
 
@@ -270,4 +288,5 @@ make certificate rotations their own edit. See [[websocket]] and [[run-nats-behi
 [[s-docs-hardening]] · [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-topology]] ·
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] ·
-[[s-gh-7684-certificate-expiry]]
+[[s-gh-7684-certificate-expiry]] ·
+[[s-docs-cross-account]] · [[s-docs-putting-it-together]]

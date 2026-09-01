@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [peer-remove, replicas, catchup, lag, current, quorum, 10075, 10202, retire-a-node]
 aliases: [rebalance, "peer-remove", "peer remove", "move a stream", "retire a node", "add a node", "scale a cluster"]
-sources: [s-docs-scaling-and-peers, s-docs-placement, s-docs-rolling-upgrades, s-docs-surviving-node-loss, s-docs-jetstream-in-a-cluster]
+sources: [s-docs-scaling-and-peers, s-docs-placement, s-docs-rolling-upgrades, s-docs-surviving-node-loss, s-docs-jetstream-in-a-cluster, s-gh-4342-memory-stream-backup]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Rebalance streams across a cluster
@@ -61,6 +61,17 @@ the stream's placement, records the new peer set, and the stream's group picks i
 two — the instant the assignment lands, while the new peer is still empty. So the window right after
 a grow is the *least* redundant the group has been. The new peer cannot win an election while its log
 is empty, but it is counted.
+
+**The same grow, used for a different reason: a memory stream you are about to restart.** An R1
+memory stream has nothing on disk, so a restart destroys it — and there is no snapshot path to fall
+back on. The maintainer's procedure is this step, run in both directions around the restart: "before
+the restart update the stream's configuration to set `replicas=3`, check using `nats stream info`
+that all the new replicators have caught up, restart your server and then update the stream's
+configuration back to `replicas=1`". The boundary is stated plainly in the same thread: "if it's
+fault-tolerance you need (unscheduled server restart) then you must use `replicas=3`" — the technique
+converts a **planned** restart into a no-op and does nothing for an unplanned one
+(source: [[s-gh-4342-memory-stream-backup]]). `nats stream find --replicas=1` lists the candidates;
+see [[upgrade-a-cluster]] and [[backup-and-restore-jetstream]].
 
 ### Watch the catchup
 
@@ -201,4 +212,5 @@ Wiring that check into monitoring is what turns "one change at a time" from a di
 ## Sources
 
 [[s-docs-scaling-and-peers]] · [[s-docs-placement]] · [[s-docs-rolling-upgrades]] ·
-[[s-docs-surviving-node-loss]] · [[s-docs-jetstream-in-a-cluster]]
+[[s-docs-surviving-node-loss]] · [[s-docs-jetstream-in-a-cluster]] ·
+[[s-gh-4342-memory-stream-backup]]

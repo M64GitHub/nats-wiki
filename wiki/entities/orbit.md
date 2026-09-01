@@ -7,9 +7,9 @@ verified-against: synadia-io/orbit.* as of 2026-08-31
 verified-on: 2026-08-31
 tags: [orbit, extensions, incubator, partitioned-consumer-groups, kv-codecs, counters]
 aliases: [orbit, orbit.go, orbit.js, orbit.py, orbit.java, orbit.rs, orbit.net, orbit.c, "synadia-io/orbit"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-advanced-publishing]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-advanced-publishing, s-docs-get-direct]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Orbit (synadia-io/orbit.*)
@@ -71,7 +71,14 @@ retry / chaos utilities", and warn that the "Exact module set differs per langua
 
 ## What an operator needs to know
 
-**Two 2.12/2.14 server features are reachable only through Orbit in most clients.** Atomic batch
+**Three server features are reachable only through Orbit in most clients**, and the oldest of them is
+not new at all: **batched Direct Get**, a 2.11 mechanism. "`nats.js` sends a batched Direct Get
+directly; Go, Rust, Java, and C# reach it through the Synadia Orbit helper libraries"
+(source: [[s-docs-get-direct]]) — so the gap Orbit fills is not only a lag behind the newest release
+but a standing difference in what each core client considers its own job ([[direct-get]]). The other
+two are newer:
+
+**Two 2.12/2.14 publishing features are reachable only through Orbit in most clients.** Atomic batch
 publishing (`allow_atomic`, 2.12) is in the core client for the `nats` CLI and nats.js; **Go, Java,
 Rust and .NET reach it through Orbit**, and nats.py has to drive the `Nats-Batch-*` headers itself.
 Fast-ingest batch publishing (`allow_batched`, 2.14) is worse served: `jetstreamext.NewFastPublisher`
@@ -95,4 +102,5 @@ optional extra** — worth knowing before designing around either mode ([[publis
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-advanced-publishing]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-advanced-publishing]] ·
+[[s-docs-get-direct]]

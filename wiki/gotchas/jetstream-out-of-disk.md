@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10047, 10028, max_bytes, max_file_store, reserved_storage, out-of-space, OUT_OF_STORAGE]
 aliases: ["JetStream out of disk", "insufficient storage resources available", "insufficient memory resources available", "JetStream out of resources will be DISABLED", "10047", "10028", "out of storage"]
-sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6]
+sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # "insufficient storage resources available (10047)"
@@ -172,6 +172,17 @@ page.
 On an Arm Mac, Docker Desktop's VM has its own virtual disk limit; reaching it produces `10047`
 inside the container while the host has space (source: [[s-issue-4281-insufficient-storage]]).
 
+Two more ways `store_dir` is not where you think. **A `store_dir` on tmpfs is RAM**, so it fills
+against the memory limit rather than the volume — and it is not supported: "we don't support running
+the JetStream file store on RAM disks and cannot rely on RAM disks being anything other than
+temporary". A **memory** stream is the supported alternative, and the server already caches filestore
+blocks in memory for speed, so the tmpfs trick buys nothing it does not already do. **And with no
+`jetstream { store_dir }` set at all the default sits under `os.TempDir()`** — exactly where
+`tmpwatch`, `tmpreaper`, `systemd-tmpfiles` and container image cleaners look, which is a different
+failure with the same flavour: the directories go missing under a stream the server still lists
+(source: [[s-gh-5924-filestore-dirs-vanished]]; that symptom is
+[[stream-directories-disappear]]).
+
 ## Prevention
 
 - **Pin `max_file_store` *below* the volume**, and `max_memory_store` below the container's memory
@@ -254,4 +265,5 @@ values.
 - [[s-docs-sizing-and-resources]] — the docs page that states the 75% default correctly.
 - [[s-nats-server-filestore-layout]] — why the ceiling bounds a logical figure and the directory is
   bigger.
-- [[s-nats-helm-chart-values-2.14.6]] — the chart rendering `max_file_store` equal to the PVC size.
+- [[s-nats-helm-chart-values-2.14.6]] — the chart rendering `max_file_store` equal to the PVC size. ·
+[[s-gh-5924-filestore-dirs-vanished]]

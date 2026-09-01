@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # RAFT in nats-server
@@ -35,6 +35,14 @@ A cluster runs **many RAFT groups at once** (source: [[s-docs-raft-and-leaders]]
 servers, and a change to one does not move the other. A three-server cluster holding one replicated
 stream is already running at least two groups.
 
+**Three elections, not one.** "Each consumer gets its own Raft group and leader — chosen
+independently of the stream's", so a stream leader, a consumer leader and the meta leader are three
+separate outcomes on possibly three different servers. `nats stream info` names the stream's group in
+its `Cluster Group` field — "its own Raft group, separate from the meta group. Each stream gets one".
+And the separation people get wrong, stated plainly: "The meta leader decides where a stream lives,
+but it doesn't handle its messages" — a cluster on its own does not make JetStream highly available;
+`num_replicas` does (source: [[s-docs-jetstream-in-a-cluster]]; [[replicas]]).
+
 ### Elections
 
 - The leader sends a **heartbeat** to its followers **by default about once a second**.
@@ -48,6 +56,19 @@ stream is already running at least two groups.
   own. One vote per peer per term is what stops two leaders emerging.
 - The candidate becomes leader on collecting a **quorum**: a majority of the group's peers,
   **`(N+1)/2`**. For a three-peer group that is two — its own vote plus one.
+
+**A draining node takes itself out of the running.** Lame duck calls `transferRaftLeaders()`, which
+issues `StepDown()` on **every** Raft node the server holds, and its groups then become
+**observers** — so it cannot win an election on the way out. All of that happens *before* the
+`lame_duck_duration` timer starts, which governs client disconnects and nothing else (source:
+[[s-nats-server-lame-duck]], nats-server 2.14.6; [[upgrade-a-cluster]]).
+
+**A peer added to a live group votes before it holds anything.** Raising a stream's replica count
+makes the meta leader assign a new peer, and "adding the peer changes the quorum right away: an
+`R=4` group commits once **three** peers hold a write, not two". The empty peer cannot win an
+election — "it stays an observer until the leader's first entries reach it" — but it does count
+against the majority, which is why membership changes are made **one at a time** and gated on
+`current` (source: [[s-docs-scaling-and-peers]]).
 
 **The quorum rule is why a majority must survive.** A three-peer group keeps a leader while two
 peers are up; lose two and the survivor cannot reach a majority, so the group goes **leaderless**
@@ -159,6 +180,43 @@ The last two mean a capacity problem is blocking the repair; fix that and the re
 `Resetting stream cluster state` is a group that did not heal — see
 [[malformed-or-corrupt-message]].
 
+**The RAFT log lines worth recognising**, from a real 2.9.8 incident (source:
+[[s-gh-7463-jetstream-corruption]]). They come as a family, and reading the family rather than one
+line is the diagnosis:
+
+```
+[WRN] RAFT [xY6fvr60 - C-R3F-atNRG1rP] Wrong index, ae is &{leader:VNsg0pXW term:7 commit:3258048 ...}, index stored was 3258025, n.pindex is 3258048
+[ERR] RAFT [xY6fvr60 - C-R3F-atNRG1rP] Critical write error: malformed or corrupt message
+[WRN] JetStream cluster stream '$G > IDX_TRADE_P005' has NO quorum, stalled
+[WRN] RAFT [... ] Expected first catchup entry to be a snapshot and peerstate, will retry
+[WRN] RAFT [... ] Error storing entry to WAL: raft: could not store entry to WAL
+```
+
+The bracketed pair is `<server id> - <group name>`, so the group name (`C-R3F-…`) is what ties a
+line to a stream. Two readings that save time:
+
+- **`JetStream out of resources, will be DISABLED` in this company is not a capacity message.** It is
+  the out-of-space handler being called from the Raft write-error path — the incident above had 6–7%
+  of 200 GB used (source: [[s-nats-server-jetstream-resources]]). [[malformed-or-corrupt-message]]
+  separates it from [[jetstream-out-of-disk]].
+- **`Restored N messages for stream '<account> > <stream>'` at INFO on startup is the positive
+  signal**, and its *absence* for a stream that used to print it is the cheapest corruption check
+  there is.
+
+**Watch the counters, not the route count.** `nats server list`'s `Routes` column counts
+*connections*, not peers: each link to a peer is a small pool (`cluster.pool_size`, default **3**)
+plus a dedicated system-account route, so a three-server cluster shows **8** and reading that as a
+peer count produces false alarms (sources: [[s-docs-forming-a-cluster]],
+[[s-docs-your-first-cluster]]). The usable checks are `nats server report jetstream` for the meta
+group and `nats server check stream --stream=ORDERS --peer-expect=3`, which exits non-zero when a
+stream is under-replicated (source: [[s-docs-jetstream-in-a-cluster]]).
+
+**A lag warning is about this layer, not about consumers.** `JetStream cluster stream … has high
+message lag` fires when proposals accepted from publishers outrun what has been committed and
+applied on the **stream leader**; the threshold is a constant, **10,000** at v2.14.6, and the line is
+rate-limited so its frequency is not a severity measure (sources: [[s-gh-6490-high-message-lag]],
+[[s-nats-server-jetstream-log-warnings]]; [[stream-has-high-message-lag]]).
+
 Two advisories make leadership changes observable without polling ([[advisories]]):
 `$JS.EVENT.ADVISORY.STREAM.LEADER_ELECTED` and `$JS.EVENT.ADVISORY.STREAM.QUORUM_LOST`, with
 `CONSUMER.` equivalents. **Quorum-lost is the one to alert on**; leader-elected is normal and
@@ -190,6 +248,25 @@ the other is the common panic (source: [[s-docs-raft-and-leaders]]).
 lock: the quorum election can still land elsewhere. Run the stepdown to move leadership *off* the
 current server, then read `nats stream info` to learn who actually won. Placement cannot name a
 leader at all — see [[stream-placement]].
+
+**A super-cluster is one meta group over the WAN, and that is a design decision, not a detail.**
+Quorum there is decided by the **total** server count across regions, so an unequal deployment lets a
+dominant region hold the meta group hostage, and every metadata operation pays WAN latency. The
+alternative shape — a hub with leafnodes — is a *separate* meta group per JetStream domain, which is
+why domains are the tool for regional independence (source: [[s-gh-7438-multi-region-availability]];
+[[multi-region-jetstream]], [[jetstream-domain]]).
+
+**Leadership is where the memory goes.** Measured across a JetStream cluster, the nodes holding
+stream, consumer and **meta** leadership sat far above their peers, because a meta leader coordinates
+and holds state for the cluster. An asymmetric memory profile is therefore expected rather than
+suspicious, and the mitigation is architectural: keep meta leadership off the nodes carrying
+high-volume streams (source: [[s-synadia-jetstream-memory-patterns]]; [[jetstream-sizing]]).
+
+**Disaster recovery runs through this layer.** Every `stream rm` and `stream edit` in a promotion
+goes through the JetStream metadata group, so that group must have quorum before any of it works —
+and the promoted stream "must live where that quorum survives", which is why a DR mirror is normally
+placed in its own JetStream domain or its own cluster (source: [[s-docs-disaster-recovery]];
+[[disaster-recovery]]).
 
 ## The configured peer set, not the live one
 
@@ -252,7 +329,9 @@ means a stream was already capturing `$JS.EVENT.ADVISORY.>` — not that someone
 [[replicas]] · [[stream-placement]] · [[stream]] · [[consumer]] · [[monitoring-endpoints]] ·
 [[stream-leader-keeps-moving]] · [[meta-layer]] · [[upgrade-a-cluster]] · [[rebalance-streams]] ·
 [[build-a-3-node-cluster]] ·
-[[malformed-or-corrupt-message]] · [[stream-has-high-message-lag]]
+[[malformed-or-corrupt-message]] · [[stream-has-high-message-lag]] · [[disaster-recovery]] ·
+[[multi-region-jetstream]] · [[jetstream-domain]] · [[jetstream-sizing]] ·
+[[jetstream-out-of-disk]] · [[advisories]]
 
 ## Sources
 
@@ -260,4 +339,9 @@ means a stream was already capturing `$JS.EVENT.ADVISORY.>` — not that someone
 [[s-docs-placement]] · [[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] ·
 [[s-docs-upgrade-to-2.12]] · [[s-nats-server-jetstream-log-warnings]] · [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-rolling-upgrades]] ·
-[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-endpoints]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-endpoints]] ·
+[[s-docs-disaster-recovery]] · [[s-docs-forming-a-cluster]] · [[s-docs-jetstream-in-a-cluster]] ·
+[[s-docs-scaling-and-peers]] · [[s-docs-your-first-cluster]] · [[s-gh-6490-high-message-lag]] ·
+[[s-gh-7438-multi-region-availability]] · [[s-gh-7463-jetstream-corruption]] ·
+[[s-nats-server-lame-duck]] · [[s-synadia-jetstream-memory-patterns]] ·
+[[s-nats-server-jetstream-resources]]

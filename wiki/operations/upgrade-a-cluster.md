@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [rolling-upgrade, lame-duck, SIGUSR2, meta-leader, downgrade, PodDisruptionBudget, ldm]
 aliases: [rolling upgrade, "upgrade NATS", "roll a cluster", lame duck, ldm, "upgrade nats-server"]
-sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers]
+sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Upgrade a cluster
@@ -37,6 +37,18 @@ Every node on the new version, with:
   affected asset into an unsupported/offline mode instead of misreading it (source:
   [[s-docs-upgrade-to-2.12]]).
 - **A backup**, or a deliberate decision not to have one ([[backup-and-restore-jetstream]]).
+- **Find your R1 memory streams first — a roll destroys them.** There is no backup path for a memory
+  stream at all (`nats stream backup` cannot snapshot one), so a maintainer's answer to "can a memory
+  stream be backed up?" is the procedure instead: "If you run the stream as an R3 and do rolling
+  restarts and `/healthz` checks it will survive." For one that is R1 today, the controlled sequence
+  is: "before the restart update the stream's configuration to set `replicas=3`, check using
+  `nats stream info` that all the new replicators have caught up, restart your server and then update
+  the stream's configuration back to `replicas=1`" — with the boundary stated plainly, "if it's
+  fault-tolerance you need (unscheduled server restart) then you must use `replicas=3`"
+  (source: [[s-gh-4342-memory-stream-backup]]). `nats stream find --replicas=1` lists the candidates.
+  This is the same catch-up gate as step 3, and it makes the restart a no-op only for a *planned* one.
+  If the stream must also survive into an archive, mirror it into a file-backed stream and snapshot
+  that ([[mirrors-and-sources]]).
 - **Every stream at full replica count and every replica `current`.** A roll that starts one replica
   short spends the whole procedure one failure from quorum loss.
 - **A service unit whose `ExecStop` sends SIGUSR2**, or you are signalling by hand
@@ -262,6 +274,16 @@ The per-hop hazards live on the release pages; these are the ones an upgrade can
 
 **There is no 2.13** — 2.14 is the direct successor of 2.12 ([[nats-server-2.14]]).
 
+**Upgrading is also the project's own answer to an old cluster misbehaving.** Asked about R3
+WorkQueue streams on **2.9.8** whose Raft WAL had gone corrupt — with no resource pressure behind it
+(20 days up, 6–7% of 200 GB used, 1.3 GB of a 2 GB memory limit) and where deleting the PVC and
+resyncing from the healthy replicas **reproduced** the corruption — a maintainer's whole reply was:
+"2.9.x is now very old, unsupported and 100s of bug fixes behind, we have invested a lot of time on
+the storage layer since… You need to upgrade to 2.12.x." The asker upgraded and reported the problem
+gone (source: [[s-gh-7463-jetstream-corruption]]). If you are rolling a cluster several minors behind,
+treat the upgrade itself as the remedy rather than something to schedule after the investigation. See
+[[nats-server-2.12]] and [[disaster-recovery]].
+
 ## Pitfalls
 
 **Do not size `lame_duck_duration` against JetStream.** The docs advise setting it to cover "how long
@@ -294,6 +316,23 @@ loses quorum ([[rebalance-streams]]).
 
 **`--signal stop` is `SIGKILL`.** The name is the trap; `ldm` is the drain.
 
+**A restart can come back with a smaller JetStream ceiling than the data it already holds.** With no
+explicit `max_file_store`, the file-storage limit is computed as **75% of what is *free* under
+`store_dir` at startup** — not 75% of the volume — so every byte JetStream itself has written lowers
+the next start's ceiling. It is invisible in testing and appears the first time a loaded server is
+restarted, which is usually an upgrade (source: [[s-issue-8322-dynamic-maxstore-shrinks]]). **Pin
+`max_file_store` to the volume** before the roll, and never write `max_file_store: 0` to mean "no
+limit" — it disables file storage. See [[jetstream-sizing]] and [[jetstream-out-of-disk]].
+
+**Clients can stay silent for about four minutes after a node dies.** A default client notices a
+server that stopped answering only after two missed pongs on a two-minute ping interval — roughly
+**four minutes** — unless the socket errors first (source: [[s-adr-40-nats-connection]]). That is why
+the drain matters: lame-duck closes connections in a staggered way and the clients move immediately,
+where an abrupt kill leaves some of them waiting out that window before they even start reconnecting.
+Reconnect behaviour after that is bounded by client defaults you do not control, so a node that goes
+down hard still delivers all of its clients to the survivors at once
+([[how-clients-reach-a-cluster]]).
+
 ## Related
 
 [[install-nats-server]] · [[build-a-3-node-cluster]] · [[reload-server-config]] ·
@@ -307,4 +346,6 @@ loses quorum ([[rebalance-streams]]).
 [[s-docs-rolling-upgrades]] · [[s-nats-server-lame-duck]] · [[s-nats-server-signals]] ·
 [[s-nats-helm-chart-values-2.14.6]] ·
 [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] · [[s-nats-server-systemd-units]] ·
-[[s-docs-scaling-and-peers]]
+[[s-docs-scaling-and-peers]] · [[s-gh-4342-memory-stream-backup]] ·
+[[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-40-nats-connection]] ·
+[[s-gh-7463-jetstream-corruption]]

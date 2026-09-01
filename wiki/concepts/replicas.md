@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Replicas
@@ -37,7 +37,10 @@ most useful thing on this page.
 - **On a single server, R>1 is refused rather than degraded.** `nats stream add … --replicas 3`
   on a non-clustered server answers `replicas > 1 not supported in non-clustered mode`
   (error **10074**, [[error-codes]]) — redundancy is a cluster's job, so the fix is
-  [[build-a-3-node-cluster]], not a flag (source: [[s-docs-single-server]]).
+  [[build-a-3-node-cluster]], not a flag (source: [[s-docs-single-server]]). What that cluster has to
+  be — a `cluster {}` block, seed routes on each server, and peers that discover the rest of the mesh
+  from whoever they reach first — is [[build-a-3-node-cluster]]'s subject
+  (source: [[s-docs-your-first-cluster]]).
 - **Use odd counts.** R=2 still has a single point of failure — lose either copy and one server out
   of two cannot form a majority, so writes block. R=4 tolerates only one loss, the same as R=3,
   while paying for a fourth copy.
@@ -95,7 +98,15 @@ leader does all the work and the followers only stand by, adding replication loa
 throughput.
 
 When you need more throughput the tool is not a replica: add workers to a consumer
-([[worker-pool]]), or split subjects across streams.
+([[worker-pool]]) — a single stream feeding a pool of pull consumers scales by adding workers, not
+copies (source: [[s-docs-worker-pool]]) — or split subjects across streams.
+
+**A replica is not a mirror.** Replicas are one Raft group holding one log: every copy has the same
+sequence numbers and a write is not acked until a quorum holds it. A [[mirrors-and-sources|mirror]]
+is a *second stream* that copies asynchronously, keeps its own retention, and reports its distance as
+`Lag` in `nats stream info` — with no consensus and no guarantee it is current
+(source: [[s-docs-mirrors-and-sources]]). Where each one helps is
+[[disaster-recovery]].
 
 **The independence is a storage property too.** R3 only buys what it costs while the three copies can
 fail separately, which is why the Helm chart gives each replica its own PersistentVolumeClaim rather
@@ -112,6 +123,11 @@ A node's disk is not the only ceiling. **On an un-tiered account an R3 stream co
 account's storage limit, because the limit measures total bytes stored across all replicas. **On a
 tiered account replication is baked into the tier**: the bytes reported are usable bytes, so a
 10 GiB tier holds a 10 GiB R3 stream (source: [[s-docs-sizing-and-resources]]).
+
+That rule is three lines in the server, not a docs simplification: `accountReservation`
+(`jetstream.go:2511–2519`, nats-server 2.14.6) counts `replicas × bytes` on an untiered account, a
+tiered limit "already bakes in replication" and counts once, and **the per-server footprint is always
+a single replica's worth** (source: [[s-nats-server-jetstream-resources]]).
 
 Miss the multiplier on an un-tiered account and **the third replica fails to place** when the
 account hits its ceiling — the node has disk, the account does not. Read the live ceilings with
@@ -147,10 +163,56 @@ nats stream info ORDERS
 nats stream info ORDERS --json | grep '"num_replicas"'
 ```
 
+**You raise a count, you never name a server.** The meta leader assigns the extra replica to a
+server that qualifies under the stream's placement, records the new peer set in its assignment log,
+and the group picks it up — so growing a group is a placement question, not a hostname one.
+
+**The new peer counts for quorum immediately and holds no data.** Adding one to an R=3 group makes
+it R=4, and "an `R=4` group commits once **three** peers hold a write, not two". What the empty peer
+*cannot* do is win an election — "it stays an observer until the leader's first entries reach it".
+The practical rule that follows is **one membership change at a time**, with `nats stream info` read
+until the new peer is `current`; until then the group is easier to stall, not harder
+(source: [[s-docs-scaling-and-peers]]).
+
+**Two more ways a replica count changes**, both worth knowing before you need them:
+
+- **On restore.** `nats stream restore --replicas <n>` overrides "how many replicas of the data to
+  create", alongside `--cluster` and `--config` — so a restore is a placement decision, not just a
+  copy, and is the supported way to land a stream at a different count (source:
+  [[s-natscli-backup-restore]], nats CLI 0.4.0; [[backup-and-restore-jetstream]]).
+- **Temporarily, as a technique.** Raising a stream to R3, waiting for every replica to read
+  `current`, doing the disruptive thing, then lowering it again is a maintainer-suggested pattern for
+  surviving a restart on a stream that normally runs R1: "before the restart update the stream's
+  configuration to set `replicas=3`, check using `nats stream info` that all the new replicators have
+  caught up, restart your server and then update the stream's configuration back to `replicas=1`".
+  The blunter version of the same advice: "If it's fault-tolerance you need (unscheduled server
+  restart) then you must use `replicas=3`" (source: [[s-gh-4342-memory-stream-backup]]).
+
+**One migration that does not work: standalone → clustered.** Adding a cluster block to a
+single-server deployment and restarting, intending to raise R1 streams to R3 afterwards, loses the
+data instead — "the existing streams are immediately marked as orphaned and automatically deleted
+before I have any opportunity to update their replica counts", because a clustered setup "stores on
+which servers those streams/consumers are hosted separately" and a standalone one has no such
+record. In-place migration "is not planned at the moment"; back up and restore into the cluster, or
+leafnode the standalone server to the cluster, mirror the streams across and promote the mirrors
+(source: [[s-gh-7831-standalone-to-cluster]]).
+
 `--replicas=3` **requires a real cluster of at least three servers**; a single-node server rejects
 it, which is expected rather than a misconfiguration (source: [[s-docs-surviving-node-loss]]). If
-the servers exist but the edit still fails with `no suitable peers for placement`, the cause is a
-placement constraint — see [[stream-placement]].
+the servers exist but the edit still fails with `no suitable peers for placement` (**10005**), the
+cause is a placement constraint — and **placement never relaxes itself to fit a replica count**. It
+fails so you notice, including when fewer servers carry the required tags than the count asks for
+(source: [[s-docs-placement]]; [[stream-placement]]).
+
+`10005` is a *class* of error rather than one cause — storage capacity is one, an unmatched tag
+another — and the response names at most the tag. The only thing that says which peers were rejected
+and why is **debug logging**, which prints one line per candidate:
+
+```
+[DBG] Peer selection: discard ** reason: not target cluster **
+```
+
+(source: [[s-gh-7982-no-suitable-peers]], observed on 2.12.5; [[no-suitable-peers-for-placement]]).
 
 ## What you can observe
 
@@ -168,7 +230,36 @@ Cluster Information:
 and a **persistent** lag points at a slow disk or a saturated route between peers
 (source: [[s-docs-replication-and-r3]]).
 
-Reads from the **leader** are read-after-write; reads from a follower can be correct but behind.
+**That line is the gate on every rolling operation.** "Every replica must read `current` before you
+take the next node down", because "a restarted node isn't done until its `ORDERS` replica has caught
+up" and "two nodes down costs the R3 stream its quorum" (source: [[s-docs-rolling-upgrades]];
+[[upgrade-a-cluster]] is the runbook, and it also says to upgrade the meta-leader last).
+
+**Readiness does not tell you this.** On Kubernetes "a pod catching its R3 replicas up after a
+restart still reports ready and keeps serving clients" — documented behaviour, not a bug — so replica
+catch-up belongs in a **startup** probe, and a cluster must be a StatefulSet rather than a
+Deployment: "Each node owns a slice of the R3 stream" and has to come back with its own volume rather
+than as a fresh replica (source: [[s-docs-kubernetes]]; [[kubernetes-storage]]). Writing a readiness
+probe that requires peers deadlocks the cluster, because no node is ready until it can see the
+others.
+
+**A `JetStream cluster` lag warning is about replication, not consumers.** It fires when proposals
+accepted from publishers outrun what has been committed and applied locally on the **stream leader** —
+the two named causes are a core NATS publish into a stream's subject and async JetStream publishes
+from many publishers at once, both of which bypass the back-pressure a `PubAck` provides. The log
+line is rate-limited, so its frequency is not a measure of severity (source:
+[[s-gh-6490-high-message-lag]]; [[stream-has-high-message-lag]]).
+
+**2.12 hardened the empty-replica case.** Scale-up and reset now guard against "leader elections
+based on empty state", and replicated in-memory streams became more reliable — "all but one server
+can be restarted and the in-memory stream's data can reliably be caught back up". The cost is stated
+in the same breath: during that scenario **all servers involved in the stream's replication must be
+available, not just enough for quorum** (source: [[s-docs-upgrade-to-2.12]]).
+
+Reads from the **leader** are read-after-write; reads from a follower can be correct but behind. So
+`nats stream get` "goes to the leader" and is always current, while a [[direct-get|Direct Get]]
+"answers from any replica or mirror, which may trail the leader" — **do not use it for
+read-after-write checks**, such as confirming a publish landed (source: [[s-docs-get-direct]]).
 
 ## To verify
 
@@ -257,7 +348,10 @@ clients unable to connect — [[no-suitable-peers-for-placement]].
 
 [[stream]] · [[consumer]] · [[raft-in-nats]] · [[stream-placement]] · [[retention-policies]] ·
 [[jetstream-sizing]] · [[stream-leader-keeps-moving]] · [[defaults-and-limits]] · [[config-keys]] ·
-[[stream-has-high-message-lag]] · [[malformed-or-corrupt-message]]
+[[stream-has-high-message-lag]] · [[malformed-or-corrupt-message]] · [[direct-get]] ·
+[[worker-pool]] · [[mirrors-and-sources]] · [[disaster-recovery]] · [[upgrade-a-cluster]] ·
+[[kubernetes-storage]] · [[no-suitable-peers-for-placement]] · [[backup-and-restore-jetstream]] ·
+[[build-a-3-node-cluster]]
 
 ## Sources
 
@@ -265,3 +359,10 @@ clients unable to connect — [[no-suitable-peers-for-placement]].
 [[s-docs-raft-and-leaders]] · [[s-docs-sizing-and-resources]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-as-dr]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-docs-single-server]] · [[s-docs-disaster-recovery]] · [[s-k8s-760-jetstream-pvc-per-replica]] ·
 [[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]]
+
+[[s-docs-get-direct]] · [[s-docs-kubernetes]] · [[s-docs-mirrors-and-sources]] ·
+[[s-docs-placement]] · [[s-docs-rolling-upgrades]] · [[s-docs-scaling-and-peers]] ·
+[[s-docs-upgrade-to-2.12]] · [[s-docs-worker-pool]] · [[s-docs-your-first-cluster]] ·
+[[s-gh-4342-memory-stream-backup]] · [[s-gh-6490-high-message-lag]] ·
+[[s-gh-7831-standalone-to-cluster]] · [[s-gh-7982-no-suitable-peers]] ·
+[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]]

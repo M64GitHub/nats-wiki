@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [ack, nak, term, ack_wait, max_deliver, max_ack_pending, backoff, advisories]
 aliases: [acknowledgement, acknowledgment, ack, nak, term, at-least-once, AckWait, MaxDeliver]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Ack and redelivery
@@ -63,7 +63,17 @@ A client answers a delivered message in **exactly one of four ways**
 to space out redeliveries from the CLI, set a consumer `backoff` instead.
 
 **A nak returns the message to the consumer, not to the worker that nak'd it** — with a
-[[worker-pool|worker pool]] sharing one consumer, the redelivery can land on a different worker.
+[[worker-pool|worker pool]] sharing one consumer, the redelivery can land on a different worker. If
+*which* worker gets a message matters, that is what [[priority-groups]] are for, not what a nak is
+(source: [[s-docs-worker-pool]]).
+
+**`max_ack_pending` is shared by the whole consumer, not held per reader.** "Five workers get 1000
+between them, not 1000 each" — so it doubles as a concurrency ceiling on the pool, and set below the
+worker count it starves them: "set it to 3 and only three messages are ever in progress, so ten
+workers leave seven of them idle no matter how much is stored. Set the cap to at least your worker
+count, with room to spare" (source: [[s-docs-worker-pool]]). The two settings pull against each
+other — `max_ack_pending` bounds how much is in flight, `ack_wait` bounds how long a failure stays
+invisible — and a large cap plus a correlated failure means everything in flight redelivers at once.
 
 **After a term** the message is gone from *this* consumer but stays in the stream under the default
 `limits` retention: other consumers still see it and it ages out with the stream's limits. On a
@@ -243,4 +253,5 @@ create-time-only rule a consumer's `ack_wait` follows.
 [[s-docs-delivery-and-acknowledgment]] · [[s-docs-acknowledgment]] · [[s-docs-pull-consumers]] ·
 [[s-docs-consumer-config]] · [[s-docs-policies]] · [[s-nats-server-constants-2.14.6]] ·
 [[s-docs-mqtt-qos-sessions-and-retained]] ·
-[[s-docs-monitoring-advisories-and-events]]
+[[s-docs-monitoring-advisories-and-events]] ·
+[[s-docs-worker-pool]]

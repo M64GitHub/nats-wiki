@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [jetstream-domain, domain, default_js_domain, js-domain, mapping, external, api-prefix, leafnode]
 aliases: [domain, js domain, js-domain, jetstream domains, "$JS.<domain>.API", default_js_domain]
-sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain, s-nats-server-object-store-leafnode, s-docs-mqtt-auth-and-clustering]
+sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain, s-nats-server-object-store-leafnode, s-docs-mqtt-auth-and-clustering, s-natscli-stream-external]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # JetStream domain
@@ -106,7 +106,14 @@ nats --js-domain leaf01a stream ls
 - **A domain is not an account.** It scopes the JetStream API subject space; it does not isolate
   subjects, users or data. [[account]] does that.
 - **A domain does not move data.** Getting messages from one domain into another is
-  [[mirrors-and-sources]] with an `external` block — see [[cross-domain-sourcing]].
+  [[mirrors-and-sources]] with an `external` block — see [[cross-domain-sourcing]]. In that block the
+  domain is not named as a domain: it is carried as the API prefix **`$JS.<domain>.API`**, which the
+  `nats` CLI composes for you from the domain name alone
+  (`mirror.External.ApiPrefix = fmt.Sprintf("$JS.%s.API", domainName)`), and which the server reads
+  back the same way — `ExternalStream.Domain()` returns `tokenAt(ext.ApiPrefix, 2)`, the second token
+  (`stream.go:432–437` at v2.14.6). **For a domain the delivery prefix is optional**, because the
+  mapping above already routes it; for a *different account* both prefixes are required and both are
+  **your local import subjects**, not the remote's (source: [[s-natscli-stream-external]]).
 - **A domain is not a cluster.** A domain can be one server or a whole cluster; what it delimits is
   the JetStream meta group, not the route mesh.
 
@@ -163,7 +170,8 @@ exists, because the leaf can reach JetStream through the hub.
 [[s-nats-server-leafnode-js-domains]] · [[s-docs-leaf-nodes]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7881-cross-domain-sourcing]] ·
 [[s-gh-7834-leafnode-same-js-domain]] · [[s-nats-server-object-store-leafnode]] ·
-[[s-docs-mqtt-auth-and-clustering]]
+[[s-docs-mqtt-auth-and-clustering]] ·
+[[s-natscli-stream-external]]
 
 ## To verify
 

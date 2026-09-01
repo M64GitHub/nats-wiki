@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [cluster, routes, gossip, seed, cluster-name, no_advertise, failover, tls, 6222]
 aliases: [cluster, clustering, "form a cluster", "first cluster", routes, "cluster setup"]
-sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection]
+sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection, s-docs-encryption-and-tls, s-docs-putting-it-together, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-single-server, s-gh-5859-unexpected-nats-timeout, s-nats-server-systemd-units]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Build a 3-node cluster
@@ -110,7 +110,10 @@ themselves.
 ### TLS on the routes
 
 Client TLS and cluster TLS are **separate blocks**, and turning on the first leaves the second
-plaintext — including replicated JetStream data (source: [[s-docs-hardening]]):
+plaintext — including replicated JetStream data. The named failure: "An operator secures clients and
+sees the encrypted client connection, then ships a cluster whose inter-node Raft traffic, including
+replicated `ORDERS` data, is still unencrypted" (sources: [[s-docs-hardening]],
+[[s-docs-encryption-and-tls]]):
 
 ```
 cluster {
@@ -248,7 +251,26 @@ and `cluster.port` are **restart-only** — only a `listen` whose host is unchan
 **Removing the `cluster` block from a server that holds replicated streams is not a rollback.** Take
 it out of the cluster the JetStream way — move the stream's replicas off it first
 ([[rebalance-streams]]) — and never treat "delete the block and restart" as safe on a node with data
-([[streams-deleted-when-clustering-a-standalone-server]]).
+([[streams-deleted-when-clustering-a-standalone-server]]). Rolling all the way back to one server is
+a real position, not a failure — a single server is a genuine deployment for development, an edge
+device and a small single-instance service, and only a single point of failure for anything else
+(source: [[s-docs-single-server]]; [[install-nats-server]], whose systemd unit and its drain-on-stop
+wiring every node here inherits, source: [[s-nats-server-systemd-units]]).
+
+## What this cluster now supports, and the two operations it needs next
+
+**Growing or shrinking it is a membership change, not a config edit.** You raise a stream's
+`--replicas` and the meta leader assigns the peer; you take one off a server with
+`nats stream cluster peer-remove`. The rule is **one change at a time**: a new peer counts towards
+quorum immediately while holding no data, so an `R=4` group commits once three peers hold a write,
+and the empty peer stays an observer until the leader's entries reach it (source:
+[[s-docs-scaling-and-peers]]; [[replicas]], [[rebalance-streams]]).
+
+**Upgrading it has an order.** Non-leaders first, the **meta-leader last and drained**, and every
+replica read `current` in `nats stream info` before the next node goes down — "two nodes down costs
+the R3 stream its quorum", and stepping the meta-leader down without draining it stalls stream and
+consumer operations cluster-wide for the 5–10s election instead of about a second (source:
+[[s-docs-rolling-upgrades]]). The procedure is [[upgrade-a-cluster]].
 
 ## Pitfalls
 
@@ -301,6 +323,17 @@ names as [[nats-helm-charts]] does. The thread has **no accepted answer**; the w
 to check `/routez` for the expected count and restart the node until DNS hands it a resolution that
 clusters (source: [[s-gh-7190-asymmetric-cluster]]).
 
+**A second, independent report of the same config** reached a maintainer in a thread about
+unexplained `nats: timeout` on AKS: against a `routes` block holding one service DNS name, "the
+following configuration will not work ok on k8s, you need to add all the A records from the
+statefulset to the config or use the nats-io/k8s helm chart" — one entry per pod. Two unrelated
+deployments, the same defect, so check it before anything subtler (source:
+[[s-gh-5859-unexpected-nats-timeout]]; [[nats-timeout]]). While you are in that log, two lines from
+the same thread are **not** symptoms: `Delaying PING due to remote client data or ping 48s ago` at
+DBG is the ordinary 2-minute ping interval being skipped because traffic was recent, and
+`maxprocs: Updating GOMAXPROCS=N: determined from CPU quota` merely tells you how many cores the
+server thinks it has — worth reading, not worth chasing.
+
 **The route port is a privilege boundary.** A route carries every account's traffic plus the system
 account. Exposed with no authorization, anyone who connects with the cluster name can join as a
 server and read or inject messages across your accounts (source: [[s-docs-your-first-cluster]]).
@@ -326,6 +359,19 @@ at the next failover. [[how-clients-reach-a-cluster]] covers the three ways to f
 
 
 ## If this cluster will also carry a gateway or leafnodes
+
+**Know what the extra layer buys before you add it.** "Stacking these shapes gives you one address
+space by default. Routes carry an account's full interest across a cluster; a gateway forwards any
+subject the far side wants. Neither partitions anything — they widen where a message can go." The one
+layer that *can* draw a boundary is a leaf, and only when it is bound to its own account. So a
+gateway proposed as an isolation mechanism is a design error, and the pitfall on the other side is
+**building the whole stack before a limit forces it** (source: [[s-docs-putting-it-together]];
+[[choosing-a-topology]], [[account]]).
+
+**And a composed server needs `system_account` set** — defining both `leafnodes {}` and `gateway {}`
+without one refuses to start with `nats-server: leaf nodes and gateways (both being defined) require
+a system account to also be configured`. The docs' own composed example omits it, so it is unrunnable
+as printed (source: [[s-docs-putting-it-together]]).
 
 Three checks that belong in the same change, because two of them stop the server from starting and
 `nats-server -c … -t` reports the file valid first (source: [[s-nats-server-topology]], reproduced on
@@ -373,11 +419,15 @@ See [[gateway]], [[leafnode]] and [[choosing-a-topology]] before adding either l
 [[no-suitable-peers-for-placement]] · [[streams-deleted-when-clustering-a-standalone-server]] ·
 [[config-keys]] · [[account]] · [[nats-helm-charts]] · [[nats-cli]] · [[monitoring-endpoints]] ·
 [[jetstream-sizing]] · [[rotate-tls-certificates]] · [[upgrade-a-cluster]] ·
-[[rebalance-streams]] · [[reload-server-config]] · [[raft-in-nats]] · [[tls-in-nats]] ·
-[[how-clients-reach-a-cluster]]
+[[rebalance-streams]] · [[reload-server-config]] · [[tls-in-nats]] ·
+[[how-clients-reach-a-cluster]] · [[choosing-a-topology]] · [[nats-timeout]]
 
 ## Sources
 
 [[s-docs-your-first-cluster]] · [[s-docs-forming-a-cluster]] ·
 [[s-nats-server-route-cluster-formation]] · [[s-gh-7190-asymmetric-cluster]] ·
-[[s-gh-3569-connect-to-route-port]] · [[s-docs-hardening]] · [[s-docs-kubernetes]] · [[s-nats-server-topology]] · [[s-docs-super-clusters]] · [[s-adr-40-nats-connection]]
+[[s-gh-3569-connect-to-route-port]] · [[s-docs-hardening]] · [[s-docs-kubernetes]] ·
+[[s-nats-server-topology]] · [[s-docs-super-clusters]] · [[s-adr-40-nats-connection]] ·
+[[s-docs-encryption-and-tls]] · [[s-docs-putting-it-together]] · [[s-docs-rolling-upgrades]] ·
+[[s-docs-scaling-and-peers]] · [[s-docs-single-server]] · [[s-gh-5859-unexpected-nats-timeout]] ·
+[[s-nats-server-systemd-units]]

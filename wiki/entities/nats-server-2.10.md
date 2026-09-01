@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.10, compression, kv-sources, kv-mirrors]
 aliases: ["2.10", v2.10, v2.10.0, v2.10.29]
-sources: [s-adr-8-key-value-store, s-adr-20-object-store]
+sources: [s-adr-8-key-value-store, s-adr-20-object-store, s-gh-4535-unauthenticated-connections]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nats-server 2.10
@@ -42,6 +42,15 @@ Dates and tags from `raw/release-notes/_tags-and-dates.md` (GitHub releases API,
 - **KV bucket metadata** — ADR-8 revision 8 (2025-02-17), server requirement `2.10.0`.
 - **Object Store compression** — ADR-20 revision 3 (2024-02-05), "Data Compression of Object Stores
   for NATS Server 2.10" (source: [[s-adr-20-object-store]]). See [[object-store]].
+- **A security fix in v2.10.2**, and the only dated point release this page can name. Before it,
+  declaring an `accounts` block "appears to outright ignore any users/creds defined in
+  `authorization`" — so a config with a `$SYS` account and top-level `authorization` users accepted
+  connections **with no credentials at all**, landing them in the still-active default `$G`. A
+  maintainer confirmed it as a bug, filed
+  [PR #4605](https://github.com/nats-io/nats-server/pull/4605), and stated the release: "Merged, will
+  be in **2.10.2** release" (source: [[s-gh-4535-unauthenticated-connections]]). **Anything below
+  v2.10.2 has this hole**; the narrower trap that survives it — `no_auth_user`, and `$G` staying alive
+  when you name only the system account — is on [[account]].
 
 ## Why the version still matters
 
@@ -63,4 +72,4 @@ not.
 
 ## Sources
 
-[[s-adr-8-key-value-store]] · [[s-adr-20-object-store]]
+[[s-adr-8-key-value-store]] · [[s-adr-20-object-store]] · [[s-gh-4535-unauthenticated-connections]]

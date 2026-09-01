@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [leafnode, jetstream-domain, system-account, extending-jetstream, verify_and_map, mapping]
 aliases: ["JetStream using domains", "JetStream not extended domains differ", "leafnode streams not visible", "extending JetStream", "js-domain"]
-sources: [s-gh-7834-leafnode-same-js-domain, s-nats-server-leafnode-js-domains, s-gh-5859-unexpected-nats-timeout, s-docs-accounts-and-multitenancy, s-nats-server-object-store-leafnode]
+sources: [s-gh-7834-leafnode-same-js-domain, s-nats-server-leafnode-js-domains, s-gh-5859-unexpected-nats-timeout, s-docs-accounts-and-multitenancy, s-nats-server-object-store-leafnode, s-docs-leaf-nodes]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Streams are not visible across a leafnode
@@ -167,18 +167,26 @@ to the cluster is lost?" — is the right question, and the wiki does not yet ha
 ## Prevention
 
 - Decide **one JetStream or two** before configuring anything. One JetStream means the system account
-  crosses the leafnode; two means distinct domains and explicit `--js-domain` addressing.
+  crosses the leafnode; two means distinct domains and explicit `--js-domain` addressing. The docs
+  state the rule from the other side: a leaf that runs its own JetStream **needs a domain**, because
+  a domain "is a name that isolates one JetStream system from another across a leaf link… **Without
+  distinct domains, a leaf's JetStream and its hub's JetStream collide**"
+  (source: [[s-docs-leaf-nodes]]).
 - Grep the hub's log for `Extending JetStream domain` after every leafnode change. It is the only
   positive confirmation.
 - Do not reuse a domain name. A domain is a namespace; two of them with the same name is the one
   configuration the server actively guards against.
 
+**Watch for the mirror image of this page's symptom.** The docs name the trap as a *misplaced* stream
+rather than a missing one: "if `factory-1` enables JetStream while sharing the hub's system account,
+it extends the *hub's* JetStream rather than running its own, so **a stream you create on the factory
+floor may land on the hub, not locally**" (source: [[s-docs-leaf-nodes]]). Same configuration, same
+first row of the table above — the operator just happens to be standing at the other end of it.
+
 ## To verify
 
 - Whether a leafnode that extends a hub's JetStream retains any **local** durability when the link
   drops. The thread asks; no public source read so far answers it.
-- The docs' leafnode chapter (`raw/nats-docs/learn/topologies/leaf-nodes.md`) has not been ingested —
-  that is plan step 6, and [[leafnode]] and [[gateway]] remain wanted pages.
 
 ## Related
 
@@ -197,4 +205,5 @@ to the cluster is lost?" — is the right question, and the wiki does not yet ha
   `JetStream using domains: local "", remote "myjsdomain"` per leafnode connection.
 - [[s-docs-accounts-and-multitenancy]] — what `$SYS` is and why it is the account that crosses.
 - [[s-nats-server-object-store-leafnode]] — the deny list's `$OBJ.>` against the object store's
-  actual `$O.` prefix, run on a hub/leaf pair at v2.14.6.
+  actual `$O.` prefix, run on a hub/leaf pair at v2.14.6. ·
+[[s-docs-leaf-nodes]]

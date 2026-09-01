@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # "Slow Consumer Detected" in the server log
@@ -112,6 +112,37 @@ The practical consequence either way: **`pending` sorting finds a client that is
 right now; it will not find one that already fell over.** Poll `/connz?sort=pending` continuously
 rather than after the fact.
 
+### The other half of the relationship: `stalls`
+
+The server does not only disconnect a slow reader — it first **slows the producers writing to it**,
+and *that* side is instrumented. `deliverMsg` stalls a `CLIENT` producer whenever a destination
+connection is in a stalled state (`client.go:3937–3944` at v2.14.6), bounded by
+`stallClientMinDuration` **2 ms**, `stallClientMaxDuration` **5 ms** and `stallTotalAllowed`
+**10 ms** per read-loop invocation (source: [[s-nats-server-topology]]). Three observables come with
+it, and none is mentioned in the thread behind this page:
+
+| where | what |
+|---|---|
+| log | `Producer was stalled for a total of %v` (`client.go:1451`), rate-limited |
+| `/varz` | **`stalled_clients`** (`monitor.go:1279`, `1909`) — server-wide count of stalls |
+| `/connz` | **`stalls`**, per connection (`monitor.go:133`, `597`) |
+
+This partly answers the first open question below. **`/connz` does carry a per-connection counter —
+but it counts the victim, not the culprit**: `stalls` on a connection means *this producer was held
+back by some slow destination*, which is the opposite end of the relationship from the one the log
+line names. Used together the two narrow it: rising `stalled_clients` with `slow_consumers` above zero
+says the drop is coupled to producers, and the connections carrying `stalls` are the ones publishing
+to whatever is slow.
+
+`no_fast_producer_stall: true` removes the coupling — the server then "drops messages to the slow
+consumer instead" of holding the producer back. That trades a latency problem for a loss problem;
+decide which one you would rather have.
+
+**A destination can be a gateway, not a client.** The reported case is a supercluster where a fast
+producer was throttled by its slowest remote destination, and nobody in the thread named any of the
+three observables above (source: [[s-gh-7494-supercluster-degradation]]). See
+[[supercluster-slows-when-a-remote-subscriber-joins]] and [[gateway]].
+
 ## Causes
 
 Ranked by plausibility, and **explicitly not confirmed by a source** — the thread behind this page
@@ -129,8 +160,11 @@ Each of these is a hypothesis. None is sourced.
 
 ## What would still close this page
 
-- **Whether `/connz` exposes a per-connection slow-consumer counter** — the endpoint's response
-  schema has not been read field by field, only its query parameters. See [[monitoring-endpoints]].
+- ~~**Whether `/connz` exposes a per-connection slow-consumer counter**~~ — **partly answered**: it
+  exposes **`stalls`**, verified in the server source above, but that counts a producer being held
+  back rather than the reader being dropped. Whether any per-connection field records *this connection
+  was disconnected as a slow consumer* is still unread; the rest of the `/connz` response schema has
+  not been gone through field by field. See [[monitoring-endpoints]].
 - Whether the Prometheus exporter emits a per-connection or per-account slow-consumer metric.
 - Whether the server logs the connection id or client name at a higher debug level, as it does for
   [[no-suitable-peers-for-placement|peer selection]] — `debug` is reloadable
@@ -149,11 +183,21 @@ Each of these is a hypothesis. None is sourced.
 - **Know your `write_deadline`.** The default is `10s` and it is reloadable, so it can be raised to
   buy diagnosis time without a restart — but raising it hides the symptom rather than fixing the
   reader.
+- **Alert on `stalled_clients` too.** It moves before a disconnect does, and it is the counter that
+  says the slowness is already reaching your publishers.
+
+**Ruling this page out.** If you are chasing a `nats: timeout` rather than a log line, the
+client-side exclusion is cheap: in one investigated report the reporter's `ConnectionListener` and
+`ErrorListener` "never fired (so no reconnects, no client-side slow consumers)", which took this
+whole page off the table before any server log was read (source:
+[[s-gh-5859-unexpected-nats-timeout]]). See [[nats-timeout]].
 
 ## Explained by
 
-Nothing yet. When a source explains what the server counts as a slow consumer and where it records
-the connection, that becomes an internals page and this page should link it.
+**Partly.** The *stall* half now has a mechanism read from the server source — `deliverMsg`, the three
+duration constants and the `stalled_clients` / `stalls` counters, above. The *disconnect* half does
+not: no source read explains what the server counts as a slow consumer or where it records which
+connection it dropped. When one does, that becomes an internals page and this page should link it.
 
 ## Related
 
@@ -165,4 +209,5 @@ the connection, that becomes an internals page and this page should link it.
 ## Sources
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
-[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]]
+[[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]]

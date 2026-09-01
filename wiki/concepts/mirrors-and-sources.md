@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Mirrors and sources
@@ -95,6 +95,12 @@ four rules that surprise people (source: [[s-adr-31-direct-get]]):
    each mirror.
 
 ADR-31's own advice: "always set `mirror_direct` to their desired value."
+
+**And the read you get from a mirror is a read that may be behind.** Direct Get "answers from any
+replica or mirror, which may trail the leader", so it is the wrong tool for a read-after-write check
+such as confirming a publish landed; `nats stream get` goes to the leader and is always current
+(source: [[s-docs-get-direct]]). That staleness is the price of the read spreading this section is
+about — see [[direct-get]].
 
 ## Limits and failure modes
 
@@ -226,6 +232,18 @@ detail behind `lag`, `active` and `error`.
   `mirror_direct`. Neither produces a log line; both produce a copy that quietly never catches up.
 - **R3 is not a second site.** Replication protects against losing one node in a cluster; a mirror is
   what survives losing the cluster. See [[replicas]].
+- **A mirror is the only way to back up a memory stream.** A snapshot reads a stream's on-disk files
+  and a memory stream has none, so `nats stream backup` fails; the maintainer's answer is blunt —
+  "If you really need to, create a file backed mirror and back that up" (source:
+  [[s-gh-4342-memory-stream-backup]]; [[backup-and-restore-jetstream]]).
+- **Promotion is a metadata operation, so it needs the meta group.** Every `stream rm` and
+  `stream edit` in the promotion goes through the JetStream metadata group: no edit succeeds until
+  the cluster recovers, and "the promoted stream must live where that quorum survives" — which is why
+  a DR mirror normally sits in its own [[jetstream-domain]] or its own cluster. Step order matters
+  too: dropping the mirror config (`--no-mirror`) comes before removing the lost stream's assignment
+  (`nats stream rm ORDERS --force`), which exists only because the dead stream's subjects still
+  occupy the account and would otherwise collide with `subjects overlap with an existing stream`
+  (**10065**) (source: [[s-docs-disaster-recovery]]; [[disaster-recovery]] has the runbook).
 
 ## Crossing a domain or an account
 
@@ -256,6 +274,31 @@ convention. A prefix that overlaps `$JS.API` is rejected at create time — erro
 The full procedure, including what the docs cannot tell you and what this wiki could not verify, is
 [[cross-domain-sourcing]].
 
+**This is the data plane of every cross-boundary question**, and the reason mirrors and sources keep
+turning up as the answer to problems that sound like something else:
+
+- **Across accounts.** There is no cross-account user, so the two ways to reach another tenant's
+  JetStream are importing its `$JS.API.>` under a prefix (control plane) or **sourcing its streams**
+  into your own (data plane) — the maintainer's own framing, with a worked repository at
+  `synadia-labs/cross-account-jetstream-sourcing` (source: [[s-gh-5606-cross-account-jetstream]];
+  [[cross-account-sharing]], [[account]]).
+- **Sharing a KV bucket across accounts** has no first-class form, and mirroring `KV_<bucket>` into
+  the second account is the shape people reach for. Note what it is not: **read access and write
+  access are not symmetric**, because a mirror is read-only (source:
+  [[s-gh-7017-kv-across-accounts]]).
+- **Across regions**, whichever topology you pick. "Crossing a JetStream boundary is a
+  **mirror-or-source** operation either way", so the choice between a gateway and a leafnode is a
+  network decision, not a replication one (source: [[s-gh-6328-jetstream-behind-gateways]]) — and in
+  a super-cluster "sourcing and consuming from streams in other regions remains the same", which is
+  the convenience a single virtual cluster buys at the price of one WAN-wide meta group
+  (source: [[s-gh-7438-multi-region-availability]]; [[multi-region-jetstream]]).
+- **Off a standalone server and into a cluster.** Because adding a `cluster` block deletes the
+  standalone server's streams, a maintainer's suggested lower-downtime path is to "leafnode connect
+  the standalone server to a cluster and create mirrors of the streams first, then unplug the
+  leafnode standalone server and make the streams stop being mirrors" — called "the most 'native' way
+  to do this migration" (source: [[s-gh-7831-standalone-to-cluster]];
+  [[streams-deleted-when-clustering-a-standalone-server]]).
+
 
 ## Transforming subjects while copying
 
@@ -264,6 +307,23 @@ re-namespaced as they are copied — prefixing every region's orders as they mer
 for instance. The template language and the two other places it is used are on
 [[subject-transforms]]; the config fields are the per-source `subject_transforms`
 (source: [[s-docs-subject-mapping]], [[s-docs-stream-config]]).
+
+**A KV bucket copied to another bucket is a stream copy with two extras** (source:
+[[s-adr-57-kv-subject-transforms]]). Because a bucket *is* a stream ([[key-value]]), the client
+builds the copy for you and fills in what you would otherwise get wrong:
+
+- **A KV mirror always sets `mirror_direct`**, and its stream name is `KV_`-prefixed if it is not
+  already — so a KV mirror is expected to serve reads for the upstream bucket, joining its responder
+  pool. Every `mirror_direct` alignment rule above applies to it unchanged.
+- **A KV source gets a subject transform generated for it.** A source with no explicit transform is
+  assumed to be a KV bucket, `KV_`-prefixed, and given
+  `$KV.<source>.>` → `$KV.<bucket>.>` so keys land in the destination bucket's own subject space.
+  Sourcing `ORDERS` into `NEW_ORDERS` with a key filter `NEW.>` produces:
+
+  ```json
+  {"sources": [{"name": "KV_ORDERS",
+                "subject_transforms": [{"src": "$KV.ORDERS.NEW.>", "dest": "$KV.NEW_ORDERS.>"}]}]}
+  ```
 
 **Two constraints that come from elsewhere and land here.** A mirror **cannot also be a
 batch-publish target** — the server refuses the config with
@@ -278,7 +338,10 @@ what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]
 
 
 [[stream]] · [[replicas]] · [[direct-get]] · [[error-codes]] · [[key-value]] · [[message-ttl]] ·
-[[backup-and-restore-jetstream]] · [[monitoring-endpoints]] · [[account]]
+[[backup-and-restore-jetstream]] · [[monitoring-endpoints]] · [[account]] ·
+[[cross-account-sharing]] · [[multi-region-jetstream]] · [[jetstream-domain]] ·
+[[streams-deleted-when-clustering-a-standalone-server]] · [[disaster-recovery]] ·
+[[cross-domain-sourcing]] · [[subject-transforms]]
 
 ## To verify
 
@@ -287,4 +350,8 @@ what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]
 
 ## Sources
 
-[[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]] · [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-60-reliable-sourcing]] · [[s-docs-subject-mapping]]
+[[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]] · [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-60-reliable-sourcing]] · [[s-docs-subject-mapping]] ·
+[[s-adr-57-kv-subject-transforms]] · [[s-docs-disaster-recovery]] · [[s-docs-get-direct]] ·
+[[s-gh-4342-memory-stream-backup]] · [[s-gh-5606-cross-account-jetstream]] ·
+[[s-gh-6328-jetstream-behind-gateways]] · [[s-gh-7017-kv-across-accounts]] ·
+[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]]

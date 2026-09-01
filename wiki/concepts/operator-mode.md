@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [operator, jwt, nkeys, ed25519, signing-keys, scoped, revocation, bearer, resolver, creds]
 aliases: [decentralized auth, decentralized authentication, jwt auth, operator, trust chain, nkeys, scoped signing key, resolver]
-sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins]
+sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-docs-authentication-basics, s-docs-authorization, s-docs-cross-account, s-gh-5941-restrict-leafnode-subjects, s-gh-7834-leafnode-same-js-domain]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Operator mode
@@ -41,6 +41,14 @@ the role and this is guaranteed:
 
 "If you ever see an ID which starts with an `S` … *be very careful*."
 
+**What this replaces.** Config mode has three credential styles — a password on the wire, an
+**NKey** (the public key in the config, a signature over a server nonce on the wire, "nothing secret
+crosses the wire") and a server-wide **token** — plus a fourth that is easy to forget: with mTLS the
+server can map a certificate identity straight to a user, so "the cert *is* the credential". Operator
+mode keeps the nonce-signature idea and moves the identity itself into a signed JWT, which is why the
+NKey style is the one that translates directly. And when the chapter on the other side says "token",
+it "always means this, never a JWT" (source: [[s-docs-authentication-basics]]).
+
 **The server performs exactly three checks per connection:**
 
 1. the **nonce signature** verifies against the user's public key — this "proves the client holds the
@@ -55,8 +63,11 @@ homemade account JWT fails 3.
 operator. "A user signed by an account signing key carries an `issuer_account` field in its JWT naming
 the account it belongs to."
 
-**A scoped signing key is how permissions arrive.** A signing key with a role name and a fixed
-permission set; every user it issues gets exactly those. The user's own JWT then carries an empty
+**A scoped signing key is how permissions arrive**, and the permission model itself does not change:
+the same two lists, the same "allow closes everything else" and "deny beats allow" rules, "the server
+enforces the same two rules either way" (source: [[s-docs-authorization]]; [[subject-permissions]]).
+A signing key carries a role name and a fixed permission set; every user it issues gets exactly
+those. The user's own JWT then carries an empty
 permission set (`"pub": {}, "sub": {}`) and "the server applies the key's template at connect time, so
 a change to the template reaches every user signed by that key on the next account push, with no creds
 re-issued".
@@ -153,10 +164,30 @@ a seed, and it reduces the credential to a single document that must never leak"
   around operator *signing keys* instead — "keep at least one off-line, and only keep one operator
   signing key exposed to risk".
 - **Two things `nats auth` v0.4.0 cannot do**, for which `nsc` still works on the same store:
-  activation tokens, and importing a single account into an existing operator.
+  activation tokens, and importing a single account into an existing operator. The substitute offered
+  for private exports is **`--token-position`**, "which keys a wildcard export so each importing
+  account can only import the subject carrying its own account key". And the asymmetry worth planning
+  around: in config mode an unmatched import stops the server at boot, while **in operator mode both
+  a dangling import and a dangling export are silent**, because "JWT mode has no startup check to
+  catch a mismatch" — a real reason to wire shares in config first (source:
+  [[s-docs-cross-account]]; [[cross-account-sharing]]).
 - **Auth callout is configured differently here** — on the account's JWT rather than the server
   config, with the account declaring which other accounts the service may bind clients to (see
   [[auth-callout]]).
+- **Leafnode permissions only exist here.** In config mode a `leafnodes { authorization }` user
+  cannot carry a `permissions` block at all — `parseLeafUsers` accepts four fields and `permissions`
+  is a parse error — so the only lever is the account it binds to. In operator mode the leaf presents
+  a `.creds` file, the permissions travel in its user JWT, and they are reversed on the hub side and
+  pushed back to the leaf for local enforcement. If you need per-subject control on a leaf link, this
+  is the mode that has it (source: [[s-gh-5941-restrict-leafnode-subjects]]; [[leafnode]]).
+- **A certificate-mapped system user has no password to give a leafnode remote.** With
+  `verify_and_map` the certificate *is* the identity, which an operator hit head-on: "it seems
+  impossible to be able to specify a password for a user on the `system_account` when using TLS."
+  Since extending JetStream over a leafnode needs the connection to be on the **system account**, a
+  remote that can only authenticate by certificate has to be wired accordingly — the account can hold
+  both a password user and a certificate-mapped one (source:
+  [[s-gh-7834-leafnode-same-js-domain]]; [[streams-not-visible-across-a-leafnode]],
+  [[tls-in-nats]]).
 
 ## Why an operator cares
 
@@ -209,10 +240,13 @@ a JWT.
 
 [[account]] · [[subject-permissions]] · [[set-up-operator-mode]] · [[auth-callout]] ·
 [[cross-account-sharing]] · [[backup-and-restore-identity]] · [[nsc]] · [[nk]] · [[nats-cli]] ·
-[[js-api-subjects]] · [[config-keys]]
+[[js-api-subjects]] · [[config-keys]] · [[leafnode]] · [[tls-in-nats]] ·
+[[streams-not-visible-across-a-leafnode]]
 
 ## Sources
 
 [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]] · [[s-gh-7854-jwt-push-timeout]] ·
 [[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] ·
-[[s-docs-mqtt-auth-and-clustering]] · [[s-docs-websocket-browsers-and-origins]]
+[[s-docs-mqtt-auth-and-clustering]] · [[s-docs-websocket-browsers-and-origins]] ·
+[[s-docs-authentication-basics]] · [[s-docs-authorization]] · [[s-docs-cross-account]] ·
+[[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7834-leafnode-same-js-domain]]

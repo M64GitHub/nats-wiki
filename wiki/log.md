@@ -2246,3 +2246,554 @@ current phase is collecting, and both files are shaped to be sent whenever that 
 **Two plans are now open at once**, which has not happened before, so a bare `start the plan` is
 ambiguous: it takes the *newest* `inbox/plan-*.md`, which is now the meta-layer one. Both should be
 started by naming the file.
+
+
+## 2026-09-01 — consolidate: `concepts/account`, the plan's single biggest debt (step 2)
+
+*Operation: consolidate*, `inbox/plan-consolidation-2026-08-31.md` step 2. No new sources; nothing in
+`raw/` touched.
+
+**Unlanded ripples 202 across 56 pages → 181 across 55.** `concepts/account` goes **21 → 0**. Citation
+drift stayed 0, lint clean, staleness 0. Bank **105/83** unchanged — no row moved from open to
+answered; four already-answered rows gained `[[account]]` as a second answering page (48, 90, 95, 96).
+
+**The mix, per the pacing note step 4 established:** of 21 pairs, **3 were citation-only** and **18
+were real additions** — the opposite ratio to the reference layer, and the reason this page was the
+plan's first target. A concept page absorbs behaviour; a reference table only absorbs values.
+
+**What actually landed** (each was absent from the page, not merely uncited):
+
+- **The system account may not have JetStream.** `[FTL] Not allowed to enable JetStream on the system
+  account`, confirmed at 2.14.6 in `server.go:2429`. The page previously said only that JetStream is
+  opt-in per account, which reads as if the system account were an ordinary opt-in.
+- **Per-account JetStream limits**, a whole section: `10047` has *two* origins, server `max_file_store`
+  or the account's `MaxStore` tier (a 2023 report ran a `122 MiB` account under a far larger server);
+  `nats account info` is what tells them apart; on an untiered account R3 counts three times against
+  the account limit; `max_consumers` is the only enforceable control on consumer creation.
+- **What crosses the boundary**: there is no cross-account user, and the two shapes that get across
+  anyway (a `$JS.API.>` service export under a prefix; mirroring/sourcing with `external`), both
+  all-or-nothing unless the export is narrowed.
+- **What an account does *not* scope**: TLS is per kind of peer and encryption at rest is server-wide.
+- **The account is what a leafnode binds to** — `leafnodes.remotes[].account` and
+  `leafnodes.authorization.users[].account`; `permissions` there is a parse error
+  (`opts.go:3005–3064`); extending JetStream needs the **system account** *and* identical domains, and
+  identical domains on any other account make the server deny JetStream outright.
+- **Where auth callout puts a client** — the callout's `account` defaults to `$G`, the target account
+  must already exist in the config, and `allowed_accounts` (2.11+) with its `$G` exception.
+- **The push is `$SYS.REQ.CLAIMS.UPDATE`** over the client port, its four-subject temporary user, and
+  the silent timeout with no server-side log line. This was the gap the plan sampled before writing.
+- **Composed servers refuse to start without `system_account`** (`leafnode.go:346–349`), which
+  `nats-server -t` does not catch; and the `Account` column of `nats server report leafnodes` is the
+  isolation audit.
+- Accounts, users, permissions, account limits and the `jetstream` flag **all reload** — which is what
+  makes `no_auth_user` not reloading the sharp exception.
+
+**Citation-only** (material was already on the page): `s-docs-authentication-basics` (`$G` landing),
+`s-docs-security-checklist` (narrow `no_auth_user`, declare `SYS`), `s-docs-forming-a-cluster` (the
+cluster chapter sets up no system account).
+
+**No strikes.** Every one of the 21 had something to say to this page. Two were landed as pointer
+sentences rather than sections, because their material belongs elsewhere and the page now says so:
+`s-gh-7505-auth-callout-nkey` (what the server validates before a callout — on [[auth-callout]]) and
+`s-docs-config-and-jwt-backup` (the two copies of the account JWTs — on [[backup-and-restore-identity]]).
+
+**`## To verify` grew rather than shrank**, deliberately: the JetStream tier fields are now stated, so
+the old item was narrowed to the connection-side limits it still does not cover, and a second item
+records the import-ceiling question asked on gh#5606 and never answered (bank row 98, still empty).
+
+`verified-against: nats-server 2.14.6` / `verified-on: 2026-08-31` left as they were — no server was
+run today; every added claim carries the version its own summary verified it at.
+
+
+## 2026-09-01 — consolidate: the JetStream core — `stream`, `replicas`, `consumer` (step 3)
+
+*Operation: consolidate*, `inbox/plan-consolidation-2026-08-31.md` step 3. No new sources ingested;
+one **new file in `raw/`**, which is a run, not a fetch (below).
+
+**Unlanded ripples 181 across 55 pages → 144 across 52.** `concepts/stream` **16 → 0**,
+`concepts/replicas` **15 → 0**, `concepts/consumer` **6 → 0** — all 37 claims of the step. Citation
+drift 0, lint clean. Bank **105/83**; rows 32 and 38 gained `[[stream]]` / `[[replicas]]` as further
+answering pages, no row moved from open to answered.
+
+**Mix: 33 real additions, 4 citation-only, 0 strikes.** The concept-page ratio from step 2 held.
+
+**`concepts/stream`** gained: the account owning the stream namespace and the `10065
+subjects overlap with an existing stream` check that runs across it; `max_bytes` as a **reservation**
+against server and account limits, not just a ceiling; ~2 FDs per stream and `replicas × bytes` on an
+untiered account; the 2.14 change making a filestore I/O error **freeze** the stream; why
+`nats stream info` can list a stream whose directory is gone (metadata in the meta layer, blocks under
+`store_dir`); the restore rules (`stream names may not be changed during restore`, no merge into a
+live stream); a **Purging is a request with options** section from ADR-10 (`filter`/`seq`/`keep`,
+`10003` for `seq`+`keep`, `10109` sealed, `10110` `deny_purge`, and `--keep` as *the* recovery tool);
+the per-stream API subject as an **ACL boundary** plus `nats schema show` and `--trace`; two new rows
+in *What you cannot change later* (`mirror` fixed vs `sources` editable; `allow_msg_ttl` enable-only,
+API level 1, not on a mirror); and a **Streams you did not create by hand** table giving the `KV_` and
+`OBJ_` bucket shapes.
+
+**`concepts/replicas`** gained: growing a group as a placement decision, and the sharp part —
+**a new peer counts for quorum immediately and holds no data**, so R=4 commits at three while the
+empty peer cannot win an election; one membership change at a time; `--replicas` on **restore** and
+the "temporarily R3" technique as the other two ways a count changes; the **standalone → clustered
+migration that deletes the streams**; `current` as the gate on every rolling operation and the fact
+that Kubernetes **readiness does not tell you this** (catch-up belongs in a startup probe, and a
+peer-aware readiness probe deadlocks the cluster); the `Peer selection: discard … reason:` debug lines
+as the only diagnostic for `10005`; placement never relaxing to fit a replica count; the replication
+lag warning being about the stream leader, not consumers; 2.12's empty-state protection and its cost
+(**all** replication peers available, not just quorum); and a *replica is not a mirror* paragraph.
+Shape 3 landed too: the account-quota rule now cites `accountReservation`
+(`jetstream.go:2511–2519`, 2.14.6) beside the docs sentence it explains.
+
+**`concepts/consumer`** gained: the **ordered consumer as a client construct** with the seven fields
+the client forces and the four things it may not be; the KV read patterns as consumers (watch =
+ordered at `last_per_subject`, history = filtered `deliver_all`, keys = headers-only last-per-subject);
+that a durable and an ephemeral **cannot be told apart at the subject level** on modern clients, so
+`max_consumers` on the account is the enforceable control; the worker-pool facts (`max_ack_pending`
+shared, arrival-order service, position owned by the consumer); and that **"Slow Consumer Detected" is
+about a connection, not a JetStream consumer**.
+
+### A docs issue the pass found: `inbox/docs-issues.md` #37
+
+Consolidation put two pages side by side that had never met: [[consumer]] carried
+`learn/jetstream/policies.md`'s "priority policy — can change" and [[priority-groups]] carried
+ADR-42's "you cannot switch between policies. Only `PriorityTimeout` is updatable". **The server
+settles it against the ADR.** Run on the local **v2.14.6** binary (matching `verified-against`) with
+nats CLI 0.4.0: `overflow` → `pinned_client`, removing groups, and adding them back are all accepted
+with no error; and a consumer created with **two** groups keeps both, against the ADR's "more than one
+is an error".
+
+**Neighbour sweep, as the rulebook requires: four ADR-42 rules checked, two wrong, two hold** — the
+16-character group-name cap (`10162`) and the push-consumer refusal (`10178`) both fire. A fifth
+observation, not a defect: `pinned_client` with no explicit value fills `priority_timeout` with
+**2 minutes**, and that field *is* updatable — the one accurate clause in the sentence.
+
+Recorded as **#37** (`destination: ADR repo`, `kind: wrong-value`, `medium`, `upstream: not filed`) —
+the second ADR-42 row after #7. Evidence: `raw/nats-server-src/priority-groups-observed-v2.14.6.md`,
+registered in `raw/sources.md`. [[priority-groups]] now states the server's behaviour and says the
+sources disagree; its `verified-against` moved to **2.14.6** and `verified-on` to **2026-09-01**,
+because a run happened. The run's transcript also records what was **not** tested: whether a two-group
+consumer serves both groups (the docs say only the first is used — unverified), behaviour with active
+pinned clients, and the clustered case. [[consumer]]'s claim was already right and now carries the
+run behind it.
+
+**Not filled: `since:` on these three pages.** None of the 37 summaries states which release streams,
+replicas or consumers first appeared in, so shape 4 stays open here rather than being answered from
+memory. Version attribution for individual *fields* is on the pages (2.11/2.12/2.14) and is sourced.
+
+
+## 2026-09-01 — consolidate: topology and cluster operations (step 5)
+
+*Operation: consolidate*, `inbox/plan-consolidation-2026-08-31.md` step 5. No new sources; nothing in
+`raw/` touched.
+
+**Unlanded ripples 144 across 52 pages → 105 across 47.** `internals/raft-in-nats` **10 → 0**,
+`operations/install-nats-server` **10 → 0**, `concepts/mirrors-and-sources` **9 → 0**,
+`operations/build-a-3-node-cluster` **7 → 0**, `internals/stream-placement` **3 → 0** — all 39 claims
+of the step (the plan's count of 40 was written when `raft-in-nats` had 11). Citation drift 0, lint
+clean. Bank **105/83** unchanged; rows 35, 77 and 92 gained further answering pages.
+
+**Mix: 34 real additions, 5 citation-only, 0 strikes.**
+
+**Shape 1 was the step's prediction and it was half right.** Both runbooks already had their
+`### Kubernetes` and `### systemd` surfaces — what was missing was not a surface but the *content*
+inside two of them, plus one surface nobody had noticed was absent:
+
+- `install-nats-server` gained a **`### TLS`** section it never had (the three independent blocks;
+  `verify: true` meaning different things on client and route), plus `include` path resolution, the
+  quoted-vs-unquoted `$NAME` inversion that makes bcrypt hashes the values you *do* quote,
+  `nats-server -c … -t`, and the reload/restart principle in the docs' own words. Its `### Kubernetes`
+  gained the two chart facts that bite — **the shipped drain arithmetic has no slack**
+  (`10s + 30s + 20s = 60`, exactly `terminationGracePeriodSeconds`) and the reloader sidecar's
+  `natsVolumeMountPrefixes: [/etc/]`, so a certificate mounted elsewhere never produces a SIGHUP.
+- `build-a-3-node-cluster` gained a **second independent report** of the one-DNS-name `routes` defect
+  (gh#5859 alongside gh#7190), the two log lines from that thread that are *not* symptoms, the
+  "composition adds reach, not boundaries" framing with the system-account startup refusal, and a new
+  **What this cluster now supports** section covering membership changes and upgrade order.
+
+**`raft-in-nats`** gained the RAFT log-line family from a real incident (`Wrong index`,
+`Critical write error`, `has NO quorum, stalled`), the reading that `JetStream out of resources` on
+that path is **not** a capacity message, `Restored N messages …` as the positive startup signal,
+three independent elections rather than one, a draining node's groups becoming **observers**, a new
+peer counting for quorum while holding no data, `Routes` being a connection count and not a peer
+count (8 for three servers), the super-cluster's single WAN-wide meta group as a quorum hazard, and
+meta leadership as the explanation for an asymmetric memory profile.
+
+**`mirrors-and-sources`** gained the KV shapes from ADR-57 (a KV mirror always sets `mirror_direct`;
+a KV source gets `$KV.<source>.>` → `$KV.<bucket>.>` generated), Direct Get's staleness, the
+file-backed mirror as the *only* backup path for a memory stream, promotion needing meta quorum, and
+a section naming the four cross-boundary problems that all resolve to "mirror or source".
+
+**`stream-placement`** gained `peer-remove` versus `--replicas` — the two commands people confuse —
+with `10075 peer remap failed` leaving an R>1 stream a replica short when nowhere qualifies, the
+serialised meta-group variant (`10202`), restore as a third placement lever, and the `…ErrF` naming
+rule that explains why `10005` can quote your tag.
+
+**Citation-only** (material already on the page): `s-docs-encryption-and-tls` and
+`s-nats-server-systemd-units` on `build-a-3-node-cluster`, `s-gh-5924-filestore-dirs-vanished` and
+`s-nats-server-lame-duck` on `install-nats-server` (both sharpened rather than merely cited), and
+`s-docs-single-server` on the cluster runbook's rollback.
+
+**No strikes.** Four pairs landed as pointer sentences rather than sections, because their material
+belongs elsewhere and the page now says where: `s-docs-your-first-cluster` /
+`s-nats-server-route-cluster-formation` / `s-docs-forming-a-cluster` on `install-nats-server` (route
+formation is the cluster runbook's subject) and `s-docs-rolling-upgrades` on both runbooks
+([[upgrade-a-cluster]] owns the procedure).
+
+
+## 2026-09-01 — consolidate: security, part two (step 6)
+
+*Operation: consolidate*, `inbox/plan-consolidation-2026-08-31.md` step 6. No new sources; nothing in
+`raw/` touched.
+
+**Unlanded ripples 105 across 47 pages → 80 across 40.** `concepts/subject-permissions` **6 → 0**,
+`concepts/cross-account-sharing` **5 → 0**, `concepts/operator-mode` **5 → 0**,
+`entities/nk` **3 → 0**, `concepts/tls-in-nats` **3 → 0**, `entities/nsc` **1 → 0**, and
+`operations/backup-and-restore-identity` **2 → 0** — 25 claims. Citation drift 0, `--strict` passes.
+Bank **105/83** unchanged; rows 48 and 49 gained further answering pages.
+
+**Mix: 22 real additions, 3 citation-only, 0 strikes.**
+
+**The step's premise held, and it was worth the ordering.** The plan put this after step 2 because
+"whatever `account` absorbs will change what these four still owe", and the list had already moved:
+`tls-in-nats` came into the step at **3** rather than the plan's 4, and none of the 25 pairs
+duplicated what `account` had taken. What was left was the material that genuinely belongs to a
+*user*-level page rather than a tenant-level one.
+
+**`subject-permissions`** gained a whole surface it did not have: **two places the permission model
+changes shape**. On a leafnode in config mode there are no user permissions at all — `parseLeafUsers`
+(`opts.go:3005–3064`) accepts four fields and `permissions` is a parse error — leaving
+`deny_exports` / `deny_imports` (deny-only) and the bound account; in operator mode the permissions
+travel in the leaf's user JWT, are reversed on the hub side and merge with the leaf's own. With auth
+callout the lists are minted per connection, the server auto-denies `$SYS.REQ.USER.AUTH` for every
+user on the callout's account, and nothing the client sent is verified first. It also gained the
+scoped-signing-key mechanics (edit re-permissions every user on the next push; invisible until
+pushed; removing one is mass revocation), the renamed-import rule, and gh#4535's community lock-down
+`no_auth_user` — with the observation that its `deny: ["*"]` denies **one token only**, since `*` is
+one token and `>` is the form that denies everything. That follows from two claims already sourced on
+the page; it is flagged as the weakness in the quoted workaround, not as new server behaviour.
+
+**`cross-account-sharing`** gained the `nats` CLI's two `external` branches, which state the
+precondition the docs never do — **the `external` block does not create the import, it names the
+local prefix an existing import already lives under**, so Route 1 is a prerequisite for Route 2's
+cross-account case, not an alternative. Plus the error a missing far-side export produces
+(`service import not authorized` on `$JS.leaf01a.API.CONSUMER.CREATE.tank`, from a thread with **no
+maintainer reply**), import/export as account properties, and the leafnode case where this page *is*
+the answer to "restrict what a leaf shares".
+
+**`operator-mode`** gained what it replaces (the three config-mode credential styles plus mTLS's
+cert-as-credential), leafnode permissions as a genuine operator-mode-only capability, the
+certificate-mapped system user that has no password to give a leafnode remote, and the
+config-vs-operator asymmetry on shares: config mode stops the server on an unmatched import, operator
+mode is silent on **both** halves, with `--token-position` as `nats auth`'s substitute for activation
+tokens.
+
+**`tls-in-nats`** gained the reason stream compression exists — "use of filestore encryption can
+almost completely prevent host filesystem compression", so the server compresses *before* it
+encrypts and `jetstream { key }` without `compression: s2` is the combination that quietly costs the
+most disk — plus where TLS sits among the credential styles.
+
+**The two entity pages were pure shape 6** (what the thing does, but not what bites you). `nk` gained
+a **What bites** section: a lost seed is a permanently lost identity; an operator backup is a seed in
+cleartext unless `--key` encrypts it with a **curve** NKey (a different kind from the Ed25519 keys the
+page tabulates), and that curve seed is itself unrecoverable; prefer signing keys to identity keys.
+`nsc` gained the two-copies problem — the workstation store versus the server's resolver directory,
+which drift silently, where a restored store does not refill the resolver and the symptom is
+`Authorization Violation` while every local listing looks right — and `resolver_preload` of the system
+account as the bootstrap that belongs in the backup set.
+
+**`backup-and-restore-identity`** was taken with the step rather than left for step 8, to finish the
+security layer in one sitting, the way step 4 took `reference/advisories`. It gained what the archive
+actually is, the store's real layout (`$XDG_DATA_HOME/nats` — JWTs in `stores`, seeds in `keys`,
+nsc-compatible), and the point that after a leak **restoring is not the remedy, revoking is** — a
+`user add` JWT never expires, and revocation is an entry in the account JWT, so it too only takes
+effect on a push.
+
+**Citation-only:** `s-docs-authorization` on `operator-mode` (the permission rules are unchanged in
+JWT form), `s-docs-security-checklist` on `cross-account-sharing`, and `s-docs-operator-mode` on `nk`.
+**No strikes.**
+
+## 2026-09-01 — consolidate: tools and entities (step 7)
+
+**Operation: consolidate**, plan `inbox/plan-consolidation-2026-08-31.md` step 7 — every remaining
+`entities/` page. Unlanded ripples **80 → 50** (40 → 26 pages); the whole entity layer is now clear.
+Citation drift held at **0**, `--strict` passes, broken links 0. Question bank unmoved at **105/83**,
+★ **42/42** — no row was earned, and none of the 22 open rows is about a tool or an entity.
+
+**Pages: 14 · claims: 30 · mix: 28 real additions, 2 pointer sentences, 0 citation-only, 0 strikes.**
+That is the inverse of step 4's reference-table pass (33 of 46 citation-only there) and it confirms
+what step 6 saw on `nk` and `nsc`: **an entity page is almost never merely missing a citation.**
+Shape 6 — "what the thing does but not what bites you" — was the whole of this step, on all 14 pages.
+
+**`entities/nats-cli` (11) was the sitting the plan predicted**, and its 11 pairs split 9 additions,
+2 pointers:
+
+- **A permissions failure reaches the CLI as a timeout, not a denial.** Every JetStream API call is a
+  request, so a locked-down user running `nats stream info` gets `context deadline exceeded` and
+  never a permission error; the evidence is server-side and names the CLI by version string. The same
+  shape one level up: `nats account info` printing **no `Account:` line at all** is the user being
+  denied `$SYS.REQ.USER.INFO`, not a broken server.
+- **The `Routes` column of `nats server list` counts connections, not peers** — 2 peers × (3 pooled +
+  1 system) = 8 on a healthy three-node cluster. What confirms the mesh is the count being *equal and
+  non-zero on every row*, never its value.
+- **Every `nats server …` command needs a system-account user**, which the docs' own walkthrough
+  configs do not create.
+- **The `nats auth` store's location and layout** (`$XDG_DATA_HOME/nats`, nsc-compatible) went into
+  the Facts table, which previously named only the context directory; plus the whole backup/restore
+  path — `nkey gen curve`, `--key` taking a **file path not a key string**, restore keeping the
+  original keys so old creds still work, and the resolver still being empty until you push.
+- **`SYSTEM` is pre-created and its user is not**, which is one of the ordinary reasons a push finds
+  nothing listening on `$SYS.REQ.CLAIMS.UPDATE`.
+- **What `--chunk-size` / `--window-size` actually tune**: the 8 MiB window of 128 KiB chunks and the
+  **five-second ack timeout that aborts the backup** — the reason a distant link needs them, not
+  throughput.
+- **`--trace` on a long `--count` run** as the cheapest demonstration of server-driven failover.
+- **Why `nats account tls` exists**: `openssl s_client` against 4222 normally fails, because the
+  server sends plaintext `INFO` before the handshake.
+- **Never mix CLI and CRD ownership of a stream** — [[nack]] restores a *deleted* stream on its
+  ~30-second resync but does not revert a manual `nats stream edit` unless run with `--control-loop`.
+
+**The two pointer sentences, both honest "merely relevant" calls.** `s-docs-single-server`'s
+`replicas > 1 not supported in non-clustered mode` is a server rule that already lives on
+[[replicas]] — the CLI page takes only the `--server` flag as the alternative to a context and points
+there. `s-gh-6605-which-consumer-is-slow` is a thread with no answer: the page records that
+**`nats-top` is a different binary with no `nats top` subcommand** and that the suggested
+`nats-top -sort pending` was reported not to work, then points at [[slow-consumer-detected]], which
+owns the unknown.
+
+**`entities/nats-helm-charts` (4)** gained four behaviours, all of which bite:
+`http: "127.0.0.1:8222"` — the standard host hardening answer — is an **outage** here, because the
+kubelet's probes dial the pod IP, not loopback; the reloader's real mechanics (inotify, the PID at
+`/var/run/nats/nats.pid`, **30 retries four seconds apart**, and `reloader.merge` replacing the
+container's args *wholesale* when you add `--force-poll`); the chart's **`jetstream_` → `nats_`
+metric rename**, which is why a self-run exporter without `-prefix nats` produces empty panels; and
+the chart enumerating peer DNS names rather than one multi-value name, which is the shape a reported
+asymmetric-cluster failure comes from copying wrong.
+
+**`entities/nats-server` (2)** gained the **complete signal table** from `server/signal.go` at
+v2.14.6 — including the two that bite: `nats-server --signal stop` is **`SIGKILL`**, not a graceful
+stop, and **`SIGTERM` is ignored once a drain is in progress**, which is what lets a `preStop` hook
+running `--signal ldm` finish. Plus `Trapped %q signal` as the log record of what a node was asked to
+do. The CNCF row gained its date and level (**Incubating since 2018-03-15**, still not Graduated).
+
+**The four smallest pages carried the four sharpest facts.** `nats-py`: the client **would not send
+credentials when the server's `INFO` omitted `auth_required`**, so an authenticated user silently
+landed as the anonymous one — fixed in **v2.4.0**, and Go never had it. `nats-server-2.10`: the same
+thread's server-side half, **PR #4605, "will be in 2.10.2"** — before that release, declaring an
+`accounts` block ignored top-level `authorization` users outright and accepted credential-less
+connections. `nats-server-2.11`: **`allowed_accounts` is 2.11+**, and it is what makes an auth-callout
+rollout incremental at all. `nats-server-2.12`: the closest thing to a public support policy — a
+maintainer's "2.9.x is now very old, unsupported and 100s of bug fixes behind … You need to upgrade
+to 2.12.x", with the asker confirming the upgrade fixed it.
+
+**And four smaller ones.** `cncf`: "almost every repo" is now counted — **30 of 32** Apache-2.0, the
+exceptions `nats.ex` and `nats-top`, both MIT. `nats-box`: it is **not** a Docker Official Image
+(`natsio/nats-box`) while the server **is** (`_/nats`) — different provenance rules on a cluster that
+allow-lists. `nats-js` / `orbit`, from one sentence: `nats.js` is the only client that sends a batched
+Direct Get itself, so what is one dependency there is an Orbit dependency in Go, Rust, Java and C# —
+which makes **three** features reachable only through Orbit, and the oldest is 2.11, not 2.12.
+`synadia-products` gained a **sixth product name, Synadia Control Plane**, known only from a community
+reply and recorded as exactly that.
+
+**`entities/nats-architecture-and-design`** was the one page where the landing was a correction: its
+"ADRs this wiki has read" line still said **7 of 54** and the real count is **17**. The material from
+ADR-31 is sharper than the count: **an ADR can retract its own earlier text in place, with no version
+bump** — "Earlier revisions of this document described the server auto-promoting `allow_direct: true`
+… servers leave `allow_direct` untouched". `main` is the state and there are no releases, which is
+why this wiki mirrors the tarball with a fetch date.
+
+**One number was checked rather than written.** The `cncf` licence row first said "31 of the 33";
+counting the rows in `s-github-repo-facts` gave **30 of 32**, and the page says that.
+
+## 2026-09-01 — consolidate: step 8, first sitting — the twelve mid-sized pages
+
+**Operation: consolidate**, plan `inbox/plan-consolidation-2026-08-31.md` step 8, first of its two
+sittings: the 12 pages the plan rescoped out of "26 pages carrying one claim each" because they carry
+two to five. Unlanded ripples **50 → 14** (26 → 14 pages) — every one of the 36 claims landed, and
+what remains is exactly the 14 single-claim rows the second sitting is for. Citation drift held at
+**0**, `--strict` passes, broken links 0. Question bank **105/83**, ★ **42/42** — no row moved from
+open to answered; **seven rows gained further answering pages** (32, 38, 39, 52, 62, 69, 77).
+
+**36 claims across 12 pages: 35 real additions, 0 pointer sentences, 1 strike that was already
+recorded and had never taken effect.** The plan predicted these would be addition-shaped because they
+are concept- and operation-shaped, and they were.
+
+**The strike that had not counted.** `s-docs-object-store-your-first-object` struck
+`operations/jetstream-sizing` **at ingest**, with its reason written out — but the note sits inside
+`## Pages touched` and named the page in wikilink syntax, so `tools/lint.py` went on counting it. The
+strike is real and stands; the link is now plain text and the note says why. Swept the rest of the
+summary layer for the same shape: **this was the only one**, so the count has been carrying exactly
+one false positive, not a systemic one.
+
+**`concepts/key-value` (5)** gained a surface it did not have at all: **`$KV.>` is its own subject
+space**, which is why the server's leafnode deny list is three entries —
+`["$JS.API.>", "$KV.>", "$OBJ.>"]` — why a deny list meaning to cover KV must name `$KV.>` itself, and
+why addressing a bucket in another domain needs the mapping `$JS.<domain>.API.$KV.>` → `$KV.>` that
+the source's own comment calls "very very very ugly". Plus the read mechanism (a `_sys_` queue group
+of stream peers, so a KV read is load-balanced across R replicas *by design* and the stale read is the
+price), the docs' own sentence that "'the latest value for a key' is 'the last message on its
+subject'" with the `nats stream get --last-for` line that makes a KV get inspectable without a KV
+client, `Lag` as the honest staleness bound on a replicated bucket, and a maintainer's answer that the
+shape for a regional read replica is a **leafnode with JetStream sourcing**, not a gateway. One
+addition narrows a stated gap: ADR-31's Subject-Appended `$JS.API.DIRECT.GET.<stream>.>` exists "so
+that environments may choose to apply subject-based interest restrictions", which makes per-key
+**read** sharing expressible as an ordinary subject grant — recorded with both caveats, that it is
+reads only and that this wiki has not verified the grant against a running server.
+
+**`operations/jetstream-sizing` (4 → 3 after the strike)** gained the two ways a sizing exercise is
+the wrong exercise. `has high message lag` is usually not undersized hardware: "you are sending faster
+then the system can process and store messages into the stream. This can happen if you use a core
+publish into a stream or if you use async Jetstream publishes with many publishers" — both **remove
+the backpressure a synchronous `PubAck` provides**, so no hardware fixes them. And a `store_dir` on
+tmpfs is not a memory stream: "we don't support running the JetStream file store on RAM disks", with
+the adjacent trap that an unset `store_dir` defaults under `os.TempDir()`, exactly where
+`tmpwatch` and `systemd-tmpfiles` look. Plus the memory pairing the page implied but never sized:
+**neither `max_memory_store` nor `GOMEMLIMIT` reserves anything at startup**, so the hardened unit's
+`MemoryMax=6G` / `GOMEMLIMIT=5500MiB` over a `4Gi` store is the shape to copy.
+
+**`gotchas/jetstream-slows-as-consumers-grow` (4)** was shape 3 throughout — evidence that had reached
+other pages and not this one. Cause 4 (churn) now carries the log line that tells churn from count,
+`Consumer assignment for '…' not cleaned up, retrying`, its companion tell (**`Consumers: 0` while the
+log floods**), and `Readloop processing time: 2m11s`. Cause 3 gained the client feature that silently
+turns a filter problem into a consumer-count problem: "watch multiple keys on one watcher" needs
+**2.10+**, and below it the same code opens **one consumer per key**. Prevention gained the hard
+backstop the page lacked — **`max_consumers` on the account** — with the reason subject permissions
+cannot do the job: durable and ephemeral consumers share
+`$JS.API.CONSUMER.CREATE.<stream>.<name>` and the `durable_name` is in the payload.
+
+**`operations/upgrade-a-cluster` (4)** gained a precondition that can cost every message: **a roll
+destroys R1 memory streams**, with the maintainer's own sequence (`replicas=3`, wait for caught-up,
+restart, back to `replicas=1`) and its boundary — "if it's fault-tolerance you need (unscheduled
+server restart) then you must use `replicas=3`". Plus the restart trap that only appears on a loaded
+server: with no explicit `max_file_store` the ceiling is **75% of what is *free*** at startup, so
+every byte JetStream wrote lowers the next start's limit. Plus the client-side timing nobody budgets
+for — **~4 minutes** of silence before a default client notices a dead server (two missed pongs on a
+two-minute ping interval), which is the argument for draining rather than killing.
+
+**`concepts/direct-get` (3)** gained a second reason to reach for it, and it is a *security* reason
+rather than a capacity one: untrusted clients that need history will otherwise create consumers, and
+**subject permissions cannot stop them**. It also gained the fact that on a KV bucket `allow_direct`
+is not a choice — "we do not support disabling direct get on any buckets" — so the page's own
+"`allow_direct` off ⇒ the read hangs" failure cannot happen to a conforming bucket while the stale-read
+one always applies.
+
+**`operations/disaster-recovery` (3)** gained the restore advisories
+(`$JS.EVENT.ADVISORY.STREAM.RESTORE_CREATE/COMPLETE.<stream>`) as free monitoring and as the way to
+alert on a restore nobody authorised; the identity-plane sequence, where restoring the operator
+backup leaves the **resolver directory empty** and every client fails `Authorization Violation` until
+a push, which works only because `server.conf` preloads the `SYSTEM` JWT — "that preload is the
+bootstrap path for the whole recovery"; and a pitfall worth the whole entry: **a fresh replica can
+resync the damage**. Deleting the PVC and syncing from two healthy replicas reproduced
+`Critical write error: malformed or corrupt message`, and the fix was an upgrade, not a recovery.
+
+**`gotchas/slow-consumer-detected` (3)** gained the other half of the relationship and, with it, a
+partial answer to one of its own open questions. `/connz` **does** carry a per-connection counter —
+**`stalls`** — but it counts the producer being held back, not the reader being dropped; `/varz`
+carries **`stalled_clients`**; the log line is `Producer was stalled for a total of %v`; and the stall
+is bounded at 2 ms / 5 ms / 10 ms per read-loop invocation. `no_fast_producer_stall: true` trades the
+latency problem for a loss problem. The page's *Explained by* section, which read "Nothing yet", now
+says **partly**: the stall half has a mechanism, the disconnect half still does not.
+
+**The last five.** `backup-and-restore-jetstream` gained a whole missing surface —
+**`nats account backup` / `restore`**, the account-level analogue with its four flags, per connected
+account — and the migration the runbook exists for: **a standalone server cannot be clustered in
+place**, the streams are deleted on restart before you can raise their replica counts, and the two
+supported paths are backup-and-restore or leafnode-mirror-and-promote. `internals/js-api` gained the
+mechanism behind its own "info APIs are deprioritised" section: there are literally **two queues**,
+and a full one **drains entirely**, sending no reply of any kind — the sharpest server-side cause of a
+client `nats: timeout`, traceable only through the rate-limited log line and
+`$JS.EVENT.ADVISORY.API.LIMIT_REACHED`. `concepts/leafnode` gained `remotes[].nkey` as a credential
+form and the spoofing trap that comes with it (the server verifies **nothing** in `connect_opts`; the
+callout service must check `signed_nonce` against `client_info.nonce` itself), plus the cross-domain
+failure that names its own subject, `service import not authorized`. `reload-server-config` gained
+exports and imports as reloadable, the operator-mode counterpart (`push`, not SIGHUP), and the
+pitfall that **`-t` is a parse check, not a start check** — the docs' own composed example passes it
+and then refuses to boot. `retention-policies` gained the sentence that makes its table make sense —
+on `limits` and `interest` **an ack advances a position, it does not remove a message** — and the rule
+that `10099`/`10100` are the contract while their text is not.
+
+**One tool note.** `tools/check-staleness.py` now reports **5** authority-unknown rows rather than 2:
+`nats-py`, `orbit` and `synadia-products` began stating a config key or a subject in step 7, and their
+`verified-against` names a site capture or a date rather than a release feed. Not stale — correctly
+unverifiable by machine, and the report says so.
+
+## 2026-09-01 — consolidate: step 8, second sitting — the fourteen single-claim rows, and the queue reaches zero
+
+**Operation: consolidate**, plan `inbox/plan-consolidation-2026-08-31.md` step 8, second sitting.
+Unlanded ripples **14 → 0**. Citation drift **0**, `--strict` passes, broken links 0, orphans 0,
+frontmatter clean. Question bank **105/83**, ★ **42/42**; three rows gained further answering pages
+(26, 41, 69). **The queue this plan was written to work is empty.**
+
+**14 claims across 14 pages: 13 real additions, 1 citation-only, 0 strikes, 0 pointer sentences.**
+The plan expected this sitting to be where "merely relevant" was the honest answer most often and
+where the first earned strike would appear. **It was wrong about that, and the reason is worth
+recording**: a single-claim row is not a weak pairing, it is a pairing nobody has had a second reason
+to revisit. Twelve of the fourteen turned out to be a source explaining something the page already
+*asserted* — the explanation, not the claim, was what had never landed.
+
+**That shape, three times over.** `concepts/message-ttl` says mirrors may not set
+`subject_delete_marker_ttl` "because inserting new messages would make it impossible to match
+sequences" — and the mirror contract that makes that true (a mirrored message "keeps the **same
+sequence number, the same timestamp, and the same subject**", a sourced one gets "**fresh sequence
+numbers**") was sitting in a summary the page did not cite. Same page, same source: **a mirror keeps
+its own retention**, which is what actually produces the audit-trail behaviour the page describes.
+`concepts/jetstream-domain` says a domain "does not move data" and points at the `external` block —
+without saying that in that block **the domain is not named as a domain**: it is carried as
+`$JS.<domain>.API`, which the CLI composes (`mirror.External.ApiPrefix = fmt.Sprintf("$JS.%s.API",
+domainName)`) and the server reads back as `tokenAt(ext.ApiPrefix, 2)` (`stream.go:432–437`,
+v2.14.6). And `gotchas/streams-not-visible-across-a-leafnode` had the whole server-source rule table
+but not the docs' statement of the **mirror-image symptom**: "a stream you create on the factory floor
+may land on the hub, not locally" — the same first row of that table, read by an operator standing at
+the other end.
+
+**Three additions change what a reader would do.**
+
+- **`concepts/auth-callout`**: credentials are re-offered on **every reconnect**, so a node going down
+  produces not just a reconnect storm at the survivors but a **callout storm** at a service whose
+  outage already means no new connections. The page's central thesis is "the service is on the
+  connection path"; this is the sentence that prices it. Two more from the same source: config-mode
+  passwords reach the service as **plaintext** ("bcrypt protects only the config file at rest"), and
+  `Authorization Violation` is by design **indistinguishable** from a wrong password or an unknown
+  user, so a client cannot tell your service rejected it from the server never having heard of it.
+- **`concepts/ack-and-redelivery`**: `max_ack_pending` is **shared by the whole consumer** — "five
+  workers get 1000 between them, not 1000 each" — so it doubles as the pool's concurrency ceiling and,
+  set below the worker count, starves it: "set it to 3 and only three messages are ever in progress,
+  so ten workers leave seven of them idle no matter how much is stored".
+- **`concepts/choosing-a-topology`**: a leaf remote's `urls` list is a **reconnect pool for one NATS
+  system**, not one entry per cluster. Listing two clusters of a super-cluster builds two bridges into
+  the same system that feed each other, and the server's loop guard does not catch this shape. Reach a
+  super-cluster through DNS instead.
+
+**Two mitigations landed where the warning lives.** `concepts/ordered-consumer` now carries the lever
+that removes whole consumers rather than describing their cost: **multiple filter subjects on one
+consumer, 2.10+**, with the trap that a client on an older server silently falls back to one consumer
+per key. `operations/rebalance-streams` gained the memory-stream case it had no mention of — the same
+grow-and-shrink it already documents, run around a **planned** restart, with the maintainer's boundary
+attached: "if it's fault-tolerance you need (unscheduled server restart) then you must use
+`replicas=3`".
+
+**And two pages gained a "not here" that saves an hour.** `gotchas/stream-has-high-message-lag` now
+says outright that the timeout half of its own symptom pairing **is not in the server log** —
+`nats: timeout` is client-side, "the server does not send it and does not log it" — so the two must be
+correlated by time, not by grep. `gotchas/jetstream-out-of-disk` gained two more ways `store_dir` is
+not where you think: **tmpfs is RAM** and unsupported ("we don't support running the JetStream file
+store on RAM disks"), and an unset `store_dir` defaults under **`os.TempDir()`**, where `tmpwatch` and
+`systemd-tmpfiles` look.
+
+**The one citation-only pair, named as such.** `operations/rotate-tls-certificates` ←
+`s-docs-security-checklist`: every TLS item on the checklist — reload after replacing, files read once
+at startup, TLS on the cluster/leafnode/gateway blocks, `serverAuth`+`clientAuth`, the mapped user
+matched to the certificate subject, TLS-first with a duration — was **already on the page from other
+sources**. The citation is recorded against the checklist's one-line compression of the whole runbook
+rather than a manufactured section. No strike: the summary genuinely bears on the page, it just had
+nothing left to add to it.
+
+**Also corrected in passing.** `streams-not-visible-across-a-leafnode` carried a *To verify* item
+saying the docs' leafnode chapter "has not been ingested — that is plan step 6". It has been since;
+`s-docs-leaf-nodes` is what this sitting landed on the page. The stale item is removed.
+
+**The plan is done.** **202 claims** landed over steps 2–8 — **183 real additions, 16
+citation-only, 2 pointer sentences, 1 phantom strike** — from **252** at the plan's writing and
+**202** when this run of steps began. This session took the last three steps — **80 claims across the
+40 pages** lint listed at its start (step 7's 14 entity pages, 8a's 12 mid-sized, 8b's 14
+single-claim). Zero strikes earned in-pass across the whole plan, two
+pointer sentences, one phantom strike cleared, one docs issue (**#37**) produced, and citation drift
+held at 0 throughout.

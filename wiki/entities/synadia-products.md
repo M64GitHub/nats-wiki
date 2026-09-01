@@ -7,9 +7,9 @@ verified-against: synadia.com site navigation captured 2026-08-31
 verified-on: 2026-08-31
 tags: [product, commercial, synadia-cloud, synadia-platform, insights, protect, managed-nats]
 aliases: ["Synadia Cloud", "Synadia Platform", "Synadia Deploy", "Synadia Insights", "Synadia Protect", NGS]
-sources: [s-github-repo-facts, s-synadia-jetstream-anti-patterns]
+sources: [s-github-repo-facts, s-synadia-jetstream-anti-patterns, s-gh-5606-cross-account-jetstream]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Synadia commercial products
@@ -28,6 +28,16 @@ sentence per product and no more — five near-empty pages would be worse than o
 | **Synadia Deploy for Kubernetes** | "Self-serve NATS & Synadia Platform deployment for Kubernetes environments." |
 | **Synadia Insights** | "Granular, NATS-native observability including 100+ audit checks from our experts." |
 | **Synadia Protect** | "A security gateway for NATS. Enforce policy on every connection and message." |
+
+**A sixth name appears in the wild: Synadia Control Plane.** It is not in the site navigation this
+table was read from, and the only public source this wiki has read for it is a community reply on a
+GitHub thread about managing several accounts at once — it "gives you an overlay where you can manage
+multiple accounts with a single user" (source: [[s-gh-5606-cross-account-jetstream]]). Recorded here
+because the open-source shape of that problem is real and awkward: there is **no cross-account user**,
+so the do-it-yourself answer is to export the other account's `$JS.API.>` as a service and import it
+under a prefix — a route no docs page covers, and one of the two undocumented ones on
+[[cross-account-sharing]]. What the product actually covers is not stated by any Synadia
+source this wiki has read — the sentence above is a community member's description, quoted as such.
 
 ## Where they sit against the open-source stack
 
@@ -63,6 +73,6 @@ sentence per product and no more — five near-empty pages would be worse than o
 ## Sources
 
 [[s-github-repo-facts]] (the `nats-surveyor` README's reference to Insights) ·
-[[s-synadia-jetstream-anti-patterns]]. The five product names and their one-line descriptions are
+[[s-synadia-jetstream-anti-patterns]] · [[s-gh-5606-cross-account-jetstream]]. The five product names and their one-line descriptions are
 read from the site navigation captured verbatim in
 `raw/synadia-blog/nats-jetstream-high-ram-usage.txt`, lines 7–11.

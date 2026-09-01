@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, gossip, reject_unknown_cluster, 7222, stalled_clients]
 aliases: [gateways, super-cluster, supercluster, super cluster, cluster of clusters, geo-affinity, geo affinity]
-sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates]
+sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Gateway
@@ -49,6 +49,15 @@ mention (source: [[s-nats-server-topology]]). Same shape as the route-side adopt
 stays inside one cluster; it's the unit a stream is replicated across"
 (source: [[s-docs-jetstream-in-a-cluster]]). Moving stream data between clusters is
 [[mirrors-and-sources]], not a replica count — see [[multi-region-jetstream]].
+
+**So a gateway is the wrong tool for the thing it is most often reached for.** Asked for regional read
+replicas of a KV bucket across four continents, a maintainer's answer was to skip the super-cluster
+entirely: "you could simply have your 3 node cluster in the US and have each of your 1 nodes in other
+parts of the world connect to the cluster as Leaf Nodes. Then you can enable JS on those leaf nodes
+and create read replica streams that source from streams located in the cluster"
+(source: [[s-gh-6328-jetstream-behind-gateways]]). Because the data has to be mirrored or sourced
+whichever link it crosses, the gateway buys nothing here — the connection type is chosen on network
+and isolation grounds instead. See [[choosing-a-topology]] and [[leafnode]].
 
 ## Geo-affinity, precisely
 
@@ -170,7 +179,8 @@ counters that say so.
 
 [[s-docs-super-clusters]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] ·
-[[s-gh-7438-multi-region-availability]] · [[s-gh-4823-leafnode-supercluster-duplicates]]
+[[s-gh-7438-multi-region-availability]] · [[s-gh-4823-leafnode-supercluster-duplicates]] ·
+[[s-gh-6328-jetstream-behind-gateways]]
 
 ## To verify
 

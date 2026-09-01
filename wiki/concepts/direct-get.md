@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [direct-get, allow_direct, mirror_direct, last_by_subj, multi_last, batch, EOB]
 aliases: [direct get, allow_direct, "$JS.API.DIRECT.GET", direct read, mirror_direct]
-sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood]
+sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Direct Get
@@ -121,7 +121,19 @@ its four alignment rules — in particular that it is captured at create time an
 
 - **It is the escape route from consumer sprawl.** When a service only needs current state, a direct
   read replaces a consumer entirely — the alternative [[jetstream-slows-as-consumers-grow]]
-  recommends when consumer counts become the bottleneck.
+  recommends when consumer counts become the bottleneck. Synadia's own framing is that it is "even
+  faster and more lightweight than consumers, making it ideal for getting specific messages from
+  streams", and calls it out especially for **mobile and IoT clients** that want the latest value on a
+  subject rather than a stream position (source: [[s-synadia-jetstream-anti-patterns]]).
+- **It is also the escape route from a permissions problem that has no clean answer.** Untrusted
+  clients — a browser over [[websocket]], say — that need stream history can otherwise create
+  consumers you did not plan for, and **subject permissions cannot stop them**: a durable and an
+  ephemeral consumer are both created on `$JS.API.CONSUMER.CREATE.<stream>.<name>` and the
+  `durable_name` is in the **payload**, which a subject grant cannot see. The public thread asking how
+  to restrict this ends without an answer (source: [[s-gh-5044-restrict-durable-consumers]]). A
+  direct-read plus a republish subject sidesteps it: there is no consumer to create, so nothing to
+  restrict. See [[subject-permissions]] and, for the enforceable backstop, `max_consumers` on
+  [[account]].
 - **It spreads read load across replicas** instead of concentrating it on the leader, which is one of
   the few ways [[replicas]] buys throughput rather than only durability.
 - **Client coverage is uneven.** `nats.js` sends a batched Direct Get directly; Go, Rust, Java and C#
@@ -142,6 +154,14 @@ timestamp" (source: [[s-docs-kv-under-the-hood]]). This is why a KV get "is fast
 no position to track, no message to acknowledge, and no consumer to clean up" — and why a bucket
 behaves as a key-value store while being an append-only log underneath. See [[key-value]].
 
+**On a KV bucket this is not a setting you get to make.** The KV spec fixes `allow_direct` to `true`
+and says so twice: it is "modifiable out-of-band only, never through a KV bucket update", and "we do
+not support disabling direct get on any buckets". The non-direct path — a `stream_msg_get_request`
+with `last_by_subj` — is explicitly marked as supported **for legacy buckets only**
+(source: [[s-adr-8-key-value-store]]). So the *"`allow_direct` off ⇒ the read hangs"* failure above
+cannot happen to a conforming bucket, and the *"a direct read can be stale"* one always applies to
+one.
+
 ## Related
 
 [[stream]] · [[consumer]] · [[key-value]] · [[object-store]] · [[mirrors-and-sources]] ·
@@ -150,4 +170,5 @@ behaves as a key-value store while being an append-only log underneath. See [[ke
 ## Sources
 
 [[s-docs-get-direct]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-and-sources]] ·
-[[s-docs-kv-under-the-hood]]
+[[s-docs-kv-under-the-hood]] · [[s-synadia-jetstream-anti-patterns]] ·
+[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]]
