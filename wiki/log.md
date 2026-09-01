@@ -2797,3 +2797,61 @@ citation-only, 2 pointer sentences, 1 phantom strike** — from **252** at the p
 single-claim). Zero strikes earned in-pass across the whole plan, two
 pointer sentences, one phantom strike cleared, one docs issue (**#37**) produced, and citation drift
 held at 0 throughout.
+
+## 2026-09-01 — scout: delivery timing, and a contradiction three sources cannot settle
+
+**Operation: scout** `delivery-timing` → `inbox/scout-delivery-timing-2026-09-01.md`, and the plan it
+produced, `inbox/plan-delivery-timing-2026-09-01.md`. **Nothing ingested.**
+
+**Why this topic.** With unlanded ripples at 0 and ★ complete (42/42), the bank's 22 open rows need
+*sources*, not synthesis. Six of them are one mechanism — 16, 17, 18, 19 (redelivery) and 29, 30 (the
+message scheduler) — because they are one decision: **a message needs to arrive later than now, so do
+you delay the redelivery or schedule the publish?** Row 30 is a maintainer being asked to choose
+between exactly those two.
+
+**Eleven candidates, none blocked.** Six GitHub discussions, two Synadia posts, ADR-51, the JetStream
+headers reference and the docs' acknowledgment chapter. **Four are already in `raw/`** (ADR-51, the
+headers reference, the acknowledgment chapter, and the 2.14 release notes), so most of this topic can
+be ingested without fetching anything. Five of the six discussions carry maintainer answers and three
+are formally accepted — an unusually high hit rate for this bank, where most rows point at threads
+that died.
+
+**Finding 1 — the docs and a Synadia post contradict each other, and an unanswered thread sits between
+them.** `learn/jetstream/acknowledgment.md` says three separate times that a consumer backoff does not
+slow a nak: "it only shapes redeliveries that fire when the AckWait timer runs out — **it doesn't slow
+a nak**" (line 298), "a bare nak redelivers right away, and a configured backoff doesn't slow it"
+(586), "the CLI's `--nak` only asks for immediate redelivery" (42). The Synadia reliability post
+(Andrew Connolly, 2026-07-24) says the backoff schedule *does* apply to nak-triggered redeliveries.
+And **gh#5631 — bank row 18 — reports a nak that did not redeliver immediately** on 2.10.14, with no
+error and no reply in the thread, ever. Three positions, and the wiki currently states the docs'.
+
+This is *Operation: record a docs issue* shaped, and the claim is **behavioural**, so the rulebook
+requires it to be **run**. The local binary is **v2.14.6** — checked, and exactly the version
+[[ack-and-redelivery]] already cites, so a run is attributable without moving any `verified-against`.
+The plan's step 2 does it, with all three outcomes routed in advance: docs right → a row against the
+blog; docs wrong → a `wrong-value` row against `nats-docs` in three places *and* row 18 explained;
+depends on something neither names → `inbox/server-issues.md`, because there is no authority above the
+server. **Which one it is has not been guessed.**
+
+**Finding 2 — the message scheduler has no prose anywhere in the documentation.** Checked against the
+**live** `docs.nats.io/llms.txt` rather than the 2026-08-31 mirror: no `learn/` page mentions message
+scheduling, scheduled messages, cron or delayed publishing. The feature exists in the docs as a header
+table, **nine error codes** (10186–10192, 10203, 10212) and three lines of release notes. A 2.12
+feature extended in 2.14, with no page telling anyone how to use it — a `missing` row for `nats-docs`,
+and the clearest case this wiki has for a page that does not exist: outside ADR-51 and one vendor blog
+post there is no readable account of it at all.
+
+**One thing checked and found *not* to be a gap.** `wiki/reference/error-codes.md` carries none of
+those nine codes — and that is correct, not a defect. The page states its own scope: "the full 222-row
+table is not reproduced here… This page gives the structure, the lookup, and **the codes this wiki
+cites**." They join it when a page cites them. Recorded because the opposite conclusion was the
+tempting one.
+
+**The plan that came out of it** has four steps, ordered so the falsifiable one comes early: the three
+answered threads first (they may already explain half of gh#5631), the server run second, ADR-51 and
+the new `message-scheduling` page third, and the applied layer last — because step 4 is the only step
+allowed to add pages and has to earn them from the bank. Its dead-letter page is explicitly
+conditional: **no public question, no page**, and the refusal gets logged if the search comes up empty.
+
+**Bank unchanged at 105/83.** A scout adds no answers; it says where they would come from. Expected at
+the end of the plan: **105/88**, or 105/87 with row 18 as a stated dead end.

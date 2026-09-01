@@ -2,7 +2,7 @@
 title: Index
 type: index
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # NATS Wiki — Index
@@ -689,12 +689,19 @@ names now have pages — see the Entities section above. People: none yet.)*
 - `inbox/plan-first-ingests-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as the record
 - `inbox/plan-runbooks-and-security-2026-08-31.md` — **finished** 2026-08-31, all 7 steps; kept as
   the record
-- `inbox/plan-consolidation-2026-08-31.md` — **partly worked**: steps 1 and 4 done 2026-08-31,
-  **steps 2, 3, 5–8 still open**. The follow-on queue for unlanded ripples, worked per
-  *Operation: consolidate*; say `start the plan` against this file to continue it
+- `inbox/plan-consolidation-2026-08-31.md` — **finished** 2026-09-01, all 8 steps; kept as the
+  record. Took unlanded ripples **252 → 0** across 202 claims, per *Operation: consolidate*
 - `inbox/plan-drift-and-adrs-2026-08-31.md` — **finished** 2026-08-31, all 5 steps; kept as the record
 - `inbox/plan-the-unread-chapters-2026-08-31.md` — **finished** 2026-09-01, all 6 steps; kept as the
   record
+- `inbox/scout-delivery-timing-2026-09-01.md` — **scout**, 2026-09-01. Eleven candidates on
+  redelivery timing and the message scheduler, for bank rows 16–19 and 29–30. Carries two findings the
+  plan below exists to settle: the docs and a Synadia post **disagree on whether a consumer backoff
+  applies to a nak**, and the message scheduler has **no prose anywhere in docs.nats.io** (checked
+  against the live index, not the mirror)
+- `inbox/plan-delivery-timing-2026-09-01.md` — **proposed**, not started, and the newest file — so a
+  bare `start the plan` takes this one. Four steps from the scout above; step 2 is a **server run** on
+  v2.14.6 rather than a read, because the contradiction is behavioural
 - `inbox/plan-the-meta-layer-2026-09-01.md` — **proposed**, not started. The last structural hole in
   the JetStream coverage: `meta-layer` and `stream-leader-keeps-moving`, the two remaining wanted
   pages, plus Q37 and Q40. **Name the file explicitly** when starting it — a bare `start the plan`
