@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [permissions, allow, deny, default_permissions, allow_responses, queue-group, _INBOX, "$JS.API"]
 aliases: [permissions, authorization, allow list, deny list, publish permissions, subscribe permissions, default_permissions, allow_responses]
-sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey]
+sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -285,6 +285,30 @@ browsers and nothing else. Confirmed on 2.14.6: a handshake with no `Origin` get
 through one (sources: [[s-docs-websocket-browsers-and-origins]],
 [[s-nats-server-mqtt-websocket-observed]]). Permissions are what protect the port.
 
+## A stream setting can undo a permission decision
+
+Subject permissions are not the only thing that governs what a client can do to a stream, and one
+stream field changes two others behind you: **enabling `allow_msg_schedules` also enables
+`allow_rollup_hdrs` and clears `deny_purge`** (source: [[s-adr-51-message-scheduler]], confirmed on
+v2.14.6 — [[message-scheduling]]).
+
+That matters here because both of those are controls someone may have set deliberately:
+
+- **`allow_rollup_hdrs`** lets a publisher send `Nats-Rollup: sub` — deleting every earlier message on
+  a subject — or `Nats-Rollup: all`, deleting the whole stream's contents. A publish permission on
+  `orders.>` becomes considerably more powerful once rollups are allowed.
+- **`deny_purge`** blocks `$JS.API.STREAM.PURGE.<stream>` regardless of who is asking; clearing it
+  re-opens that path to anyone whose permissions reach the JetStream API.
+
+Neither change is announced, and **`allow_msg_schedules` cannot be turned off again**, so the stream
+does not go back. When reviewing what an account may do to a stream, read the stream's stored config
+rather than the config that was submitted:
+
+```
+nats stream info ORDERS --json | jq '.config | {allow_msg_schedules, allow_rollup_hdrs, deny_purge}'
+```
+
+
 ## Related
 
 [[account]] · [[operator-mode]] · [[auth-callout]] · [[tls-in-nats]] · [[cross-account-sharing]] ·
@@ -300,4 +324,4 @@ through one (sources: [[s-docs-websocket-browsers-and-origins]],
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-docs-auth-callout]] · [[s-docs-cross-account]] · [[s-docs-decentralized-auth]] ·
 [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7505-auth-callout-nkey]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]]

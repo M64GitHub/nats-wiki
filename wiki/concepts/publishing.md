@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [PubAck, Nats-Msg-Id, duplicate, duplicate_window, async-publish, atomic-batch, fast-ingest, AllowAtomicPublish, AllowBatchPublish, Nats-Batch-Id, Nats-Expected-Last-Subject-Sequence, exactly-once, persist_mode]
 aliases: [publish, PubAck, pub ack, exactly once, exactly-once, deduplication, dedup, Nats-Msg-Id, msg id, async publish, atomic batch, batch publish, fast ingest, publish acknowledgement]
-sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14]
+sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Publishing to a stream
@@ -192,6 +192,23 @@ rejects atomic publishing, because the atomicity depends on the synchronous writ
 batches are fine on such a stream" (source: [[s-docs-advanced-publishing]]). Both are `persist_mode`
 and `allow_atomic` on [[stream]]; neither can be changed after creation.
 
+### The window bounds re-*publication*, not re-*delivery*
+
+The duplicate window is consulted **on publish and never on delivery**, so it does nothing about a
+consumer redelivering a message the stream already holds. Operators conflate the two often enough
+that a maintainer has had to say it outright (source: [[s-gh-6628-ackwait-vs-dupe-window]]):
+
+> "AckWait and DupeWindow are two different settings that are not related to each other."
+> — @MauriceVanVeen, 2025-03-10
+
+`duplicate_window` is a **stream** setting bounding how long the server remembers a `Nats-Msg-Id`;
+`ack_wait` is a **consumer** setting bounding how long it waits for an answer before delivering the
+same stored message again ([[ack-and-redelivery]]). The asker of that thread had a `10m` window
+against an `8m` `ack_wait` and expected the longer window to suppress the redeliveries; it cannot,
+and no stream setting can. To be handled once, bound the deliveries — `max_deliver: 1`, or an ack or
+term on every path.
+
+
 ## Limits and failure modes
 
 - **Batch size and in-flight limits.** The docs state **1,000 messages per atomic batch** and **at
@@ -206,6 +223,35 @@ and `allow_atomic` on [[stream]]; neither can be changed after creation.
   success status; code that treats a non-zero `duplicate` as a failure will retry forever.
 - **`max_payload` bounds a single message** (`1MB` by default), and a batch does not get around it —
   each message is still a message ([[defaults-and-limits]]).
+
+## A fifth mode: publish now, store for later
+
+**Since 2.12** a publish can carry a *schedule* instead of being stored as an ordinary message: the
+stream keeps it and produces messages on a target subject at the times the headers ask for
+([[message-scheduling]]). It is a publish-time feature — the whole configuration is headers on one
+`nats pub` — so two things belong on this page.
+
+**The headers**, in the same namespace as everything above (source: [[s-docs-jetstream-headers]]):
+`Nats-Schedule`, `Nats-Schedule-Target`, `Nats-Schedule-Source`, `Nats-Schedule-TTL`,
+`Nats-Schedule-Time-Zone`, `Nats-Schedule-Rollup` — and, on the messages the server generates,
+`Nats-Scheduler` and `Nats-Schedule-Next`. Extra headers on the schedule ride through to the target
+verbatim.
+
+**`nats pub` without `-J` cannot report a rejected publish.** This is not specific to schedules and it
+matters for every header on this page: a plain `nats pub` is a **core NATS publish**, so it sets no
+reply subject, the `PubAck` has nowhere to go, and the CLI prints `Published N bytes` for a message
+the server refused. Observed at v2.14.6: the same invalid schedule prints an error with `-J` and
+nothing without it (source: [[s-nats-server-message-schedules-observed]]).
+
+```
+nats pub    schedules.x 'body' -H 'Nats-Schedule:*/5 * * * *' …   # "Published 1 bytes" — and refused
+nats pub -J schedules.x 'body' --schedule-cron='*/5 * * * *' …    # "message schedules pattern is invalid (10189)"
+```
+
+**Cancelling a schedule uses this page's expected-state headers.** `Nats-Schedule-Next: purge` plus
+`Nats-Scheduler: <schedule subject>`, optionally with `Nats-Expected-Last-Subject-Sequence`, stops a
+schedule and publishes a message as one atomic operation (source: [[s-adr-51-message-scheduler]]).
+
 
 ## To verify
 
@@ -234,4 +280,4 @@ and `allow_atomic` on [[stream]]; neither can be changed after creation.
 - [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] — the releases the two batch modes shipped
   in.
 - [[s-relnotes-2.14.0]] — the `Nats-Batch-Commit: eob` end-of-batch commit.
-- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response.
+- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]]

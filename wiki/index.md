@@ -44,6 +44,9 @@ exists to answer live in `inbox/question-bank.md`.
   the `423`, and the `failover` option that does nothing on 2.14.
 - [[message-ttl]] — `Nats-TTL`, subject delete markers, the silent TTL clamp, and the marker kinds
   that are documented but unimplemented.
+- [[message-scheduling]] — the stream publishes for you: `allow_msg_schedules` and the two fields it
+  silently changes, `@at` in 2.12 and cron in 2.14, six-field cron and the `10189` with four causes,
+  the atomic cancel and its `10212`, and why retention decides whether a schedule ever fires.
 - [[account]] — the absolute boundary: `$G` and `$SYS`, per-account JetStream, why a cross-account
   request fails as `No responders`, and the three `no_auth_user` traps.
 - [[publishing]] — what a `PubAck` proves and what it does not; `Nats-Msg-Id` and the two-minute
@@ -129,6 +132,9 @@ exists to answer live in `inbox/question-bank.md`.
 
 - [[worker-pool]] — many processes on one consumer: demand-based distribution, `max_ack_pending` as a
   *shared* ceiling, and why this is not a queue group.
+- [[dead-letter-queue]] — there is no DLQ, deliberately: capture the max-deliveries advisory,
+  direct-get the original by sequence, republish. The advisory carries no payload and never will, and
+  with nobody fetching nothing is ever dead-lettered.
 - [[multi-region-jetstream]] — one hub cluster, leaf regions with their own domains. Why a
   super-cluster couples every region's availability, and what the shape costs you.
 - [[how-clients-reach-a-cluster]] — seed URLs versus what the server advertises: the three designs
@@ -419,6 +425,13 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-defaults-sweep]] — all 216 documented defaults compared with the source at
   v2.14.6: leafnode compression is `s2_auto` and not `accept`, `mqtt.max_ack_pending` is 1024 and
   not 100, `mqtt.port` has no default at all, and why a use-site default is invisible in `/varz`.
+- [[s-nats-server-nak-backoff-observed]] — thirteen runs on the v2.14.6 binary settling what a nak
+  actually waits: a **bare** nak is immediate with or without a `backoff`, but a nak carrying a delay
+  waits `delay + (backoff[dc] − backoff[0])`, `-NAK {}` is not a bare nak, and `ack_wait` beside a
+  `backoff` is silently overwritten. Docs issues #38 and #39, server issue SI-2.
+- [[s-nats-server-message-schedules-observed]] — the message scheduler run rather than read: every
+  ADR-51 rule held, ten error codes pinned to their conditions, the two header rows the docs get
+  wrong, `nats pub` without `-J` hiding a rejection, and `--schedule-after` broken at CLI 0.4.0.
 
 **The `nats.go` client source**
 
@@ -451,6 +464,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-adr-42-priority-groups]] — the three priority policies and the pinned-client protocol.
 - [[s-adr-43-per-message-ttl]] — `Nats-TTL`, markers, the clamp, and seven error codes.
 - [[s-adr-48-kv-ttl]] — KV limit markers: one setting, two stream fields, a 1-second floor, and why
+- [[s-adr-51-message-scheduler]] — the message scheduler's only real specification: the header family,
+  six-field cron, time zones as a tzdata dependency, the retention table and the two-stream shape for
+  interest retention.
   there is no TTL on `Put`.
 - [[s-adr-54-kv-codecs]] — *Proposed*: keys are subjects, nothing escapes them for you, and what a
   client-side codec costs you in `nats kv ls` and in a watcher.
@@ -536,11 +552,33 @@ exists to answer live in `inbox/question-bank.md`.
   "A Supercluster is a single system", and reach it by DNS.
 - [[s-gh-7494-supercluster-degradation]] — 80,000 msg/s to 2,000 when a distant subscriber joins.
   **Unanswered**; the source explains it exactly.
+- [[s-gh-6628-ackwait-vs-dupe-window]] — `ack_wait` and the duplicate window "are not related to
+  each other"; the asker's real cause was a **pull batch of 100**.
+- [[s-gh-6350-exponential-backoff]] — the marked answer that splits retry in two: consumer `backoff`
+  for an implicit failure, `nakWithDelay` for an explicit one.
+- [[s-gh-4972-nak-with-delay-blocks]] — a delayed nak keeps its `max_ack_pending` slot for the whole
+  delay. **Working as designed**, with a maintainer arguing in the same thread that it should not be.
+- [[s-gh-5631-nak-not-immediate]] — a nak that redelivered only after the ack timeout, on 2.10.14.
+  **Zero comments in two years**; the wiki answers it from the binary instead.
+- [[s-gh-7672-cron-schedules]] — cron schedules are 2.14, and on 2.12 they come back as
+  `message schedules pattern is invalid` — a version problem wearing a syntax problem's clothes.
+- [[s-gh-7628-scheduler-vs-nak]] — "Nak is not meant for that purpose": use the scheduler, and it
+  scales because it is built on the per-message TTL work.
+- [[s-gh-4994-scale-to-zero-dlq]] — "We do not have automated DLQs… by design", and the
+  scale-to-zero trap: with nobody fetching, `ack_wait` never advances the delivery count.
+- [[s-gh-7590-dlq-payload-loss]] — the max-deliveries advisory has no payload, why the maintainers
+  resist adding one, and the 2.12.3/2.12.4 R3 defect that made the documented recipe fail.
 
 **Synadia blog (continued)**
 
 - [[s-synadia-jetstream-anti-patterns]] — the ~100k consumer and ~300 subject-filter thresholds,
   why `consumer info` is expensive, and republish / Direct Get as alternatives to consumers.
+- [[s-synadia-reliable-delivery-dlq]] — the dead-letter pattern assembled from the max-deliveries
+  advisory, a direct get by sequence and a republish; how retention bounds the recovery window. **Two
+  of its claims are wrong at 2.14.6** (docs issue #39).
+- [[s-synadia-delayed-scheduling]] — the readable account of the message scheduler: the four
+  `Nats-Schedule` formats with the version each arrived in, six gotchas, and the target-vs-schedule
+  rule the specification omits.
 
 **docs.nats.io — Ecosystem, install and deployment**
 
@@ -557,6 +595,8 @@ exists to answer live in `inbox/question-bank.md`.
 
 - [[s-docs-get-direct]] — the point read, `allow_direct`, batch with `Nats-Num-Pending`, and the
   three ways it is misused.
+- [[s-docs-jetstream-headers]] — the docs' one table of the whole JetStream header space; its
+  scheduling rows are the docs' *entire* coverage of the scheduler, and two of them are wrong.
 - [[s-docs-worker-pool]] — one consumer many workers, the shared `MaxAckPending` cap, and the queue
   group comparison.
 - [[s-docs-mirrors-and-sources]] — mirror vs source, the comparison table, and the export type that

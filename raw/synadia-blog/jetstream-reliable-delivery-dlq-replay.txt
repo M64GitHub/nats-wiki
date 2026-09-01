@@ -1,0 +1,619 @@
+NEW: The Edge Autonomy Gap report. AI is arriving at the edge — 500 practitioners say the infrastructure isn't ready.
+
+The creators of
+
+NATS Slack: 11K+ membersNATS GitHub: 41K+ stars
+
+ProductsSynadia PlatformSingle-tenant, fully managed NATS in your cloud. Enterprise control without operating it yourself.
+Synadia CloudMulti-tenant, hosted NATS. Build quickly with NATS, don't operate it.
+Synadia Deploy for KubernetesSelf-serve NATS & Synadia Platform deployment for Kubernetes environments.
+Synadia InsightsGranular, NATS-native observability including 100+ audit checks from our experts.
+Synadia ProtectA security gateway for NATS. Enforce policy on every connection and message.
+
+SolutionsDistributed & Agentic AI
+Connected Car
+Financial Services
+Microservices
+Smart Manufacturing
+
+Customers
+
+Resources
+### FEATURED
+RethinkConn 2026The biggest NATS event of the year
+Living on the EdgeEdge-to-core messaging patterns
+Synadia EducationLive NATS training from the experts
+
+### RESOURCES
+BlogDocsVideosNewsletterOn-demand Workshops
+
+### Comparisons
+NATS vs KafkaNATS vs Kinesis
+
+Edge Autonomy 2026
+ReportThe Edge Autonomy GapWhy the edge isn’t ready for AI
+AssessmentBenchmark your edgeGet your autonomy score in ~2 minutes
+
+CompanyHiring!
+
+Contact us
+
+The creators of
+
+Open main menu
+
+All posts
+
+# Reliable Message Delivery in NATS JetStream: Acks, Retries, Dead Letters, and Replay
+Andrew Connolly
+
+• Jul 24, 2026
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in PerplexityShare on XShare on LinkedInShare via emailCopy as MarkdownCopy link
+
+JetStream gives you delivery guarantees as a small set of primitives you compose, not a switch you flip. The happy path proves very little about them; what matters is what happens when a message fails. This post walks the complete lifecycle of a failing message in NATS JetStream, from the publish acknowledgment through redelivery, a dead-letter queue (DLQ), and replay, with working Go.
+
+TL;DR: JetStream’s delivery guarantees compose from a handful of primitives. A publish acknowledgment confirms an event is persisted in a stream (with Nats-Msg-Id deduplication inside a configurable window). A durable consumer tracks each subscriber’s progress, and explicit acknowledgment gives the consumer three verbs: ack (done), nak (redeliver immediately, after a delay, or on a backoff schedule), and term (stop trying). MaxDeliver bounds redelivery. When a message exceeds it, the server publishes an advisory on $JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.<stream>.<consumer>; capture those advisories in a stream of their own, fetch the original message by sequence, and you have a dead-letter queue that is itself a replayable stream. Any authorized consumer can replay history from a sequence number or a timestamp. NATS has no one-line DLQ config; it has something more composable, and this post builds it in about thirty lines of Go.
+
+One answer up front, since it is the question most people arrive with: NATS does not ship a single-config dead-letter queue. It ships the pieces you assemble one from, and what you end up with is a first-class, replayable stream rather than an opaque holding pen. The rest of this post is the assembly.
+
+## The failure scenarios
+
+Every reliability discussion eventually reduces to the same handful of ways delivery goes wrong. Here is each one and the primitive that answers it.
+
+| | Failure scenario | NATS / JetStream answer
+| Consumer offline at publish time | Durable streams + durable consumers; delivery resumes from last acknowledged message
+| Consumer cannot process a message | Three consumer verbs: ack (done), nak (redeliver, optionally with delay or a backoff schedule), term (stop trying)
+| Downstream system out for hours | Bounded redelivery (AckWait, MaxDeliver, backoff); consumer resumes from its cursor when the system returns
+| Poison message loops forever | MaxDeliver bound → max-deliveries advisory → DLQ pattern (advisories captured into a replayable stream)
+| Rebuild state from history | Consumer start position by sequence or timestamp; ReplayPolicy instant or original-timing; any authorized consumer can rewind
+| Command needs confirmed delivery | Publish acknowledgment confirms persistence; request/reply confirms execution
+
+The rest of this post implements that frame. Code is Go, using the jetstream package; the same primitives exist in the other NATS client libraries.
+
+## The lifecycle of a failing message
+
+Before the mechanics, here is the map. A message that fails travels a defined path, and every arrow in it is one of the primitives above.
+
+- 1
+
+flowchart LR
+
+2
+
+P[Publisher] -->|publish| S[(Stream)]
+
+3
+
+S -->|PubAck: persisted| P
+
+4
+
+S -->|deliver| C[Consumer]
+
+5
+
+C -->|ack| S
+
+6
+
+C -->|nak / delay / backoff| S
+
+7
+
+C -->|term| S
+
+8
+
+S -->|MaxDeliver exceeded| A[[MAX_DELIVERIES advisory]]
+
+9
+
+A -->|captured by| AS[(Advisory stream)]
+
+10
+
+AS --> H[DLQ handler]
+
+11
+
+H -->|direct get by seq| S
+
+12
+
+H -->|republish| D[(DLQ stream)]
+
+13
+
+D -->|replay / repair| P
+
+|publish| S[(Stream)] S -->|PubAck: persisted| P S -->|deliver| C[Consumer] C -->|ack| S C -->|nak / delay / backoff| S C -->|term| S S -->|MaxDeliver exceeded| A[[MAX_DELIVERIES advisory]] A -->|captured by| AS[(Advisory stream)] AS --> H[DLQ handler] H -->|direct get by seq| S H -->|republish| D[(DLQ stream)] D -->|replay / repair| P">
+
+A message is persisted, delivered, and acknowledged. When the acknowledgment never comes, it is redelivered, then bounded, then routed to a durable place you can inspect and replay. Nothing here is magic; each step is a configuration value or a method call.
+
+## How do acknowledgments work in NATS JetStream?
+
+There are two acknowledgments in JetStream, and conflating them is the most common source of confusion: the publish acknowledgment protects the write, and the consumer acknowledgment protects the read.
+
+The publish acknowledgment (PubAck) is the server’s confirmation that your event has been persisted to the stream according to that stream’s storage and replication configuration. On a replicated stream, the PubAck means the message is committed across the configured replicas, not merely accepted by one node. If you do not receive a PubAck, you do not know the write landed, so you retry.
+
+Retrying safely is where deduplication comes in. Set the Nats-Msg-Id header on publish, and the stream rejects a duplicate with the same ID inside its deduplication window (configurable per stream, a couple of minutes by default). The PubAck for a duplicate comes back flagged as such, so a retry after a dropped ack is idempotent at the stream boundary.
+
+1
+
+ack, err := js.Publish(ctx, "orders.created", data,
+
+2
+
+jetstream.WithMsgID("order-8f2c-created"))
+
+3
+
+if err != nil {
+
+4
+
+// No PubAck: safe to retry, dedup window protects against a double-write.
+
+5
+
+return err
+
+6
+
+}
+
+7
+
+if ack.Duplicate {
+
+8
+
+// This exact message ID was already persisted within the window.
+
+9
+
+}
+
+The precise name for this is exactly-once publish within the deduplication window. It does not make end-to-end processing exactly-once; no distributed system can promise that. What you build on top is effectively-once processing: at-least-once delivery combined with idempotent consumers. Hold that thought for the exactly-once question in the FAQ.
+
+The consumer acknowledgment is the read-side counterpart. With an explicit acknowledgment policy (AckExplicitPolicy), the consumer must positively acknowledge each message, and until it does, JetStream considers that message in-flight and owes it redelivery. The consumer’s durable cursor advances only over acknowledged messages, which is exactly why a subscriber that was offline at publish time resumes from its last acknowledged position rather than losing anything.
+
+Two settings govern the in-flight window:
+
+- AckWait: how long the server waits for an acknowledgment before it assumes the delivery failed and redelivers.
+
+- MaxAckPending: the ceiling on unacknowledged messages a consumer may hold at once. This is your backpressure knob; it bounds how much work a slow or wedged consumer can pull without confirming.
+
+## The three consumer verbs
+
+Explicit acknowledgment gives the consumer three ways to respond to a message. This is the whole vocabulary of read-side reliability.
+
+| | Verb | When to use it | What the server does
+| Ack | Processing succeeded | Marks the message acknowledged; the cursor advances past it
+| Nak (or NakWithDelay) | Transient failure; retry is worth attempting | Schedules redelivery, immediately or after the delay you specify
+| Term | Permanent failure; retrying will never help | Stops redelivery of this message entirely and advances past it
+
+The distinction between Nak and Term is judgment, and it belongs in your handler. A timeout talking to a database is a Nak: try again shortly. A message that fails schema validation is a Term, because no number of retries fixes malformed input.
+
+1
+
+msg, err := consumer.Next()
+
+2
+
+// ...
+
+3
+
+switch result := process(msg); {
+
+4
+
+case result == nil:
+
+5
+
+msg.Ack()
+
+6
+
+case errors.Is(result, errTransient):
+
+7
+
+msg.NakWithDelay(5 * time.Second)
+
+8
+
+case errors.Is(result, errPermanent):
+
+9
+
+msg.Term()
+
+10
+
+}
+
+## How do I retry a failed message with a backoff?
+
+A fixed AckWait gives you uniform redelivery timing, but transient outages rarely want uniform timing. You want to back off as failures persist. JetStream supports this at the consumer level with BackOff, a slice of durations on the consumer configuration. The first redelivery waits BackOff[0], the second waits BackOff[1], and so on; once the schedule is exhausted, the last interval repeats until the delivery bound is reached.
+
+1
+
+cfg := jetstream.ConsumerConfig{
+
+2
+
+Durable: "order-processor",
+
+3
+
+AckPolicy: jetstream.AckExplicitPolicy,
+
+4
+
+AckWait: 30 * time.Second,
+
+5
+
+MaxAckPending: 1000,
+
+6
+
+MaxDeliver: 5,
+
+7
+
+BackOff: []time.Duration{
+
+8
+
+1 * time.Second,
+
+9
+
+5 * time.Second,
+
+10
+
+30 * time.Second,
+
+11
+
+2 * time.Minute,
+
+12
+
+},
+
+13
+
+}
+
+When you set BackOff, size MaxDeliver deliberately against the length of the schedule. A MaxDeliver of 5 with a four-entry backoff gives four spaced retries after the initial delivery; the fifth attempt is the last before the message is bounded out. This is the answer to “downstream system out for hours”: the consumer keeps its cursor, spaces its retries, and picks up where it left off when the dependency returns, without losing a message and without hammering a recovering service.
+
+## How do I stop a poison message from redelivering forever?
+
+Some messages never succeed no matter how patiently you retry. That is the classic poison message, and without a bound it redelivers forever, starving the consumer of forward progress. MaxDeliver is the bound: after that many delivery attempts, JetStream stops redelivering the message on its own.
+
+But stopping is not enough. A message that silently falls off the end of its redelivery budget is a message you have lost track of. That is where advisories come in. When a message exceeds MaxDeliver, the server publishes an advisory:
+
+1
+
+$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.<stream>.<consumer>
+
+.">
+
+Related advisories fire on explicit termination ($JS.EVENT.ADVISORY.CONSUMER.MSG_TERMINATED.<stream>.<consumer>) and on negative acknowledgment ($JS.EVENT.ADVISORY.CONSUMER.MSG_NAKED). One thing to internalize: advisories are transient messages. If nobody is subscribed when one fires, it is gone. So you do the obvious thing and persist them into a stream.
+
+## Does NATS have a dead-letter queue?
+
+No. NATS has no single-config dead-letter queue. There is no dead_letter: true field on a consumer. What NATS has instead is the set of primitives you assemble one from, and the DLQ you build is an ordinary JetStream stream with all the retention, filtering, and replay that implies, which beats a special-case holding pen.
+
+The pattern is three parts:
+
+- Capture the advisories. Create a stream that subscribes to the max-deliveries advisory subject. This stream is the index of everything that exhausted its redelivery budget.
+
+- Fetch the original message. Each advisory carries the source stream name and the stream sequence of the failed message. Use a direct get by sequence to pull the original payload back out.
+
+- Republish to a DLQ subject captured by its own stream, so the dead-lettered messages live in a durable, queryable place.
+
+First the two streams, a few lines of configuration:
+
+1
+
+// Index stream: persists max-deliveries advisories.
+
+2
+
+js.CreateStream(ctx, jetstream.StreamConfig{
+
+3
+
+Name: "DLQ_ADVISORIES",
+
+4
+
+Subjects: []string{"$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.>"},
+
+5
+
+})
+
+6
+
+7
+
+// Dead-letter stream: the durable home for failed payloads.
+
+8
+
+js.CreateStream(ctx, jetstream.StreamConfig{
+
+9
+
+Name: "DLQ",
+
+10
+
+Subjects: []string{"dlq.>"},
+
+11
+
+})
+
+"},})// Dead-letter stream: the durable home for failed payloads.js.CreateStream(ctx, jetstream.StreamConfig{ Name: "DLQ", Subjects: []string{"dlq.>"},})">
+
+Now the handler that ties them together:
+
+1
+
+type maxDeliverAdvisory struct {
+
+2
+
+Stream string `json:"stream"`
+
+3
+
+Consumer string `json:"consumer"`
+
+4
+
+StreamSeq uint64 `json:"stream_seq"`
+
+5
+
+}
+
+6
+
+7
+
+// advisories is a durable consumer on the DLQ_ADVISORIES stream.
+
+8
+
+func runDLQ(ctx context.Context, js jetstream.JetStream, advisories jetstream.Consumer) error {
+
+9
+
+_, err := advisories.Consume(func(m jetstream.Msg) {
+
+10
+
+var a maxDeliverAdvisory
+
+11
+
+if err := json.Unmarshal(m.Data(), &a); err != nil {
+
+12
+
+m.Term() // malformed advisory: never retry
+
+13
+
+return
+
+14
+
+}
+
+15
+
+src, err := js.Stream(ctx, a.Stream)
+
+16
+
+if err != nil {
+
+17
+
+m.Nak()
+
+18
+
+return
+
+19
+
+}
+
+20
+
+orig, err := src.GetMsg(ctx, a.StreamSeq) // direct get by sequence
+
+21
+
+if err != nil {
+
+22
+
+m.Nak()
+
+23
+
+return
+
+24
+
+}
+
+25
+
+dead := nats.NewMsg(fmt.Sprintf("dlq.%s.%s", a.Stream, a.Consumer))
+
+26
+
+dead.Data = orig.Data
+
+27
+
+dead.Header = orig.Header
+
+28
+
+dead.Header.Set("Nats-Dlq-Origin-Seq", strconv.FormatUint(a.StreamSeq, 10))
+
+29
+
+if _, err := js.PublishMsg(ctx, dead); err != nil {
+
+30
+
+m.Nak()
+
+31
+
+return
+
+32
+
+}
+
+33
+
+m.Ack()
+
+34
+
+})
+
+35
+
+return err
+
+36
+
+}
+
+That is the whole DLQ. The handler is itself a well-behaved JetStream consumer: if it cannot reach the source stream, it Naks and tries the advisory again later; if the advisory is malformed, it Terms. Failed messages land on dlq.<stream>.<consumer>, subject-partitioned so you can inspect or replay a single failing consumer’s backlog without touching the rest.
+
+And because the DLQ is a stream, working with it means reading another consumer, not opening a ticket and grepping logs. Read the dead-letter stream, fix the downstream defect, and replay the affected messages back onto their original subject. NATS traded a one-line config field for a dead-letter mechanism that is first-class infrastructure.
+
+## Retention interactions
+
+The DLQ pattern touches the source stream by sequence, so how that stream retains messages matters.
+
+- Limits retention: the stream keeps messages until an age, size, or count limit is hit, independent of acknowledgment. This is the friendliest case for the DLQ handler: when the advisory fires, the original message is still there to fetch, as long as your limits are generous enough that it has not aged out between the last delivery attempt and the handler’s direct get.
+
+- Work-queue retention: a message is retained until it is terminally acknowledged, then removed. Here, timing is subtle: the message must still be present when your handler does its direct get. Because exhausting MaxDeliver is what triggers the advisory in the first place, treat the capture handler as time-sensitive and keep it running close to the source, rather than assuming the payload lingers indefinitely.
+
+- Interest retention: a message is retained only while there is interest from consumers that have not yet acknowledged it. As with work-queue retention, the window in which the original payload is available for a direct get is bounded by consumer behavior, so verify the fetch happens promptly.
+
+The general rule: on any retention policy that removes messages once they are terminally handled, capture the payload while it still exists. Copying the original into the DLQ stream at capture time, as the handler above does, is what makes the dead-lettered data durable regardless of what the source stream does next.
+
+## How do I replay past messages in JetStream?
+
+Replay is the same read primitive, aimed backward in time. A consumer’s DeliverPolicy sets where it starts:
+
+- All: from the first message in the stream.
+
+- Last: from the most recent message.
+
+- New: only messages arriving after the consumer is created.
+
+- By start sequence: from a specific stream sequence.
+
+- By start time: from a specific timestamp.
+
+ReplayPolicy then controls pacing: instant delivers as fast as the consumer can take it; original reproduces the timing of the original stream, spacing redelivery to match the intervals at which messages first arrived, which is useful for realistic load reproduction.
+
+1
+
+js.CreateConsumer(ctx, "EVENTS", jetstream.ConsumerConfig{
+
+2
+
+DeliverPolicy: jetstream.DeliverByStartTimePolicy,
+
+3
+
+OptStartTime: &startOfLastWeek,
+
+4
+
+ReplayPolicy: jetstream.ReplayInstantPolicy,
+
+5
+
+})
+
+The concrete payoff: to rebuild a read model or projection, you do not coordinate with the producing systems and you do not ask anyone to re-emit events. You create a fresh consumer, point it at the sequence or timestamp you want, replay the history JetStream already holds, and let it catch up to live. Any authorized consumer can rewind; the producers never know it happened.
+
+## FAQ
+
+How do acknowledgments work in NATS JetStream? There are two. A publish acknowledgment (PubAck) confirms the server persisted your message to the stream per its storage and replication configuration. A consumer acknowledgment confirms a subscriber finished processing a delivered message; under an explicit ack policy the consumer must ack each message, and the durable cursor advances only over acknowledged messages.
+
+How do I retry a failed message with a backoff? Negatively acknowledge it. Nak schedules an immediate redelivery, NakWithDelay waits a fixed interval, and the consumer’s BackOff schedule applies an escalating series of delays across successive redeliveries. Size MaxDeliver against the backoff schedule so the retries you want all get a chance to run.
+
+Does NATS have a dead-letter queue? Not as a single configuration flag. You build one by bounding redelivery with MaxDeliver, capturing the resulting max-deliveries advisories into their own stream, and running a small handler that fetches each failed message by sequence and republishes it to a DLQ subject captured by a dedicated stream. The result is a durable, filterable, replayable dead-letter stream.
+
+How do I stop a poison message from redelivering forever? Set MaxDeliver on the consumer to bound the number of delivery attempts, or call Term in your handler when you detect a permanent failure. Both stop redelivery; MaxDeliver also emits an advisory you can capture for a DLQ.
+
+How do I replay past messages in JetStream? Create a consumer with a DeliverPolicy of all, by start sequence, or by start time, and choose a ReplayPolicy of instant or original timing. The consumer reads the retained history without involving the original producers.
+
+Is JetStream exactly-once? JetStream provides exactly-once publish within the deduplication window via the Nats-Msg-Id header, and at-least-once delivery to consumers. End-to-end exactly-once processing is achieved the same way it is in any honest distributed system: build idempotent consumers on top of at-least-once delivery to get effectively-once results. Avoid treating unqualified “exactly-once” as a delivery guarantee.
+
+## Go deeper
+
+- JetStream concepts, consumers, and replay in the official documentation at docs.nats.io.
+
+- Runnable, client-by-client examples at natsbyexample.com, including acknowledgment and redelivery patterns.
+
+- The NATS Architecture Decision Records for the design intent behind streams, consumers, and deduplication.
+
+Two companion posts in this pack extend the picture: an architecture piece on whether industrial IoT deployments really need separate protocol brokers, and a concept piece arguing that message reliability belongs in the infrastructure rather than in application code. This post is the implementation those two point to.
+
+Delivery guarantees in JetStream come down to a publish acknowledgment, durable cursors, three consumer verbs, bounded redelivery, advisories, and replay. Build the DLQ once from advisories and a direct get, and the absence of a one-line config reads less like a gap and more like a design decision.
+
+Want help from the NATS experts? Meet with our architects to get help tailored to your use case and environment.
+
+## Related posts
+
+All posts
+
+TechnologyThe cost of the stitched stack: why AI stalls before it reaches the edgeAndrew Connolly•Jul 24, 2026
+
+TechnologyHow to Stream NATS Messages to ClickHouse in Real TimeAndrew Connolly•Jul 10, 2026
+
+TechnologyFrom Solace to NATS: One Platform for Messaging, Streaming, and the EdgeAndrew Connolly•Jul 9, 2026
+
+Products Synadia CloudSynadia PlatformSynadia Deploy for KubernetesSynadia InsightsSynadia Protect
+Resources BlogDocsVideosSynadia EducationNATS vs KafkaNATS vs Kinesis
+Company AboutBrandCustomersContactCareersPress
+Legal TermsPrivacyDPASubprocessorsSupport LifecycleTrust Center
+
+Get the NATS Newsletter
+News and content from across the community
+
+Subscribe
+
+© 2026 Synadia Communications, Inc.
+
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in Perplexity
+X YouTube LinkedIn Slack GitHub
+
+Cancel

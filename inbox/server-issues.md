@@ -32,6 +32,7 @@ So the discipline here is different:
 | # | finding | kind | severity | run on | upstream |
 |---|---|---|---|---|---|
 | SI-1 | The leafnode JetStream deny list names `$OBJ.>`, but the object store's subjects are `$O.<bucket>.C.>` and `$O.<bucket>.M.>` — so object-store data crosses a JetStream domain boundary that KV data does not, and two same-named buckets on either side of a leafnode silently converge | inconsistent | ★ high | v2.14.6 | not filed |
+| SI-2 | A nak that carries a delay is redelivered after `delay + (BackOff[dc] − BackOff[0])`, not after `delay`: `processNak` backdates the pending timestamp by `o.cfg.AckWait` while `checkPending` measures it against the attempt's backoff entry. A client asking for 2s gets 12s; a client asking for **0s** gets 10s. A **bare** `-NAK` is unaffected, and `-NAK {}` is not bare | unexpected | high | v2.14.6 | not filed |
 
 ---
 
@@ -122,3 +123,104 @@ JetStream domain*; `wiki/concepts/jetstream-domain.md`; `wiki/concepts/leafnode.
 `wiki/gotchas/streams-not-visible-across-a-leafnode.md`;
 `wiki/summaries/s-nats-server-object-store-leafnode.md`. The **documentation** half — that no page
 states what a domain does to either store — is `inbox/docs-issues.md` **#35**.
+
+---
+
+## SI-2 · A delayed nak waits longer than the delay it was given, when the consumer has a backoff
+
+**The observation.** On a pull consumer with `BackOff = [5s, 10s, 15s]`, a nak carrying an explicit
+**2-second** delay was redelivered after **2.000 s, 7.000 s, 12.000 s, 12.001 s** on successive
+attempts — measured from the server's own trace log, run on **v2.14.6**. The client asked for two
+seconds every time. On the same consumer, a nak carrying an explicit **zero** delay
+(`-NAK {"delay":0}`) was redelivered after **0.00 s, 4.94 s, 9.94 s**.
+
+A **bare** `-NAK` on the same consumer is unaffected — 0.00 s every time.
+
+**Why.** Three places in `server/consumer.go` at tag v2.14.6 compose into it.
+
+1 · A backoff **overwrites** `AckWait` at creation (`consumer.go:653–659`):
+
+```go
+	// If BackOff was specified that will override the AckWait and the MaxDeliver.
+	if len(config.BackOff) > 0 {
+		if pedantic && config.AckWait != config.BackOff[0] {
+			return NewJSPedanticError(errors.New("first backoff value has to equal batch AckWait"))
+		}
+		config.AckWait = config.BackOff[0]
+	}
+```
+
+2 · A delayed nak backdates the pending timestamp by that `AckWait` (`consumer.go:3229–3231`):
+
+```go
+				if p, ok := o.pending[sseq]; ok {
+					// now - ackWait is expired now, so offset from there.
+					p.Timestamp = time.Now().Add(-o.cfg.AckWait).Add(d).UnixNano()
+```
+
+3 · But `checkPending` measures the elapsed time against **the attempt's backoff entry**, not against
+`AckWait` (`consumer.go:6052–6066`):
+
+```go
+		elapsed, deadline := now-p.Timestamp, ttl
+		if len(o.cfg.BackOff) > 0 {
+			dc := int(o.rdc[seq])
+			…
+			deadline = int64(o.cfg.BackOff[dc])
+		}
+		if elapsed >= deadline {
+```
+
+The comment in §2 — *"now - ackWait is expired now, so offset from there"* — is exact only when the
+deadline in §3 is also `AckWait`, which is true only for a consumer with **no** backoff. With one, the
+message is redelivered when
+
+```
+now  ≥  (nak_time − BackOff[0] + d) + BackOff[min(dc, len−1)]
+```
+
+so the wait a client receives is `d + (BackOff[min(dc, len−1)] − BackOff[0])`. Predicted 2 · 7 · 12 · 12
+against `[5s, 10s, 15s]`; observed 2.000 · 7.000 · 12.000 · 12.001.
+
+**Which naks take this path.** `processNak` branches on `len(nak) > len(AckNak)` — anything after the
+four bytes `-NAK`. An empty options object counts: `json.Unmarshal([]byte("{}"), &nd)` succeeds with
+`d == 0`, so **`-NAK {}` is not treated as a bare nak** and picks up the backoff term above. A client
+library that always serialises its nak options therefore gets different timing from one that omits
+them, for the same API call.
+
+**The reproduction.** `raw/nats-server-src/nak-backoff-observed-v2.14.6.md` — thirteen runs on the
+v2.14.6 binary with nats CLI 0.4.0, 2026-09-01, including the positive control (E12: no answer at all
+gives 5.00 · 10.00 · 15.00, the documented schedule) that rules out an inert backoff, and the
+no-backoff control (E8: three 2s naks give 1.95 · 1.95 · 1.95). The instrument is
+`raw/nats-server-src/nats-probe-client.py`, written because **nats CLI 0.4.0 cannot send a delayed
+nak at all** — `nats consumer next` offers `--ack`, `--nak` and `--term` and no delay flag.
+
+**What would settle it.** One question, for `nats-io/nats-server`:
+
+> Is a delayed nak's delay meant to be honoured exactly? If it is, the backdating in `processNak`
+> should offset by the same deadline `checkPending` will apply (`BackOff[dc]`) rather than by
+> `cfg.AckWait`. If it is *not* — if the backoff is deliberately additive to a nak delay — then the
+> documented rule that a backoff "doesn't slow a nak" is the thing that needs changing, and
+> `-NAK {}` still deserves to behave like `-NAK`.
+
+**Searched and not found.** No public issue, discussion or ADR read so far describes the interaction
+of `BackOff` with a delayed nak. `learn/jetstream/acknowledgment.md` states the opposite three times
+(`inbox/docs-issues.md` **#38**), and the one blog post that claims backoff applies to naks claims it
+for the *bare* nak, which is the case where it does not (**#39**).
+
+**What was not tested.**
+
+- **Clustered consumers.** All runs are R1 on one server. `updateDelivered` replicates the backdated
+  timestamp to followers; a leader change while a delayed nak sleeps was not tested.
+- **Push consumers**, and `AckAll` / `AckNone` policies. Pull with `AckExplicit` only.
+- **A decreasing backoff schedule**, where `BackOff[dc] − BackOff[0]` would be negative and the
+  redelivery would presumably fire *before* the requested delay. The CLI's generator only produces
+  increasing schedules; the API would accept a decreasing one.
+- **Which client libraries send `-NAK {}`** rather than a bare `-NAK` for a plain nak. That is the
+  missing half of `nats-io/nats-server` discussion #5631, which reports exactly this symptom on
+  2.10.14 with the C# client and has never been answered.
+- **2.10.14 itself.** Only v2.14.6 was run.
+
+**Where the wiki records this:** `wiki/concepts/ack-and-redelivery.md` — *What a delayed nak actually
+waits*. The **documentation** half — that the docs state a flat independence which does not hold — is
+`inbox/docs-issues.md` **#38**, and the blog post that states the opposite error is **#39**.

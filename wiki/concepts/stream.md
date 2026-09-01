@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -310,6 +310,38 @@ messages from streams" with no consumer at all — both are named as the fix whe
 too many consumers (source: [[s-synadia-jetstream-anti-patterns]];
 [[jetstream-slows-as-consumers-grow]], [[direct-get]]).
 
+## `allow_msg_schedules`, and the two fields it changes behind you
+
+**Since 2.12.** Setting `allow_msg_schedules` lets messages on this stream carry `Nats-Schedule`
+headers, so the stream itself publishes messages on a schedule ([[message-scheduling]]). It belongs on
+this page for one reason: **it is a one-way door that silently rewrites two other stream fields**
+(source: [[s-adr-51-message-scheduler]], confirmed on v2.14.6 —
+source: [[s-nats-server-message-schedules-observed]]).
+
+```
+$ nats stream add SCHED --subjects='schedules.>,orders' --allow-schedules --allow-msg-ttl
+$ nats stream info SCHED --json | jq '.config | {allow_msg_schedules, allow_rollup_hdrs, deny_purge}'
+{ "allow_msg_schedules": true, "allow_rollup_hdrs": true, "deny_purge": false }
+```
+
+Neither rollup nor purge was asked for. Schedules are stored as rollup-subject messages — the server
+auto-applies `Nats-Rollup: sub` so a new schedule replaces the old one on the same subject — so
+enabling the feature **enables `allow_rollup_hdrs` and clears `deny_purge`**. If either was a
+deliberate control on that stream, it is gone; see [[subject-permissions]].
+
+Its other rules, and where they sit against *What you cannot change later*:
+
+| rule | error |
+|---|---|
+| **cannot be turned off again** — it joins the fields above that are effectively permanent | `message schedules can not be disabled (10052)` |
+| not allowed on a **mirror** | `10186` |
+| not allowed on a stream with **sources** | `10187` |
+| not supported with **`discard: new`** | `message scheduling cannot use discard new (10052)` |
+| raises the stream to **API level 2** | older clients cannot manage it |
+
+`nats stream info` shows it as `Allows Schedules: true` with `Required API Level: 2`.
+
+
 ## To verify
 
 - The `duplicate_window` clamps in **pedantic mode** are read from the source; no run has confirmed
@@ -369,4 +401,4 @@ and the newest message block is never compacted. See [[filestore-layout]] for th
 [[s-issue-4281-insufficient-storage]] · [[s-synadia-jetstream-anti-patterns]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]].
+[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]]

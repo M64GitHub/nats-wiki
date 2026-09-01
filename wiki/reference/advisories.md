@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Advisories and system events
@@ -228,6 +228,61 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 ([[raft-in-nats]]), but a stream whose leader keeps moving is a symptom
 ([[stream-leader-keeps-moving]]).
 
+## Capturing advisories into a stream
+
+Advisories are **published once and stored nowhere**: "if nobody is subscribed when one fires, it is
+gone" (source: [[s-synadia-reliable-delivery-dlq]]). Any design that depends on noticing one needs a
+stream over the advisory subject, not a subscriber somebody remembers to run.
+
+```
+nats stream add DLQ_ADVISORIES \
+  --subjects='$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.>' \
+  --storage=file --replicas=3
+```
+
+That stream is "the index of everything that exhausted its redelivery budget". Because each
+max-deliveries advisory carries the source stream and the **stream sequence** of the message that ran
+out of attempts, the index is enough to fetch the original with [[direct-get]] and republish it — the
+dead-letter pattern, which NATS has no config field for and assembles out of these parts. See
+[[ack-and-redelivery]] for what the advisory means and [[retention-policies]] for the race the fetch
+runs against.
+
+Two notes for anyone building this:
+
+- **The advisory is a pointer, not a copy.** On `workqueue` or `interest` retention the message it
+  names may already be gone; capture the payload at capture time.
+- **`$JS.EVENT.ADVISORY.API` fires for ordinary API calls**, so a stream over the whole
+  `$JS.EVENT.ADVISORY.>` space is much noisier than one scoped to the subject you care about.
+
+
+### The max-deliveries advisory carries no payload, and will not
+
+The body is metadata only — the stream, the consumer, the stream sequence and the delivery count:
+
+```json
+{"type":"io.nats.jetstream.advisory.v1.max_deliver","id":"TMbth7XzlJOkyzkRhNWQTR",
+ "timestamp":"2026-09-01T02:36:13.790078Z","stream":"WQ","consumer":"w",
+ "stream_seq":1,"deliveries":2}
+```
+
+A request to include the failed message's payload was **considered and resisted**, for a reason worth
+recording because it will not change soon (source: [[s-gh-7590-dlq-payload-loss]]):
+
+> "We have considered this before but has quite a lot of user feedback that this is a bad idea due to
+> the payloads potentially being sensitive and DLQ advisories going to different locations outside of
+> nats. It might be something that would make sense as a per consumer opt in though."
+> — @ripienaar, 2025-11-28
+
+**Treat every advisory as an index entry, not a record.** The `stream_seq` is how you reach the
+message ([[direct-get]]), and on retention policies that remove acked messages you have to fetch it
+promptly — see [[dead-letter-queue]] and [[retention-policies]].
+
+**And the advisory only fires if someone is fetching.** A pull consumer with no client asking for
+messages never advances its delivery count, so `max_deliver` is never reached and this advisory is
+never published, however long `ack_wait` has elapsed (source: [[s-gh-4994-scale-to-zero-dlq]]). An
+alert built on this subject is silent in exactly the situation where a worker pool has died.
+
+
 ## How this was derived
 
 - **The subject prefixes come from `server/jetstream_api.go` at tag v2.14.6**, lines 232–314, quoted
@@ -264,4 +319,4 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
 [[s-docs-advanced-publishing]] ·
-[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]]
+[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]]

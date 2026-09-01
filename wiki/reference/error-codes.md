@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # JetStream error codes
@@ -182,6 +182,42 @@ number alone tells you almost nothing and the *text* is the only detail — the 
 match-on-the-number rule. [[no-suitable-peers-for-placement]] and [[message-ttl]] enumerate the
 distinct conditions hiding behind each.
 
+### Message scheduling — ten codes, all observed at v2.14.6
+
+Every code below was produced on the binary and read off the `PubAck`
+(source: [[s-nats-server-message-schedules-observed]]); see [[message-scheduling]] for what each
+condition means.
+
+| code | constant | condition |
+|---|---|---|
+| `10186` | `JSMirrorWithMsgSchedulesErr` | `allow_msg_schedules` on a mirror |
+| `10187` | `JSSourceWithMsgSchedulesErr` | `allow_msg_schedules` on a stream with sources |
+| `10188` | `JSMessageSchedulesDisabledErr` | a schedule, or a cancel, on a stream with schedules off |
+| `10189` | `JSMessageSchedulesPatternInvalidErr` | the pattern is bad — **four unrelated causes**, below |
+| `10190` | `JSMessageSchedulesTargetInvalidErr` | no `Nats-Schedule-Target`, or one outside the stream |
+| `10191` | `JSMessageSchedulesTTLInvalidErr` | a malformed `Nats-Schedule-TTL`, or one below the TTL floor |
+| `10192` | `JSMessageSchedulesRollupInvalidErr` | `Nats-Schedule-Rollup` other than `sub` |
+| `10203` | `JSMessageSchedulesSourceInvalidErr` | a wildcard `Nats-Schedule-Source` |
+| `10212` | `JSMessageSchedulesSchedulerInvalidErr` | five `Nats-Scheduler` / `Nats-Schedule-Next` conditions |
+| `10223` | `JSMessageSchedulesTimeZoneInvalidErr` | a fixed offset (`+02:00`) or an empty time-zone header |
+
+**`10189` is the one to be careful with.** The same code and the same text —
+`message schedules pattern is invalid` — comes back for at least four different mistakes:
+
+1. a **five-field** cron (`*/5 * * * *`); the server wants six, seconds first;
+2. `@every` below the `1s` minimum;
+3. a `Nats-Schedule-Time-Zone` on a non-cron schedule — *not* the time-zone code;
+4. a **2.14 expression sent to a 2.12 server**, where cron did not exist yet
+   (source: [[s-gh-7672-cron-schedules]]) — and, by the same path, an IANA zone the host has no tzdata
+   for (source: [[s-adr-51-message-scheduler]]).
+
+**Two scheduling refusals do not get a scheduling code at all.** `message scheduling cannot use
+discard new` and `message schedules can not be disabled` both arrive as **`10052`**
+(`JSStreamInvalidConfigF`, HTTP 500), the generic invalid-stream-config wrapper — so the reason is
+only in the text, and code-matching cannot distinguish them from any other bad stream config. This is
+the page's own rule about never matching on error text meeting a case where the code is not enough.
+
+
 ## Reading a code
 
 **In a server log**, `ApiError` appends the code in parentheses:
@@ -260,4 +296,4 @@ summaries that put them there — [[s-adr-43-per-message-ttl]] (`10052`, `10165`
 [[s-docs-stream-backup-restore]] (`10064`) · [[s-gh-7982-no-suitable-peers]] (`10005`) ·
 [[s-issue-4281-insufficient-storage]] (`10028`, `10047`) · [[s-nats-server-snapshot-restore]]
 (`10060`, `10064`, `10130`) · [[s-docs-advanced-publishing]] (the eleven `JSAtomicPublish*` and
-`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle).
+`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]]

@@ -51,7 +51,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 48 | ADR-48.md | TTL Support for Key-Value Buckets | Implemented | clients jetstream kv | jetstream, client, kv, refinement, 2.11 | implemented refinement 2.11 | [[s-adr-48-kv-ttl]] |
 | 49 | ADR-49.md | JetStream Distributed Counter CRDT | Approved | jetstream | jetstream, spec, 2.12 | approved 2.12 |  |
 | 50 | ADR-50.md | JetStream Batch Publishing | Approved | clients core jetstream | jetstream, server, client, 2.12, 2.14 | approved 2.12 2.14 |  |
-| 51 | ADR-51.md | JetStream Message Scheduler | Approved | jetstream | jetstream, 2.12, 2.14 | approved 2.12 2.14 |  |
+| 51 | ADR-51.md | JetStream Message Scheduler | Approved | jetstream | jetstream, 2.12, 2.14 | approved 2.12 2.14 | [[s-adr-51-message-scheduler]] |
 | 52 | ADR-52.md | No Headers support for Direct Get | Deprecated |  | deprecated | deprecated |  |
 | 53 | ADR-53.md | Feature flags | Proposed | core | server | proposed |  |
 | 54 | ADR-54.md | KV Codecs | Proposed | clients jetstream kv | jetstream, client, spec, orbit, kv, refinement | proposed refinement | [[s-adr-54-kv-codecs]] |

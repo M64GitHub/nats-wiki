@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Worker pool
@@ -108,6 +108,49 @@ while workers are idle, `max_ack_pending` is your bottleneck.
 - **No control over placement.** Demand-based distribution is the point, and the cost is that you
   cannot pin work to a worker.
 
+## Retries come out of the same budget as concurrency
+
+The pool's ceiling is `max_ack_pending`, and **a message nak'd with a delay keeps its slot for the
+whole delay** — it is still pending, because "max pending is used to manage ordering"
+(source: [[s-gh-4972-nak-with-delay-blocks]], and see [[ack-and-redelivery]]). So a pool that retries
+with delays is spending one budget on two things.
+
+The reporter of that thread ran a pool with `max_ack_pending: 10` and nak'd each message with a
+one-minute delay: **the tenth nak stopped the pool dead**, 10 messages handled out of 100 published.
+Nothing crashed and nothing logged; `Outstanding Acks` simply sat at its maximum with every worker
+idle until the first delay expired. That is the shape to recognise — it looks exactly like a stuck
+handler, and `nats consumer info` alone does not tell the two apart.
+
+Two things follow for sizing a pool:
+
+- **The cap must cover workers *plus* the sleeping retry set**, roughly *R × D* extra slots at a nak
+  rate of *R* per second and a delay of *D* seconds (arithmetic from the constraint; no source states
+  a number). A pool of 10 workers retrying 50 messages a second at a 60-second delay needs a cap in
+  the thousands, not tens.
+- **Extra consume loops buy nothing.** Running ten `Consume` callbacks against one consumer does not
+  give ten workers' worth of slots — the cap is one number per consumer, across goroutines and across
+  processes alike. In that thread the apparent improvement came only from dropping `MaxAckPending`
+  out of the config, which restored the default of 1000.
+
+When the delay is long, the retry is really a scheduled publish and does not belong on the ack loop
+at all — a maintainer recommends the message scheduler over a delayed nak for that work
+([[message-scheduling]], [[s-gh-7628-scheduler-vs-nak]]).
+
+
+### Confirmed on 2.14.6, not inherited from a 2024 thread
+
+The maintainers' "working as designed" is from January 2024, and the same thread has a maintainer
+arguing it should change, with no fix version named anywhere. So it was re-run on the current
+release: a consumer with `max_ack_pending: 2`, both delivered messages nak'd with a **30-second**
+delay, and then another pull — which came back **`408 Request Timeout`** with no message, while two
+more sat unprocessed in the stream (source: [[s-nats-server-nak-backoff-observed]], nats-server
+v2.14.6, 2026-09-01).
+
+**A stalled pool looks like an idle one.** The pull expires normally, no error mentions the cap, and
+nothing is logged. `nats consumer info` is the only place it shows: `Outstanding Acks` pinned at its
+maximum with `Unprocessed Messages` above zero.
+
+
 ## When *not* to use it
 
 - **When order matters.** A pool processes messages concurrently; the consumer's order is not the
@@ -145,4 +188,4 @@ outright, because there the first ack removes the message for everyone ([[retent
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]]

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -394,6 +394,35 @@ An asymmetric memory profile across a cluster — one node at 13 GB while its pe
 is the expected shape when that node holds meta leadership plus stream and consumer leadership. Look
 at leadership before looking for a leak. See [[raft-in-nats]].
 
+### A retry policy is a capacity input
+
+`max_ack_pending` is usually sized against worker count ([[worker-pool]]), but a consumer that
+retries with **delayed naks** spends the same budget twice: a message nak'd with a delay stays
+*pending* for the whole delay, so it holds its slot while it sleeps
+(source: [[s-gh-4972-nak-with-delay-blocks]], [[ack-and-redelivery]]).
+
+The sleeping set is a steady-state number you can compute from the retry policy:
+
+```
+sleeping slots ≈ nak rate (per second) × nak delay (seconds)
+cap ≥ workers in flight + sleeping slots + headroom
+```
+
+(Arithmetic from the constraint; **no source states this number** — the only published guidance is a
+maintainer's "the only real option today is to increase the maxackpending.")
+
+A worked case from the reporting thread: `max_ack_pending: 10`, every message nak'd with a
+one-minute delay — 10 sleeping slots consume the entire cap and the consumer delivers **nothing** for
+a minute. At 50 naks per second and a 60-second delay the sleeping set alone is ~3000 slots, which is
+three times the default cap of 1000.
+
+**What this costs elsewhere:** pending state is per consumer and is replicated, so a large
+`max_ack_pending` is not free — it grows the consumer's `o.dat` and its Raft traffic, which is the
+budget *Consumers are a cluster-wide budget* above is about. A retry design with long delays and high
+rates is therefore a **sizing decision**, not a client-side detail; if the numbers come out absurd,
+schedule the retry as a new message instead ([[message-scheduling]]).
+
+
 ## A worked example
 
 A three-node cluster, one R3 file stream, on an **un-tiered** account.
@@ -628,4 +657,4 @@ wiki could contain.
 [[s-nats-server-object-store-observed]] · [[s-docs-object-store-chunking]] ·
 [[s-docs-monitoring-profiling]] · [[s-gh-7483-varz-cpu-in-containers]] ·
 [[s-nats-server-monitoring-observed]] · [[s-docs-hardening]] ·
-[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]]
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]]

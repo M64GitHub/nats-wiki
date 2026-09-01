@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [direct-get, allow_direct, mirror_direct, last_by_subj, multi_last, batch, EOB]
 aliases: [direct get, allow_direct, "$JS.API.DIRECT.GET", direct read, mirror_direct]
-sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store]
+sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store, s-synadia-reliable-delivery-dlq]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -117,6 +117,22 @@ its four alignment rules — in particular that it is captured at create time an
 - **Old servers are detected by absence.** A server without batch support "sends the first response
   and nothing follows" — the tell is a missing `Nats-Num-Pending` on the first reply.
 
+## Fetching a message an advisory points at
+
+A direct get **by sequence** is the fetch step of the dead-letter pattern: a max-deliveries advisory
+names the source stream and the stream sequence of the message that ran out of delivery attempts, and
+a handler reads the original back with one point read before republishing it to a dead-letter subject
+(source: [[s-synadia-reliable-delivery-dlq]]; the advisory side is on [[advisories]]).
+
+It fits because the handler wants **the message, not a position**: no consumer to create, no cursor to
+maintain, and any replica can answer. The costs on this page apply unchanged — the stream must have
+`allow_direct` set, and a direct get can be served by a lagging replica ([[replicas]]).
+
+**The race is retention, not the read.** If the source stream is `workqueue` or `interest`, the
+message may already be gone by the time the advisory is handled ([[retention-policies]]); a direct get
+then returns nothing, and the dead-lettered payload is lost unless the handler ran promptly.
+
+
 ## Why an operator cares
 
 - **It is the escape route from consumer sprawl.** When a service only needs current state, a direct
@@ -171,4 +187,4 @@ one.
 
 [[s-docs-get-direct]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-and-sources]] ·
 [[s-docs-kv-under-the-hood]] · [[s-synadia-jetstream-anti-patterns]] ·
-[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]]
+[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]] · [[s-synadia-reliable-delivery-dlq]]

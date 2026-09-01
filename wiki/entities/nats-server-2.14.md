@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.14, feature_flags, js_ack_fc_v2]
 aliases: ["2.14", v2.14, v2.14.0, v2.14.6]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # nats-server 2.14
@@ -158,6 +158,29 @@ field. WorkQueue/Interest sourcing started on 2.14 will appear to work but fall 
 reliable ephemeral consumer mode, and **durable consumers created with `AckFlowControl` are marked
 "offline" and unusable until upgraded back to 2.14**.
 
+## What the scheduler gained here, in detail
+
+2.12 shipped only single delayed messages; **2.14 is where the rest of ADR-51 landed** — and it is the
+release a cron schedule requires (source: [[s-gh-7672-cron-schedules]], [[nats-server-2.12]]).
+Verified on **v2.14.6** (source: [[s-nats-server-message-schedules-observed]]):
+
+- **Six-field cron**, seconds first — `0 */5 * * * *`. A five-field expression is rejected.
+- **`@every <duration>`**, minimum `1s`, plus `@yearly` / `@monthly` / `@weekly` / `@daily` /
+  `@hourly`.
+- **`Nats-Schedule-Time-Zone`** (revision 3), cron-only, taking IANA names, `UTC` or `Local` — and
+  requiring **tzdata on the host**, or the schedule is refused as an invalid pattern. Fixed offsets
+  are rejected with `10223`.
+- **`Nats-Schedule-Source`** — subject sampling: publish the last message on another subject rather
+  than the schedule's own body.
+- **`Nats-Schedule-Rollup`** (revision 4) and the atomic **stop-a-schedule** protocol
+  (`Nats-Schedule-Next: purge` with `Nats-Scheduler`), whose `10212` guard exists so a cancellation is
+  not rolled up together with the schedule it cancels.
+- **Discard New is refused** with schedules (ADR-51 revision 8) — enforced at 2.14.6 although the ADR
+  still records that revision's server version as `TBD`.
+
+See [[message-scheduling]] for the whole feature and the ten error codes it can return.
+
+
 ## Related
 
 [[nats-server-2.12]] · [[nats-server-2.15-preview]] · [[raft-in-nats]] · [[retention-policies]] ·
@@ -168,4 +191,4 @@ reliable ephemeral consumer mode, and **durable consumers created with `AckFlowC
 
 [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
 [[s-nats-server-jetstream-resources]] ·
-[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]]
+[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]]

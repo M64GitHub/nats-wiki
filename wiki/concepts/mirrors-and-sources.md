@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -343,6 +343,36 @@ what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]
 [[streams-deleted-when-clustering-a-standalone-server]] · [[disaster-recovery]] ·
 [[cross-domain-sourcing]] · [[subject-transforms]]
 
+## A stream that copies cannot schedule
+
+`allow_msg_schedules` ([[message-scheduling]]) is refused on both shapes, with a code for each
+(source: [[s-adr-51-message-scheduler]], observed at v2.14.6):
+
+```
+nats: error: could not create Stream: stream mirrors can not also schedule messages (10186)
+nats: error: could not create Stream: stream source can not also schedule messages (10187)
+```
+
+The reason is the one this page turns on: a mirror or a source is **fed** by another stream, and a
+schedule has to be *stored* on the stream that will fire it. So the schedule and the copy cannot be
+the same stream.
+
+**That constraint shapes the recommended design for interest retention.** ADR-51's preferred layout
+puts the schedules in a dedicated `workqueue` stream and has the `interest` stream **source** the
+target subjects from it — schedules on one side, application consumers on the other. The asymmetry is
+the point: `allow_msg_schedules` goes on the **source** stream only, because the downstream stream
+has sources configured and therefore cannot set it. See [[retention-policies]].
+
+
+### Where NATS sits against other brokers on delayed delivery
+
+Worth knowing when someone arrives expecting a feature from elsewhere: "Amazon SQS offers delay
+queues natively. RabbitMQ supports delayed delivery through a plugin. **Kafka has no built-in
+per-message delay at all**" (source: [[s-synadia-delayed-scheduling]]). NATS's answer is
+[[message-scheduling]] — server-side, per-message and header-driven — and it is the one feature a
+stream **cannot** have while it mirrors or sources another.
+
+
 ## To verify
 
 - Whether a **KV mirror on file storage** is materially slower than on memory storage
@@ -354,4 +384,4 @@ what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]
 [[s-adr-57-kv-subject-transforms]] · [[s-docs-disaster-recovery]] · [[s-docs-get-direct]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-5606-cross-account-jetstream]] ·
 [[s-gh-6328-jetstream-behind-gateways]] · [[s-gh-7017-kv-across-accounts]] ·
-[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]]
+[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]]

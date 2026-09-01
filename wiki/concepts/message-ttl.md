@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ttl, Nats-TTL, subject_delete_marker_ttl, tombstone, markers]
 aliases: [Nats-TTL, per-message TTL, message TTL, subject delete marker, limit marker]
-sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits, s-docs-mirrors-and-sources]
+sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits, s-docs-mirrors-and-sources, s-adr-51-message-scheduler, s-gh-7628-scheduler-vs-nak, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-synadia-delayed-scheduling]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -131,6 +131,37 @@ All the `10052` responses are `JSStreamInvalidConfigF` and share one shape, with
 description field — which is exactly the case ADR-7 warns not to match on as text. See
 [[error-codes]] and [[js-api]].
 
+## The message scheduler is built on this
+
+**[[message-scheduling]] is not a separate subsystem — it is this machinery pointed at a different
+job.** A maintainer says so when asked whether the scheduler will hold 100K+ pending schedules: "It
+should support a very large amount of schedules since it's **built on top of the per-message TTL
+work** which similarly also supports a very large amount" (source: [[s-gh-7628-scheduler-vs-nak]]).
+
+Two consequences an operator meets directly:
+
+- **`Nats-Schedule-TTL` needs `allow_msg_ttl` on the stream**, and without it the publish fails with
+  `10166 per-message TTL is disabled` — a *TTL* error on what looks like a *scheduling* feature
+  (observed at v2.14.6, source: [[s-nats-server-message-schedules-observed]]). It sets `Nats-TTL` on
+  the **generated** message, not on the schedule; the docs' header table says the opposite
+  (source: [[s-docs-jetstream-headers]], `inbox/docs-issues.md` #41).
+- **A `Nats-TTL` on the schedule message itself is the recommended way to stop a stale schedule from
+  firing after downtime.** A past-dated schedule fires the moment the server recovers it — "even if it
+  was schedule for a month ago, it will be sent immediately" — and a TTL is what removes it first
+  (source: [[s-adr-51-message-scheduler]]).
+
+A `Nats-Schedule-TTL` below this page's own TTL floor, or one that does not parse, is rejected with
+`10191` rather than clamped.
+
+
+### `allow_msg_ttl` is not implied by `allow_msg_schedules`
+
+They are two flags and enabling the scheduler does not enable this one: a schedule carrying
+`Nats-Schedule-TTL` on a stream with only `allow_msg_schedules` fails with **`10166 per-message TTL is
+disabled`** — a TTL error raised by what looks like a scheduling feature (source:
+[[s-synadia-delayed-scheduling]], confirmed at v2.14.6). Set both, or drop the header.
+
+
 ## To verify
 
 - The server-side **default** for `subject_delete_marker_ttl` (as opposed to its 1-second minimum)
@@ -164,4 +195,4 @@ the marker's `MaxAge` reason ([[key-value]]).
 
 [[s-adr-43-per-message-ttl]] · [[s-docs-stream-config]] · [[s-adr-8-key-value-store]] ·
 [[s-adr-48-kv-ttl]] · [[s-docs-kv-ttl-and-limits]] ·
-[[s-docs-mirrors-and-sources]]
+[[s-docs-mirrors-and-sources]] · [[s-adr-51-message-scheduler]] · [[s-gh-7628-scheduler-vs-nak]] · [[s-nats-server-message-schedules-observed]] · [[s-docs-jetstream-headers]] · [[s-synadia-delayed-scheduling]]

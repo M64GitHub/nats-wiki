@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.12, strict-mode, elastic-pointers, offline-assets, GOMEMLIMIT]
 aliases: ["2.12", v2.12, v2.12.0, v2.12.15]
-sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing, s-gh-7463-jetstream-corruption]
+sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing, s-gh-7463-jetstream-corruption, s-adr-51-message-scheduler, s-gh-7672-cron-schedules]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -147,6 +147,26 @@ From v2.11.9 the older server recognises 2.12 features in use and safely puts th
 or consumer into unsupported/offline mode, protecting both the data and the server. Downgrading to
 anything older gives up that protection.
 
+## What 2.12's message scheduling actually shipped, and what it did not
+
+`AllowMsgSchedules` arrived here, but only **one** of ADR-51's three use cases came with it, and the
+gap caught operators out. A maintainer, answering someone whose cron expression was rejected
+(source: [[s-gh-7672-cron-schedules]]):
+
+> "Only single scheduled messages from that ADR were released as part of 2.12… The remaining items,
+> like cron-like schedules, will be part of version 2.14 to be released March of next year."
+> — @MauriceVanVeen, 2025-12-21
+
+So on 2.12: `Nats-Schedule: @at <RFC3339>` with a `Nats-Schedule-Target`, a `Nats-Schedule-TTL`, and
+nothing else. **Cron, `@every`, `@hourly`, `Nats-Schedule-Source` and `Nats-Schedule-Time-Zone` are
+2.14** ([[nats-server-2.14]]).
+
+**The failure is a syntax error, not a version error.** A 2.14 expression on a 2.12 server comes back
+as `message schedules pattern is invalid` (**10189**) — the same message a genuinely malformed cron
+gets. Read ADR-51's revision table, which maps each addition to a server version, before debugging the
+expression ([[message-scheduling]], [[error-codes]]).
+
+
 ## Related
 
 [[nats-server-2.11]] · [[nats-server-2.14]] · [[priority-groups]] · [[js-api]] ·
@@ -154,4 +174,4 @@ anything older gives up that protection.
 
 ## Sources
 
-[[s-docs-upgrade-to-2.12]] · [[s-docs-advanced-publishing]] · [[s-gh-7463-jetstream-corruption]]
+[[s-docs-upgrade-to-2.12]] · [[s-docs-advanced-publishing]] · [[s-gh-7463-jetstream-corruption]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]]

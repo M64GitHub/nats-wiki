@@ -2889,3 +2889,256 @@ The note the file ends on is the one worth keeping: the easy rows were answered 
 is disproportionately **the questions nobody public has answered**. `no-public-answer` will be the
 right result more often from here, and per the bank's own convention a stated dead end with a date on
 it is the most valuable row in the table.
+
+## 2026-09-01 — ingest: three answered redelivery threads (delivery-timing plan, step 1)
+
+*Operation: ingest*, three times, working `inbox/plan-delivery-timing-2026-09-01.md`. Candidates 1, 2
+and 4 of `inbox/scout-delivery-timing-2026-09-01.md`, fetched through the GitHub GraphQL API into
+`raw/gh-discussions/` and recorded in `raw/sources.md`.
+
+**Fetched:** `gh-6628.md`, `gh-6350.md`, `gh-4972.md` — and `gh-5631.md`, which belongs to step 2 but
+was fetched in the same call. It has **zero comments** and is stored for the same reason `gh-7017` is:
+an unanswered public question is evidence.
+
+**Summaries created (3):** [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-gh-6350-exponential-backoff]] ·
+[[s-gh-4972-nak-with-delay-blocks]].
+
+**Pages updated (5):**
+
+- [[ack-and-redelivery]] — a new `## Retry: two mechanisms, one shared budget` with three parts: the
+  implicit/explicit split from @jnmoyne's marked answer; the delayed-nak-holds-its-slot constraint
+  with @ripienaar's reason and @derekcollison's dissent in the same thread; and a flat statement that
+  the duplicate window has nothing to do with redelivery. The `## To verify` bullet for Q19 was
+  **retired** — it is now answered on the page rather than listed as unknown.
+- [[publishing]] — `### The window bounds re-*publication*, not re-*delivery*`, under *Limits and
+  failure modes*.
+- [[consumer]] — `## The batch is on the clock, all of it`: `ack_wait` starts on the whole batch, not
+  on the message being worked, which is what actually caused gh#6628's redeliveries.
+- [[worker-pool]] — `## Retries come out of the same budget as concurrency`, with the stall signature
+  (`Outstanding Acks` at maximum, every worker idle) and why extra consume loops buy nothing.
+- [[jetstream-sizing]] — `### A retry policy is a capacity input`, with the sleeping-slot arithmetic
+  marked as derived from the constraint rather than quoted from a source.
+
+**Question bank:** rows **16**, **17** and **19** filled. Row 18 deliberately untouched — it is step
+2's, and it is the one that needs the binary.
+
+**`inbox/docs-issues.md`:** nothing added. All three threads are consistent with the docs and with the
+server as this wiki already states it; the contradiction this plan exists to settle is in step 2's
+source, not in these.
+
+**One thing worth recording about age.** gh#4972 is from 2024-01-18 and both maintainers describe the
+`max_ack_pending` behaviour as current *"today"*, with @derekcollison arguing in the thread that it
+should change and **no fix version named anywhere**. The page states it against v2.14.6 because step 2
+re-ran it on that binary, not because a 2024 thread is authority for a 2026 release.
+
+## 2026-09-01 — ingest + run: the nak/backoff contradiction, settled on the binary (delivery-timing plan, step 2)
+
+The step the plan was written for. Three public sources disagreed about whether a consumer `backoff`
+affects a nak; the claim is behavioural, so per `CLAUDE.md` it was **run**, not read. **Both published
+answers turned out to be wrong.**
+
+**Source ingested:** the Synadia post *Reliable Message Delivery in NATS JetStream* (Andrew Connolly,
+2026-07-24) → `raw/synadia-blog/jetstream-reliable-delivery-dlq-replay.{html,txt}`,
+[[s-synadia-reliable-delivery-dlq]]. Also [[s-gh-5631-nak-not-immediate]], row 18's own thread —
+**zero comments in two years**, recorded as unanswered.
+
+**Run:** `raw/nats-server-src/nak-backoff-observed-v2.14.6.md` — thirteen experiments on
+**nats-server v2.14.6** (`nats-server --version` checked first; it matches what
+[[ack-and-redelivery]] cites) with **nats CLI 0.4.0**, plus three ranges of `server/consumer.go` at
+the tag. The instrument is `raw/nats-server-src/nats-probe-client.py`, a ~90-line stdlib-only NATS
+client written for this, because **nats CLI 0.4.0 cannot send a delayed nak at all** — `nats consumer
+next` has `--ack`, `--nak`, `--term` and no delay flag. Summary: [[s-nats-server-nak-backoff-observed]].
+
+**The result, which is neither of the two answers on offer:**
+
+- A **bare** `-NAK` is redelivered immediately, with or without a backoff — **0.00s**. The docs are
+  right about this case and the blog is wrong.
+- A nak **carrying a delay** waits `delay + (backoff[dc] − backoff[0])`. Asking for 2s gave
+  **2.000 · 7.000 · 12.000 · 12.001** seconds; asking for **zero** delay gave **0.00 · 4.94 · 9.94**.
+  The docs' "it doesn't slow a nak" is wrong here.
+- **`-NAK {}` is not a bare nak** — the server branches on anything after `-NAK`, and an empty options
+  object parses to a zero delay, so two clients implementing the same API call can differ.
+- `ack_wait` set beside a `backoff` is silently overwritten by the first backoff entry, **in the
+  server** (`consumer.go:658`) — the blog's own Go snippet stores `ack_wait: 1s` where it reads 30s.
+- Row 19 **re-run on 2.14.6** rather than inherited from a 2024 thread: cap 2, both messages nak'd
+  with a 30s delay, next pull returns `408` and nothing.
+
+Two controls make the negatives real: no answer at all redelivers on the documented schedule
+(**5.00 · 10.00 · 15.00**, so the backoff is not inert), and delayed naks on a backoff-free consumer
+are exact (**1.95 · 1.95 · 1.95**).
+
+**A harness bug is recorded in the transcript on purpose.** The first run created every consumer with
+**no filter subject** on a `test.>` stream, so consumers shared each other's messages and the delivery
+counts read `1, 1, 2`. Every table since carries the stream sequence beside the delivery count.
+
+**Recorded in three places, as the rulebook requires when one finding is both:**
+
+- `inbox/docs-issues.md` **#38** — `learn/jetstream/acknowledgment.md`, `wrong-value`, `high`,
+  `destination: nats-docs`. Deliberately **not ★**: the retry still happens, only its timing is wrong.
+- `inbox/docs-issues.md` **#39** — the Synadia post, `wrong-value`, **★ high**, `destination: Synadia
+  blog` — a **new destination value**, noted in that file's legend. ★ because its copyable snippet
+  gives a reader a 1-second ack deadline where the code says 30.
+- `inbox/server-issues.md` **SI-2** — `unexpected`, `high`, the behaviour itself, with the question
+  that would settle it and the four things not tested. #38 and SI-2 point at each other.
+
+**Neighbour sweep** (required when a page is wrong): every timing claim in the acknowledgment chapter
+was checked against the same binary — **five checked, one wrong**. The default `ack_wait` of 30s, the
+backoff reusing its last entry, `--nak` being immediate-only, and "a plain nak redelivers immediately"
+all hold.
+
+**Pages updated (6):** [[ack-and-redelivery]] (three new sections — *What a delayed nak actually
+waits*, *`ack_wait` beside a `backoff` is silently discarded*, *Why a nak never reports a failure* —
+plus the older `Backoff` bullet, the nak row of the four-answers table and failure mode 3 corrected to
+match, and `verified-on` moved to 2026-09-01) · [[consumer]] · [[worker-pool]] · [[advisories]] ·
+[[direct-get]] · [[retention-policies]].
+
+**Question bank:** row **17** and row **19** completed, row **18** filled and flagged `measured` — the
+wiki answers the question from the binary while stating that the thread it came from was never
+answered and that the reporter's 2.10.14 case is not confirmed. Lint: 0 unlanded ripples, 0 citation
+drift.
+
+## 2026-09-01 — ingest + run: the message scheduler, and the page that should exist (delivery-timing plan, step 3)
+
+Four sources ingested and one new page written. ADR-51 is the **only real description of this feature
+in public**, so rather than paraphrase it, every rule in it that could be checked was **run** on the
+binary — 26 publishes and 4 stream operations on **nats-server v2.14.6** with **nats CLI 0.4.0**.
+
+**Summaries created (4):** [[s-adr-51-message-scheduler]] (Approved, 8 revisions, 2.12 → 2.14) ·
+[[s-docs-jetstream-headers]] · [[s-gh-7672-cron-schedules]] · [[s-gh-7628-scheduler-vs-nak]] · plus
+[[s-nats-server-message-schedules-observed]] for the run
+(`raw/nats-server-src/message-schedules-observed-v2.14.6.md`).
+
+**New page:** [[message-scheduling]] — licensed by bank rows 29 and 30, which no page owned.
+
+**Everything ADR-51 states held on 2.14.6**, including revision 8's Discard New rule, whose server
+version the ADR still records as `TBD`. The run's own additions:
+
+- **Ten scheduler error codes, not nine** — `10223 JSMessageSchedulesTimeZoneInvalidErr` joins the
+  nine the scout counted — each pinned to its exact condition off the `PubAck`.
+- **`10189` has at least four unrelated causes** and names none: a five-field cron, `@every` under
+  `1s`, a time zone on a non-cron schedule, and a 2.14 expression on a 2.12 server.
+- **The two stream-level refusals arrive as `10052`**, the generic `JSStreamInvalidConfigF`, so the
+  reason lives only in the message text.
+- **`allow_msg_schedules` stores `allow_rollup_hdrs: true` and `deny_purge: false`** — observed, not
+  just specified, which is why it also reached [[subject-permissions]].
+- **`nats pub` without `-J` is a core publish and hides a rejected JetStream publish.** This produced
+  a **false first result** — every invalid publish appeared to be accepted — and is recorded in the
+  transcript, on [[publishing]] and on the new page.
+- **nats CLI 0.4.0's `--schedule-after` cannot work**: it emits `Nats-Schedule: <RFC3339>` with no
+  `@at ` prefix and is always rejected with `10189`. Caught from the server's `-DV` trace.
+
+**Two things the plan and the scout had slightly wrong, corrected from the source rather than
+repeated:** the `@every` minimum is **`1s`**, not `1m` (`@every 1m` is ADR-51's example), and there
+are **ten** error codes, not nine.
+
+**Pages updated (10):** [[message-ttl]] (the load-bearing link — the scheduler is built on it) ·
+[[error-codes]] · [[publishing]] · [[stream]] · [[retention-policies]] · [[mirrors-and-sources]] ·
+[[subject-permissions]] · [[js-api-subjects]] · [[nats-server-2.12]] · [[nats-server-2.14]]. The
+ADR-51 row of `inbox/adr-toc.md` now links its summary.
+
+**`inbox/docs-issues.md` — three rows:**
+
+- **#40** — `nats pub --schedule-after`, `destination: natscli`, a **new destination value** noted in
+  that file's legend. `high`, not ★: the flag implies `--jetstream`, so the error is printed.
+- **#41** — the header reference calls `Nats-Scheduler` a "Scheduler ID" and `Nats-Schedule-TTL` a
+  TTL for *the schedule*; both are wrong, and the second is silent — a schedule set to expire itself
+  never does.
+- **#42** — no prose page anywhere, confirmed against the **live** `docs.nats.io/llms.txt` on the day.
+  The neighbours were swept rather than assumed: 2.12 has 3 of 18 bullets linking only to an ADR and
+  2.14 has 4 of 15, so scheduling is not unique — what distinguishes it is being announced **four
+  times across two releases** while comparable features (priority groups, atomic batch) got chapters.
+
+**Question bank:** rows **29** and **30** filled. Lint: 0 broken links, 0 unlanded ripples, 0 citation
+drift, 0 pages missing from the index.
+
+## 2026-09-01 — ingest: the applied layer, and a dead-letter page the bank had to earn (delivery-timing plan, step 4)
+
+**Source ingested:** *Delayed Message Scheduling in NATS JetStream* (Peter Humulock, 2026-04-09) →
+[[s-synadia-delayed-scheduling]]. Its four caveats were each checked against ADR-51 and the binary:
+past-dated schedules firing immediately, one schedule per subject, mirrors/sources refused, and DST —
+**all confirmed** except DST, which needs a clock and was not tested. It also states a rule the
+specification does not: **the target may not be the schedule's own subject**, which the server
+enforces with `10190` (run and appended to
+`raw/nats-server-src/message-schedules-observed-v2.14.6.md`). Where the blog and the ADR give
+different advice about stale schedules, the page says so and prefers the ADR.
+
+**Not recorded as a docs issue:** the ADR's silence about that target rule is an omission, not a
+contradiction — `enhancement` at most — so it is stated on [[message-scheduling]] and left out of the
+report rather than inflating it.
+
+**The dead-letter page: the scope test ran, and the bank passed it.** `CLAUDE.md` is explicit that no
+question means no page, so GitHub issues and discussions were searched before anything was written.
+Two real public questions turned up, and both are now bank rows with their URLs:
+
+- **Q106** — [gh#4994](https://github.com/nats-io/nats-server/discussions/4994), answered by
+  @derekcollison: *"We do not have automated DLQs… by design since we truly separate consumers from
+  stream semantics."* Plus the finding that makes the row `★`: **with no client fetching, `ack_wait`
+  expiring does not advance a pull consumer's delivery count**, so a pool scaled to zero produces no
+  redelivery, no advisory and no dead letter — and every number looks calm.
+- **Q107** — [gh#7590](https://github.com/nats-io/nats-server/discussions/7590), still open: the
+  advisory carries **no payload**, and @ripienaar explains the objection is that payloads may be
+  sensitive and advisories leave NATS.
+
+**Summaries created (3):** [[s-synadia-delayed-scheduling]] · [[s-gh-4994-scale-to-zero-dlq]] ·
+[[s-gh-7590-dlq-payload-loss]]. **New page:** [[dead-letter-queue]] (`kind: pattern`).
+
+**A public disagreement settled on the binary.** gh#7590's reporter says a max-delivered message is
+gone from the stream; a later commenter says it is still there. Run at v2.14.6 R1 on **both**
+`workqueue` and `limits` streams: the advisory fires and **the message survives and is fetchable by
+the sequence the advisory names** — the commenter is right. The reporter's failure was real on their
+version: issue #7817 lost max-delivered messages on **R3 WorkQueue** streams at 2.12.3/2.12.4, fixed
+by PR #7845 and shipped in **2.12.5**, quoted from that release's notes. Both halves are now on
+[[ack-and-redelivery]] and [[retention-policies]] with the version attached.
+
+**Pages updated (6):** [[message-scheduling]] · [[mirrors-and-sources]] · [[message-ttl]] ·
+[[ack-and-redelivery]] · [[advisories]] · [[consumer]] · [[retention-policies]].
+
+**Lint:** 0 broken links, 0 orphans, 0 citation drift, 0 unlanded ripples, 0 pages missing from the
+index.
+
+## 2026-09-01 — plan finished: delivery timing, and what it settled
+
+`inbox/plan-delivery-timing-2026-09-01.md` is done, all four steps, with the two-line result written
+at the top of the file.
+
+**The scoreboard.** Question bank **107 rows, 91 answered, 16 open**; ★ complete at **43/43**. All six
+rows the plan targeted are closed (16, 17, 18, 19, 29, 30), and the work earned two more (106, 107),
+each with the URL of someone publicly asking it. Row 18 closed **properly** rather than as a stated
+dead end, because the run explained the symptom rather than just failing to find an answer.
+
+**What was produced.** Eleven summaries, two new reader pages ([[message-scheduling]],
+[[dead-letter-queue]]), around twenty existing pages rippled, and **two run transcripts** in
+`raw/nats-server-src/` — the nak/backoff experiments and the message-scheduler experiments — plus a
+purpose-written stdlib NATS client (`nats-probe-client.py`), which existed because **nats CLI 0.4.0
+cannot send a delayed nak at all**.
+
+**Six findings recorded**, four of them impossible to reach without running the binary:
+
+| record | what it is |
+|---|---|
+| docs-issues **#38** | `nats-docs`: "a backoff doesn't slow a nak" is true of a bare nak and false of a delayed one |
+| docs-issues **#39** ★ | a Synadia post: recommends the one nak a backoff does not shape, and its snippet silently gives a 1-second ack deadline |
+| docs-issues **#40** | `natscli`: `nats pub --schedule-after` emits a schedule the server always rejects |
+| docs-issues **#41** | `nats-docs`: the header reference misdescribes `Nats-Scheduler` and `Nats-Schedule-TTL` |
+| docs-issues **#42** | `nats-docs`: the message scheduler has no prose page at all, verified against the live `llms.txt` |
+| server-issues **SI-2** | the delayed-nak timing arithmetic, with the question that would settle it |
+
+Two new `destination` values entered the report — a **published blog post** (#39) and **`natscli`**
+(#40) — and the file's legend now says so.
+
+**Three things worth carrying forward as method**, all recorded in the transcripts rather than tidied
+away:
+
+1. **A harness bug produced a plausible false finding**, twice. First, consumers created with no
+   filter subject shared each other's messages, so delivery counts read `1, 1, 2`. Then `nats pub`
+   without `-J` reported every rejected schedule as published, because a core publish has no reply
+   subject to carry the `PubAck`. Both are in the raw files, with what changed to catch them.
+2. **Two of the plan's and scout's own numbers were wrong** and were corrected from the sources rather
+   than repeated: the `@every` minimum is `1s`, not `1m`, and there are **ten** scheduler error codes,
+   not nine.
+3. **A public disagreement was settled by running it** rather than by picking a side — whether a
+   max-delivered message survives on a WorkQueue stream. It does, at 2.14.6; the reporter who said
+   otherwise was hitting a real defect fixed in **2.12.5**.
+
+**Next.** The bank's 16 open rows are the three clusters `inbox/plan-the-meta-layer-2026-09-01.md` and
+the standing scout backlog already name. Nothing from this plan is left open.

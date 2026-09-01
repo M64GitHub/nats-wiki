@@ -19,7 +19,7 @@ those are suggestions — the point of the report is the finding, not the patch.
 |---|---|
 | `★` | a **confirmed factual error with real impact** — following the documentation produces a broken result, **silently**. If you triage on one thing, triage on this |
 | `where` | the doc path. For docs.nats.io prefix `https://docs.nats.io/` |
-| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`. Three rows (#7, #30, #31) are ADR errors rather than docs errors |
+| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Three rows (#7, #30, #31) are ADR errors rather than docs errors, one (#40) is a **CLI defect**, and one (#39) is a **published blog post** rather than a repository at all |
 | `kind` | `wrong-value` and `missing` are defects; `enhancement` is correct-but-unhelpful |
 | `severity` | our estimate of consequence, not of effort |
 | **`upstream`** | where this was filed and what became of it. `not filed` means we have not sent it yet |
@@ -97,6 +97,11 @@ row.
 | 35 | No page anywhere in the docs states what happens to **KV and Object Store subjects across a JetStream domain boundary** — and the two behave differently, so a reader who generalises from the KV case is wrong about the Object Store one. (The *behaviour* is `inbox/server-issues.md` **SI-1**; this row is the documentation gap alone) | `learn/topologies/leaf-nodes.md`; `learn/object-store/under-the-hood.md`; `learn/key-value/under-the-hood.md` | nats-docs | missing | high | not filed | wiki states the observed 2.14.6 behaviour on four pages and flags the defect question as open |
 | 36 | The advisories chapter's own diagram caption drops `.CONSUMER.` from the max-deliveries advisory subject — `$JS.EVENT.ADVISORY.MAX_DELIVERIES.ORDERS.shipping`, three times — while the prose on the same page has it right; a subscription copied from the caption receives nothing | `learn/monitoring/advisories-and-events.md` | nats-docs | wrong-value | low | not filed | wiki states the observed subject and notes the page contradicts itself |
 | 37 | ADR-42 states that a consumer's priority policy and groups cannot be changed after creation ("Only `PriorityTimeout` is updatable today") and that more than one group per consumer is an error; at 2.14.6 all three forbidden transitions are accepted and two groups are accepted and stored. `learn/jetstream/policies.md` says the opposite of the ADR and is right | `nats-architecture-and-design` ADR-42 | ADR repo | wrong-value | medium | not filed | wiki states the observed behaviour and says the ADR and the docs disagree |
+| 38 | The acknowledgment chapter says three times that a consumer `backoff` "doesn't slow a nak" (lines 42, 298, 586). True of a **bare** nak; **false of a nak carrying a delay**, which is the only kind the sentence's own paragraph is about. At 2.14.6 a nak asking for 2s waits 12s, and a nak asking for **0s** waits 10s, on a consumer with `backoff` `[5s,10s,15s]` | `learn/jetstream/acknowledgment.md` | nats-docs | wrong-value | high | not filed | wiki states the measured rule and says the sources disagree |
+| 39 | A Synadia engineering post answers "how do I retry a failed message with a backoff?" with "Negatively acknowledge it" — but a bare nak is the one case a backoff does **not** shape. Its copyable Go consumer config also sets `AckWait: 30s` next to `BackOff: [1s, …]`, and **the server silently stores `ack_wait: 1s`**, a 30× shorter ack deadline than the code reads | [synadia.com/blog/jetstream-reliable-delivery-dlq-replay](https://www.synadia.com/blog/jetstream-reliable-delivery-dlq-replay) | Synadia blog | wrong-value | ★ high | not filed | wiki states the observed behaviour and cites the post for the parts that hold |
+| 40 | `nats pub --schedule-after` emits `Nats-Schedule: <RFC3339>` **without the `@at ` prefix**, which the server always rejects with `10189 message schedules pattern is invalid`. The flag cannot work at all; the sibling `--schedule-at`, `--schedule-every` and `--schedule-cron` emit valid patterns | nats CLI 0.4.0, `nats pub --schedule-after` | natscli | wrong-value | high | not filed | wiki documents `--schedule-at` and warns off the flag |
+| 41 | The JetStream header reference describes `Nats-Scheduler` as a "Scheduler ID" (it is **the subject holding the schedule**) and `Nats-Schedule-TTL` as "Time-to-live for **the schedule**" (it sets `Nats-TTL` on the **generated message**). `Nats-Schedule-Time-Zone` and `Nats-Schedule-Rollup` have **empty descriptions**, and the section never says the stream must set `allow_msg_schedules` | `reference/jetstream/api/headers.md` | nats-docs | wrong-value | high | not filed | wiki states the observed header values |
+| 42 | **The message scheduler has no prose page anywhere in the documentation.** Four release-note bullets across 2.12 and 2.14 announce it and all four link only to ADR-51; the whole tree's coverage is one header table and ten error codes. Verified against the **live** `docs.nats.io/llms.txt` on 2026-09-01: no entry mentions scheduling, cron or delayed publishing | `learn/jetstream/` (absent); `release-notes/upgrade-to-2.12.md`, `upgrade-to-2.14.md` | nats-docs | missing | high | not filed | wiki writes `message-scheduling` from ADR-51 and the binary |
 
 ---
 
@@ -1956,6 +1961,273 @@ no caveat at all.
 
 ---
 
+## 38 · "A backoff doesn't slow a nak" is true of a bare nak and false of a delayed one
+
+**Impact: a retry waits up to six times longer than the code asked for, silently.** Nothing errors
+and nothing is logged; the message simply comes back later than the client's `nakWithDelay` said.
+
+**What the docs say**, in three places in `learn/jetstream/acknowledgment.md`:
+
+> line 42 — "Passing that delay is a client-library call — the CLI's `--nak` only asks for immediate
+> redelivery — so there's no CLI tab here. (To space out redeliveries from the CLI, set a consumer
+> backoff instead.)"
+
+> line 298 — "A delayed nak sets the wait one redelivery at a time, and the client chooses it. A
+> **backoff** on the consumer grows the wait automatically, but it only shapes redeliveries that fire
+> when the AckWait timer runs out — **it doesn't slow a nak**."
+
+> line 586 — "A bare nak redelivers right away, and a configured backoff doesn't slow it — to delay a
+> nak, the client attaches the delay to the nak itself."
+
+Line 586 is careful and correct: it says *a bare nak*. Line 298 is not — it draws the contrast with
+the **delayed** nak in its own first sentence and then denies any interaction, and line 42 sends a
+reader who wants spaced retries to the backoff as if the two were alternatives.
+
+**What the server does.** Run on **v2.14.6** with a consumer whose backoff is `5s, 10s, 15s`
+(`raw/nats-server-src/nak-backoff-observed-v2.14.6.md`, thirteen experiments):
+
+| what the client sent | attempt | asked for | **got** |
+|---|---|---|---|
+| `-NAK` (bare) | 1, 2, 3 | immediate | **0.00 s** — the docs are right |
+| `-NAK {"delay":2000000000}` | 1 | 2 s | **2.000 s** |
+| `-NAK {"delay":2000000000}` | 2 | 2 s | **7.000 s** |
+| `-NAK {"delay":2000000000}` | 3 | 2 s | **12.000 s** |
+| `-NAK {"delay":0}` | 2 | immediate | **4.94 s** |
+| `-NAK {"delay":0}` | 3 | immediate | **9.94 s** |
+
+with two controls: no answer at all gives the documented schedule exactly (**5.00 · 10.00 · 15.00**,
+so the backoff is not inert), and the same delayed naks on a consumer with **no** backoff give
+**1.95 · 1.95 · 1.95**, so the delay is honoured when there is nothing to interfere.
+
+**The mechanism**, from `server/consumer.go` at v2.14.6: `processNak` backdates the pending timestamp
+by `o.cfg.AckWait` (`:3231`), `checkPending` measures it against `o.cfg.BackOff[dc]` (`:6066`), and
+`AckWait` was overwritten with `BackOff[0]` at creation (`:658`). The wait a client receives is
+therefore `delay + (BackOff[dc] − BackOff[0])`. The **behaviour** is
+`inbox/server-issues.md` **SI-2**; this row is the documentation half.
+
+**One more thing the same sentence hides:** `-NAK {}` — an empty options object — is **not** treated
+as a bare nak. `processNak` branches on there being anything after `-NAK`, and an empty object parses
+to a zero delay, so it takes the delayed path and picks up the backoff term. Two client libraries
+implementing the same "plain nak" API can therefore produce different timing.
+
+**Suggested fix:** make line 298 say what line 586 says — that a backoff does not slow a **bare** nak
+— and add one sentence for the case the page currently leaves out: on a consumer with a backoff, a
+nak that carries a delay is redelivered after that delay **plus** the difference between the current
+attempt's backoff entry and the first one. If the server behaviour is judged a defect instead
+(SI-2), the sentence should say the delay is honoured and the docs will be right once it is fixed.
+
+**Why this is `high` and not `★`.** The retry still happens and no message is lost or lost track of;
+what is wrong is its timing. That is worth a `high` — a 2-second retry that takes 12 seconds will
+break an SLA and no signal anywhere says why — but it is not the silent-total-failure shape the ★
+rows have.
+
+## 39 · A Synadia post recommends the one nak a backoff does not shape, and its consumer snippet sets an ack deadline 30× shorter than it reads ★
+
+**Impact: a reader who copies the post's consumer config gets a 1-second ack deadline instead of the
+30 seconds written two lines above it** — so every handler slower than a second is redelivered while
+it is still working, duplicating the work. Nothing warns; the value is simply overwritten by the
+server.
+
+*Recorded here although the destination is a blog rather than a repository: it is a public,
+first-party engineering post that the wiki draws on, and this file is where this wiki records what a
+source got wrong.*
+
+**What the post says.** *Reliable Message Delivery in NATS JetStream: Acks, Retries, Dead Letters, and
+Replay*, Andrew Connolly, 2026-07-24 (`raw/synadia-blog/jetstream-reliable-delivery-dlq-replay.txt`):
+
+> line 570 — "How do I retry a failed message with a backoff? Negatively acknowledge it. Nak schedules
+> an immediate redelivery, NakWithDelay waits a fixed interval, and the consumer's BackOff schedule
+> applies an escalating series of delays across successive redeliveries."
+
+> line 55 — "explicit acknowledgment gives the consumer three verbs: ack (done), nak (redeliver
+> immediately, after a delay, or **on a backoff schedule**), and term (stop trying)"
+
+and the copyable Go snippet at lines 268–294:
+
+```go
+cfg := jetstream.ConsumerConfig{
+    Durable:       "order-processor",
+    AckPolicy:     jetstream.AckExplicitPolicy,
+    AckWait:       30 * time.Second,
+    MaxAckPending: 1000,
+    MaxDeliver:    5,
+    BackOff:       []time.Duration{1 * time.Second, 5 * time.Second, 30 * time.Second, 2 * time.Minute},
+}
+```
+
+**What the server does.** Two findings, both run on **v2.14.6**
+(`raw/nats-server-src/nak-backoff-observed-v2.14.6.md`):
+
+**a · A bare nak is the one case the backoff does not touch.** Three bare naks on a consumer with
+`backoff` `[5s, 10s, 15s]` were redelivered after **0.00 s** each. The escalating schedule applies to
+redeliveries that fire when `AckWait` expires (measured: 5.00 · 10.00 · 15.00) and, by the accident in
+SI-2, to a nak that carries a delay — never to the bare nak the sentence names first.
+
+**b · `AckWait` next to a `BackOff` is silently discarded.** That exact config, sent to
+`$JS.API.CONSUMER.CREATE` rather than through the CLI so nothing client-side could interfere:
+
+```
+requested:  ack_wait: 30s   max_deliver: 5   backoff: [1s, 5s, 30s, 2m]
+stored:     ack_wait: 1.0s  max_deliver: 5   backoff: [1.0, 5.0, 30.0, 120.0]
+```
+
+`server/consumer.go:653–659` at v2.14.6 is explicit about it — *"If BackOff was specified that will
+override the AckWait and the MaxDeliver"* — and in **pedantic** mode the same branch returns
+`first backoff value has to equal batch AckWait` instead of overwriting. The post's own text never
+mentions the override, and the number it writes is the one a reader will believe.
+
+**What the post gets right**, and the wiki cites it for: `MaxDeliver` must be sized against the length
+of the backoff schedule; the last backoff interval repeats once the schedule is exhausted (confirmed,
+`consumer.go:6060–6063`); and the dead-letter pattern built on the `MAX_DELIVERIES` advisory.
+
+**Suggested fix:** in the FAQ answer, attach the backoff to `AckWait` expiry rather than to the nak;
+and in the snippet, either drop `AckWait` or set it to the first backoff entry, with a line saying the
+server overwrites it.
+
+## 40 · `nats pub --schedule-after` produces a schedule the server always rejects
+
+**Impact: a documented flag that cannot succeed, and an error that points somewhere else.** The
+rejection blames the schedule *pattern*, so a user debugs their duration string, the ADR's cron
+grammar, or their server version — never the flag.
+
+*Recorded here although the destination is the `natscli` repository rather than a documentation tree:
+the finding is settled the way every other row here is — the ADR defines the correct form and the
+server enforces it — so it belongs with the settled findings rather than in `inbox/server-issues.md`.*
+
+**What the CLI sends.** From the server's own `-DV` trace at v2.14.6, the four scheduling flags side
+by side (`raw/nats-server-src/message-schedules-observed-v2.14.6.md`):
+
+```
+--schedule-after=3s              ->  Nats-Schedule: 2026-09-01T02:21:28Z      ->  10189
+--schedule-at=<ts>               ->  Nats-Schedule: @at 2026-09-01T02:21:50Z  ->  OK
+--schedule-every=1m              ->  Nats-Schedule: @every 1m0s               ->  OK
+--schedule-cron='0 */5 * * * *'  ->  Nats-Schedule: 0 */5 * * * *             ->  OK
+```
+
+`--schedule-after` resolves the duration to an absolute time correctly and then omits the `@at `
+prefix. ADR-51 defines the single-delayed-message form as `@at <RFC3339>`; a bare timestamp matches no
+schedule grammar, so `server/stream.go` rejects it.
+
+**What the user sees:**
+
+```
+$ nats pub -J schedules.orders.delay 'body' --schedule-after=3s --schedule-dest=orders
+nats: error: message schedules pattern is invalid (10189)
+```
+
+**Version:** nats CLI **0.4.0** (`nats --version`), against nats-server v2.14.6.
+
+**Suggested fix:** prefix the computed timestamp with `@at ` in the `--schedule-after` path, as
+`--schedule-at` already does.
+
+**Why this is `high` and not `★`.** The flag implies `--jetstream`, so the `PubAck` is read and the
+error is printed — the failure is loud. It becomes silent only if a user reproduces the same headers
+by hand with a plain `nats pub`, which is a **core NATS publish**: no reply subject, so the `PubAck`
+and its rejection go nowhere and the CLI prints `Published N bytes` for a message the server threw
+away. That behaviour is not a defect, but it is the reason every check in the transcript above was
+re-run through a client that reads the `PubAck`.
+
+## 41 · The JetStream header reference gets two scheduling headers wrong and leaves two blank
+
+**Impact: one of the two errors is silent.** A reader who believes `Nats-Schedule-TTL` bounds *the
+schedule* will set it expecting a recurring schedule to stop itself, and the schedule will keep firing
+forever while the messages it produces quietly expire — the opposite of the intent, with nothing to
+see.
+
+**What the docs say**, in `reference/jetstream/api/headers.md` under *Scheduled Messages*:
+
+| header | the page's description |
+|---|---|
+| `Nats-Scheduler` | value "Scheduler ID"; "Identifier for the scheduler" |
+| `Nats-Schedule-TTL` | "Time-to-live for **the schedule**" |
+| `Nats-Schedule-Time-Zone` | *(empty)* |
+| `Nats-Schedule` | value "Cron expression" |
+
+and, in a different section entirely (*Message Rollup*, not *Scheduled Messages*):
+
+| `Nats-Schedule-Rollup` | String | *(empty)* |
+
+**What the server does**, run on **v2.14.6**
+(`raw/nats-server-src/message-schedules-observed-v2.14.6.md`). A schedule published with
+`Nats-Schedule-TTL: 5m` produced this message on the target subject:
+
+```
+Item: SCHED#4 on Subject orders
+
+Headers:
+  X-Custom: kept
+  Nats-Scheduler: schedules.orders.single
+  Nats-Schedule-Next: purge
+  Nats-TTL: 5m
+
+delayed-body
+```
+
+- **`Nats-Scheduler` is a subject** — the subject that held the schedule. It is not an opaque
+  identifier, and when a *client* sets it (to cancel a schedule) the server requires it to be a valid
+  publish subject that differs from the one being published to, or answers `10212`
+  (`server/stream.go` at v2.14.6). ADR-51 says so directly: "`Nats-Scheduler` — The subject holding
+  the schedule."
+- **`Nats-Schedule-TTL` sets the TTL on the generated message**, not on the schedule. ADR-51: "When
+  publishing sets a TTL on the message if the stream supports per message TTLs." The schedule's own
+  lifetime is set by a plain `Nats-TTL` on the schedule message — a different header with the opposite
+  target.
+- **`Nats-Schedule` is not only a cron expression.** `@at <RFC3339>` (the only form 2.12 supported),
+  `@every <duration>` and `@yearly`/`@monthly`/`@weekly`/`@daily`/`@hourly` are all accepted.
+- **`Nats-Schedule-Rollup` takes `sub` and nothing else** — `all` is refused with `10192` — and it
+  belongs in the *Scheduled Messages* table rather than under *Message Rollup*.
+- **`Nats-Schedule-Time-Zone`** accepts an IANA name, `UTC` or `Local`; a fixed offset or an empty
+  value is refused with `10223`, and it is rejected outright on a non-cron schedule.
+
+**Also missing from the section:** none of these headers do anything unless the stream sets
+`allow_msg_schedules`, in which case the server answers `10188 message schedules is disabled`. The
+page never mentions the stream field.
+
+**Suggested fix:** correct the two descriptions, fill the two empty ones, move `Nats-Schedule-Rollup`
+into the scheduling table, and add one sentence naming `allow_msg_schedules` as the precondition.
+
+## 42 · The message scheduler has no prose page anywhere in the documentation
+
+**Impact: an operator cannot learn this feature from the documentation at all.** They can learn that
+it exists, and they can look up the headers' names. Everything else — the six-field cron, the tzdata
+requirement, what enabling the stream field does to two other fields, how to stop a schedule, which
+retention policies quietly disable one — exists only in an ADR, which is a design document rather than
+user documentation.
+
+**Verified against the live site, not only the mirror.** `https://docs.nats.io/llms.txt`, fetched
+**2026-09-01**: no entry mentions scheduling, cron or delayed publishing. In the 861-page mirror
+fetched 2026-08-31, `Nats-Schedule` appears in exactly **two** files —
+`reference/jetstream/api/headers.md` and `release-notes/upgrade-to-2.14.md`.
+
+**Four release-note bullets announce the feature across two releases, and all four link only to the
+ADR:**
+
+- `upgrade-to-2.12.md` — *"Delayed Message Scheduling: The `AllowMsgSchedules` stream configuration
+  option allows the scheduling of messages… More information is available in ADR-51."*
+- `upgrade-to-2.14.md` — *Recurring schedules*, *Scheduled subject sampling*, *Scheduled subject
+  rollups*.
+
+**The neighbours, checked.** This is not the only bullet without a page — of 2.12's 18 feature
+bullets, 3 link to a `/learn/` page and 3 link only to an ADR; of 2.14's 15, 3 and 4 respectively. What
+distinguishes scheduling is that it is announced **four times across two releases** and still has no
+page, while comparable features do: the *Prioritized pull consumer policy* bullet immediately below
+2.12's scheduling bullet links to `/learn/jetstream/priority-groups.md`, and 2.14's atomic-batch
+bullet links to `/learn/jetstream/advanced-publishing.md`.
+
+**A shipped feature's public footprint, in full:** one stream config field, eight `Nats-Schedule*`
+headers, **ten** error codes (10186, 10187, 10188, 10189, 10190, 10191, 10192, 10203, 10212, 10223),
+four release-note bullets — and no chapter. The asker of `nats-io/nats-server` discussion
+[#7672](https://github.com/nats-io/nats-server/discussions/7672) puts it plainly while trying to find
+out whether cron works at all: *"Can't find much more info in the docs or code."*
+
+**This is `missing`, not `enhancement`.** The rulebook's line is that `enhancement` means correct but
+unhelpful; here there is no page to be unhelpful.
+
+**Suggested fix:** a `learn/jetstream/message-scheduling.md` covering the model (one schedule per
+subject, target in the same stream), the header family, the 2.12/2.14 boundary, the six-field cron and
+the `@every` minimum, the tzdata requirement for named time zones, stopping a schedule, and the
+retention table — and link it from the four release-note bullets.
+
 ## Internal — where this wiki records each of these
 
 *Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
@@ -1999,3 +2271,8 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 35 | `wiki/concepts/object-store.md` — *A bucket is not isolated by a JetStream domain*; `wiki/concepts/jetstream-domain.md`; `wiki/concepts/leafnode.md` — *Limits and failure modes*; `wiki/gotchas/streams-not-visible-across-a-leafnode.md`; `wiki/summaries/s-nats-server-object-store-leafnode.md` |
 | 36 | `wiki/reference/advisories.md` — *A docs error worth knowing*; `wiki/summaries/s-docs-monitoring-advisories-and-events.md` |
 | 37 | `wiki/concepts/priority-groups.md` — *Hard rules* and *What the ADR says that the server does not do*; `wiki/concepts/consumer.md` — *Priority policy*; `wiki/summaries/s-adr-42-priority-groups.md` |
+| 38 | `wiki/concepts/ack-and-redelivery.md` — *What a delayed nak actually waits*; `wiki/summaries/s-nats-server-nak-backoff-observed.md`; the behaviour half is `inbox/server-issues.md` **SI-2** |
+| 39 | `wiki/concepts/ack-and-redelivery.md` — *What a delayed nak actually waits* and *Backoff*; `wiki/summaries/s-synadia-reliable-delivery-dlq.md` |
+| 40 | `wiki/concepts/message-scheduling.md` — *Limits and failure modes* item 4 and the cheat sheet; `wiki/summaries/s-nats-server-message-schedules-observed.md` |
+| 41 | `wiki/concepts/message-scheduling.md` — *What configures it* and *Where the documentation is*; `wiki/summaries/s-docs-jetstream-headers.md`; `wiki/concepts/message-ttl.md` |
+| 42 | `wiki/concepts/message-scheduling.md` — the whole page, and *Where the documentation is*; `wiki/summaries/s-adr-51-message-scheduler.md` |

@@ -1,5 +1,14 @@
 # Plan — delivery timing: when a message comes back, and how to make it come later (proposed 2026-09-01)
 
+> **Result, 2026-09-01: all four steps done. All six target rows closed** (16, 17, 18, 19, 29, 30) plus
+> two new ones the work earned (106, 107) — the bank is **107/91**, ★ still complete (43/43), and row 18
+> closed properly rather than as a dead end, because the run explained the symptom.
+> **The contradiction landed on the plan's third outcome:** both published answers are wrong. A bare nak
+> is immediate with or without a backoff; a nak carrying a delay waits `delay + (backoff[dc] −
+> backoff[0])`. Six records came out of it — docs issues **#38** (nats-docs), **#39** (a blog, ★),
+> **#40** (natscli), **#41**, **#42** and server issue **SI-2** — plus two new pages
+> ([[message-scheduling]], [[dead-letter-queue]]) and two run transcripts in `raw/nats-server-src/`.
+
 Say **`start the plan`** to work this file; `CLAUDE.md` → *Operation: plan* says how. One step at a
 time, `status:` rewritten in place, `wiki/log.md` appended, `python3 tools/lint.py` run, question-bank
 cells filled, and each step reported before the next begins.
@@ -28,7 +37,7 @@ end as `no-public-answer` (see step 2).
 
 ---
 
-## Step 1 — the three answered redelivery threads · status: open
+## Step 1 — the three answered redelivery threads · status: done 2026-09-01 — s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks; rows 16, 17, 19 filled; 5 pages rippled
 
 *Operation: ingest*, three times. The cheapest step and the context the rest needs.
 
@@ -52,7 +61,7 @@ than one. If the page blurs them, that is the fix this step earns.
 
 **Closes rows 16, 17, 19.** Do **not** touch row 18 here — it is step 2's.
 
-## Step 2 — settle the nak-and-backoff contradiction on the binary · status: open
+## Step 2 — settle the nak-and-backoff contradiction on the binary · status: done 2026-09-01 — s-synadia-reliable-delivery-dlq, s-gh-5631-nak-not-immediate, s-nats-server-nak-backoff-observed; **both published answers were wrong** — the third outcome in the table below plus two docs-issue rows: #38 (nats-docs), #39 (the blog, ★) and SI-2. Rows 17, 18, 19 filled
 
 The step this plan is really for. *Operation: ingest*, then *Operation: record a docs issue* — and
 the claim is **behavioural**, so the rulebook requires it to be **run**, not read.
@@ -87,7 +96,7 @@ leaving the cell empty. A dead end that was actually investigated is worth more 
 **Do not skip step 1.** 4972's "a retried message is pending" may already be half the answer to why a
 nak looked slow to the reporter of gh#5631.
 
-## Step 3 — the message scheduler, and the page that should exist · status: open
+## Step 3 — the message scheduler, and the page that should exist · status: done 2026-09-01 — s-adr-51-message-scheduler, s-docs-jetstream-headers, s-gh-7672-cron-schedules, s-gh-7628-scheduler-vs-nak, s-nats-server-message-schedules-observed; new page [[message-scheduling]], 10 pages rippled, docs issues #40 (natscli), #41, #42; rows 29 and 30 filled. **Two corrections to this plan's own text**: the `@every` minimum is `1s`, not `1m`, and there are **ten** scheduler error codes, not nine (10223 joins them)
 
 *Operation: ingest*, four sources, two of them already local — then the new page.
 
@@ -137,7 +146,7 @@ is that `enhancement` means "correct but unhelpful", and here there is nothing t
 
 **Closes rows 29 and 30.**
 
-## Step 4 — the applied layer, and only the rows it earns · status: open
+## Step 4 — the applied layer, and only the rows it earns · status: done 2026-09-01 — s-synadia-delayed-scheduling, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss; **the bank earned the DLQ page** (new rows 106, 107 with URLs) → new page [[dead-letter-queue]]
 
 - `ingest https://www.synadia.com/blog/delayed-message-scheduling-nats-jetstream` (Peter Humulock,
   2026-04-09) → `s-synadia-delayed-scheduling`. Its value is four caveats stated more plainly than the

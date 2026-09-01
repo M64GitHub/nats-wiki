@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -240,6 +240,67 @@ consumer leader does all the work and the followers only stand by.
   (a standing view) and the Direct Get `--last-per-subject` flag (a one-shot read with no
   consumer). They are not the same feature (source: [[s-docs-policies]]).
 
+## The batch is on the clock, all of it
+
+`ack_wait` starts when a message is **delivered**, and a fetch delivers the whole batch at once — so
+every message in a batch of *N* is on the clock from the moment the batch lands, not from the moment
+the worker reaches it. With `ack_wait: 8m` and a few seconds of work per message, the tail of a
+100-message batch is already past its deadline when its turn comes, and the consumer redelivers
+messages a healthy worker is about to handle (source: [[s-gh-6628-ackwait-vs-dupe-window]]).
+
+That was the real cause behind a thread that started out as a question about the duplicate window:
+the reporter's `nats consumer info` showed nothing wrong — `Outstanding Acks: 0`, `Redelivered
+Messages: 0` — because the evidence was in the fetch loop, not on the server. Fetching one message at
+a time ended it: *"I removed this parameter and there were no more message were redelivered."*
+
+**Size the batch to fit inside `ack_wait × workers`**, and remember it interacts with the cap from
+both directions: `max_ack_pending` below the batch size caps throughput (above), and a batch larger
+than `ack_wait` can absorb causes redelivery. Neither is visible in consumer state until it has
+already happened.
+
+**`max_ack_pending` is one number per consumer, not per pull loop.** Ten `Consume` callbacks against
+one durable consumer share the one cap, as do ten processes: a maintainer had to correct exactly that
+assumption in gh#4972, where the extra throughput the reporter saw came from dropping the setting out
+of the config (restoring the default of **1000**), not from the extra loops
+(source: [[s-gh-4972-nak-with-delay-blocks]]). The same thread is why a **delayed nak** counts against
+the cap for the whole delay — see [[ack-and-redelivery]].
+
+**Both retry mechanisms are consumer-shaped, but only one is consumer *configuration*.** A consumer
+`backoff` shapes redeliveries the server starts when `ack_wait` expires; a delayed nak is a
+per-message client call that no `nats consumer` command can set (source:
+[[s-gh-6350-exponential-backoff]]). The distinction and its consequences are on
+[[ack-and-redelivery]].
+
+## A `backoff` silently rewrites `ack_wait`
+
+Two consumer settings that look independent are not: **if a consumer has a `backoff`, its first entry
+becomes `ack_wait`**, overwriting whatever was asked for. The rewrite happens in the **server**
+(`consumer.go:658` at v2.14.6, under *"If BackOff was specified that will override the AckWait and
+the MaxDeliver"*), not in a client or the CLI — a config sent straight to
+`$JS.API.CONSUMER.CREATE` with `ack_wait: 30s` and `backoff: [1s, 5s, 30s, 2m]` comes back stored as
+**`ack_wait: 1s`** (source: [[s-nats-server-nak-backoff-observed]]). In **pedantic** mode the server
+refuses the config instead, with `first backoff value has to equal batch AckWait`.
+
+So read `nats consumer info` rather than the config you submitted:
+
+```
+nats consumer info ORDERS shipping --json | jq '.config | {ack_wait, backoff, max_deliver}'
+```
+
+The consequence for timing — including the fact that a nak carrying a delay does **not** wait the
+delay it asked for on such a consumer — is on [[ack-and-redelivery]].
+
+**A nak is answered by nobody.** Unlike a stream request, a nak is published to the message's
+`$JS.ACK.…` subject and nothing replies; the server drops one whose delivery is out of range or whose
+message is no longer pending, with no error and no log line
+(source: [[s-gh-5631-nak-not-immediate]]). A consumer that appears to ignore naks cannot be diagnosed
+from the client — read the delivery counts here instead.
+
+**Replay is this page's `deliver_policy` aimed backwards.** A consumer started by start sequence or
+start time, with `replay_policy: original` rather than `instant`, reproduces the intervals at which
+the messages first arrived — the source calls it "useful for realistic load reproduction"
+(source: [[s-synadia-reliable-delivery-dlq]]).
+
 ## `consumer info` is a debugging tool, not a control-loop primitive
 
 The call routes to the **meta leader** before it can return "does not exist", and when the consumer
@@ -258,6 +319,22 @@ Two habits to avoid:
 
 Both are cheap at prototype scale and expensive across tens of thousands of clients — see
 [[jetstream-slows-as-consumers-grow]].
+
+## A consumer nobody pulls from does not time out
+
+`ack_wait` is not a background reaper. On a pull consumer, **the delivery count advances when a client
+asks for messages**; with nothing fetching, a delivered message stays in `num_ack_pending` past its
+`ack_wait` and `max_deliver` is never reached — so no redelivery, and no max-deliveries advisory
+(source: [[s-gh-4994-scale-to-zero-dlq]], confirmed as by design by a maintainer). A push consumer
+whose queue group is empty behaves the same way.
+
+This matters for two designs in particular:
+
+- **A worker pool that scales to zero** leaves messages pending indefinitely, and every advisory-based
+  alarm stays quiet ([[worker-pool]], [[dead-letter-queue]]).
+- **A monitoring check built on advisories** cannot detect "nobody is consuming"; `num_ack_pending`
+  and `num_pending` on this page can.
+
 
 ## What you can observe
 
@@ -373,7 +450,9 @@ that separates them from a crashed pool.
 [[s-adr-60-reliable-sourcing]] · [[s-docs-reading-back]] · [[s-docs-filtering]] ·
 [[s-docs-monitoring-jetstream-health]] · [[s-adr-8-key-value-store]] ·
 [[s-adr-17-ordered-consumer]] · [[s-adr-42-priority-groups]] · [[s-docs-worker-pool]] ·
-[[s-gh-5044-restrict-durable-consumers]] · [[s-gh-6605-which-consumer-is-slow]]
+[[s-gh-5044-restrict-durable-consumers]] · [[s-gh-6605-which-consumer-is-slow]] ·
+[[s-gh-6628-ackwait-vs-dupe-window]] · [[s-gh-6350-exponential-backoff]] ·
+[[s-gh-4972-nak-with-delay-blocks]]
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37.
+v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]]

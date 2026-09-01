@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # `$JS.API` subjects
@@ -186,6 +186,26 @@ consumer create and delete are needed too, and they are on `CONSUMER.*` subjects
 **created and destroyed on every call**, which is why listing a busy bucket is expensive:
 [[object-store-list-is-slow]].
 
+## Headers are the other half of the API
+
+Several JetStream features have **no API subject at all** — they are headers on an ordinary publish to
+a stream subject, answered by the `PubAck` on the publish's reply. The docs collect them in one table
+(source: [[s-docs-jetstream-headers]]), and this page lists them so nobody hunts for a `$JS.API`
+subject that does not exist:
+
+| feature | headers | page |
+|---|---|---|
+| deduplication | `Nats-Msg-Id` | [[publishing]] |
+| optimistic concurrency | `Nats-Expected-Stream`, `Nats-Expected-Last-Sequence`, `Nats-Expected-Last-Msg-Id`, `Nats-Expected-Last-Subject-Sequence`, `Nats-Expected-Last-Subject-Sequence-Subject` | [[publishing]] |
+| rollup | `Nats-Rollup` (`sub` or `all`) | [[stream]] |
+| per-message TTL | `Nats-TTL` | [[message-ttl]] |
+| atomic / fast-ingest batching | `Nats-Batch-Id`, `Nats-Batch-Sequence`, `Nats-Batch-Commit` | [[publishing]] |
+| **message scheduling** | `Nats-Schedule`, `Nats-Schedule-Target`, `Nats-Schedule-Source`, `Nats-Schedule-TTL`, `Nats-Schedule-Time-Zone`, `Nats-Schedule-Rollup`, and the server-added `Nats-Scheduler` / `Nats-Schedule-Next` | [[message-scheduling]] |
+
+**Headers are case-sensitive**, and some are set by the server rather than the client — the docs say
+so without listing which. On this wiki the server-set ones are named on each feature's page.
+
+
 ## Conventions
 
 - An **empty request body** may be nil, an empty string, or `{}`.
@@ -246,4 +266,4 @@ domain back out of as the **second token** (`stream.go:432–437`). See [[jetstr
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
 [[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]] ·
 [[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]] ·
-[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]]
+[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]]

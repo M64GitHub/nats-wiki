@@ -126,13 +126,15 @@ Nothing ingested. This section maps candidates to summaries once they are.
 
 | candidate | summary |
 |---|---|
-| 1 · gh#6628 | |
-| 2 · gh#6350 | |
-| 3 · gh#5631 | |
-| 4 · gh#4972 | |
-| 6 · Synadia — reliable delivery / DLQ | |
-| 7 · ADR-51 | |
-| 8 · gh#7672 | |
-| 9 · gh#7628 | |
-| 10 · `reference/jetstream/api/headers.md` | |
-| 11 · Synadia — delayed message scheduling | |
+| 1 · gh#6628 | [[s-gh-6628-ackwait-vs-dupe-window]] |
+| 2 · gh#6350 | [[s-gh-6350-exponential-backoff]] |
+| 3 · gh#5631 | [[s-gh-5631-nak-not-immediate]] |
+| 4 · gh#4972 | [[s-gh-4972-nak-with-delay-blocks]] |
+| 6 · Synadia — reliable delivery / DLQ | [[s-synadia-reliable-delivery-dlq]] (+ the run: [[s-nats-server-nak-backoff-observed]]) |
+| 7 · ADR-51 | [[s-adr-51-message-scheduler]] (+ the run: [[s-nats-server-message-schedules-observed]]) |
+| 8 · gh#7672 | [[s-gh-7672-cron-schedules]] |
+| 9 · gh#7628 | [[s-gh-7628-scheduler-vs-nak]] |
+| 10 · `reference/jetstream/api/headers.md` | [[s-docs-jetstream-headers]] |
+| 11 · Synadia — delayed message scheduling | [[s-synadia-delayed-scheduling]] |
+
+**All eleven candidates ingested, 2026-09-01**, working `inbox/plan-delivery-timing-2026-09-01.md`. Two candidates the scout did not list were added along the way: `gh#4994` and `gh#7590`, found by the dead-letter scope test in step 4. Two of this scout's own readings were corrected against the sources: the `@every` minimum is **`1s`**, not `1m`, and there are **ten** scheduler error codes, not nine (`10223` joins them).

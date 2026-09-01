@@ -3,10 +3,10 @@ title: Ack and redelivery
 type: concept
 area: [jetstream]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-01
 tags: [ack, nak, term, ack_wait, max_deliver, max_ack_pending, backoff, advisories]
 aliases: [acknowledgement, acknowledgment, ack, nak, term, at-least-once, AckWait, MaxDeliver]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-6628-ackwait-vs-dupe-window, s-nats-server-nak-backoff-observed, s-synadia-reliable-delivery-dlq, s-gh-5631-nak-not-immediate, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -55,7 +55,7 @@ A client answers a delivered message in **exactly one of four ways**
 | answer | effect |
 |---|---|
 | **ack** | the work succeeded; the server clears the pending entry and never delivers the message again |
-| **nak** | redeliver. A plain nak asks for redelivery **immediately**, or after a delay the client attaches |
+| **nak** | redeliver. A plain nak asks for redelivery **immediately**; a delay the client attaches is honoured only if the consumer has no `backoff` — see *What a delayed nak actually waits* |
 | **term** | give up — this message can never be handled. Clears the pending entry and moves the ack floor exactly as an ack does, but records that the work never happened |
 | **in-progress** | *not* a final answer — it **resets the `ack_wait` timer** so a long job does not trip redelivery |
 
@@ -112,14 +112,18 @@ expose these at all, which is issue 4 in `inbox/docs-issues.md`.
 `backoff` is a list of delays, one per attempt. Three rules matter
 (source: [[s-docs-acknowledgment]]):
 
-- It **only shapes redeliveries that fire when the `ack_wait` timer runs out.** It does **not**
-  slow a nak — to delay a nak, the client attaches the delay to the nak itself.
+- It **shapes redeliveries that fire when the `ack_wait` timer runs out** — and, at v2.14.6, it also
+  changes the timing of a nak that **carries a delay**, which the docs deny. A **bare** nak is
+  unaffected. See *What a delayed nak actually waits* below; the docs' flat "it doesn't slow a nak"
+  is `inbox/docs-issues.md` **#38**.
 - If the list has fewer entries than `max_deliver` allows, the server **reuses the last entry** for
   the remaining attempts.
 - **Setting a backoff replaces `ack_wait`**: the first entry becomes the wait before the first
   redelivery, and therefore the ack deadline for the first delivery too. A `--backoff-min=1s` drops
   the effective ack deadline to 1 second, overriding any `--wait` set earlier. Pick a
-  `--backoff-min` at least as long as normal processing takes.
+  `--backoff-min` at least as long as normal processing takes. Confirmed in the server, not just the
+  CLI — `consumer.go:658` at v2.14.6, and observed through the raw API
+  (source: [[s-nats-server-nak-backoff-observed]]).
 
 ### Ack policies
 
@@ -131,6 +135,153 @@ expose these at all, which is issue 4 in `inbox/docs-issues.md`.
 | `flow_control` | used by the push consumers the server creates for durable mirrors and sources; acks ride the flow-control responses and behave like `all` |
 
 `ack_policy` is **fixed at creation** (source: [[s-docs-policies]]).
+
+## Retry: two mechanisms, one shared budget
+
+Everything above describes *one* delivery. A retry policy is built out of two mechanisms that are
+chosen by **who noticed the failure**, and they are not interchangeable
+(source: [[s-gh-6350-exponential-backoff]], a maintainer's marked answer):
+
+| the failure was | noticed by | the mechanism | where it is set |
+|---|---|---|---|
+| implicit — the handler hung, or the worker died, and no answer came | the server, when `ack_wait` expires | consumer **`backoff`** | consumer configuration, server-side |
+| explicit — the handler caught an error and gave up on this attempt | the client, at once | **nak with a delay** (`nakWithDelay`) | a per-message client-library call |
+
+> "If you do not ack the message (before the consumer's AckWait timeout happens) then you can specify
+> a series of backoff times in the consumer's configuration… If you explicitly give up on processing
+> the message using the 'nack' (negative ack) then you can specify the backoff period using
+> `nakWithDelay`." — @jnmoyne, 2025-01-10
+
+A policy that wants both needs both: a `backoff` does nothing for a handler that naks, and a delayed
+nak does nothing for a worker that dies. Neither is an exponential-backoff *algorithm* — `backoff` is
+a list of durations you supply (the CLI's generator is `linear`), and a nak's delay is whatever the
+handler passes.
+
+### A delayed nak keeps its `max_ack_pending` slot for the whole delay
+
+**A message that has been delivered once and is waiting to come back counts as pending, delay or no
+delay** (source: [[s-gh-4972-nak-with-delay-blocks]]). This is deliberate:
+
+> "Any messages that was once delivered and had to be retried is pending, its an important constraint
+> as max pending is used to manage ordering to name but one case. So this is working as designed,
+> there's no alternative today." — @ripienaar, 2024-01-18
+
+The reporter had `max_ack_pending: 10`, nak'd ten messages with a one-minute delay, and the consumer
+stopped: 10 messages handled out of 100 published. **The failure mode is a total stall, not a
+slowdown** — `Outstanding Acks` sits at its maximum with every worker idle until the first delay
+expires. Confirmed on the v2.14.6 binary (source: [[s-nats-server-nak-backoff-observed]]); the
+maintainers' answer is from 2024 and describes the behaviour as current *"today"*, with
+@derekcollison arguing in the same thread that it should change and **no fix version named
+anywhere**.
+
+Three consequences:
+
+- **Retry capacity and concurrency come out of one budget.** The cap must cover the work in flight
+  *and* everything asleep in retry — at a nak rate of *R* per second with a delay of *D* seconds,
+  roughly *R × D* slots are asleep at steady state (arithmetic from the constraint; no source states
+  a number). See [[jetstream-sizing]].
+- **Raising the cap is the only lever**: "The only real option today is to increase the maxackpending."
+- **More consume loops do not help.** The same thread's reporter tried ten `Consume` callbacks
+  instead of one and thought that gave ten workers' worth of slots; the extra throughput came only
+  from dropping `MaxAckPending` out of the config, which put it back to the default of 1000. The cap
+  is **one number per consumer**, whatever is pulling against it — across goroutines and across
+  processes alike.
+
+When the delay is long enough that this hurts, the retry is really a *scheduled publish* and belongs
+on [[message-scheduling]] rather than on the ack loop — which is what a maintainer recommends for
+work at scale ([[s-gh-7628-scheduler-vs-nak]]).
+
+### The duplicate window has nothing to do with redelivery
+
+A recurring confusion, and worth stating flatly: **no stream setting suppresses a redelivery**
+(source: [[s-gh-6628-ackwait-vs-dupe-window]]).
+
+> "AckWait and DupeWindow are two different settings that are not related to each other."
+> — @MauriceVanVeen, 2025-03-10
+
+`duplicate_window` bounds re-**publication** of the same `Nats-Msg-Id` into the [[stream]]
+([[publishing]]); `ack_wait` bounds re-**delivery** of a message already stored. The dedup window is
+consulted on publish and never on delivery, so setting it longer than `ack_wait` — the asker had
+`10m` against `8m` — changes nothing. To be delivered once, bound the deliveries: "set the MaxDeliver
+value to 1, or always Ack or Term the message once you get it."
+
+**A batch fetch is the usual real cause.** That thread's redeliveries came from a pull batch of 100:
+the `ack_wait` clock starts on **every message in the batch**, not on the one being worked, so with
+`ack_wait: 8m` and a few seconds of work per message the tail of a 100-message batch is past its
+deadline before the worker reaches it. Fetching one at a time ended it. Size the batch so it fits
+inside `ack_wait × workers` — the same arithmetic [[consumer]] states from the other end.
+
+
+### What a delayed nak actually waits
+
+Three public sources disagree about whether a consumer `backoff` affects a nak, so it was **run on
+the v2.14.6 binary** rather than decided from a page (source:
+[[s-nats-server-nak-backoff-observed]], thirteen experiments, 2026-09-01). **Both published answers
+are wrong**, and the rule neither states is:
+
+```
+effective wait  =  the delay the client asked for
+                +  ( backoff[delivery count] − backoff[0] )
+```
+
+| what the client sends | consumer has a `backoff` | what happens |
+|---|---|---|
+| bare `-NAK` | no | immediate — **0.00s** |
+| bare `-NAK` | yes (`5s, 10s, 15s`) | immediate — **0.00s**. The backoff does not touch it |
+| `-NAK {"delay":2s}` | no | **1.95s**, every attempt. The delay is honoured |
+| `-NAK {"delay":2s}` | yes (`5s, 10s, 15s`) | **2.000 · 7.000 · 12.000 · 12.001** seconds |
+| `-NAK {"delay":0}` | yes (`5s, 10s, 15s`) | **0.00 · 4.94 · 9.94** — a delay nobody asked for |
+| no answer at all | yes (`5s, 10s, 15s`) | **5.00 · 10.00 · 15.00** — the schedule, as documented |
+
+The last row is the control: the schedule works exactly as the docs describe for `ack_wait` timeouts,
+so rows 1–2 are a real negative rather than a broken setup.
+
+**Why.** `processNak` backdates the message's pending timestamp by `ack_wait` —
+`p.Timestamp = time.Now().Add(-o.cfg.AckWait).Add(d)`, under the comment *"now - ackWait is expired
+now, so offset from there"* (`consumer.go:3231`) — but `checkPending` then measures that timestamp
+against **the attempt's backoff entry**, not against `ack_wait` (`consumer.go:6066`). The comment is
+exact only on a consumer with no backoff. Recorded as `inbox/server-issues.md` **SI-2**; the
+documentation half is `inbox/docs-issues.md` **#38**.
+
+**`-NAK {}` is not a bare nak.** The server branches on whether there is *anything* after the four
+bytes `-NAK`, and an empty options object parses to a zero delay — so it takes the delayed path and
+picks up the backoff term. Two client libraries implementing the same "plain nak" call can therefore
+produce different timing, depending only on whether they serialise an empty options object.
+
+**What the sources say, and why the page does not follow them.** The docs state three times that a
+backoff "doesn't slow a nak" (source: [[s-docs-acknowledgment]]) — true of a bare nak, false of a
+delayed one. A Synadia post answers "how do I retry a failed message with a backoff?" with
+"Negatively acknowledge it" (source: [[s-synadia-reliable-delivery-dlq]]) — which is the one case the
+backoff does not shape. **Prefer the server**: pick one mechanism per consumer, a `backoff` for
+timeouts *or* delayed naks with no backoff configured, and do not expect a delay you asked for to
+survive the combination.
+
+### `ack_wait` beside a `backoff` is silently discarded
+
+**Setting a `backoff` overwrites `ack_wait` with the first entry, in the server, not the client**
+(`consumer.go:658`, under *"If BackOff was specified that will override the AckWait and the
+MaxDeliver"*). Sent straight to `$JS.API.CONSUMER.CREATE`, `ack_wait: 30s` with
+`backoff: [1s, 5s, 30s, 2m]` stores **`ack_wait: 1s`** (source:
+[[s-nats-server-nak-backoff-observed]]).
+
+So **the first backoff entry *is* your ack deadline**, and a `--backoff-min=1s` gives every handler
+one second before the server decides it failed. In **pedantic** mode the server refuses instead —
+`first backoff value has to equal batch AckWait` — but nats CLI 0.4.0 exposes no flag for it.
+
+A published Go snippet with `AckWait: 30 * time.Second` next to `BackOff: [1s, …]` is doing this
+silently to whoever copies it (source: [[s-synadia-reliable-delivery-dlq]]; `inbox/docs-issues.md`
+**#39**).
+
+### Why a nak never reports a failure
+
+A nak is **fire-and-forget**: the client publishes it to the message's `$JS.ACK.…` subject and waits
+for nothing. The server discards one whose delivery is out of range (`dseq <= o.adflr ||
+dseq > o.dseq`) or whose message is no longer in the pending list, with no reply and no log line
+(`consumer.go:3182–3190`). **The absence of an error is not evidence the nak was acted on** — which
+is exactly what the reporter of an unanswered 2024 thread observed: "I do not have any error when
+calling the Nak client method in problematic cases" (source: [[s-gh-5631-nak-not-immediate]], server
+2.10.14, never answered by anyone).
+
 
 ## Limits and failure modes
 
@@ -144,8 +295,10 @@ Ranked by how often they are the answer.
    job. Either raise `ack_wait` to cover the slow case, or send **in-progress** to reset the timer
    while a long job runs.
 3. **A plain nak retries with no delay.** A transient failure then retries in the same instant,
-   fails again, and pins one worker on one message. Nak *with a delay*; a consumer backoff will not
-   help, because backoff only spaces out `ack_wait` timeouts.
+   fails again, and pins one worker on one message. Nak *with a delay* — and do not reach for a
+   consumer `backoff` to fix a nak loop: it leaves a bare nak untouched, and on a nak that carries a
+   delay it changes the wait to something neither you nor the docs chose
+   (*What a delayed nak actually waits*).
 4. **A poison message with no term path burns every delivery attempt** and holds up the messages
    behind it. When the code can tell no future attempt will succeed, answer **term** so the message
    leaves the pending list at once. Use term only when that is genuinely knowable; when in doubt,
@@ -207,11 +360,6 @@ nats events --js-advisory --no-srv-advisory
 
 ## To verify
 
-- The 2.14 docs state that **a plain nak redelivers immediately**. Question-bank Q23's neighbour
-  Q18 ("why doesn't a NAK cause an immediate redelivery?") asserts the opposite from a real
-  thread — the thread behind Q18 has not been read yet, so the wiki does not claim an answer.
-- Whether a **delayed nak holds a `max_ack_pending` slot** while it waits (question-bank Q19) is
-  not stated by any source ingested so far.
 - No source ingested so far gives **metrics** (as opposed to advisories) for acked / naked /
   terminated / redelivered counts (question-bank Q59).
 
@@ -227,6 +375,37 @@ that this happened… If no one is subscribed when it fires, you never learn tha
 being delivered" (source: [[s-docs-monitoring-advisories-and-events]]). Advisories are published once
 and stored nowhere, so a design that depends on noticing exhausted messages needs a stream capturing
 `$JS.EVENT.ADVISORY.>`, not a subscriber someone remembers to run.
+
+### With nobody fetching, `ack_wait` does not advance the delivery count
+
+**A pull consumer's redelivery needs a client asking for messages.** `ack_wait` expiring is not by
+itself enough: with no client fetching, the message stays in `AckPending` and the delivery count does
+not move, so `max_deliver` is never reached and the max-deliveries advisory never fires. Confirmed as
+**by design** (source: [[s-gh-4994-scale-to-zero-dlq]]):
+
+> "There appears to be no way to configure JetStream to eagerly move messages from pending to the dead
+> letter queue upon `AckWait` timeout, without clients issuing fetches. The behavior of a push
+> consumer + queue group setup appears to exhibit the same effect — if there are no subscribers in the
+> queue group, messages remain in `AckPending` after the `AckWait`."
+
+The asker tried "dummy fetch requests… to activate the message redirection" and "did not find a way
+to trigger this manually."
+
+**This is a trap for any pool that scales to zero.** Messages sit pending indefinitely, no advisory is
+published, and every consumer number looks calm — the queue is not stuck, it is simply unobserved. If
+something downstream depends on noticing failures, keep one puller alive or drive the check from
+`num_ack_pending` rather than from advisories. See [[dead-letter-queue]].
+
+### A message that exhausts `max_deliver` stays in the stream
+
+The advisory is not a removal. Measured at v2.14.6 on **both** `workqueue` and `limits` streams: the
+advisory fires with `stream_seq` and `deliveries`, the message is still stored, and the sequence the
+advisory names fetches it with its payload (source: [[s-nats-server-nak-backoff-observed]]). That is
+what makes [[dead-letter-queue]] possible at all.
+
+**If a fetch by that sequence returns nothing, suspect the version.** `nats-server` 2.12.3 and 2.12.4
+**lost** max-delivered messages on R3 WorkQueue streams — issue #7817, fixed by PR #7845 and shipped
+in **2.12.5** (source: [[s-gh-7590-dlq-payload-loss]]).
 
 ## MQTT has its own `ack_wait` and `max_ack_pending`
 
@@ -254,4 +433,4 @@ create-time-only rule a consumer's `ack_wait` follows.
 [[s-docs-consumer-config]] · [[s-docs-policies]] · [[s-nats-server-constants-2.14.6]] ·
 [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-monitoring-advisories-and-events]] ·
-[[s-docs-worker-pool]]
+[[s-docs-worker-pool]] · [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-nats-server-nak-backoff-observed]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-5631-nak-not-immediate]] · [[s-docs-acknowledgment]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]]

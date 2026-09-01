@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -193,6 +193,74 @@ interest, and new messages were removed before they could be copied
 (source: [[s-adr-59-sourcing-and-mirroring]]).
 
 
+## Retention decides whether a failed message can still be recovered
+
+A message that exhausts `max_deliver` produces an advisory naming its stream sequence, and anything
+that wants to recover it — a dead-letter handler, an operator with `nats stream get` — has to fetch
+it **while it still exists**. Which retention policy the stream uses decides how long that window is
+(source: [[s-synadia-reliable-delivery-dlq]]):
+
+| retention | is the failed message still there? |
+|---|---|
+| `limits` | **yes**, independently of acks — "the friendliest case", bounded only by the stream's own age/size/count limits |
+| `workqueue` | **only briefly.** The message is removed once it is terminally acknowledged, and exhausting `max_deliver` is itself the end of the road |
+| `interest` | **only briefly**, and the window "is bounded by consumer behavior" rather than by a limit you set |
+
+The rule the source gives: *"on any retention policy that removes messages once they are terminally
+handled, capture the payload while it still exists."* A recovery design built over a `workqueue`
+stream must copy the message at capture time rather than store a reference to it — see
+[[advisories]] and [[direct-get]] for the two halves of that fetch, and [[ack-and-redelivery]] for
+what happens when the delivery budget runs out.
+
+
+## Retention decides whether a scheduled message ever fires
+
+A [[message-scheduling|message schedule]] is an ordinary message that happens to carry
+`Nats-Schedule` headers, so this page's rules govern its survival — and a schedule that is removed
+stops firing, silently. "Once a schedule message is removed from storage, by any mechanism, its
+schedule stops firing" (source: [[s-adr-51-message-scheduler]]).
+
+| policy | what it does to a schedule |
+|---|---|
+| **`limits`** | the recommended choice. But `max_age` shorter than the firing interval deletes the schedule *before* it fires — prefer a `Nats-TTL` on the schedule itself — and `discard: old` under `max_msgs`/`max_bytes` can evict it the same way |
+| **`workqueue`** | works only while nothing acks the schedule. A consumer filtered on the schedule subject **permanently stops the schedule on ack** — which can be used as a cancel, though it is a race, since "message deletion as a result of acknowledgement isn't immediate" |
+| **`interest`** | "if no consumer has interest in the schedule subject, the schedule will not be stored, nor will it trigger scheduled messages" — the schedule never even lands |
+
+**The two-stream composition for `interest` retention** is the ADR's recommended shape and is worth
+knowing as a general pattern here: put the schedules in a dedicated **`workqueue`** stream (with
+`allow_msg_schedules` and subjects covering both the schedule and target patterns) and have the
+`interest` stream **source** the target subjects from it. Schedules never leave the workqueue stream,
+where nothing removes them so long as no consumer acks them.
+
+The alternative — a **pinning consumer** on the interest stream whose filter covers the schedule
+subjects, with `ack_policy: none`, purely to hold interest — works but is not recommended: "the
+pinning consumer becomes load-bearing configuration: if it is deleted or its filter drifts, schedules
+silently stop", and it costs overhead when replicated.
+
+Note the asymmetry that makes the two-stream shape legal at all: `allow_msg_schedules` goes on the
+**source** stream only, because a stream that has sources configured cannot set it
+([[mirrors-and-sources]]).
+
+
+### A message that exhausts `max_deliver` is not removed by any policy
+
+Reaching the delivery limit is not an acknowledgement, so it does not satisfy `workqueue` or
+`interest` retention. Measured at v2.14.6 on both `workqueue` and `limits` streams: the message stays
+stored and is fetchable by the sequence the max-deliveries advisory names
+(source: [[s-nats-server-nak-backoff-observed]]). What stops is delivery to that consumer, not
+storage.
+
+**There was a defect that made this look otherwise.** On **2.12.3 and 2.12.4**, R3 `workqueue` streams
+**lost** max-delivered messages — `nats-io/nats-server` issue #7817, fixed by PR #7845 and shipped in
+**2.12.5** ("Ensure that messages that have reached the max deliver state are preserved with the
+WorkQueue retention policy") (source: [[s-gh-7590-dlq-payload-loss]]). A `message not found` when
+fetching a dead-lettered sequence on those versions is that bug, not this policy.
+
+What *does* still bound the window is ordinary retention: on `workqueue` and `interest`, any consumer
+that acks the message removes it, so a [[dead-letter-queue]] handler is racing whatever else is
+attached to the stream.
+
+
 ## To verify
 
 - How `interest` and `workqueue` interact with stream **republish** is referenced by the docs but
@@ -208,4 +276,4 @@ interest, and new messages were removed before they could be copied
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
 [[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
 [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
-[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]]
+[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]]
