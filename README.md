@@ -36,6 +36,7 @@ nats-server <version>` and `verified-on: <date>`. A stale page is worse than a m
 | `tools/build-config-table.py` | turn the generated config reference into `inbox/config-keys-table.md` |
 | `tools/triage-adrs.py` | turn `raw/adr/` into `inbox/adr-toc.md` |
 | `site/` | generated web viewer (git-ignored; `python3 tools/build-site.py`) |
+| `local/` | git-ignored overlay: put your own `CLAUDE-MD-EXTENSION.md` there (what you are working on, local conventions) and the agent reads it after `CLAUDE.md` |
 | `wiki/index.md` | catalog of every page — start here |
 | `wiki/log.md` | append-only log of every ingest / query / lint |
 | `wiki/concepts/` | what a thing is and how it behaves |

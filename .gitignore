@@ -4,3 +4,4 @@ inbox/extracts/
 __pycache__/
 *.pyc
 .cache/
+local/

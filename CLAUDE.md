@@ -8,6 +8,11 @@ programmer; the viewer (the built-in site or Obsidian) is just the IDE.
 
 Read this file before doing anything in the wiki.
 
+If **`local/CLAUDE-MD-EXTENSION.md`** exists, read it next. `local/` is git-ignored: a per-clone
+overlay for instructions and context that do not belong in the public rulebook — what is being worked
+on across sessions, local conventions, drafts not yet public. Where that file and this one conflict,
+**the overlay wins.** A clone without it works exactly as this file says.
+
 **Focus:** everything needed to **run NATS in production** — the knowledge a
 solution architect or operator uses to install, configure, size, cluster,
 secure, monitor, upgrade and debug `nats-server`, with **JetStream** (plus KV

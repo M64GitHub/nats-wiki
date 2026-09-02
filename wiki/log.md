@@ -3353,3 +3353,12 @@ built-in MQTT vs a broker. **8 filled** from pages whose sections state the answ
 `multi-region-jetstream`, `jetstream-sizing`, `upgrade-a-cluster`, `disaster-recovery`,
 `backup-and-restore-jetstream`); **22 open**. Bank 107 → **137 rows, 101 answered**.
 `inbox/scout-backlog.md` gains section 5 with the two scouts these rows call for. No page changed.
+
+## 2026-09-02 — rulebook: a git-ignored local overlay, `local/CLAUDE-MD-EXTENSION.md`
+
+`CLAUDE.md` now says: if `local/CLAUDE-MD-EXTENSION.md` exists, read it after the rulebook, and where
+the two conflict the overlay wins. `local/` is git-ignored (`.gitignore`) and listed in the README's
+layout table so anyone who clones the repo can carry their own instructions without touching the
+public rulebook. Here it holds the maintainer's multi-session programme (`local/megaplan.md`, started
+2026-09-02, entered with "start the megaplan") — a tracker, not wiki content: every source, plan,
+scout and page it produces goes into the public tree as usual.
