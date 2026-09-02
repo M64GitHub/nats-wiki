@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8001-jetstream-startup-slow-50m]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Mirrors and sources
@@ -241,6 +241,36 @@ What "an internal consumer" actually is, from `server/stream.go` at 2.14.6 (sour
   (source: [[s-relnotes-2.14.4]]).
 
 
+## What a sourcing stream does at every start
+
+A stream with `sources` does not remember where it was. At every start — and on a replicated
+stream at every leader change — `startingSequenceForSources` resets what it knew and **scans the
+stream backwards from its last message**, reading each message's `Nats-Stream-Source` header to
+find the last sequence received from every source; it returns early only once *every* configured
+source has been seen (`stream.go:4787–4894` at 2.14.6). A source that has never delivered, or has
+been quiet since before the stream's oldest message, sends the scan to sequence 1 — every block
+loaded in full and decompressed, on one goroutine, under the store's read lock. On an R1 server this
+runs inline inside `recoverStream`, so the log charges it to `Restored … messages for stream … in`;
+on R3 it runs 100–600 ms after the leader is chosen, outside that line, and the stream sources
+nothing until it finishes. No log line names the scan (source: [[s-nats-server-filestore-recovery]]).
+
+Measured on 2.14.6: a 1.6 GB sourcing stream restored in **2.57 s** with one empty source configured
+and in **23 ms** without it, every goroutine sample in the scan, the 50 M-message stream it sourced
+from restoring in 3 ms alongside (source: [[s-nats-server-stream-scale-observed]]). The public
+report — 50 M messages, 7 GB, about twenty sources, Ceph at 20 MB/s — is 6 min 38 s of the same
+scan after a *clean* shutdown, diagnosed here from the reporter's own goroutine dump; the thread is
+unanswered upstream (source: [[s-gh-8001-jetstream-startup-slow-50m]];
+[[jetstream-recovery-is-slow]]).
+
+**What to do about it.** Remove sources that have nothing in the stream; keep the rest producing;
+size the restart window as the stream's bytes ÷ the volume's read rate; and plan for **2.15**, where
+the sourced sequences are indexed as they arrive and persisted as `sources.db` at the stream's root
+(PR #8282, merged 2026-08-20; empty sources indexed too since #8516; v2.15.0-preview.1's note:
+*"Restarts and leader changes previously required expensive backward scans through the stream to
+find the last sourced indices"*). Replicated streams need `feature_flags { js_snapshot_sources }`
+to replicate that index. Mirrors are not affected: a mirror resumes from its own last sequence.
+
+
 ## Reading the replication state when `Lag` is not enough
 
 Three things ADR-59 documents that no CLI output shows (source: [[s-adr-59-sourcing-and-mirroring]]):
@@ -450,4 +480,4 @@ stream **cannot** have while it mirrors or sources another.
 [[s-adr-57-kv-subject-transforms]] · [[s-docs-disaster-recovery]] · [[s-docs-get-direct]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-5606-cross-account-jetstream]] ·
 [[s-gh-6328-jetstream-behind-gateways]] · [[s-gh-7017-kv-across-accounts]] ·
-[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]]
+[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-8001-jetstream-startup-slow-50m]]

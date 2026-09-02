@@ -71,7 +71,7 @@ about `index.db` at `len(subject) + 4` per subject for row 9. Name the run for r
 stream to tens of millions of small messages through the lab, restart, time `Restored N messages …`
 and what precedes it) with its disk budget stated. **Stop there; the user picks.**
 
-## Step 4 — the run, and the ingest for scout 2 · status: open
+## Step 4 — the run, and the ingest for scout 2 · status: done 2026-09-03 — runs D/E/F on 2.14.6 (`stream-scale-observed-v2.14.6.md` + the run scripts), the S2 variant skipped; 8 summaries: s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-gh-5202-max-unique-subjects, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-synadia-how-many-subjects; raw: gh-8001/8333/5202/7147/7032, filestore-recovery-v2.14.6.md, synadia-blog/how-many-subjects…, a new collection synadia-insights/. New gotcha `jetstream-recovery-is-slow`; sections on 12 pages. Rows **4, 5, 9, 13 answered** (5 by a maintainer's "no hard limit" — not `no-public-answer`). Docs issues #52 (missing) and #53 (enhancement). `SI-3`: not the attribution the scout expected (that is recorded as fact on the pages) but a `*` inside a token that `num_pending` counts as a prefix wildcard and delivery treats as a literal, found through a mistaken filter in run E, reproduced on five messages. Measured: clean restart 3–27 ms for 50 M messages, 6.4 s after SIGKILL, 2.57 s for a 1.6 GB sourcing stream with one empty source vs 23 ms without.
 
 The row-13 run, recorded in `raw/nats-server-src/stream-scale-observed-v2.14.6.md` (state the
 message count, bytes on disk, and the restart timings; if the laptop cannot reach the thread's

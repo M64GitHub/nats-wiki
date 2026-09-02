@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks, s-gh-8333-high-cardinality-subjects, s-gh-5202-max-unique-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-nats-server-filestore-recovery, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-gh-8001-jetstream-startup-slow-50m]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # JetStream sizing
@@ -508,6 +508,52 @@ See [[stream-compression]], including why changing the setting on a live stream 
 its store restarts.
 
 
+### Subjects are a RAM term
+
+The per-subject index lives in memory — an adaptive radix tree since 2.10.9 holding, per distinct
+subject, a message count and the first and last block that contain it, with only the suffix stored
+at the leaf (source: [[s-gh-5202-max-unique-subjects]]). It is rebuilt on every start and does not
+shrink until a subject has no messages left. Three figures for it, all "small subjects":
+
+| source | per subject | per million |
+|---|---:|---:|
+| a maintainer, 2026-06 (source: [[s-gh-8333-high-cardinality-subjects]]) | — | *"in the order of 100 megs of RAM"* |
+| Synadia, 2026-05 (source: [[s-synadia-how-many-subjects]]) | *"roughly a few hundred bytes"* | 10 M ≈ 3–4 GB |
+| measured on 2.14.6, whole-process RSS, 1.2 M seven-digit subjects, block caches included (source: [[s-nats-server-stream-scale-observed]]) | **~380 B** | ~450 MB |
+
+Budget **300–400 B per distinct subject** of resident memory, per node that holds a replica, on top
+of everything else on this page, and expect the index estimate alone to be nearer the maintainer's
+number. Two costs ride on the same count: `index.db` on disk at `len(subject) + 4` per subject
+([[filestore-layout]]), and **restart time** — above 1,000,000 subjects the periodic `index.db` is
+not written at all, so every unclean stop reads every block, and even a clean one rebuilds a
+million-entry tree from the file (153 ms for 1.2 M subjects against 2 ms for six, on 3.2 M
+messages; source: [[s-nats-server-stream-scale-observed]], [[jetstream-recovery-is-slow]]).
+Synadia's monitoring product alerts on subject count through stream metadata keys
+(`io.nats.monitor.subjects-warn` / `-critical`) — a product convention, not a server feature — and
+names recovery time as the third cost (source: [[s-synadia-how-many-subjects]]). The design advice
+from the same post: size on the consumption pattern (durable consumers per subscriber, republish to
+core subjects for live fan-out, KV or `deliver_last_per_subject` for last-value), not on the subject
+count alone.
+
+### There is no message cap
+
+No constant of a billion exists in the server; sequences are `uint64`; `max_msgs` is an `int64` whose
+only validation turns 0 or anything below −1 into −1 (source: [[s-nats-server-filestore-recovery]]).
+A maintainer showed a limits stream at **1,174,510,552 messages** (36 GiB, one subject, 2.11.7) when
+a reporter believed in a one-billion cap (source: [[s-gh-7147-one-billion-cap]]); `--max-msgs
+10000000000` is accepted without comment on 2.14.6 (source: [[s-nats-server-stream-scale-observed]]).
+The maintainers' answer to "the largest known-good `MaxMsgs`" is that no such number exists: *"There
+is no hard limit to the size of a stream, but practically you will eventually run out of some kind
+of resource, be it disk space or memory space on the servers (as they maintain some per subject
+indexing)"* — and when one does, **shard by time**, one stream per year or decade, and add servers
+(source: [[s-gh-7032-max-msgs-known-good]]). So the bounds on one stream are the ones this page
+already prices: disk (bytes × replicas, per node), the subject index in RAM (above), and the restart
+window (bytes ÷ read throughput after an unclean stop, and at every start for a stream with an idle
+source — [[jetstream-recovery-is-slow]]). A billion 100-byte messages on six subjects is 125 GiB of
+blocks, as arithmetic (source: [[s-nats-server-stream-scale-observed]]). What *does* discard at a
+size: `max_bytes`, `max_file_store`, the account's store limit, `max_age` — not a count.
+
+
 ## What runs out first
 
 Roughly in the order it bites:
@@ -546,6 +592,15 @@ single host as a writer" (source: [[s-k8s-760-jetstream-pvc-per-replica]]), and 
 which turns a rescheduled pod into an empty replica
 (source: [[s-gh-7749-hostpath-jetstream]]). Three replicas therefore cost three disks, which belongs
 in the budget this page produces. The argument and the chart values are on [[kubernetes-storage]].
+
+7. **The restart window**, which is not a resource but is sized like one: after an unclean stop a
+   file stream is read end to end (6.4 s for 6.8 GB on an SSD; minutes on network storage), and a
+   stream with `sources` is read end to end at *every* start while any source has nothing in it —
+   the public report is 6 min 38 s for 7 GB at 20 MB/s, after a clean shutdown (source:
+   [[s-gh-8001-jetstream-startup-slow-50m]]).
+   Bytes on disk ÷ the volume's measured read rate, per such stream — see
+   [[jetstream-recovery-is-slow]] (source: [[s-nats-server-stream-scale-observed]]).
+
 
 ## How to measure it on a running system
 
@@ -625,7 +680,8 @@ wiki could contain.
   [[filestore-layout]].
 - **IOPS** — no public source read so far gives JetStream IOPS guidance (part of Q1). This is now
   the only unanswered term in Q1: disk, RAM, CPU and file descriptors all have numbers above.
-- **A practical cap on messages in one stream, or a known-good `MaxMsgs`** (Q4, Q5) — unstated.
+- ~~A practical cap on messages in one stream, or a known-good `MaxMsgs` (Q4, Q5)~~ — **answered**:
+  there is none; see *There is no message cap* above and [[stream]].
 - ~~How many consumers one stream or server supports (Q6)~~ — **answered**, as guidance rather
   than a limit: see *Consumers are a cluster-wide budget* above.
 - **Why memory grows with the number of unacknowledged messages** (Q10) — the Synadia post covers
@@ -657,4 +713,4 @@ wiki could contain.
 [[s-nats-server-object-store-observed]] · [[s-docs-object-store-chunking]] ·
 [[s-docs-monitoring-profiling]] · [[s-gh-7483-varz-cpu-in-containers]] ·
 [[s-nats-server-monitoring-observed]] · [[s-docs-hardening]] ·
-[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]]
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-gh-5202-max-unique-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-server-filestore-recovery]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-gh-8001-jetstream-startup-slow-50m]]

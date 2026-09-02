@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.12, strict-mode, elastic-pointers, offline-assets, GOMEMLIMIT]
 aliases: ["2.12", v2.12, v2.12.0, v2.12.15]
-sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing, s-gh-7463-jetstream-corruption, s-adr-51-message-scheduler, s-gh-7672-cron-schedules]
+sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing, s-gh-7463-jetstream-corruption, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-filestore-recovery, s-gh-8001-jetstream-startup-slow-50m]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # nats-server 2.12
@@ -167,6 +167,19 @@ gets. Read ADR-51's revision table, which maps each addition to a server version
 expression ([[message-scheduling]], [[error-codes]]).
 
 
+## Recovery in the 2.12 line
+
+**v2.12.2** (2025-11-13, with v2.11.11): "Streams are now loaded in parallel when enabling JetStream,
+often reducing the time it takes to start up the server (#7482, #7526)" — one task queue of
+`min(64, disk-I/O semaphore)` workers across an account's streams; within one stream recovery is
+still serial. **v2.12.5** (2026-03-09): tombstones always used for trailing deletes (#7782) and a race
+fixed while rebuilding block state (#7783). The row-13 report — 50 M messages restored in 6 min 38 s
+after a clean shutdown — ran on **v2.12.5**, so it had the parallel loading a maintainer pointed to;
+the time was the source scan a sourcing stream makes at every start, which no 2.12.x changes
+([[jetstream-recovery-is-slow]]; sources: [[s-nats-server-filestore-recovery]],
+[[s-gh-8001-jetstream-startup-slow-50m]]).
+
+
 ## Related
 
 [[nats-server-2.11]] · [[nats-server-2.14]] · [[priority-groups]] · [[js-api]] ·
@@ -174,4 +187,4 @@ expression ([[message-scheduling]], [[error-codes]]).
 
 ## Sources
 
-[[s-docs-upgrade-to-2.12]] · [[s-docs-advanced-publishing]] · [[s-gh-7463-jetstream-corruption]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]]
+[[s-docs-upgrade-to-2.12]] · [[s-docs-advanced-publishing]] · [[s-gh-7463-jetstream-corruption]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8001-jetstream-startup-slow-50m]]

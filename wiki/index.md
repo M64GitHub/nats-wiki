@@ -2,7 +2,7 @@
 title: Index
 type: index
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # NATS Wiki — Index
@@ -193,6 +193,13 @@ exists to answer live in `inbox/question-bank.md`.
   Cause 1: a filter that matches everything on a stream with no subjects and a sequence space that
   is mostly interior deletes (the KV hot-key shape) — measured 6.5–9.4× on 2.14.6, 65× in the
   public report. Cause 2: readers during catch-up — gate them on `Lag` 0; unanswered upstream.
+- [[jetstream-recovery-is-slow]] — `Restored N messages for stream … in 6m38s` after a *clean* shutdown,
+  with `Healthcheck failed` repeating under it. Five causes ranked: a stream with `sources` scanning
+  itself backwards for an idle or empty source at every start (2.10–2.14, gone with `sources.db` in 2.15;
+  the public thread is unanswered and its own goroutine dump says so), an unclean stop or a refused
+  `index.db` (the five warnings that say which), more than a million subjects, a slow volume, and
+  pre-2.11.11 serial recovery — measured on 2.14.6: 3–27 ms clean, 6.4 s after SIGKILL, 2.57 s for a
+  1.6 GB sourcing stream with one empty source and 23 ms without it.
 - [[stream-leader-keeps-moving]] — six causes ranked, from a peer that went quiet for ten seconds to a
   peer-removed server rejoining; the advisory that reports a flap but not its cause; and the one
   public quorum-loss report (gh#7533) mapped line by line, with the part nobody has explained.
@@ -584,6 +591,17 @@ exists to answer live in `inbox/question-bank.md`.
   storage read 65× slower than on memory because the consumer's `FilterSubject` matched everything
   and a mirror has no subjects, so the file store took the per-subject path across 83 % holes;
   without the filter, 150k+ msg/s. The initial sync's slowness was never explained.
+- [[s-gh-8001-jetstream-startup-slow-50m]] — the unanswered thread behind row 13: 50 M messages, 7 GB,
+  about twenty sources, 6 min 38 s to restore after a clean shutdown at 20 MB/s of reads; the reporter's
+  goroutine dump, which nobody upstream read, shows `startingSequenceForSources` — the source scan.
+- [[s-gh-8333-high-cardinality-subjects]] — row 9's maintainer comment: no performance problem with
+  a million-plus subjects except RAM for the radix-tree index, "in the order of 100 megs" per million.
+- [[s-gh-5202-max-unique-subjects]] — the chosen answer that the per-subject index is an in-memory
+  adaptive radix tree since 2.10.9, holding a count and two block indexes per subject; no maximum.
+- [[s-gh-7147-one-billion-cap]] — "capped at one billion?": no; a maintainer's stream at 1,174,510,552
+  messages, and a reporter's unexplained discards that the thread never reaches.
+- [[s-gh-7032-max-msgs-known-good]] — the largest known-good `MaxMsgs`: there is no hard limit; disk
+  and the per-subject index are what run out; shard by time when they do (chosen answer).
 - [[s-gh-8444-mirror-catchup-under-a-reader]] — the unanswered thread behind row 91: mirror
   catch-up 2.89× slower under one cold-scanning consumer, with a reproduction; one community comment
   argues the file store's lock structure (`SkipMsgs` + `StoreMsg` per live message against readers'
@@ -603,6 +621,15 @@ exists to answer live in `inbox/question-bank.md`.
   three readers making catch-up 3.4–3.9× (file) and 3.1–3.4× (memory) slower; an object bucket
   mirrored across two domains, empty without the transform and whole with it; a same-domain KV
   mirror unreadable by its own name; an un-acked flood dropped at the stream's inbound queue.
+- [[s-nats-server-filestore-recovery]] — the recovery path at v2.14.6 with line numbers: the two
+  timers, `recoverFullState`'s four checks and five `Stream state …` warnings, the block-by-block
+  fallback, when `index.db` is written and when the write is skipped, the three uses of the 1,000,000
+  threshold, and `startingSequenceForSources`, the backward scan a sourcing stream makes at every
+  start — inline on R1, deferred on R3 — with PRs #8282 / #8516 and the release lines that fix it in 2.15.
+- [[s-nats-server-stream-scale-observed]] — a 50 M-message stream restarted six ways (3–27 ms clean,
+  6.4 s after SIGKILL, 9.5 s with `index.db` deleted), a 1.6 GB sourcing stream at 2.57 s with an
+  empty source and 23 ms without, 1.2 M subjects at ~380 B of RSS each and no periodic `index.db`,
+  `--max-msgs 10000000000` accepted, and a `*` inside a token that pending counts and delivery disagree on.
 - [[s-relnotes-2.14.4]] — the interior-delete release (2026-07-30: #8403, #8405, #8406,
   `max_concurrent_io`, four security fixes), with the mirror and filestore lines of v2.14.1 and
   v2.14.2; the six patch bodies are in `raw/release-notes/`.
@@ -640,6 +667,10 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-synadia-reliable-delivery-dlq]] — the dead-letter pattern assembled from the max-deliveries
   advisory, a direct get by sequence and a republish; how retention bounds the recovery window. **Two
   of its claims are wrong at 2.14.6** (docs issue #39).
+- [[s-synadia-how-many-subjects]] — "roughly a few hundred bytes" per indexed subject, ~10 M ≈ 3–4 GB,
+  and the advice to size on consumption pattern (consumers, republish, KV, Direct Get) rather than
+  subject count; plus two Insights check definitions, `JETSTREAM_025` (subject count via stream
+  metadata) and `JETSTREAM_003` (90 % of `max_msgs`, the sizing formula), undated.
 - [[s-synadia-delayed-scheduling]] — the readable account of the message scheduler: the four
   `Nats-Schedule` formats with the version each arrived in, six gotchas, and the target-vs-schedule
   rule the specification omits.

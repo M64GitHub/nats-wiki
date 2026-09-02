@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.10, compression, kv-sources, kv-mirrors]
 aliases: ["2.10", v2.10, v2.10.0, v2.10.29]
-sources: [s-adr-8-key-value-store, s-adr-20-object-store, s-gh-4535-unauthenticated-connections]
+sources: [s-adr-8-key-value-store, s-adr-20-object-store, s-gh-4535-unauthenticated-connections, s-gh-5202-max-unique-subjects]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # nats-server 2.10
@@ -66,10 +66,19 @@ not.
 - Everything on this page is second-hand attribution from ADRs. The 2.10 release notes themselves
   are a gap.
 
+## The per-subject index, since 2.10.9
+
+From **2.10.9** a file store's per-subject index is an in-memory adaptive radix tree ("stree"):
+per subject, the message count and the first and last block, with path compression so only the
+suffix is stored at the leaf. A maintainer stated it in answer to "how many unique subjects can one
+stream hold" — no configured maximum; RAM for the tree is the bound (source:
+[[s-gh-5202-max-unique-subjects]]; the cost per subject is on [[jetstream-sizing]]).
+
+
 ## Related
 
 [[nats-server-2.11]] · [[key-value]] · [[object-store]] · [[stream]] · [[nats-server]]
 
 ## Sources
 
-[[s-adr-8-key-value-store]] · [[s-adr-20-object-store]] · [[s-gh-4535-unauthenticated-connections]]
+[[s-adr-8-key-value-store]] · [[s-adr-20-object-store]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5202-max-unique-subjects]]

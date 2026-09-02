@@ -111,6 +111,8 @@ row.
 | 49 | ADR-59 §*Internal consumers* says the replication consumer "is created with an explicit name following the pattern `mirror-<id>` or `src-<id>`" when a filter is set, and gets a server-generated name otherwise. That was `stream.go` at v2.10.0 and v2.12.0. The 2.14 server names it `JS_MIRROR_<id>` / `JS_SRC_<id>` unconditionally (`stream.go:3561`, `4019` at v2.14.6), which is what `/jsz?direct-consumers=true` prints and what ADR-60 specifies; ADR-59 revision 2 (2026-04-29) was not updated | `raw/adr/ADR-59.md` line 654 (§ *Internal consumers*) | ADR repo | wrong-value | low | not filed | wiki names both forms with their versions on `mirrors-and-sources` |
 | 50 | Nothing in the docs tree says an object-store bucket can be mirrored, that the mirror needs the transform `$O.<origin>.>` → `$O.<mirror>.>`, or that `nats object add` has no `--mirror` while `nats kv add` does. The six `learn/object-store/` pages never contain the word *mirror*; `learn/jetstream/mirrors-and-sources.md` never mentions a bucket; the KV chapter has one paragraph for KV. The only public route is nats-server issue #5106 (closed 2024-03-04), and the obvious procedure without it yields a bucket that lists as empty (observed on 2.14.6 / CLI 0.4.0) | `learn/object-store/*.md`, `learn/jetstream/mirrors-and-sources.md` | nats-docs | missing | medium | not filed | wiki: *Mirroring a bucket* on `object-store` |
 | 51 | ADR-57 §*Mirror Configuration* says a KV mirror gets `MirrorDirect` and a `KV_` prefix and thereby "Support[s] direct reads via the Direct GET API", but never says which subjects a client reads a mirror bucket at. The reference client reads a **same-domain** mirror at `$KV.<mirror>.>` (which the mirror does not hold — `nats kv ls M` prints `No keys found in bucket`) and a **cross-domain** mirror at `$KV.<origin>.>` (nats.go `jetstream/kv.go:1610–1618`, v1.53.1). Observed on 2.14.6: same-domain `kv get` → `key not found`, cross-domain `kv get` → the value | `raw/adr/ADR-57.md` lines 19–40 (§ *Mirror Configuration*) | ADR repo | missing | low | not filed | wiki: *Reading a mirror* on `key-value`; the asymmetry on `nats-go` |
+| 52 | The sizing chapter's *Memory* paragraph says memory "holds connections, subscriptions, and (for memory-storage streams) message data" and that a file-storage stream's "messages live on disk, not in RAM" — and never mentions the per-subject index, which is in RAM for every file-backed stream (one entry per distinct subject, a few hundred bytes each; ~380 B measured), nor that a restart reads the whole stream after an unclean stop, nor that above 1,000,000 subjects the periodic `index.db` is not written. Nothing in the 861-page tree names `index.db`, the subject index, or the `Restored N messages … in` line | `learn/deployment/sizing-and-resources.md` line 16 (§ *The four resources a node spends*, **Memory**); the whole tree for the absent terms | nats-docs | missing | medium | not filed | wiki: *Subjects are a RAM term* on `jetstream-sizing`; *Recovery at startup* on `filestore-layout`; the gotcha `jetstream-recovery-is-slow` |
+| 53 | `concepts/subjects.md` § *Performance Considerations*: "**Subjects are essentially free**: Creating new subjects has virtually no overhead - NATS efficiently handles millions of unique subjects." True for core NATS routing, which the sentence is about; read from JetStream — the page is the only place the docs discuss subject count at all — it is the opposite of the sizing rule a stream needs, and the docs never say the JetStream side differs | `concepts/subjects.md` line 1108 | nats-docs | enhancement | low | not filed | wiki: *Subjects are a RAM term* on `jetstream-sizing` |
 
 ---
 
@@ -2536,6 +2538,67 @@ open the mirror by name; if the intent is "a mirror is readable by its own name"
 add the transform it adds for sources. Either way the two branches of `mapStreamToKVS` should
 agree.
 
+## 52 · The sizing chapter has no per-subject memory term and no recovery term
+
+**Impact: an operator who sizes a file-backed stream from this chapter budgets no RAM for the
+subject index and no time for the restart. A stream with a million distinct subjects holds a few
+hundred megabytes of index in memory on every node with a replica; a stream of tens of millions of
+messages is read end to end after an unclean stop — and, on 2.10–2.14, at every start when it has
+`sources` and one of them is idle.**
+
+**Docs.** `raw/nats-docs/learn/deployment/sizing-and-resources.md`, line 16, § *The four resources a
+node spends*:
+
+> **Memory** holds connections, subscriptions, and (for memory-storage streams) message data. The
+> ORDERS stream uses file storage, so its messages live on disk, not in RAM. […] a few hundred
+> connections fit comfortably in a few hundred megabytes.
+
+The chapter sizes disk (well), file descriptors and CPU, and stops there. Searched across all 861
+pages of the mirrored tree on 2026-09-02: no page contains `index.db`, "subject index", "per-subject
+index", "radix", or the `Restored N messages for stream` log line; no page says that recovery after
+an unclean stop reads every block; `reference/config/jetstream/sync_interval.md` is the only page
+that mentions unclean shutdowns at all, and only to say syncing more often helps.
+
+**Server, v2.14.6** (`raw/nats-server-src/filestore-recovery-v2.14.6.md`): the per-subject index is
+`fs.psim *stree.SubjectTree[psi]` in memory (`filestore.go:197`, `psi` at `:169–173`), rebuilt at
+every start; `recoverFullState` (`:1927–2216`) takes `index.db` after a clean stop and `recoverMsgs`
+(`:2454–2563`) reads every block otherwise; above `highCardinalityThreshold = 1_000_000` (`:390`)
+the periodic write is skipped (`:12006–12009`). Maintainers state the memory cost in public
+(`raw/gh-discussions/gh-8333.md`: "in the order of 100 megs of RAM" per million small subjects;
+`gh-5202.md`: the ART index since 2.10.9), and Synadia's blog gives "roughly a few hundred bytes"
+per subject (`raw/synadia-blog/how-many-subjects-jetstream-stream.txt`, 2026-05-20). Measured
+(`raw/nats-server-src/stream-scale-observed-v2.14.6.md`): ~380 B of RSS per subject at 1.2 M
+subjects; a 50 M-message stream restored in 3–27 ms after a clean stop and 6.4 s after SIGKILL on an
+SSD; a 1.6 GB sourcing stream restored in 2.57 s with one empty source and 23 ms without.
+
+**Suggested fix:** in the *Memory* paragraph, add the per-subject index as a RAM term for file
+streams ("budget a few hundred bytes per distinct subject, per node holding a replica; the index is
+rebuilt at every start"); add a short *Restart time* item to the resource list (bytes on disk ÷
+read throughput after an unclean stop; the source scan on sourcing streams before 2.15), and name
+the `Filestore [<stream>] Stream state …` warnings that say the fast path was refused.
+
+## 53 · "Subjects are essentially free" is a core-NATS statement that the docs never qualify for JetStream
+
+**Impact: the one sentence in the docs about subject count says there is no cost, and a reader
+designing a stream on `orders.<uuid>` has nothing to set against it.**
+
+**Docs.** `raw/nats-docs/concepts/subjects.md`, line 1108, § *Performance Considerations*:
+
+> **Subjects are essentially free**: Creating new subjects has virtually no overhead - NATS
+> efficiently handles millions of unique subjects.
+
+The section is about the interest graph ("Subjects Interest graph is in-memory and dynamic"), and
+for core NATS the sentence is right: a subject with no subscriber costs nothing. The page never says
+that a JetStream stream indexes every distinct subject it stores, and no JetStream page says it
+either (#52).
+
+**Server, v2.14.6:** as in #52 — one index entry per distinct stored subject, in RAM, plus
+`len(subject) + 4` bytes in `index.db`, plus the recovery cost above a million.
+
+**Suggested fix:** one clause — "free to *route*; a JetStream stream keeps an in-memory index entry
+per distinct subject it stores, see *Sizing & resources*" — and the corresponding paragraph in the
+sizing chapter.
+
 ## Internal — where this wiki records each of these
 
 *Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
@@ -2593,3 +2656,5 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 49 | `wiki/concepts/mirrors-and-sources.md` — *How a mirror catches up* and the note under *The internal consumers, on demand*; `wiki/summaries/s-nats-server-mirror.md` |
 | 50 | `wiki/concepts/object-store.md` — *Mirroring a bucket*; `wiki/operations/cross-domain-sourcing.md` — step 5; `wiki/summaries/s-issue-5106-object-store-mirror-list.md` |
 | 51 | `wiki/concepts/key-value.md` — *Reading a mirror: which name, which storage, which filter*; `wiki/entities/nats-go.md` — *What bites you*; `wiki/summaries/s-nats-go-kv-object-mirror.md` |
+| 52 | `wiki/operations/jetstream-sizing.md` — *Subjects are a RAM term* and *What runs out first* (7); `wiki/internals/filestore-layout.md` — *Recovery at startup*; `wiki/gotchas/jetstream-recovery-is-slow.md`; `wiki/summaries/s-nats-server-filestore-recovery.md`, `s-nats-server-stream-scale-observed.md` |
+| 53 | `wiki/operations/jetstream-sizing.md` — *Subjects are a RAM term*; `wiki/summaries/s-synadia-how-many-subjects.md` |

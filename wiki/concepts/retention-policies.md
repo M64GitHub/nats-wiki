@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Retention policies
@@ -266,6 +266,16 @@ attached to the stream.
 - How `interest` and `workqueue` interact with stream **republish** is referenced by the docs but
   not covered by any source ingested so far.
 
+## A limits stream with no limits: the event-store shape
+
+Asked for the largest safe `max_msgs` on a `limits` stream meant to keep everything forever (~100 B
+events, ~5 M a year, R3), a maintainer's answer was that there is none: leave the limits off, expect
+disk and the per-subject index in RAM to be what eventually bounds it, and when they do, **shard by
+time** — one stream per year or decade — rather than discard; replay from the start with an ordered
+consumer (source: [[s-gh-7032-max-msgs-known-good]]; the arithmetic is on [[jetstream-sizing]],
+the no-cap statement on [[stream]]).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[ack-and-redelivery]] · [[worker-pool]] · [[jetstream-out-of-disk]] ·
@@ -276,4 +286,4 @@ attached to the stream.
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
 [[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
 [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
-[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]]
+[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]]

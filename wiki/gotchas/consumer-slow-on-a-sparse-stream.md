@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [mirror, filestore, filter_subject, interior-deletes, sparse-stream, kv, catch-up, lag, last_per_subject, measured]
 aliases: ["KV mirror slow on file storage", "file store slower than memory store", "consumer slow on a mirror", "mirror sync slow while consumers read", "mirror catch-up slow", "sparse stream slow reads", "consumer-slow-on-a-sparse-stream"]
-sources: [s-gh-8417-kv-mirror-file-vs-memory, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.14.4, s-nats-go-kv-object-mirror]
+sources: [s-gh-8417-kv-mirror-file-vs-memory, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.14.4, s-nats-go-kv-object-mirror, s-nats-server-filestore-recovery]
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Reading a mirror is slow on file storage
@@ -152,7 +152,25 @@ time (#8403)", plus faster AVL sequence sets (#8406) and snapshot encoding (#840
 per-subject state for `max_msgs_per_subject: 1` (#8254) (source: [[s-relnotes-2.14.4]]). This does
 **not** change cause 1: the heuristic is the same at 2.14.6, and the 6.5× above was measured there.
 
-### 4 · What it is not
+### 4 · More than a million subjects: the block skip is switched off
+
+**The trap.** A filtered read normally intersects the per-subject index to jump past blocks that
+cannot contain a match (`checkSkipFirstBlock` / `checkSkipFirstBlockMulti`). Above
+`highCardinalityThreshold` — 1,000,000 subjects — the server does not attempt it and walks forward
+block by block (`filestore.go:3519–3521`, `3544–3546` at 2.14.6), because intersecting a
+million-entry index on every read cost more than the skip saved: the maintainers' benchmark had the
+check at 173 µs with 1,000 subjects and 184 ms with 2,000,000. Since **v2.14.2 / v2.12.10** (#8227);
+before those releases the same stream could pin a core in the check itself (source:
+[[s-nats-server-filestore-recovery]]).
+
+**How to confirm.** `nats stream info` → `Number of Subjects` above a million on the stream being
+read; the reader is slow on a *sparse* filter (few matching blocks far apart) rather than on the
+everything-matching one of cause 1.
+
+**The fix.** Narrow filters do not help here; fewer subjects per stream do ([[jetstream-sizing]]),
+or a mirror that holds only the subset being read.
+
+### 5 · What it is not
 
 The report ruled these out with numbers, and they are the first things people suspect: **disk**
 (idle), **page cache** (warm), **block fragmentation** (the mirror re-packs to 98 % live bytes and
@@ -179,10 +197,10 @@ public report — was never explained upstream and did not reproduce here: 400,0
 ## Related
 
 [[key-value]] · [[mirrors-and-sources]] · [[filestore-layout]] · [[direct-get]] · [[consumer]] ·
-[[jetstream-slows-as-consumers-grow]] · [[nats-server-2.14]] · [[object-store]]
+[[jetstream-slows-as-consumers-grow]] · [[nats-server-2.14]] · [[object-store]] · [[jetstream-recovery-is-slow]]
 
 ## Sources
 
 [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-gh-8444-mirror-catchup-under-a-reader]] ·
 [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.14.4]] ·
-[[s-nats-go-kv-object-mirror]]
+[[s-nats-go-kv-object-mirror]] · [[s-nats-server-filestore-recovery]]

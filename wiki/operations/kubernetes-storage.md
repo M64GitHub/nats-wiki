@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [kubernetes, hostPath, PVC, volumeClaimTemplates, storageClassName, statefulset, block-storage, NFS, max_file_store, fileStore]
 aliases: [hostPath, hostpath vs pvc, kubernetes storage, jetstream pvc, persistent volume, storageClassName, volumeClaimTemplates, emptyDir]
-sources: [s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-nats-server-filestore-layout]
+sources: [s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-nats-server-filestore-layout, s-gh-8001-jetstream-startup-slow-50m, s-nats-server-stream-scale-observed]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # JetStream storage on Kubernetes
@@ -172,6 +172,21 @@ this wiki has found, and it is unambiguous.
 - Whether the chart's `fileStore.pvc.enabled: false` path is ever the intended production
   configuration; the chart says nothing about it.
 
+## A restart reads the stream, and the probe waits for it
+
+The one public report of a multi-minute JetStream restore ran under this chart, on Ceph: a 7 GB
+sourcing stream read end to end at 20 MB/s while the readiness probe logged `Healthcheck failed`
+every few seconds for 6 min 38 s and the pod stayed not-ready (source:
+[[s-gh-8001-jetstream-startup-slow-50m]]). Two things follow for the storage class. The restore
+after an unclean stop, and every start of a stream with an idle source on 2.10–2.14, is a
+**sequential read of the whole stream on one goroutine** — the volume's single-stream read rate is
+what sets the restart window, not its IOPS rating (6.4 s for 6.8 GB on a laptop SSD; source:
+[[s-nats-server-stream-scale-observed]]). And the probe is right to fail: `/healthz` answers 503
+until the stores are recovered, so `terminationGracePeriodSeconds` and the startup probe's budget
+must cover bytes ÷ read rate for the largest stream on the node. The causes and the fixes are on
+[[jetstream-recovery-is-slow]].
+
+
 ## Related
 
 [[jetstream-sizing]] · [[filestore-layout]] · [[jetstream-out-of-disk]] ·
@@ -189,4 +204,4 @@ this wiki has found, and it is unambiguous.
   `hostPath`, and `max_file_store` rendered equal to the PVC size.
 - [[s-gh-5924-filestore-dirs-vanished]] — what a `store_dir` that does not survive the pod looks like
   when it happens.
-- [[s-nats-server-filestore-layout]] — why the ceiling must sit below the volume.
+- [[s-nats-server-filestore-layout]] — why the ceiling must sit below the volume. · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-stream-scale-observed]]

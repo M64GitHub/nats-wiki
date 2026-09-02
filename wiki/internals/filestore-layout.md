@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [filestore, block-size, index.db, tombstone, compaction, disk, sizing, psim, o.dat]
 aliases: [filestore, file store, blocks, blk, msg blocks, index.db, on-disk layout, storage overhead, bytes per message]
-sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader]
+sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Filestore layout on disk
@@ -235,6 +235,52 @@ the reported bytes) occupied 29 files and 58,536 KB on the mirror (1.0×); the p
 [[s-gh-8417-kv-mirror-file-vs-memory]]). It reads no faster for it.
 
 
+### Recovery at startup: what `index.db` buys, and the five lines that say it was refused
+
+When the server starts, each file store tries `index.db` first and reads the blocks only if that
+fails (`newFileStoreWithCreated`, `filestore.go:509–549` at 2.14.6). The index path reads one file:
+the stream summary, then the per-subject index rebuilt entry by entry into the in-memory tree, then
+one record per block **without opening any block**. It is trusted after four checks — the file's
+HighwayHash, that the last block it names exists, that the block's **last record checksum** still
+equals the one saved, and that no higher-numbered block exists (`recoverFullState`, `:1927–2216`).
+Any failure is a `[WRN] Filestore [<stream>] …` line and the fallback reads **every `<n>.blk` end to
+end**, verifying each record's hash and rebuilding the per-block and per-stream subject state
+(`recoverMsgs` → `recoverMsgBlock` → `rebuildState`, `:2454–2563`, `:1232–1322`, `:1558–1620`)
+(source: [[s-nats-server-filestore-recovery]]).
+
+| the warning | what it means |
+|---|---|
+| `Stream state outdated, last block has additional entries, will rebuild` | writes landed after the last `index.db` — a SIGKILL, an OOM kill, a crash; the common one |
+| `Stream state outdated, found extra blocks, will rebuild` | a block was created after the file |
+| `Stream state checksum did not match` | the file itself is damaged; it is deleted |
+| `Stream state detected prior state, could not locate msg block N` | a block the file names is gone; its messages are counted as lost |
+| `Stream state encountered internal inconsistency on recover` | the summary and the blocks disagree; the file is deleted |
+| *(nothing)* | either the index was taken, or **there was no file** — a missing `index.db` is silent |
+
+Each of them is followed by `Recovering stream state from index errored: …`. Measured on 2.14.6 with
+50 M messages / 6.8 GB in 800 blocks (source: [[s-nats-server-stream-scale-observed]]):
+
+| the stop | `Restored … in` | reads |
+|---|---:|---|
+| clean, disk idle (six restarts) | **3–27 ms** | none — one 23 KB file |
+| clean, within seconds of a 6 GB bulk write | 1.8–7.0 s | the same path; the disk busy with write-back. Not isolated further |
+| SIGKILL after new writes | **6.4 s** | every block, 1.0–1.6 GB/s; the goroutine in `rebuildState` (read, hash, tree insert) |
+| clean, then `index.db` deleted | **9.5 s** | every block, no warning |
+
+Two things shape those numbers. **Subjects**: rebuilding the tree from the file is not free at high
+cardinality — 3.2 M messages over 1.2 M subjects took 153 ms on the index path against 1.02 s on the
+full read, where six subjects took 2 ms against 303 ms — and above 1,000,000 subjects the periodic
+write is skipped, so an unclean stop always means the full read. **Sources**: the `Restored … in`
+timer also wraps the source scan a stream with `sources` makes on an R1 server, which can dwarf the
+store's own recovery — the row-13 thread's 6 min 38 s was that, not this ([[mirrors-and-sources]],
+[[jetstream-recovery-is-slow]]; source: [[s-gh-8001-jetstream-startup-slow-50m]]). The in-memory
+tree is an adaptive radix tree since 2.10.9, with a message count and a first and last block per
+subject (source: [[s-gh-5202-max-unique-subjects]]).
+
+Streams are recovered in parallel across streams — one task queue of `min(64, max_concurrent_io)`
+workers since 2.11.11 / 2.12.2 — and serially within one stream.
+
+
 ## What you can observe
 
 ```
@@ -280,7 +326,11 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
 3. **"I deleted messages and nothing was freed."** Expected: deletes make the file bigger, and only
    a half-dead block gets rewritten. The last block never does.
 4. **High-cardinality subjects cost per subject, twice** — once in `index.db` on disk, once in the
-   in-memory `psim` tree — independent of message count. See [[stream]].
+   in-memory `psim` tree — independent of message count. The in-memory side is "in the order of 100
+   megs of RAM" per million small subjects by a maintainer's estimate and "roughly a few hundred
+   bytes" each by Synadia's (sources: [[s-gh-8333-high-cardinality-subjects]],
+   [[s-synadia-how-many-subjects]]); ~380 B of RSS each was measured. And a third time at restart,
+   above a million. See [[stream]] and [[jetstream-sizing]].
 5. **`du` and `/jsz` will always disagree**, and the gap is not a leak.
 6. **Compression's ratio can only be measured** by comparing these two numbers, which is what
    [[stream-compression]] tells you to do.
@@ -293,6 +343,14 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
   this page — see [[jetstream-sizing]].
 - Block-size selection, `emptyRecordLen` and the record format have been stable across 2.10–2.14 as
   far as the sources read here go; nothing older than 2.14.6 was measured **(unverified)**.
+
+- **Recovery** read at **2.14.6**: `recoverFullState`, its four checks and five warnings, the fallback
+  `recoverMsgs`, and `highCardinalityThreshold`'s three uses (the periodic `index.db`, the block skip on
+  filtered reads since v2.14.2 / v2.12.10, interior deletes) — all measured on the binary the same day
+  (sources: [[s-nats-server-filestore-recovery]], [[s-nats-server-stream-scale-observed]]). **2.15**
+  adds `sources.db` at the stream's root for sourcing streams; nothing in the store format changes
+  for streams without sources.
+
 
 ## To verify
 
@@ -320,4 +378,4 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
 - [[s-docs-object-store-chunking]] — the docs' unquantified per-message-overhead claim these
   numbers answer.
 - [[s-docs-object-store-under-the-hood]] — the qualitative disk-reclamation warning the bulk-delete
-  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]]
+  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]]

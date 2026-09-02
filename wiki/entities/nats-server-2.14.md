@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.14, feature_flags, js_ack_fc_v2]
 aliases: ["2.14", v2.14, v2.14.0, v2.14.6]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-filestore-recovery]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # nats-server 2.14
@@ -200,6 +200,22 @@ release, and the 6.5× re-measured on v2.14.6 shows the heuristic survived 2.14.
 [[consumer-slow-on-a-sparse-stream]].
 
 
+## The patch releases, for very large subject spaces
+
+**v2.14.2** (2026-06-02, also v2.12.10): "The filestore no longer performs a block skip check on
+streams with extremely high subject counts, as it could result in runaway CPU usage (#8227)". The
+block skip intersects the whole per-subject index on every filtered read to jump past blocks that
+cannot match; the PR's benchmark had it at 173 µs with 1,000 subjects and 184 ms with 2,000,000. Since
+this release the server does not attempt it above `highCardinalityThreshold` — 1,000,000 subjects,
+the same constant that already switched off the periodic `index.db` — and walks forward block by
+block instead ([[filestore-layout]], [[consumer-slow-on-a-sparse-stream]]). **v2.14.4** (2026-07-30):
+blocks with an unsynced or truncated key file are removed and counted as lost data instead of
+failing the whole recovery (#8365), and `max_concurrent_io` bounds the recovery task queue. **v2.14.0**
+recovers from a partial purge after a hard kill (#7676). Nothing in 2.14 touches the source scan a
+sourcing stream makes at every start; that is 2.15 ([[nats-server-2.15-preview]],
+[[jetstream-recovery-is-slow]]; source: [[s-nats-server-filestore-recovery]]).
+
+
 ## Related
 
 [[nats-server-2.12]] · [[nats-server-2.15-preview]] · [[raft-in-nats]] · [[retention-policies]] ·
@@ -210,4 +226,4 @@ release, and the 6.5× re-measured on v2.14.6 shows the heuristic survived 2.14.
 
 [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
 [[s-nats-server-jetstream-resources]] ·
-[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]]
+[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-filestore-recovery]]

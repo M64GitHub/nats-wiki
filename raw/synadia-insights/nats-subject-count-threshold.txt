@@ -1,0 +1,387 @@
+The creators of
+
+NATS Slack: 11K+ membersNATS GitHub: 41K+ stars
+
+ProductsSynadia PlatformSingle-tenant, fully managed NATS in your cloud. Enterprise control without operating it yourself.
+Synadia CloudMulti-tenant, hosted NATS. Build quickly with NATS, don't operate it.
+Synadia Deploy for KubernetesSelf-serve NATS & Synadia Platform deployment for Kubernetes environments.
+Synadia InsightsGranular, NATS-native observability including 100+ audit checks from our experts.
+Synadia ProtectA security gateway for NATS. Enforce policy on every connection and message.
+
+SolutionsDistributed & Agentic AI
+Connected Car
+Financial Services
+Microservices
+Smart Manufacturing
+
+Customers
+
+Resources
+### FEATURED
+RethinkConn 2026The biggest NATS event of the year
+Living on the EdgeEdge-to-core messaging patterns
+Synadia EducationLive NATS training from the experts
+
+### RESOURCES
+BlogDocsVideosNewsletterOn-demand Workshops
+
+### Comparisons
+NATS vs KafkaNATS vs Kinesis
+
+Edge Autonomy 2026
+ReportThe Edge Autonomy GapWhy the edge isn’t ready for AI
+AssessmentBenchmark your edgeGet your autonomy score in ~2 minutes
+
+CompanyHiring!
+
+Contact us
+
+The creators of
+
+Open main menu
+
+### Synadia Insights
+100+ Checks continuously monitoring your entire NATS deployment. Zero config required.
+
+Start free trial
+
+Checks/JETSTREAM_025
+
+# NATS Subject Count Threshold: Detecting and Managing Stream Subject Explosion
+
+Severity
+Warning
+
+Category
+Saturation
+
+Applies to
+JetStream
+
+Check ID
+JETSTREAM_025
+
+Detection threshold
+stream subject count exceeds operator-defined subjects-warn or subjects-critical threshold
+
+A subject count threshold alert fires when a stream’s unique subject count exceeds an operator-defined limit set via io.nats.monitor.subjects-warn or io.nats.monitor.subjects-critical metadata on the stream. This is a proactive guardrail — it warns you before an unchecked subject namespace grows large enough to degrade stream performance, inflate memory usage, and slow down consumer filtering.
+
+## Why this matters
+
+Every unique subject in a NATS JetStream stream adds overhead. The server maintains internal data structures to track per-subject message positions, and consumers with subject filters must evaluate each message against their filter set. As subject counts grow into the hundreds of thousands or millions, several things break down.
+
+Memory pressure climbs. The server’s in-memory subject index grows linearly with subject count. A stream with 10 million unique subjects can consume gigabytes of RAM just for the index, independent of message payload. This memory is not reclaimable while the stream exists and directly competes with resources needed for connections, routes, and other streams.
+
+Consumer filter performance degrades. Consumers that use subject filters (orders.*.shipped, for example) must match incoming messages against the stream’s subject space. As subject cardinality grows, this matching becomes increasingly expensive. In extreme cases, consumer delivery latency spikes noticeably — not because the messages are large or numerous, but because the filter evaluation itself is slow.
+
+Recovery time increases. When a server restarts, it rebuilds the subject index from the stream’s storage. A stream with millions of unique subjects takes significantly longer to recover than one with thousands. This directly impacts your cluster’s MTTR during rolling upgrades or unplanned restarts.
+
+Operational visibility suffers. Tools like nats stream info and the monitoring API return subject counts, but navigating or debugging a stream with millions of subjects becomes impractical. Teams lose the ability to inspect what’s actually in the stream without specialized tooling.
+
+The threshold mechanism exists precisely because subject count growth is often gradual and invisible until it causes problems. By setting explicit warn and critical thresholds as stream metadata, operators codify their expectations and get alerted before the stream becomes unwieldy.
+
+## Common causes
+
+-
+Unbounded entity-based subject hierarchies. Applications using patterns like events.<customer_id>.<action> or telemetry.<device_id>.readings create a new subject for every entity. As the entity set grows — new customers, new devices, new sessions — subject count grows without bound. If the stream has no TTL or message limit, subjects accumulate indefinitely even after the entities are decommissioned.
+
+-
+Timestamp or request ID embedded in subjects. Patterns like logs.2026.04.06.12.30.45 or requests.<uuid> generate a unique subject for every event. This is almost always a design error — subjects should represent categories, not individual messages. Each message becomes its own subject, and subject count grows at the message rate.
+
+-
+Missing or ineffective stream limits. Streams configured with MaxMsgs: -1 and MaxBytes: -1 (unlimited) never discard old messages, so subjects from years-old data remain in the index. Even with byte limits, if the limit is very generous relative to message size, subjects accumulate faster than they’re purged.
+
+-
+Wildcard subscription fan-out from multiple producers. When many producers publish to a shared stream using slightly different subject patterns — perhaps different teams or microservices each using their own namespace — the aggregate subject count can be much larger than any single team expects.
+
+-
+Test or development data leaking into production streams. Automated test suites or development environments publishing to production NATS clusters often use unique subject prefixes per test run, adding thousands of subjects that are never cleaned up.
+
+## How to diagnose
+
+### Check the current subject count
+
+- Terminal window# Get stream details including subject count
+
+nats stream info ORDERS
+
+# List all streams with subject counts
+
+nats stream list -a
+
+Look for the Subjects field in the stream info output. Compare it against your defined thresholds.
+
+### View the threshold configuration
+
+Thresholds are stored as stream metadata. Check them with:
+
+Terminal windownats stream info ORDERS -j | jq '.config.metadata'
+
+You’ll see entries like:
+
+1
+
+{
+
+2
+
+"io.nats.monitor.subjects-warn": "100000",
+
+3
+
+"io.nats.monitor.subjects-critical": "500000"
+
+4
+
+}
+
+### Identify the top subjects consuming the stream
+
+Terminal window# Show subjects and their message counts within the stream
+
+nats stream subjects ORDERS
+
+# Filter to see the distribution pattern
+
+nats stream subjects ORDERS | head -50
+
+This reveals whether the subject space is dominated by a small number of high-volume subjects or a long tail of one-message subjects (which signals a cardinality problem).
+
+### Monitor growth rate programmatically
+
+1
+
+package main
+
+2
+
+3
+
+import (
+
+4
+
+"fmt"
+
+5
+
+"log"
+
+6
+
+7
+
+"github.com/nats-io/nats.go"
+
+8
+
+"github.com/nats-io/nats.go/jetstream"
+
+9
+
+)
+
+10
+
+11
+
+func main() {
+
+12
+
+nc, _ := nats.Connect(nats.DefaultURL)
+
+13
+
+js, _ := jetstream.New(nc)
+
+14
+
+15
+
+stream, err := js.Stream(context.Background(), "ORDERS")
+
+16
+
+if err != nil {
+
+17
+
+log.Fatal(err)
+
+18
+
+}
+
+19
+
+20
+
+info, _ := stream.Info(context.Background())
+
+21
+
+fmt.Printf("Stream: %s\n", info.Config.Name)
+
+22
+
+fmt.Printf("Subjects: %d\n", info.State.NumSubjects)
+
+23
+
+fmt.Printf("Messages: %d\n", info.State.Msgs)
+
+24
+
+fmt.Printf("Ratio (msgs/subject): %.1f\n",
+
+25
+
+float64(info.State.Msgs)/float64(info.State.NumSubjects))
+
+26
+
+}
+
+A low messages-per-subject ratio (close to 1.0) is a strong signal that subjects are being used as unique identifiers rather than categories.
+
+## How to fix it
+
+### Immediate: reduce subject count
+
+Purge subjects with no remaining messages. After message expiry or limits discard old data, the subject index may still reference subjects with zero messages. Force a cleanup:
+
+Terminal window# Purge all messages on a specific subject
+
+nats stream purge ORDERS --subject "events.old-customer-123.>"
+
+# Purge subjects matching a pattern
+
+nats stream purge ORDERS --subject "test.>"
+
+"nats stream purge ORDERS --subject "test.>"">
+
+Set or tighten stream limits. Add message TTL and byte limits to ensure old subjects are eventually cleaned up:
+
+Terminal windownats stream edit ORDERS \
+
+--max-age 30d \
+
+--max-bytes 50GB \
+
+--discard old
+
+### Short-term: fix the subject naming scheme
+
+Move unique identifiers out of the subject. Instead of orders.<order_id>.created, use orders.created and put the order ID in the message header or payload. This collapses millions of unique subjects into a handful of event-type subjects:
+
+1
+
+// Before: one subject per order (bad)
+
+2
+
+js.Publish("orders.abc123.created", data)
+
+3
+
+4
+
+// After: fixed subject, ID in header (good)
+
+5
+
+msg := &nats.Msg{
+
+6
+
+Subject: "orders.created",
+
+7
+
+Data: data,
+
+8
+
+Header: nats.Header{"Order-Id": []string{"abc123"}},
+
+9
+
+}
+
+10
+
+js.PublishMsg(msg)
+
+Consumers that need per-entity filtering can use header-based filtering or application-level routing.
+
+Partition into multiple streams. If different teams or use cases share a single stream, split them into separate streams with narrower subject spaces. Each stream has a smaller, more manageable subject index.
+
+### Long-term: set thresholds proactively on all streams
+
+Define thresholds at stream creation time. Make it part of your stream provisioning process:
+
+Terminal windownats stream add ORDERS \
+
+--subjects "orders.>" \
+
+--metadata "io.nats.monitor.subjects-warn=50000" \
+
+--metadata "io.nats.monitor.subjects-critical=200000" \
+
+--max-age 30d \
+
+--storage file
+
+" \ --metadata "io.nats.monitor.subjects-warn=50000" \ --metadata "io.nats.monitor.subjects-critical=200000" \ --max-age 30d \ --storage file">
+
+Document subject naming conventions. Establish and enforce a naming standard that keeps cardinality bounded. Good patterns use a fixed set of tokens (entity type, action, region) rather than unbounded identifiers.
+
+Monitor with Synadia Insights. Insights evaluates subject count thresholds automatically each collection epoch across your entire deployment, alerting you before any individual stream becomes a problem.
+
+## Frequently asked questions
+
+### How do I choose the right threshold values?
+
+Start with your expected subject count based on the domain model. If a stream covers orders.> and you have 50 order event types across 10 regions, expect ~500 subjects in steady state. Set the warn threshold at 5–10x that (2,500–5,000) and critical at 20–50x (10,000–25,000). The goal is to catch unexpected growth, not alert on normal operation.
+
+### Does subject count affect publish latency?
+
+Not directly for publishing — the server appends messages regardless of subject count. The impact is on consumer delivery (filter matching), stream recovery (index rebuild), and memory usage. However, extreme subject counts (millions) can indirectly affect publish latency by increasing memory pressure and GC pauses on the server.
+
+### Can I reduce subject count without purging messages?
+
+No. Subject count reflects the unique subjects present in the stream’s stored messages. The only way to reduce it is to remove messages — either by purging specific subjects, letting TTL expire old messages, or allowing byte/message limits to discard old data. Once the messages with a given subject are gone, the subject is removed from the index.
+
+### What’s the difference between this check and High Subject Cardinality (JETSTREAM_019)?
+
+JETSTREAM_019 flags streams with high subject cardinality based on absolute or relative thresholds defined by Insights. JETSTREAM_025 uses operator-defined thresholds set via stream metadata, giving you direct control over the warning and critical levels for each stream. Think of JETSTREAM_019 as a system-wide baseline and JETSTREAM_025 as your per-stream custom guardrail.
+
+### Do subjects from deleted messages get cleaned up automatically?
+
+Yes, eventually. When all messages for a given subject are removed (by TTL, purge, or limit enforcement), the server removes that subject from the stream’s index. However, this cleanup happens during normal stream maintenance — it’s not instantaneous. If you purge a large number of subjects at once, it may take a few moments for the count to update.
+
+## Related checks
+High Subject Cardinality (JETSTREAM_002)Message Count Threshold (JETSTREAM_024)Streams Without Limits (OPT_SYS_001)JetStream Storage Pressure (SERVER_017)Stream Byte Limit (JETSTREAM_010)
+
+## Proactive monitoring for NATS subject count threshold with Synadia Insights
+With 100+ always-on audit Checks from the NATS experts, Insights helps you find and fix problems before they become costly incidents.
+No alert rules to write. No dashboards to maintain.
+Start a 14-day Insights trial
+
+Products Synadia CloudSynadia PlatformSynadia Deploy for KubernetesSynadia InsightsSynadia Protect
+Resources BlogDocsVideosSynadia EducationNATS vs KafkaNATS vs Kinesis
+Company AboutBrandCustomersContactCareersPress
+Legal TermsPrivacyDPASubprocessorsSupport LifecycleTrust Center
+
+Get the NATS Newsletter
+News and content from across the community
+
+Subscribe
+
+© 2026 Synadia Communications, Inc.
+
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in Perplexity
+X YouTube LinkedIn Slack GitHub
+
+Cancel

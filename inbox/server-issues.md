@@ -33,6 +33,7 @@ So the discipline here is different:
 |---|---|---|---|---|---|
 | SI-1 | The leafnode JetStream deny list names `$OBJ.>`, but the object store's subjects are `$O.<bucket>.C.>` and `$O.<bucket>.M.>` — so object-store data crosses a JetStream domain boundary that KV data does not, and two same-named buckets on either side of a leafnode silently converge | inconsistent | ★ high | v2.14.6 | not filed |
 | SI-2 | A nak that carries a delay is redelivered after `delay + (BackOff[dc] − BackOff[0])`, not after `delay`: `processNak` backdates the pending timestamp by `o.cfg.AckWait` while `checkPending` measures it against the attempt's backoff entry. A client asking for 2s gets 12s; a client asking for **0s** gets 10s. A **bare** `-NAK` is unaffected, and `-NAK {}` is not bare | unexpected | high | v2.14.6 | not filed |
+| SI-3 | A `*` inside a subject token — `orders.1*` — is a wildcard to the subject tree and a literal to the sublist: a consumer filtered on it reports `num_pending` for every subject beginning `orders.1`, and `STREAM.INFO`'s `subjects_filter` lists those subjects, while delivery and a direct get match the literal token and find nothing. The consumer shows a backlog it can never deliver | inconsistent | low | v2.14.6 | not filed |
 
 ---
 
@@ -224,3 +225,63 @@ for the *bare* nak, which is the case where it does not (**#39**).
 **Where the wiki records this:** `wiki/concepts/ack-and-redelivery.md` — *What a delayed nak actually
 waits*. The **documentation** half — that the docs state a flat independence which does not hold — is
 `inbox/docs-issues.md` **#38**, and the blog post that states the opposite error is **#39**.
+
+## SI-3 · A `*` inside a token counts as a wildcard in the subject tree and as a literal everywhere else
+
+**The observation.** On **v2.14.6** (nats CLI 0.4.0), a five-message stream `PT` on `pt.>` holding
+`pt.10`, `pt.11`, `pt.20`, `pt.3`, `pt.100`. A pull consumer with `filter_subject: pt.1*`:
+
+```
+filter pt.1*   num_pending at create=3    next --count 5 got: <nothing, timeout>   after: pending/delivered=0/0
+filter pt.*    num_pending at create=5    … after: pending/delivered=0/5
+filter pt.10   num_pending at create=1    … after: pending/delivered=0/1
+filter pt.1>   num_pending at create=0    … after: pending/delivered=0/0
+$ nats stream subjects PT 'pt.1*'   →   3 Subjects in stream PT
+$ nats stream get PT --last-for 'pt.1*'   →   nats: error: could not retrieve PT#-1: no message found (10037)
+```
+
+`num_pending` says **3** (`pt.10`, `pt.11`, `pt.100` — the subjects whose second token *begins with*
+`1`), the subjects report says 3, delivery delivers **nothing** and the pending count then drops to
+0; a direct get for the same string finds no message. `pt.1>` is a literal on both sides. First seen
+at scale: a consumer filtered on `card.1*` over a 1,200,000-subject stream reported 400,000 pending
+(the 200,000 subjects `card.1000000`–`card.1199999` × 2 messages) and delivered none, which made
+`nats bench js consume` wait forever (`raw/nats-server-src/stream-scale-observed-v2.14.6.md`, run E
+§E5 and the *SI probe*).
+
+**Why.** Two matchers disagree about a `*` that is not a whole token.
+
+1 · The sublist and the delivery path use `subjectHasWildcard` (`server/sublist.go:1172–1183` at
+v2.14.6), for which `*` and `>` are wildcards only when preceded by the start or a `.` and followed
+by the end or a `.` — so `pt.1*` is literal, and `IsValidSubject` (`:1209–1246`) accepts it as such,
+which is why the consumer is created.
+
+2 · `NumPending` counts through the per-block subject tree (`server/filestore.go:4322`,
+`mb.fss.Match(stringToBytes(filter), …)`), and the `subjects_filter` report through `fs.psim`. The
+tree's `genParts` (`server/stree/parts.go:23–75`) correctly leaves a mid-token `*` inside its literal
+part — but `matchParts` (`:79–147`) compares a part against a stored fragment and, when the fragment
+is shorter than the part, **truncates the part to what was consumed** (`:128–138`) and carries the
+rest, `*`, into the next node. At the next node a one-byte part equal to `*` is taken as the
+partial-wildcard placeholder (`:94–106`) and matches the rest of the token. So `pt.1*` becomes
+`pt.1` followed by anything up to the next `.`.
+
+**What would settle it.** One question, for `nats-io/nats-server`:
+
+> Is a `*` (or `>`) inside a token meant to be accepted in `filter_subject` / `filter_subjects` and
+> `subjects_filter`? If it is a literal, `stree.matchParts` should not promote a truncated literal
+> part to a wildcard, so that `num_pending` and the subjects report agree with delivery; if it is
+> meant to be rejected, consumer creation should refuse it the way it refuses an empty filter, and
+> `IsValidSubject` is the wrong test for a filter.
+
+**Searched and not found.** GitHub issues in `nats-io/nats-server` for "wildcard inside token",
+"stree partial match" and "num_pending wrong filter" on 2026-09-02: nothing on this. The docs'
+subject rules (`concepts/subjects.md`) say wildcards are whole tokens and say nothing about what a
+`*` inside a token means to a filter.
+
+**What was not tested.** `filter_subjects` (the multi-filter form) and `LoadNextMsgMulti`'s path;
+the memory store; a `*` inside the *first* token; whether the same tree matcher is reached by
+`DIRECT.GET` with `multi_last`; anything before v2.14.6.
+
+**Where the wiki records this:** `wiki/summaries/s-nats-server-stream-scale-observed.md` — *Found on
+the way*; the run in `raw/nats-server-src/stream-scale-observed-v2.14.6.md`. No reader page yet:
+the trigger is a filter that is not a NATS wildcard, so it belongs in a page on subject filters when
+one exists.

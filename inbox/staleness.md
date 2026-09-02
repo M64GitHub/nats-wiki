@@ -30,7 +30,7 @@ last true.
 
 _none._
 
-## Authority the tool cannot check (5)
+## Authority the tool cannot check (6)
 
 `verified-against` names something with no release feed here — a site capture, a date, a spec. Not
 stale, not verifiable mechanically; re-read them by hand when the thing they name changes.
@@ -41,4 +41,5 @@ stale, not verifiable mechanically; re-read them by hand when the thing they nam
 | [[nats-helm-charts]] | entity | `nats-io/k8s chart nats-2.14.6` | 2026-08-31 | config key, CLI flag | [[s-nats-helm-chart-values-2.14.6]] · [[s-docs-rolling-upgrades]] · [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]] · [[s-docs-hardening]] · [[s-docs-config-management]] · [[s-docs-prometheus-and-dashboards]] · [[s-gh-7190-asymmetric-cluster]] |
 | [[nats-py]] | entity | `nats.py v2.15.0 · PyPI nats-py 2.15.0 / nats-core 0.2.0` | 2026-08-31 | config key | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-gh-4535-unauthenticated-connections]] · [[s-docs-getting-started]] |
 | [[orbit]] | entity | `synadia-io/orbit.* as of 2026-08-31` | 2026-08-31 | config key | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-advanced-publishing]] · [[s-docs-get-direct]] |
+| [[synadia]] | entity | `synadia.com site chrome captured 2026-08-31` | 2026-08-31 | limit, config key | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-synadia-jetstream-anti-patterns]] · [[s-synadia-jetstream-memory-patterns]] · [[s-cncf-nats-project]] · [[s-nats-server-readme]] · [[s-synadia-how-many-subjects]] |
 | [[synadia-products]] | entity | `synadia.com site navigation captured 2026-08-31` | 2026-08-31 | subject | [[s-github-repo-facts]] · [[s-synadia-jetstream-anti-patterns]] · [[s-gh-5606-cross-account-jetstream]] |

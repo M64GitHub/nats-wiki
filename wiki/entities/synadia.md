@@ -7,9 +7,9 @@ verified-against: synadia.com site chrome captured 2026-08-31
 verified-on: 2026-08-31
 tags: [org, synadia, maintainer, tier-1, orbit, commercial]
 aliases: [synadia, "Synadia Communications, Inc.", synadia-io]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-synadia-jetstream-anti-patterns, s-synadia-jetstream-memory-patterns, s-cncf-nats-project, s-nats-server-readme]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-synadia-jetstream-anti-patterns, s-synadia-jetstream-memory-patterns, s-cncf-nats-project, s-nats-server-readme, s-synadia-how-many-subjects]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Synadia
@@ -64,6 +64,19 @@ itself is a [[cncf]] project under Apache-2.0 — those two facts sit side by si
   ([[s-synadia-jetstream-memory-patterns]], [[s-synadia-jetstream-anti-patterns]]). Paraphrase and
   attribute; the posts are copyrighted.
 
+## Two more public sources from Synadia
+
+The blog post *How Many Subjects Should a NATS JetStream Stream Have?* (Andrew Connolly, 2026-05-20)
+is the only published per-subject memory figure for the JetStream subject index — "roughly a few
+hundred bytes", ~10 M subjects ≈ 3–4 GB — and argues that consumer count, not subject count, is the
+usual real cost. Synadia *Insights*, the commercial monitoring product, publishes its check
+definitions: `JETSTREAM_025` alerts on a stream's subject count through the stream metadata keys
+`io.nats.monitor.subjects-warn` / `-critical` (a product convention the server ignores), and
+`JETSTREAM_003` fires at 90 % of `max_msgs`. The pages are undated and unsigned, and are cited as
+what the product watches, not as dated claims (source: [[s-synadia-how-many-subjects]];
+[[jetstream-sizing]] uses both).
+
+
 ## Related
 
 [[cncf]] · [[synadia-products]] · [[nats-server]] · [[orbit]] · [[nats-surveyor]] ·
@@ -74,4 +87,4 @@ itself is a [[cncf]] project under Apache-2.0 — those two facts sit side by si
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-synadia-jetstream-anti-patterns]] ·
 [[s-synadia-jetstream-memory-patterns]] · [[s-cncf-nats-project]] · [[s-nats-server-readme]]. Company name, self-description and product names are read
 from the site navigation and footer captured verbatim in
-`raw/synadia-blog/nats-jetstream-high-ram-usage.txt` (lines 1–12 and 138–145).
+`raw/synadia-blog/nats-jetstream-high-ram-usage.txt` (lines 1–12 and 138–145). · [[s-synadia-how-many-subjects]]

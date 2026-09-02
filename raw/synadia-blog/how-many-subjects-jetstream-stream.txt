@@ -1,0 +1,277 @@
+NEW: The Edge Autonomy Gap report. AI is arriving at the edge — 500 practitioners say the infrastructure isn't ready.
+
+The creators of
+
+NATS Slack: 11K+ membersNATS GitHub: 41K+ stars
+
+ProductsSynadia PlatformSingle-tenant, fully managed NATS in your cloud. Enterprise control without operating it yourself.
+Synadia CloudMulti-tenant, hosted NATS. Build quickly with NATS, don't operate it.
+Synadia Deploy for KubernetesSelf-serve NATS & Synadia Platform deployment for Kubernetes environments.
+Synadia InsightsGranular, NATS-native observability including 100+ audit checks from our experts.
+Synadia ProtectA security gateway for NATS. Enforce policy on every connection and message.
+
+SolutionsDistributed & Agentic AI
+Connected Car
+Financial Services
+Microservices
+Smart Manufacturing
+
+Customers
+
+Resources
+### FEATURED
+RethinkConn 2026The biggest NATS event of the year
+Living on the EdgeEdge-to-core messaging patterns
+Synadia EducationLive NATS training from the experts
+
+### RESOURCES
+BlogDocsVideosNewsletterOn-demand Workshops
+
+### Comparisons
+NATS vs KafkaNATS vs Kinesis
+
+Edge Autonomy 2026
+ReportThe Edge Autonomy GapWhy the edge isn’t ready for AI
+AssessmentBenchmark your edgeGet your autonomy score in ~2 minutes
+
+CompanyHiring!
+
+Contact us
+
+The creators of
+
+Open main menu
+
+All posts
+
+Series: NATS Community FAQs
+# How Many Subjects Should a NATS JetStream Stream Have?
+Andrew Connolly
+
+• May 20, 2026
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in PerplexityShare on XShare on LinkedInShare via emailCopy as MarkdownCopy link
+
+A common community question is: if you have a very large number of possible subjects, should they all belong to one JetStream stream, or should you partition them across many streams?
+
+There is no universal limit that makes one answer correct for every deployment. The practical answer depends on memory, retention requirements, consumer behavior, and whether subscribers need historical replay or mostly live delivery.
+
+## Short answer
+
+JetStream can handle very large subject sets, but subjects are indexed in memory. As a rough sizing guideline, expect a few hundred bytes of memory overhead per subject. A deployment with around 10 million subjects can be reasonable, adding on the order of several GB of memory for subject indexes. Much larger deployments have been done, but they require careful capacity planning, testing, and operational discipline.
+
+If your main issue is not stream storage but the number of consumers created for many small filtered subscriptions, consider whether you really need a JetStream consumer per subscriber. For workloads where most messages are consumed immediately, stream republish can move committed JetStream messages back onto ordinary NATS subjects for live subscribers, while JetStream remains the source of truth for recovery.
+
+## Stream subject count is usually a memory-sizing question
+
+A stream subject list can include wildcard subjects, but once messages arrive JetStream still needs internal indexing to support subject-oriented operations. That index has memory cost.
+
+A useful rule of thumb:
+
+- Each indexed subject has overhead, roughly a few hundred bytes.
+
+- Millions of subjects can be practical if the server has sufficient memory.
+
+- Around 10 million subjects may add roughly 3-4 GB of memory overhead.
+
+- 100 million subjects has been done, but should not be treated as a casual default.
+
+The important point is that subject count by itself is not the only question. You also need to account for:
+
+- message volume per subject,
+
+- retention policy,
+
+- replication factor,
+
+- storage type and capacity,
+
+- number of streams,
+
+- number of consumers,
+
+- consumer delivery mode and acknowledgement behavior,
+
+- failover and restart time expectations.
+
+A single stream with many subjects may be simpler than thousands of streams, but it can also concentrate operational risk and resource usage. Thousands of streams can provide partitioning boundaries, but they add management overhead. Benchmark the shape of your workload rather than relying only on stream count or subject count.
+
+## The consumer-count problem is often separate
+
+A common pattern is to partition many subjects across streams, then create consumers filtered to the small set of subjects a client needs. This can become expensive when clients frequently need different filter sets.
+
+JetStream consumers are stateful. If your application model requires many unique filtered views, you may end up with many consumers. If filters need to change dynamically, you often have to create different consumer instances rather than treating a consumer as a lightweight mutable subscription.
+
+One thing that can reduce the count: since NATS Server 2.10 a single consumer can specify multiple filter subjects, so a subscriber that needs a known, fixed handful of subjects can often be served by one consumer instead of one consumer per subject. The filter set is still fixed when the consumer is created, so genuinely dynamic filters still require creating a new consumer.
+
+That does not necessarily mean one huge stream fixes the problem. Moving from many streams to one stream may reduce stream management overhead, but it does not remove the need for many filtered consumers if every subscriber still requires its own JetStream-filtered view.
+
+Ask first: do subscribers need JetStream replay semantics for every message, or do they mostly need current live updates?
+
+## Option: use stream republish for live fan-out
+
+JetStream stream republish can be useful when you want to persist messages first, then fan them out to ordinary NATS subscribers.
+
+At a high level:
+
+- Publishers write to ingest subjects captured by a stream.
+
+- JetStream commits the message to the stream.
+
+- The stream republishes the committed message to a mapped NATS subject.
+
+- Subscribers use normal NATS subscriptions on the republished subjects.
+
+Republish happens after the message has been committed to the stream. Republished messages include metadata that lets consumers identify details such as:
+
+- the source stream,
+
+- the stream sequence assigned to the message,
+
+- the original subject,
+
+- subject-sequence information that can help detect gaps.
+
+This pattern can drastically reduce the need for one JetStream consumer per live subscriber. Ordinary NATS subscriptions are lightweight and are a natural fit for large live fan-out.
+
+The tradeoff is that ordinary NATS subscribers are not durable. If a subscriber disconnects, it may miss live messages. The recovery path is to consult JetStream when needed.
+
+## Recovering after gaps or reconnects
+
+With a republish-based design, subscribers can use the metadata on republished messages to detect whether they missed something. When they detect a gap, they can recover from JetStream using an ephemeral consumer or a Direct Get request, depending on the exact access pattern and client support available in your environment.
+
+This works best when:
+
+- most subscribers are connected most of the time,
+
+- most messages are consumed immediately,
+
+- reconnect gaps are occasional,
+
+- recovery is the exception, not the steady-state path.
+
+If subscribers are frequently offline and require full durable replay, regular JetStream consumers may be the better fit despite the higher consumer count.
+
+## What if the stream is being used like a last-value cache?
+
+Another common requirement is: when a client subscribes, it should receive the latest value for a subject even if no new message is published after it connects.
+
+That is different from ordinary live subscription. A normal NATS subscription only receives messages published after the subscription is active. A republished live stream alone does not automatically send the last stored value to a newly connected subscriber.
+
+NATS offers more than one way to get last-value-on-connect behavior, and they trade off differently:
+
+- A consumer with the DeliverLastPerSubject delivery policy (deliver_last_per_subject). This kind of consumer first delivers the most recent message for each subject matching its filter, then continues with new messages. That single mechanism does combine “current value per subject” with “continue live.” The tradeoff is that it is still a consumer: if every subscriber needs its own filtered last-value view, you are back to the consumer-count consideration above.
+
+- The NATS Key-Value (KV) store. KV is built on JetStream and is purpose-built as a last-value store, keeping only the latest value for each key. A KV Watch delivers the current value for matching keys and then live updates, also combining initial state and live delivery in one call. KV fits well when you need only the latest value per key rather than full message history. Each watcher is still backed by a consumer, so the same per-subscriber cost applies, and KV intentionally does not retain history.
+
+- Republish plus Direct Get. In the consumer-less republish design, live delivery (a core NATS subscription) and last-value lookup (a Direct Get) are separate operations that you stitch together yourself.
+
+Direct Get — consumer-less retrieval of a stored message, including the last message on a subject — has been available since NATS Server 2.9, and requires the stream to be created with direct access enabled (allow_direct). NATS Server 2.11 adds batched and multi-subject Direct Get, which can fetch the last message for many subjects in a single request. Client library support for the newer batched form continues to roll out, so check the client and version you are using before designing around a specific helper method.
+
+One caveat specific to the republish design: there is no single operation that performs a Direct Get and then atomically continues a live subscription from exactly that point. Live delivery and the last-value fetch are separate, so you design around the handoff.
+
+A common approach for the republish design is:
+
+- Start the live subscription.
+
+- Fetch the latest stored value for the subject with a Direct Get.
+
+- Use stream metadata, sequence information, or application-level versioning to de-duplicate and order messages.
+
+- Continue processing live updates.
+
+- If a gap is detected later, recover from JetStream.
+
+The exact ordering depends on your tolerance for duplicates, stale initial values, and missed updates. In distributed systems, it is often simpler to make message processing idempotent than to rely on a perfectly race-free subscribe-and-fetch transition.
+
+## When to prefer each design
+
+### Prefer many JetStream consumers when
+
+- each subscriber needs independent durable replay,
+
+- subscribers are often offline,
+
+- acknowledgement state matters per subscriber,
+
+- each subscriber needs its own cursor,
+
+- replay is part of the normal steady-state workload,
+
+- you want last-value-on-connect from one mechanism — a DeliverLastPerSubject consumer or a KV Watch — and can absorb one consumer per subscriber.
+
+### Prefer republish plus ordinary NATS subscriptions when
+
+- subscribers mostly need live updates,
+
+- missed messages are rare,
+
+- recovery can be handled on reconnect or gap detection,
+
+- creating one JetStream consumer per filtered subscriber is too expensive,
+
+- you can use metadata or application versions to detect duplicates and gaps.
+
+### Prefer subject or stream partitioning when
+
+- you need operational isolation between tenants, domains, or workloads,
+
+- retention settings differ across groups,
+
+- write volume is easier to scale when split,
+
+- failure domains should be smaller,
+
+- administrative ownership differs.
+
+Partitioning is not only about subject count. It is also about blast radius, operational clarity, and resource isolation.
+
+## Practical recommendations
+
+If you have around a million potential subjects, do not assume that the subject count alone requires thousands of streams. Instead:
+
+- Estimate memory overhead for subject indexes.
+
+- Measure with realistic subject cardinality and message volume.
+
+- Decide whether subscribers need durable replay or mostly live delivery.
+
+- Avoid creating many JetStream consumers if ordinary NATS subscriptions plus recovery are sufficient.
+
+- For last-value-style reconnect behavior, compare the options: a DeliverLastPerSubject consumer or a KV Watch give last-value-on-connect from one mechanism but cost one consumer per subscriber, while republish plus Direct Get avoids per-subscriber consumers at the cost of a fetch-and-subscribe handoff to design around.
+
+- Plan for duplicates and races around the initial fetch plus live subscription handoff.
+
+The core design question is not simply how many subjects a stream can have. It is whether your stream, consumer, and subscription model matches the way clients actually consume data.
+
+## Conclusion
+
+Large subject counts are feasible in JetStream, but they have memory cost and should be sized deliberately. If many filtered consumers are the bottleneck, moving all subjects into one stream may not solve the real problem. For mostly live consumption, consider stream republish to ordinary NATS subjects, with JetStream used for recovery. When clients need the latest value on connect, weigh a KV store or a DeliverLastPerSubject consumer against republish plus Direct Get. For durable per-subscriber replay, JetStream consumers remain the right abstraction, but you should budget for their operational cost.
+
+Want help from the NATS experts? Meet with our architects to get help tailored to your use case and environment.
+
+## Related posts
+
+All posts
+
+Open SourcePartitioned Consumer Groups in NATS JetStream: Ordered, Scalable ProcessingPeter Humulock•Jul 15, 2026
+
+Open SourcePull Consumer Priority Groups in NATS JetStream: Overflow, Pinned, and Prioritized RoutingPeter Humulock•Jun 22, 2026
+
+Open SourceJetStream Anti-Patterns: Avoid these pitfalls to scale more efficientlyAndrew Connolly•Jun 6, 2026
+
+Products Synadia CloudSynadia PlatformSynadia Deploy for KubernetesSynadia InsightsSynadia Protect
+Resources BlogDocsVideosSynadia EducationNATS vs KafkaNATS vs Kinesis
+Company AboutBrandCustomersContactCareersPress
+Legal TermsPrivacyDPASubprocessorsSupport LifecycleTrust Center
+
+Get the NATS Newsletter
+News and content from across the community
+
+Subscribe
+
+© 2026 Synadia Communications, Inc.
+
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in Perplexity
+X YouTube LinkedIn Slack GitHub
+
+Cancel

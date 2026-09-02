@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # Defaults and limits
@@ -136,7 +136,8 @@ Not configuration — these are compiled in, and they decide how much disk a str
 | the last message block | **never compacted**, on either path | `filestore.go:6151`, `filestore.go:8039` | [[filestore-layout]] |
 | `index.db` write cadence | **2m plus up to 30s of jitter**, forced on purge and clean stop | `filestore.go:11904–11906` | [[filestore-layout]] |
 | `index.db` cost | **`len(subject) + 4` per distinct subject**, plus ~8 per block | `filestore.go:12050–12056` | [[filestore-layout]] · [[key-value]] |
-| high-cardinality cut-off (`highCardinalityThreshold`) | **1,000,000** subjects or interior deletes — above it the periodic `index.db` write is skipped | `filestore.go:388–390`, `filestore.go:12006–12009` | [[filestore-layout]] |
+| high-cardinality cut-off (`highCardinalityThreshold`) | **1,000,000** subjects or interior deletes — a code constant with three uses: above it the periodic `index.db` write is skipped (only a clean stop writes one), the block skip on filtered reads is not attempted (since v2.14.2 / v2.12.10, #8227), and the interior-delete count is tested against the same number | `filestore.go:388–390`, `filestore.go:12006–12009`, `filestore.go:3519–3521`, `filestore.go:3544–3546` | [[filestore-layout]] · [[jetstream-recovery-is-slow]] |
+| messages per stream | **no cap** — sequences are `uint64`; `max_msgs` is an `int64`, and a 0 or a value below −1 is rewritten to −1 (unlimited; a pedantic-mode error only); a maintainer's limits stream at 1,174,510,552 messages on 2.11.7 | `stream.go:58`, `stream.go:1713–1718`; gh#7147 | [[stream]] · [[jetstream-sizing]] |
 | per-block subject-state idle expiry (`defaultFssExpiration`) | `2m` | `filestore.go:337` | — |
 | bad-record-length guard (`rlBadThresh`) | `32MB` | `filestore.go:383–384` | — |
 
@@ -419,4 +420,4 @@ states neither the version they were measured against nor the method
 [[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] ·
 [[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]]
+[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]]

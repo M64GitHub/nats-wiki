@@ -3534,3 +3534,64 @@ per-clone convention): **`local/scratch/`** with an `INDEX.md`, laid out by purp
 cited, the ingest copies the picked files into `raw/` with a manifest row, and a scout's *Status*
 line names the cache paths the next step starts from. This session's material is in it now. Nothing
 in `wiki/` changed; lint unchanged.
+
+## 2026-09-03 — ingest: stream scale ceilings and the filestore — rows 4, 5, 9, 13 (phase B, step 4)
+
+Step 4 of `inbox/plan-the-runnable-scouts-2026-09-02.md`, from the pick in the *Status* line of
+`inbox/scout-stream-scale-2026-09-02.md`. **Runs first**, through `tools/lab/cluster.sh up 1` on
+v2.14.6 / CLI 0.4.0, recorded in `raw/nats-server-src/stream-scale-observed-v2.14.6.md` with the
+scripts (`stream-scale-runE.sh`, `stream-scale-runD.sh`, `stream-scale-agg*.json`) beside it. **Run
+E** (row 9): 3 M messages over 1.2 M subjects against the same over 6 — RSS ~380 B per subject
+(whole process), no periodic `index.db` in five minutes above the threshold (the clean stop wrote
+one of 19.2 MB), restarts 153 ms / 1.02 s / 850 ms (clean, SIGKILL, no file) against 2 ms / 303 ms /
+309 ms. **Run D** (row 13): 50 M × 100 B in 130 s, 6.7 GB in 800 blocks; clean-stop restarts **3–27
+ms** with the disk idle and 1.8–7 s within seconds of a bulk write (not isolated); SIGKILL **6.4 s**
+with `Stream state outdated, last block has additional entries, will rebuild` and every goroutine
+sample in `rebuildState`; `index.db` deleted **9.5 s**, silently. The sources variant, twice in the
+idle regime with goroutine samples: a 1.6 GB stream with one **empty** source restores in **2.57 s**
+(all samples in `startingSequenceForSources`), **23 ms** with that source removed — the thread's
+6 min 38 s is that scan at 20 MB/s, read off the reporter's own dump; on R1 it runs inside the
+`Restored … in` timer, on R3 after it (`stream.go:4958–4972`). **Run F** (rows 4, 5): `--max-msgs
+1000000000` and `10000000000` accepted; 134 B/msg → 10⁹ messages = 124.8 GiB, as arithmetic. The
+S2 variant was skipped, as the pick allowed.
+
+**Ingested** (8 summaries, at the cap): `s-gh-8001-jetstream-startup-slow-50m`,
+`s-gh-8333-high-cardinality-subjects`, `s-gh-5202-max-unique-subjects`, `s-gh-7147-one-billion-cap`,
+`s-gh-7032-max-msgs-known-good`, `s-nats-server-filestore-recovery` (candidates 2 + 4, with the PR
+texts of 3 and the release lines of 5 quoted in `raw/nats-server-src/filestore-recovery-v2.14.6.md`),
+`s-nats-server-stream-scale-observed`, `s-synadia-how-many-subjects` (the blog post into
+`raw/synadia-blog/`, the two Insights check pages into a new collection `raw/synadia-insights/`).
+Raw: the five threads promoted from `local/scratch/gh/` with `tools/fetch-discussion.py
+--render-only --out`; manifest rows extended. Candidate 13 (gh#3772) stays a pointer for phase G;
+14 skipped.
+
+**Pages.** New gotcha **`jetstream-recovery-is-slow`** (five causes, ranked; the source scan first,
+marked unanswered upstream). New sections: `filestore-layout` — *Recovery at startup* (the four
+checks, the five warnings, the measured table) and a version note; `mirrors-and-sources` — *What a
+sourcing stream does at every start*; `jetstream-sizing` — *Subjects are a RAM term* (three figures)
+and *There is no message cap*, item 7 (the restart window) under *What runs out first*, rows 4/5
+struck from *What is still unknown*; `stream` — *There is no cap on messages, and no known-good
+`max_msgs`*; `defaults-and-limits` — the threshold row gains its three uses; `nats-server-2.15-preview`
+— *The source index: `sources.db`*, and its *To verify* corrected; `nats-server-2.14` — the 2.14.2
+block-skip change on the concept side; `nats-server-2.12` — recovery in the 2.12 line;
+`nats-server-2.10` — the ART index since 2.10.9; `kubernetes-storage` — the restart window and the
+probe; `consumer-slow-on-a-sparse-stream` — cause 4, the block skip off above a million subjects;
+`synadia`; `retention-policies` — the event-store shape.
+
+**Bank.** Rows **4, 5, 9, 13 answered** — 5 by a maintainer's "no hard limit", not the
+`no-public-answer` the backlog expected; 13 with the mechanism the thread never received. 108 / 137.
+
+**Docs issues #52** (missing: the sizing chapter has no per-subject memory term and no recovery
+term; the whole tree never names `index.db` or the subject index) and **#53** (enhancement:
+"Subjects are essentially free" is unqualified for JetStream). **Server issue `SI-3`**
+(inconsistent, low): a `*` inside a token — `pt.1*` — is a wildcard to the subject tree and a
+literal to the sublist, so `num_pending` and the subjects report count messages that delivery never
+matches; reproduced on a five-message stream, mechanism at `stree/parts.go:79–147` against
+`sublist.go:1172–1183`. Found because run E's planned filtered read used `card.1*` by mistake. The
+`SI-3` the scout anticipated — the `Restored … in` line charging the source scan to "restore" — is
+recorded as a fact on the pages (the timer wraps `recoverStream`; on R1 the scan is inside it) rather
+than as a question: the attribution is what the code does, and 2.15 removes the scan.
+
+Found and not pursued: clean restarts made within seconds of a bulk write took 1.8–7 s where the
+same restart with the disk idle took milliseconds; the disk was at ~800 MB/s of write-back in the
+worst case. Recorded in the raw file as observed, cause not isolated.

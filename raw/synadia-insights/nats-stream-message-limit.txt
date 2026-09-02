@@ -1,0 +1,337 @@
+The creators of
+
+NATS Slack: 11K+ membersNATS GitHub: 41K+ stars
+
+ProductsSynadia PlatformSingle-tenant, fully managed NATS in your cloud. Enterprise control without operating it yourself.
+Synadia CloudMulti-tenant, hosted NATS. Build quickly with NATS, don't operate it.
+Synadia Deploy for KubernetesSelf-serve NATS & Synadia Platform deployment for Kubernetes environments.
+Synadia InsightsGranular, NATS-native observability including 100+ audit checks from our experts.
+Synadia ProtectA security gateway for NATS. Enforce policy on every connection and message.
+
+SolutionsDistributed & Agentic AI
+Connected Car
+Financial Services
+Microservices
+Smart Manufacturing
+
+Customers
+
+Resources
+### FEATURED
+RethinkConn 2026The biggest NATS event of the year
+Living on the EdgeEdge-to-core messaging patterns
+Synadia EducationLive NATS training from the experts
+
+### RESOURCES
+BlogDocsVideosNewsletterOn-demand Workshops
+
+### Comparisons
+NATS vs KafkaNATS vs Kinesis
+
+Edge Autonomy 2026
+ReportThe Edge Autonomy GapWhy the edge isn’t ready for AI
+AssessmentBenchmark your edgeGet your autonomy score in ~2 minutes
+
+CompanyHiring!
+
+Contact us
+
+The creators of
+
+Open main menu
+
+### Synadia Insights
+100+ Checks continuously monitoring your entire NATS deployment. Zero config required.
+
+Start free trial
+
+Checks/JETSTREAM_003
+
+# NATS Stream Message Limit: What It Means and How to Fix It
+
+Severity
+Warning
+
+Category
+Saturation
+
+Applies to
+JetStream
+
+Check ID
+JETSTREAM_003
+
+Detection threshold
+stream message count >= 90% of max_msgs
+
+Stream Message Limit means a JetStream stream’s message count has reached or exceeded 90% of its configured max_msgs limit. Depending on the stream’s discard policy, the next publishes will either silently discard the oldest messages or reject new publishes entirely.
+
+## Why this matters
+
+Every JetStream stream can have a max_msgs limit that caps the total number of messages the stream retains. This limit exists to prevent unbounded growth — but when a stream approaches it, the behavior depends on the discard policy, and both outcomes have consequences.
+
+With discard: old (the default), the stream automatically drops the oldest messages to make room for new ones. This is silent. No error is returned to the publisher, and no advisory is emitted. If a consumer hasn’t finished processing those old messages, they’re gone. For workqueue-style streams where every message must be processed exactly once, silent discard of unprocessed messages means data loss.
+
+With discard: new, the stream rejects new publishes once the limit is reached. Publishers receive an error, and the stream stops accepting data until messages are consumed or manually purged. This protects existing data but breaks the publish path — any system that depends on writing to this stream stops making progress.
+
+In both cases, hitting 90% of the limit is a clear signal that the stream is approaching a behavioral boundary. The remaining 10% headroom can disappear in minutes during traffic spikes, leaving no time for manual intervention. This check fires at 90% to give operators a window to act.
+
+## Common causes
+
+-
+Retention policy mismatch. The stream has a max_msgs limit but no max_age or max_bytes limit to complement it. Messages accumulate without any time-based expiration, so the message count grows monotonically until the limit is reached. Adding max_age ensures older messages are expired regardless of count.
+
+-
+Consumer processing slower than publish rate. For workqueue retention streams, messages are only removed after consumer acknowledgment. If consumers fall behind — due to processing bottlenecks, downtime, or scaling issues — the message count grows until the limit is hit. The stream becomes a queue of unprocessed work with no room for new items.
+
+-
+Missing max_msgs_per_subject limit. A stream captures a wildcard subject like orders.>, and one particular subject (e.g., orders.us-east) produces far more messages than others. Without max_msgs_per_subject, a single hot subject can fill the entire stream’s message limit, starving other subjects of capacity.
+
+-
+Batch or backfill operations. A one-time data import or backfill publishes millions of messages in a short window. The stream’s max_msgs was sized for steady-state throughput, not bulk operations. The backfill fills the stream faster than retention can clear space.
+
+-
+max_msgs set too low for the workload. The limit was chosen during initial deployment based on estimates that undershot actual production volumes. Message rates grew, but the limit was never updated.
+
+## How to diagnose
+
+### Check which streams are approaching their limits
+
+- Terminal windownats stream report
+
+Look at the MSGS column and compare with the stream’s max_msgs configuration. Any stream above 90% capacity is flagged by this check.
+
+### Inspect a specific stream’s configuration and state
+
+Terminal windownats stream info <stream_name>
+
+">
+
+Key fields to examine:
+
+- Messages: Current message count
+
+- Max Msgs: Configured limit
+
+- Max Msgs Per Subject: Per-subject limit (if set)
+
+- Discard Policy: old or new — determines behavior at the limit
+
+- Retention: limits, workqueue, or interest
+
+- Max Age: Time-based retention (if set)
+
+### Check consumer lag
+
+If the stream uses workqueue retention, messages are only removed after acknowledgment. Check whether consumers are keeping up:
+
+Terminal windownats consumer report <stream_name>
+
+">
+
+A high UNPROCESSED count means consumers are falling behind, preventing message removal and causing the count to climb.
+
+### Identify hot subjects
+
+If the stream uses a wildcard subject, check which specific subjects contribute the most messages:
+
+Terminal windownats stream subjects <stream_name>
+
+">
+
+This shows per-subject message counts, revealing whether one subject dominates the stream’s capacity.
+
+## How to fix it
+
+### Immediate: create headroom
+
+Add or reduce max_age to expire old messages:
+
+Terminal windownats stream edit <stream_name> --max-age 24h
+
+--max-age 24h">
+
+This immediately begins expiring messages older than 24 hours, regardless of count. The message count drops as expired messages are removed.
+
+Purge stale data if safe to do so:
+
+Terminal window# Purge all messages (destructive)
+
+nats stream purge <stream_name>
+
+# Purge messages older than a specific sequence
+
+nats stream purge <stream_name> --seq 1000000
+
+nats stream purge --seq 1000000">
+
+Only purge if you’re certain the data isn’t needed or consumers have already processed it.
+
+Increase max_msgs if the limit is too conservative:
+
+Terminal windownats stream edit <stream_name> --max-msgs 20000000
+
+--max-msgs 20000000">
+
+### Short-term: fix the retention and processing pipeline
+
+Add max_msgs_per_subject to distribute capacity fairly:
+
+1
+
+js, _ := nc.JetStream()
+
+2
+
+_, err := js.UpdateStream(&nats.StreamConfig{
+
+3
+
+Name: "ORDERS",
+
+4
+
+Subjects: []string{"orders.>"},
+
+5
+
+MaxMsgs: 10_000_000,
+
+6
+
+MaxMsgsPerSubject: 100_000, // per-subject cap
+
+7
+
+MaxAge: 24 * time.Hour,
+
+8
+
+Discard: nats.DiscardOld,
+
+9
+
+})
+
+"}, MaxMsgs: 10_000_000, MaxMsgsPerSubject: 100_000, // per-subject cap MaxAge: 24 * time.Hour, Discard: nats.DiscardOld,})">
+
+1
+
+from nats.js.api import StreamConfig
+
+2
+
+3
+
+await js.update_stream(StreamConfig(
+
+4
+
+name="ORDERS",
+
+5
+
+subjects=["orders.>"],
+
+6
+
+max_msgs=10_000_000,
+
+7
+
+max_msgs_per_subject=100_000,
+
+8
+
+max_age=86400, # 24 hours
+
+9
+
+discard_policy="old",
+
+10
+
+))
+
+"], max_msgs=10_000_000, max_msgs_per_subject=100_000, max_age=86400, # 24 hours discard_policy="old",))">
+
+Scale consumers for workqueue streams. If the stream uses workqueue retention and messages accumulate because consumers can’t keep up, add more consumer instances:
+
+Terminal window# Verify pull consumer configuration
+
+nats consumer info <stream_name> <consumer_name>
+
+# Scale up processing (application-level)
+
+# Each instance fetches from the same consumer
+
+">
+
+Switch discard policy if appropriate. If you’re using discard: new and want the stream to self-manage, switch to discard: old so the oldest messages are automatically removed:
+
+Terminal windownats stream edit <stream_name> --discard old
+
+--discard old">
+
+Be aware: with workqueue retention and discard: old, unacknowledged messages can be silently removed if the stream is full.
+
+### Long-term: establish stream limit governance
+
+Require limits on all streams. Use account-level policies or CI/CD validation to ensure every stream has at least one retention limit (max_msgs, max_bytes, or max_age). Streams with no limits grow without bound (see OPT_SYS_001).
+
+Size limits based on measured throughput. Calculate max_msgs based on your actual publish rate and desired retention window:
+
+1
+
+max_msgs = publish_rate_per_second × retention_window_seconds × safety_factor
+
+For example: 1,000 msg/s × 86,400s (24h) × 1.5 safety factor = 129,600,000 messages.
+
+Monitor with Synadia Insights. Insights evaluates stream message counts every collection epoch and fires this check at 90% capacity. It also reports JETSTREAM_010 (Stream Byte Limit) and JETSTREAM_011 (Stream Consumer Limit) for the other stream limit dimensions, giving you a comprehensive view of stream capacity across your deployment.
+
+## Frequently asked questions
+
+### What happens when the stream actually hits max_msgs?
+
+It depends on the discard policy. With discard: old (default), the oldest message is silently removed to make room for each new publish. With discard: new, the publish is rejected with an error. Neither behavior generates a server-level advisory — the stream quietly handles it according to its configuration.
+
+### Can I set max_msgs and max_age together?
+
+Yes, and you should. Multiple retention limits work as independent constraints — whichever limit is reached first triggers message removal. Setting both max_msgs and max_age provides a cap on total count (protecting storage) and a cap on message staleness (protecting relevance). A stream with max_msgs: 10000000 and max_age: 48h never exceeds 10 million messages and never retains messages older than 48 hours.
+
+### How does max_msgs_per_subject interact with max_msgs?
+
+max_msgs_per_subject limits the number of messages retained for each distinct subject within the stream. max_msgs limits the total across all subjects. Both constraints are enforced independently. A stream with max_msgs: 1000000 and max_msgs_per_subject: 10000 ensures no single subject can dominate the stream’s capacity, while the global limit caps total resource usage.
+
+### Why is my workqueue stream hitting the message limit?
+
+Workqueue retention only removes messages after a consumer acknowledges them. If your consumer is down, slow, or repeatedly nacking messages, the message count grows because nothing is being removed. Check consumer health with nats consumer report <stream>. If num_pending is high, the consumer isn’t keeping up. Scale consumers, fix processing errors, or check if ack_wait is too short (causing unnecessary redeliveries that slow throughput).
+
+### Should I set max_msgs to -1 (unlimited) and rely only on max_age?
+
+You can, but it’s risky. A traffic spike or backfill can publish millions of messages faster than max_age expires them, consuming unbounded storage. Using max_msgs alongside max_age provides a hard cap that protects against burst scenarios. The message count limit acts as a circuit breaker — max_age handles steady-state cleanup, and max_msgs handles worst-case capacity.
+
+## Related checks
+Streams Without Limits (OPT_SYS_001)High Subject Cardinality (JETSTREAM_002)JetStream Memory Pressure (SERVER_005)JetStream Memory Utilization Critical (JETSTREAM_007)Ack Pending Buildup (OPT_SYS_003)
+
+## Proactive monitoring for NATS stream message limit with Synadia Insights
+With 100+ always-on audit Checks from the NATS experts, Insights helps you find and fix problems before they become costly incidents.
+No alert rules to write. No dashboards to maintain.
+Start a 14-day Insights trial
+
+Products Synadia CloudSynadia PlatformSynadia Deploy for KubernetesSynadia InsightsSynadia Protect
+Resources BlogDocsVideosSynadia EducationNATS vs KafkaNATS vs Kinesis
+Company AboutBrandCustomersContactCareersPress
+Legal TermsPrivacyDPASubprocessorsSupport LifecycleTrust Center
+
+Get the NATS Newsletter
+News and content from across the community
+
+Subscribe
+
+© 2026 Synadia Communications, Inc.
+
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in Perplexity
+X YouTube LinkedIn Slack GitHub
+
+Cancel

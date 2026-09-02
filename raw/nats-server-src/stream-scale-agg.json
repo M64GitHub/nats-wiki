@@ -1,0 +1,1 @@
+{"name":"AGG","subjects":[],"retention":"limits","max_consumers":-1,"max_msgs":-1,"max_bytes":-1,"max_age":0,"max_msg_size":-1,"storage":"file","discard":"old","num_replicas":1,"duplicate_window":120000000000,"sources":[{"name":"EVENTS","filter_subject":"ev.1"},{"name":"IDLE"}]}

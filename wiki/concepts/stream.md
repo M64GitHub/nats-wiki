@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Stream
@@ -184,6 +184,24 @@ across, but a mirror is read-only and turning it into a publishable replacement 
   message is `stream names may not be changed during restore`. So a real recovery is: confirm the
   broken stream is gone, then restore (source: [[s-docs-stream-backup-restore]];
   [[backup-and-restore-jetstream]] has the runbook).
+
+### There is no cap on messages, and no known-good `max_msgs`
+
+A stream's message count is not bounded by the server: no constant of a billion exists in it,
+sequences are `uint64`, and `max_msgs` is an `int64` whose only validation rewrites 0 or anything
+below −1 to −1 — unlimited (source: [[s-nats-server-filestore-recovery]]); `nats stream edit
+--max-msgs 10000000000` is accepted on 2.14.6 (source: [[s-nats-server-stream-scale-observed]]). A
+maintainer answered the
+"capped at one billion?" report with a limits stream at **1,174,510,552 messages** on one subject;
+the reporter's discards were never explained and the thread never shows the size limits that would
+have (source: [[s-gh-7147-one-billion-cap]]). Asked for the largest known-good `max_msgs`, a
+maintainer said there is no hard limit and the bounds are disk and the per-subject index in RAM —
+shard by time when one runs out (source: [[s-gh-7032-max-msgs-known-good]]). What a stream *is*
+bounded by, then: `max_bytes` and the server's and account's storage limits (all sizes), `max_age`,
+memory for one entry per distinct subject (a few hundred bytes each; source:
+[[s-gh-8333-high-cardinality-subjects]], [[s-synadia-how-many-subjects]]), and the time a restart
+takes to read it ([[jetstream-recovery-is-slow]]). [[jetstream-sizing]] prices each.
+
 
 ## Sequences are addresses, and they are never reused
 
@@ -401,4 +419,4 @@ and the newest message block is never compacted. See [[filestore-layout]] for th
 [[s-issue-4281-insufficient-storage]] · [[s-synadia-jetstream-anti-patterns]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]]
+[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]]
