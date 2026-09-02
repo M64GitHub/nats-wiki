@@ -2,11 +2,11 @@
 title: JetStream error codes
 type: reference
 area: [jetstream, core]
-verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-against: nats-server 2.14.6
+verified-on: 2026-09-01
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -91,6 +91,10 @@ Two structural notes from the table's own appendix:
 | **10002** | `JSAccountResourcesExceededErr` | 400 | resource limits exceeded for account | [[jetstream-sizing]] |
 | **10003** | `JSBadRequestErr` | 400 | bad request | [[js-api]] · [[maximum-messages-exceeded]] |
 | **10005** | `JSClusterNoPeersErrF` | 400 | `{err}` | [[no-suitable-peers-for-placement]] |
+| **10008** | `JSClusterNotAvailErr` | 503 | JetStream system temporarily unavailable | [[meta-layer]] · [[nats-timeout]] |
+| **10039** | `JSNotEnabledForAccountErr` | 503 | JetStream not enabled for account | [[js-api-subjects]] — also what a request to the docs' wrong `$JS.API.META.SERVER.REMOVE` receives |
+| **10044** | `JSClusterServerNotMemberErr` | 400 | server is not a member of the cluster | [[meta-layer]] |
+| **10202** | `JSClusterServerMemberChangeInflightErr` | 400 | cluster member change is in progress | [[meta-layer]] · [[disaster-recovery]] |
 | **10014** | `JSConsumerNotFoundErr` | 404 | consumer not found | [[js-api]] |
 | **10023** | `JSInsufficientResourcesErr` | 503 | insufficient resources | [[jetstream-sizing]] · [[jetstream-out-of-disk]] |
 | **10028** | `JSMemoryResourcesExceededErr` | 500 | insufficient memory resources available | [[jetstream-out-of-disk]] |
@@ -296,4 +300,4 @@ summaries that put them there — [[s-adr-43-per-message-ttl]] (`10052`, `10165`
 [[s-docs-stream-backup-restore]] (`10064`) · [[s-gh-7982-no-suitable-peers]] (`10005`) ·
 [[s-issue-4281-insufficient-storage]] (`10028`, `10047`) · [[s-nats-server-snapshot-restore]]
 (`10060`, `10064`, `10130`) · [[s-docs-advanced-publishing]] (the eleven `JSAtomicPublish*` and
-`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]]
+`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]]

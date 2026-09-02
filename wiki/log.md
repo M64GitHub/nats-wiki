@@ -3142,3 +3142,146 @@ away:
 
 **Next.** The bank's 16 open rows are the three clusters `inbox/plan-the-meta-layer-2026-09-01.md` and
 the standing scout backlog already name. Nothing from this plan is left open.
+
+## 2026-09-01 — ingest + run: the meta layer, from `jetstream_cluster.go` and a three-node cluster (meta-layer plan, step 1)
+
+**Operation:** ingest `server/jetstream_cluster.go` (with `raft.go`, `jetstream_api.go`,
+`monitor.go`, `jetstream.go`, `server.go`, `opts.go`, `errors.json`) at **v2.14.6**, read for the
+plan's five questions rather than summarised, then **run**: a three-node cluster on the v2.14.6 binary
+with nats CLI 0.4.0. Baseline measured before starting, as the plan asked: unlanded ripples **0 across
+0 pages**; bank 107 rows / 91 answered.
+
+**Raw:** `raw/nats-server-src/jetstream-cluster-v2.14.6.md` (65 quoted ranges with real line
+numbers) and `raw/nats-server-src/jetstream-cluster-observed-v2.14.6.md` (thirteen numbered
+observations plus what was not tested). `raw/sources.md` row updated.
+
+**Created:** `wiki/summaries/s-nats-server-jetstream-cluster.md` (one summary over both raw files);
+**`wiki/internals/meta-layer.md`** — the wanted page five pages already pointed at.
+
+**Updated (16, each now citing the summary):** `raft-in-nats` (new section *What the meta layer adds*;
+heartbeat/election To-verify item **settled** — constants, no config key; `/jsz?meta=1` corrected),
+`replicas` (meta replica-count To-verify item **settled** — there is none; new section on a
+timed-out publish), `streams-deleted-when-clustering-a-standalone-server` (the orphan check reproduced,
+with the 30-second timer), `jetstream-domain` (observer mode and `extension_hint`),
+`no-suitable-peers-for-placement` (the pre-leader timeout explained), `js-api-subjects` (two wrong
+subjects corrected against the server; two undocumented subjects added), `monitoring-endpoints`
+(`meta_cluster` fields, the five `/healthz` meta messages), `error-codes` (10008, 10039, 10044, 10202),
+`advisories` (the `SERVER.REMOVED` body observed), `choosing-a-topology` and `gateway` (global-quorum
+To-verify items **settled** from the source), `multi-region-jetstream`, `nats-timeout`,
+`disaster-recovery` (peer-remove: reply after quorum, the misleading CLI message, the five-minute
+rejoin), `upgrade-a-cluster` (the meta leader's own transfer on shutdown), `build-a-3-node-cluster`
+(the meta log lines to expect). `verified-against` raised to 2.14.6 / 2026-09-01 on the eleven pages
+whose facts were re-checked on the binary or the source; left alone on the rest.
+
+**What the run settled that reading could not:** bootstrap elects in 0.28 s, recovery in 5.3 s, a
+stepdown in 0.5 s, a SIGKILLed leader in 3.5 s; a lone survivor **claims meta leadership for 10 s**
+after losing its peers (healthz ok, `10008` only afterwards); a create or publish that timed out is
+committed if the old leader re-wins and discarded if not — observed both ways; a standalone server's
+stream is deleted **30.0 s** after joining; a peer-removed server that keeps running is **re-added
+after five minutes**, with no log line. And `nats pub -J` prints `Published` before waiting for the
+ack — the raw file records the column that invalidated.
+
+**Docs issues, four new (42 → 46), each verified against the source and two on the wire:**
+
+| record | what it is |
+|---|---|
+| docs-issues **#43** ★ | `nats-docs`: the API reference's `$JS.API.META.SERVER.REMOVE` and `$JS.API.ACCOUNT.PURGE` are not the subjects the server serves; 98 subject mentions swept, 5 wrong, all these two; the purge row's system-account column is wrong too |
+| docs-issues **#44** | `nats-docs`: nothing says a standalone server's streams are deleted when it joins a cluster, on the migration the topology chapter narrates |
+| docs-issues **#45** | `nats-docs`: the meta API reference is called "the full set" and omits the two stream-move subjects |
+| docs-issues **#46** | `nats-docs`: `extension_hint` is documented without its purpose or its two values |
+
+**Index:** `meta-layer` under Internals, the summary under Summaries, Wanted pages down to two
+(`consumer-keeps-redelivering`, `stream-leader-keeps-moving`), the docs-issues count and routing line
+corrected (it had been left at 36).
+
+**Question bank:** 107 rows / **91** answered → 91. Q36 and Q38 gained `[[meta-layer]]`; Q40's
+peer-remove half is now observed but the thread is step 2's, so the row stays open.
+
+**Step 3, partly done early:** two of its four items — the heartbeat/election keys and the global-quorum
+claim — were settled by this read. `/raftz` and compaction remain.
+
+**Lint:** clean — broken links none, citation drift 0, **unlanded ripples 0 → 0**, staleness 0 behind
+2.14.6. The cluster (n1–n4) was left running on ports 4291–4294 for step 3's `/raftz` run.
+
+## 2026-09-01 — ingest + run: two unanswered threads, `stream-leader-keeps-moving` and `evict-a-sick-server` (meta-layer plan, step 2)
+
+**Operation:** ingest `nats-io/nats-server` discussions **#7533** (Q37) and **#6892** (Q40), fetched
+through the GraphQL API into `raw/gh-discussions/gh-7533.md` and `gh-6892.md`. **Both had zero
+comments and no answer.** Per the plan, neither page manufactures the thread's answer: each maps the
+report to mechanisms this wiki has already verified and says what stays unexplained. Then a short read
+of `mqtt.go`, `events.go`, `server.go` and `jetstream_cluster.go` at v2.14.6
+(`raw/nats-server-src/kick-ldm-and-mqtt-session-v2.14.6.md`, nine ranges) and a **run** of the two
+per-client system requests against a live client on the step-1 cluster
+(`raw/nats-server-src/kick-ldm-observed-v2.14.6.md`).
+
+**Created:** `wiki/summaries/s-gh-7533-quorum-loss-mqtt.md`,
+`wiki/summaries/s-gh-6892-evict-a-sick-node.md`, `wiki/summaries/s-nats-server-kick-ldm-mqtt-session.md`;
+**`wiki/gotchas/stream-leader-keeps-moving.md`** — symptom-first, six causes ranked (a peer quiet for
+ten seconds; 2.14 overrun stepdown; `resetClusteredState`; deliberate transfers; membership churn
+including the five-minute rejoin; pre-2.12 empty-state elections), each with *how to confirm* and *the
+fix* from pages already sourced, and gh#7533's sequence traced line by line — `10071` to
+`mqttSession.save`'s `Nats-Expected-Last-Subject-Sequence` header, `10008` to the meta layer, the
+`MS` timeouts and `NO quorum` to the stream and consumer groups — with the first line's cause named as
+the part nobody has explained; **`wiki/operations/evict-a-sick-server.md`** (runbook) — decided from
+the thread, which gave no procedure and no existing runbook owned one: stepdown, peer-remove (and its
+five-minute undo), `KICK` per cid through the sick server, the `LDM` request that only informs, what
+no request can do (by IP, in bulk, or to routes), and the platform as the reliable half.
+
+**Updated (4):** `mqtt` (the `10071` / `10008` pair as cluster errors), `slow-consumer-detected` (a
+route slow consumer removes a server from its peers, not from its clients), `raft-in-nats` and
+`meta-layer` (pointers to both new pages with the thread citations). The last wanted gotcha pointed
+at from `raft-in-nats` and `advisories` now exists; **Wanted pages is down to one**
+(`consumer-keeps-redelivering`).
+
+**What the run settled:** `KICK` closes the connection — `>>> Disconnected due to: EOF, will attempt
+reconnect`, back on another server in 2.5 s; `LDM` sends an INFO with `ldm: true` and nats CLI 0.4.0
+stayed connected; an unknown cid answers `no such client or leafnode id`; the per-server request set at
+2.14.6 is `KICK`, `LDM`, `RELOAD` and the `z` endpoints, all executed by the server named in the subject.
+
+**Question bank:** 107 rows, **91 → 93** answered. Q37 marked `no-public-answer` with the page in bold;
+Q40 answered by the runbook and `meta-layer`, flagged `observed`, with the row noting the thread itself
+got no reply. Docs issues: none this step.
+
+**Lint:** clean — broken links none, citation drift 0 after one repair (`mqtt`'s frontmatter), unlanded
+ripples **0 → 0**, staleness 0 behind 2.14.6. The cluster stays up for step 3.
+
+## 2026-09-01 — ingest + run: `/raftz`, and the reference page that was supposed to document it (meta-layer plan, step 3 — plan finished)
+
+**Operation:** ingest `reference/system/monitor/raftz.md` from the mirror (re-fetched live the same
+day: **173 bytes**, two request options, no response fields), read `Raftz`, `RaftzGroup`,
+`RaftzGroupPeer` and `HandleRaftz` in `monitor.go` at v2.14.6 plus the parameter-decode lines of five
+sibling handlers, and **run** the endpoint on the step-1 cluster — follower and leader views, six
+filter combinations, and the documented `account=` parameter shown ignored on `/raftz` and `/accountz`
+(`raw/nats-server-src/raftz-v2.14.6.md`, 12 ranges plus the observations).
+
+**Created:** `wiki/summaries/s-docs-monitor-raftz.md`, `wiki/summaries/s-nats-server-raftz.md`.
+
+**Updated (4):** `monitoring-endpoints` (the `/jsz`, `/raftz` and `/accountz` rows now carry the
+HTTP names; a `/raftz` section with the full field set and the `acc`-defaults-to-`$SYS` rule; *A docs
+error worth knowing* on the six pages that print payload names), `raft-in-nats` (its last `## To
+verify` item settled; the *Where it lives* sentence corrected — the docs claim compaction, snapshot
+timing and batching are "documented with `/raftz`" and they are not; a new section with the endpoint
+and a **table of the constants** the docs promised: heartbeat 1 s, election 4–9 s, lost-quorum 10 s,
+append batch 256 KB / 512 entries, meta / stream / consumer snapshot thresholds, the 5-minute
+peer-remove timeout, the 48-hour observer timer), `stream-leader-keeps-moving` (triage gains the
+per-group `term`, `overrun`, `catching_up` view), `meta-layer` (the `_meta_` group as `/raftz` shows it).
+
+**Docs issues, two new (46 → 48):**
+
+| record | what it is |
+|---|---|
+| docs-issues **#47** | `nats-docs`: the `/raftz` reference page is empty of response fields while three learn pages promise "the full field set", heartbeat intervals, batching and log compaction there — none of which is a field or a key |
+| docs-issues **#48** ★ | `nats-docs`: six monitor reference pages (`accountz`, `jsz`, `leafz`, `subsz`, `gatewayz`, `raftz`) print the `$SYS.REQ.SERVER.PING.<Z>` payload names as the endpoint's request options; the HTTP handlers ignore them, observed (`/accountz?account=NOPE` → the normal page, `?acc=NOPE` → `400`). 14 pages swept; `connz` and `healthz` are right |
+
+**The plan is finished.** Its *Done when* list, checked: `meta-layer` and `stream-leader-keeps-moving`
+exist and are cited by every page that pointed at them; Q37 carries a written reason it cannot be
+answered and Q40 is answered from the source and a run; every `## To verify` item on `raft-in-nats` is
+settled. Two-line result written at the top of `inbox/plan-the-meta-layer-2026-09-01.md`, with the
+next plan proposed there.
+
+**Numbers for the whole plan:** pages **276 → 285** by `tools/lint.py`'s count (3 reader pages, 6 summaries); bank 107 rows,
+**91 → 93** answered; docs issues **42 → 48** (two ★); unlanded ripples **0 → 0** at every step;
+wanted pages 3 → **1** (`consumer-keeps-redelivering`); binary and every `verified-against` touched
+at **2.14.6**. The scratch cluster (n1–n4) is stopped; its logs stay in the session scratchpad.
+
+**Lint:** clean — broken links none, citation drift 0, unlanded ripples 0, staleness 0 behind 2.14.6.

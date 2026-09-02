@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -263,8 +263,10 @@ read-after-write checks**, such as confirming a publish landed (source: [[s-docs
 
 ## To verify
 
-- The docs do not state a **replica count for the meta group** or how it relates to a stream's
-  `num_replicas`; see [[meta-layer]] once a source covers it.
+- ~~The docs do not state a replica count for the meta group~~ **Settled 2026-09-01**: there is none
+  to state. The meta group's peers are every JetStream-enabled server the cluster knows (across
+  gateways too), quorum is `size/2 + 1`, and nothing relates it to `num_replicas` — [[meta-layer]]
+  (source: [[s-nats-server-jetstream-cluster]]).
 - No source ingested so far quantifies the throughput cost of R=3 versus R=1 beyond "roughly three
   times the storage and write traffic", and none gives the **per-message storage overhead** on top
   of the payload bytes — see *What is still unknown* on [[jetstream-sizing]].
@@ -330,7 +332,7 @@ Two constraints to read alongside them:
 own `routes` list and clamps the result to 1–3.
 
 That is the number of routes **written in the config**, not the size of the cluster. Confirmed on
-2.14.6: a genuine three-node cluster (`/jsz?meta=1` reporting `cluster_size: 3`) whose node listed its
+2.14.6: a genuine three-node cluster (`/jsz` reporting `meta_cluster.cluster_size: 3`) whose node listed its
 two peers created all five MQTT streams at **R=2** — survivable for one node loss, and not what a
 three-node cluster implies. Setting `mqtt { stream_replicas: 3 }` on the same node gave R=3 (sources:
 [[s-docs-mqtt-auth-and-clustering]], [[s-nats-server-mqtt-websocket-observed]]).
@@ -343,6 +345,17 @@ The server states what it chose, once, at the point the streams are created:
 
 Ask for more than the cluster has peers and the streams are never created, which surfaces as MQTT
 clients unable to connect — [[no-suitable-peers-for-placement]].
+
+## A publish that timed out may still be stored
+
+The `PubAck` promise is one-directional: an ack means the write is on a quorum; **no ack means
+unknown**, not "not stored". Observed on 2.14.6 with two of three servers killed: two publishes that
+returned `nats: timeout` were both in the stream once quorum returned, because the leader had appended
+them and later re-won its group. Had a different server won, they would have been discarded. Treat a
+timeout as unknown and resend with a `Nats-Msg-Id` so the duplicate is dropped — and note that
+`nats pub -J` prints `Published …` *before* it waits for the ack, then `nats: error: nats: timeout` on
+the next line ([[meta-layer]]; source: [[s-nats-server-jetstream-cluster]]).
+
 
 ## Related
 
@@ -365,4 +378,4 @@ clients unable to connect — [[no-suitable-peers-for-placement]].
 [[s-docs-upgrade-to-2.12]] · [[s-docs-worker-pool]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7831-standalone-to-cluster]] · [[s-gh-7982-no-suitable-peers]] ·
-[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]]
+[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]] · [[s-nats-server-jetstream-cluster]]

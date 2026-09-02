@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [topology, route, gateway, leafnode, supercluster, multi-region, decision, quorum]
 aliases: [which topology, cluster vs gateway vs leafnode, leafnode or gateway, topology decision, super-cluster or leafnode]
-sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-4823-leafnode-supercluster-duplicates]
+sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-4823-leafnode-supercluster-duplicates, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -160,14 +160,16 @@ question-bank row **Q103**.
 [[s-docs-jetstream-in-a-cluster]] · [[s-gh-6328-jetstream-behind-gateways]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-topology]] ·
 [[s-gh-7494-supercluster-degradation]] ·
-[[s-gh-4823-leafnode-supercluster-duplicates]]
+[[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-nats-server-jetstream-cluster]]
 
 ## To verify
 
 - **The reversibility of a leaf topology is unknown.** The docs claim every layer is reversible
   ("the layer below never changed"); the two public questions asking exactly that are unanswered.
   This page records the claim and the silence rather than choosing between them.
-- The statement that a super-cluster's stream and consumer creation "relies on a global quorum" comes
-  from the asker in [[s-gh-7438-multi-region-availability]], not contradicted by the maintainer reply
-  and consistent with the meta group being cluster-spanning. It has **not** been read from the server
-  source.
+- ~~The "global quorum" statement has not been read from the server source~~ **Settled 2026-09-01**:
+  configured gateway URLs count toward the meta group's expected peer size at bootstrap, and every
+  stream and consumer create is a proposal the meta leader must commit to a majority of that group —
+  so a super-cluster's creates do need a majority across all its clusters. See [[meta-layer]]
+  (source: [[s-nats-server-jetstream-cluster]]; the question was
+  [[s-gh-7438-multi-region-availability]]).

@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [multi-region, leafnode, jetstream-domain, gateway, quorum, sourcing, mirror, geo-affinity]
 aliases: [multi region, multi-region availability, global deployment, regional read replica, geo distribution]
-sources: [s-gh-7438-multi-region-availability, s-gh-6328-jetstream-behind-gateways, s-docs-super-clusters, s-docs-jetstream-in-a-cluster, s-docs-leaf-nodes, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-nats-server-topology]
+sources: [s-gh-7438-multi-region-availability, s-gh-6328-jetstream-behind-gateways, s-docs-super-clusters, s-docs-jetstream-in-a-cluster, s-docs-leaf-nodes, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-nats-server-topology, s-nats-server-jetstream-cluster]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Multi-region JetStream
@@ -178,6 +178,17 @@ If `nats --js-domain eu stream ls` returns the hub's streams, the two ends are e
 separate — check the log for `JetStream using domains: local "…", remote "…"`, whose absence means
 the connection **is** extending.
 
+## Confirmed from the server: one meta group across gateways
+
+The "global quorum" above was, until 2026-09-01, the asker's phrasing. It is now read from the
+source at v2.14.6: at bootstrap the meta group's expected peer size is the server's `routes` plus
+every configured gateway URL, and every stream or consumer create is a proposal the meta leader must
+commit to a majority of that group. A region that cannot reach that majority cannot create, update or
+delete anything, and its creates time out or answer `10008` — while its existing streams keep serving.
+The per-domain alternative is exactly one meta group per domain. Details and measurements:
+[[meta-layer]] (source: [[s-nats-server-jetstream-cluster]]).
+
+
 ## Related
 
 [[choosing-a-topology]] · [[leafnode]] · [[gateway]] · [[jetstream-domain]] ·
@@ -189,7 +200,7 @@ the connection **is** extending.
 [[s-gh-7438-multi-region-availability]] · [[s-gh-6328-jetstream-behind-gateways]] ·
 [[s-docs-super-clusters]] · [[s-docs-jetstream-in-a-cluster]] · [[s-docs-leaf-nodes]] ·
 [[s-nats-server-leafnode-js-domains]] · [[s-nats-server-topology]] · [[s-docs-mirrors-and-sources]] ·
-[[s-docs-mirrors-as-dr]]
+[[s-docs-mirrors-as-dr]] · [[s-nats-server-jetstream-cluster]]
 
 ## To verify
 

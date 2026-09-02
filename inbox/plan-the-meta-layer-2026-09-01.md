@@ -1,5 +1,13 @@
 # Plan — the meta layer, and why a leader keeps moving (proposed 2026-09-01)
 
+> **Result (2026-09-01): finished, all three steps.** `meta-layer`, `stream-leader-keeps-moving` and
+> `evict-a-sick-server` exist and are cited by every page that pointed at them; Q37 is a stated dead
+> end and Q40 is answered from the source and a run; every `## To verify` item on `raft-in-nats` is
+> settled. Bank 107 rows / **93** answered, docs issues **48**, unlanded ripples 0 throughout.
+> **Next:** the standing consolidation queue (`plan-consolidation-2026-08-31.md`'s largest debts:
+> `concepts/account`, `concepts/stream`, `entities/nats-cli`) or a scout for the last wanted page,
+> `consumer-keeps-redelivering` (issue #6921) — see *Not in this plan* below.
+
 Say **`start the plan inbox/plan-the-meta-layer-2026-09-01.md`** to work this file — **name it
 explicitly**, because a bare `start the plan` takes the *newest* `inbox/plan-*.md` and
 `plan-consolidation-2026-08-31.md` may still be the one you want. `CLAUDE.md` → *Operation: plan*
@@ -45,7 +53,7 @@ already point at them; Q37 and Q40 are answered or carry a written reason they c
 
 ---
 
-## Step 1 — read `server/jetstream_cluster.go`, and write `meta-layer` · status: open
+## Step 1 — read `server/jetstream_cluster.go`, and write `meta-layer` · status: done 2026-09-01 — s-nats-server-jetstream-cluster (one summary over two raw files: the 64 quoted ranges and a three-node run). `meta-layer` written and cited by 16 pages; the To-verify items on `replicas` (meta replica count), `raft-in-nats` (heartbeat/election keys) and `choosing-a-topology` / `gateway` (global quorum) are settled — which is step 3's first and fourth item done early. Docs issues #43–#46. Unlanded ripples 0 → 0. Bank 107 rows / 91 answered → 91 (Q36 and Q38 gained the page; Q40's peer-remove half is observed, the thread is step 2)
 
 ```
 ingest https://raw.githubusercontent.com/nats-io/nats-server/v2.14.6/server/jetstream_cluster.go
@@ -83,7 +91,7 @@ that no gotcha, sizing or concept page needs*. Four already need this one.
 [[replicas]] (the To-verify item), [[raft-in-nats]], [[jetstream-domain]],
 [[no-suitable-peers-for-placement]], [[js-api-subjects]], `wiki/index.md`'s *Wanted pages*.
 
-## Step 2 — Q37 and Q40, and `stream-leader-keeps-moving` · status: open
+## Step 2 — Q37 and Q40, and `stream-leader-keeps-moving` · status: done 2026-09-01 — s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session. **Both threads were unanswered** (zero comments each); the rows say so. `stream-leader-keeps-moving` written symptom-first with six ranked causes from pages already verified, and gh#7533's sequence mapped line by line (the `10071` first line traced to `mqttSession.save`'s expected-last-subject-sequence header; its cause stays unexplained). Q40 got its own runbook, `evict-a-sick-server`, because the thread gave no procedure and no existing runbook owned one: the KICK and LDM system requests were read and run (KICK disconnects, LDM only informs), peer-remove's five-minute rejoin from step 1 is the other half. Bank 91 → 93 answered (Q37 as no-public-answer, Q40 answered). Unlanded ripples 0 → 0
 
 ```
 ingest https://github.com/nats-io/nats-server/discussions/7533   # Q37, quorum loss after days stable
@@ -111,7 +119,7 @@ that a client's `rtt` is up to an hour old and a route's is not**).
 lame-duck, or otherwise — it may belong on [[rebalance-streams]] or [[upgrade-a-cluster]] instead of a
 new page. Decide from the thread, not from here.
 
-## Step 3 — settle `raft-in-nats`'s open items · status: open
+## Step 3 — settle `raft-in-nats`'s open items · status: done 2026-09-01 — s-docs-monitor-raftz, s-nats-server-raftz. All four items settled: the heartbeat/election constants and the global-quorum claim had already fallen out of step 1; `/raftz` was read from `monitor.go` and **run** (follower and leader views, six filter combinations) — its field set is on `monitoring-endpoints` and `raft-in-nats`; compaction and snapshot timing are a table of constants on `raft-in-nats`. The docs page that was supposed to document all of this is 173 bytes with no response fields (docs issue #47, verified live), and the sibling sweep found six monitor reference pages printing system-request payload names the HTTP handlers ignore (#48 ★, observed on `/accountz` and `/raftz`). Unlanded ripples 0 → 0
 
 ```
 ingest raw/nats-docs/reference/system/monitor/raftz.md      # if present; else fetch it

@@ -7,9 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [mqtt, qos, retained, sessions, client-id, topic-conversion, "$MQTT", stream_replicas, MQTT_WS]
 aliases: [MQTT, mqtt, "mqtt {}", MQTT broker, "$MQTT", MQTT_WS, mosquitto]
-sources: [s-docs-mqtt-your-first-mqtt-client, s-docs-mqtt-topics-and-subjects,
-  s-docs-mqtt-qos-sessions-and-retained, s-docs-mqtt-auth-and-clustering,
-  s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed]
+sources: [s-docs-mqtt-your-first-mqtt-client, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-qos-sessions-and-retained, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7533-quorum-loss-mqtt, s-nats-server-kick-ldm-mqtt-session]
 created: 2026-09-01
 updated: 2026-09-01
 ---
@@ -283,6 +281,28 @@ ping-derived `rtt` that a NATS client eventually does — see
 (source: [[s-nats-server-monitoring-observed]]). Use `/connz?mqtt_client=<id>` for what MQTT
 connections *do* expose.
 
+## Two connect errors that come from the cluster, not from MQTT
+
+Both were reported in the same incident on 2.12.1 — 30 QoS 1 clients on a three-node Kubernetes
+cluster, failing one after another after days of stable operation (source:
+[[s-gh-7533-quorum-loss-mqtt]]):
+
+```
+unable to connect: unable to persist session "<client id>" (seq=40344): wrong last sequence: 0 (10071)
+unable to connect: loading session record for account "default", session "<client id>": JetStream system temporarily unavailable (10008)
+```
+
+**`10071`** is the stream refusing a conditional publish. The server writes a session record to
+`$MQTT_sess` with `Nats-Expected-Last-Subject-Sequence` set to the sequence it stored last time;
+`wrong last sequence: 0` says the stream now holds **no** record on that subject — the record the
+server remembered writing was gone as the stream then reported it (source:
+[[s-nats-server-kick-ldm-mqtt-session]]). **`10008`** is the server believing the JetStream meta group
+has no leader ([[meta-layer]]). Neither is an MQTT fault; the sequence that followed them — 5-second
+`MS` timeouts on `$MQTT.msgs.…`, then a `$MQTT_msgs` consumer with `NO quorum, stalled` — is
+[[stream-leader-keeps-moving]]. The thread was never answered; what made the session record vanish
+first is not known in public.
+
+
 ## Related
 
 [[websocket]] · [[stream]] · [[subject-permissions]] · [[account]] · [[operator-mode]] ·
@@ -308,4 +328,4 @@ connections *do* expose.
 [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-mqtt-topics-and-subjects]] ·
 [[s-docs-mqtt-qos-sessions-and-retained]] · [[s-docs-mqtt-auth-and-clustering]] ·
 [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-nats-server-monitoring-observed]]
+[[s-nats-server-monitoring-observed]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-kick-ldm-mqtt-session]]

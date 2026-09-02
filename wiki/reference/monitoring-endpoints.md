@@ -2,13 +2,13 @@
 title: Monitoring endpoints
 type: reference
 area: [monitoring, deploy]
-verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-against: nats-server 2.14.6
+verified-on: 2026-09-01
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # Monitoring endpoints
@@ -46,10 +46,10 @@ Query parameters are the request-schema fields from the 2.14 reference tree.
 | **`/varz`** | the server process: version, uptime, memory, connection counters, `slow_consumers` | — |
 | **`/connz`** | client connections | `acc`, `auth`, `cid`, `filter_subject`, `limit`, `mqtt_client`, `offset`, `sort`, `state`, `subscriptions`, `subscriptions_detail`, `user` |
 | **`/routez`** | cluster routes to peer servers | `subscriptions`, `subscriptions_detail` |
-| **`/jsz`** | JetStream state: streams, consumers, meta leader | `account`, `accounts`, `config`, `consumer`, `direct_consumer`, `leader_only`, `limit`, `offset`, `raft`, `stream_leader_only`, `streams` |
+| **`/jsz`** | JetStream state: streams, consumers, meta leader | `acc`, `accounts`, `config`, `consumers`, `direct-consumers`, `leader-only`, `limit`, `offset`, `raft`, `stream-leader-only`, `streams` — **the docs print `account`, `consumer`, `direct_consumer`, `leader_only`, `stream_leader_only`, which the endpoint ignores** (docs issue #48) |
 | **`/healthz`** | a yes/no health check — `200` healthy, `503` not | `account`, `consumer`, `details`, `js-enabled` *(deprecated — use `js-enabled-only`)*, `js-enabled-only`, `js-meta-only`, `js-server-only`, `stream` |
-| **`/raftz`** | live RAFT group state: term, leader, per-peer status | `account`, `group` |
-| `/accountz` | account configuration | `account` |
+| **`/raftz`** | live RAFT group state: term, leader, overrun, per-peer status | `acc`, `group` — **the docs print `account`, which the endpoint ignores**; with no `acc` only the system account's groups are listed |
+| `/accountz` | account configuration | `acc` — the docs print `account`, which the endpoint ignores |
 | `/accstatz` | per-account statistics | `accounts`, `include_unused` |
 | `/gatewayz` | gateway connections | `account_name`, `accounts`, `name`, `subscriptions`, `subscriptions_detail` |
 | `/leafz` | leafnode connections | `account`, `subscriptions` |
@@ -121,6 +121,13 @@ the cluster name and appearing in the list, with only the connection counts diff
 `/jsz` reports streams, consumers, `meta_cluster.leader`, and the per-stream and per-consumer
 numbers beneath.
 
+`meta_cluster` is **always present** — `name`, `leader`, `peer` (the leader's id), `cluster_size`,
+`pending`, `pending_requests`, `pending_infos`, `snapshot{pending_entries, pending_size, last_time,
+last_duration}` — and **only the leader's copy** carries `replicas[]`, one entry per other peer with
+`current` and `active` (nanoseconds since last contact). There is no `meta` query parameter: `/jsz?meta=1`
+returns the same body as `/jsz`. `?raft=1&streams=1` adds each stream's `raft_group`, `leader_since` and
+replicas. Confirmed on 2.14.6 ([[meta-layer]]; source: [[s-nats-server-jetstream-cluster]]).
+
 > **An unscoped `/jsz` is slow at scale.** `?accounts=true&streams=true&consumers=true` walks every
 > account, stream and consumer on the node and serialises the lot — "on a node with thousands of
 > consumers it can take long enough that a scrape times out and you get *no* data."
@@ -147,6 +154,14 @@ curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8222/healthz
 
 Its parameters narrow what "healthy" means — JetStream only, this server only, the meta layer only,
 or one named stream or consumer. **`js-enabled` is deprecated in favour of `js-enabled-only`.**
+
+`?js-meta-only=true` stops after the meta-layer checks, and a `503` names one of five states:
+`JetStream has not established contact with a meta leader` (no leader known), `JetStream is not current
+with the meta leader` (a leader is known but not heard from within 2 s — **what a dead leader looks
+like** until its term ends), `JetStream is still recovering meta layer`, `JetStream meta layer is not
+running`, `JetStream meta layer write error: …`. The startup log repeats the first one as
+`Healthcheck failed: "…"` once a second until a leader exists ([[meta-layer]]; source:
+[[s-nats-server-jetstream-cluster]]).
 
 Since **2.14** a filestore I/O error **freezes the affected stream and reports unhealthy here**,
 with the error text containing `write error`; the server keeps serving core traffic and needs a
@@ -394,12 +409,46 @@ applies". So any field named on this page can be found as a series, and the expo
 its labels and the metric list are on [[prometheus-nats-exporter]]
 (source: [[s-docs-prometheus-and-dashboards]]).
 
+### `/raftz` — scope it to an account, or you only see the meta group
+
+`/raftz` returns one object per Raft group this server holds, keyed `account → group name`. Two
+things the docs do not say: the account filter is **`acc`**, not `account` (which is silently
+ignored), and **it defaults to the system account**, so a bare `/raftz` shows only `$SYS` → `_meta_`.
+A stream's or consumer's group needs both filters, because `group=` alone is looked up inside `$SYS`
+and returns `{}`. Confirmed on 2.14.6 (source: [[s-nats-server-raftz]]):
+
+```
+curl -s http://localhost:8222/raftz | jq '."$SYS"._meta_'                       # the meta group
+curl -s 'http://localhost:8222/raftz?acc=ORDERS_ACCOUNT&group=S-R3F-RCvvHwre' | jq   # one stream's group
+nats server request raft --account ORDERS_ACCOUNT --group S-R3F-RCvvHwre          # the same over $SYS
+```
+
+Per group: `id` (this server's peer id), `state` (`LEADER` / `FOLLOWER` / `CANDIDATE` / `OBSERVER` /
+`CLOSED`), `size` and `quorum_needed` (`size/2 + 1`), `committed` / `applied`, `term`, `voted_for`,
+`pterm` / `pindex`, `leader` and — on the leader only — `leader_since`, `ever_had_leader` (the
+cold-boot signal), `system_account` / `traffic_account`, the four queue lengths `ipq_proposal_len`,
+`ipq_entry_len`, `ipq_resp_len`, `ipq_apply_len`, a `wal` object (`messages`, `bytes`, `first_seq`,
+`last_seq`, timestamps — `messages: 0` with `first_seq = last_seq + 1` is a freshly compacted log) and
+`wal_error`. The flags that matter on a bad day are omitted when false: **`overrun`** and
+`overrun_count` (the 2.14 overrun protection, [[raft-in-nats]]), `catching_up`, `observer`, `paused`.
+`peers` maps peer id to `name`, `known`, `last_seen` and `last_replicated_index`; a follower reports
+`last_seen` for the leader only, the leader reports both for every peer. The docs' page for this
+endpoint prints none of it (docs issue #47; source: [[s-docs-monitor-raftz]]).
+
+**A docs error worth knowing.** Six of the generated reference pages — `accountz`, `jsz`, `leafz`,
+`subsz`, `gatewayz`, `raftz` — print the field names of the `$SYS.REQ.SERVER.PING.<Z>` request
+payload (`account`, `consumer`, `subscriptions`, …) as the endpoint's request options. The HTTP
+handlers read different names (`acc`, `consumers`, `subs`, …) and ignore the documented ones: on
+2.14.6 `/accountz?account=NOPE` returns the normal page while `/accountz?acc=NOPE` answers
+`400 Account NOPE does not exist`. `connz` and `healthz` print the right names. Use the underscore
+names in `nats server request …` and its flags, never in a URL (source: [[s-nats-server-raftz]]).
+
 ## What is deliberately not here
 
 **Response fields.** Each endpoint's response schema runs to dozens of fields and is generated; the
 docs' own pages are the place for them. The fields above are the ones this wiki has a reason to
-explain. `/raftz`'s field set, in particular, is referenced by [[raft-in-nats]] but **has not been
-ingested** — it is the next monitoring source worth taking.
+explain. `/raftz` is the exception, below: the docs' page for it has **no** response fields, so its
+field set is on this page instead.
 
 **Account visibility over `$SYS`.** What an account can see of itself does not travel over this port:
 `nats account info` asks `$SYS.REQ.USER.INFO`, and a narrow publish allow-list silently blanks the
@@ -485,4 +534,4 @@ states the replica count it derived for MQTT state — see [[mqtt]].
 [[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-nats-server-monitoring-observed]] · [[s-gh-7362-routez-connz-rtt]] ·
 [[s-gh-7483-varz-cpu-in-containers]] · [[s-docs-monitoring-profiling]] ·
-[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]]

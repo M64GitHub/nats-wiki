@@ -85,6 +85,10 @@ exists to answer live in `inbox/question-bank.md`.
 
 - [[raft-in-nats]] — meta group vs per-asset groups, the 4–9 second election window, append →
   commit → apply, and the stepdown commands.
+- [[meta-layer]] — the one Raft group a cluster runs about itself: what it stores, why a stream
+  with no record in it is deleted 30 s after a join, the constants nobody can tune, a survivor that
+  claims leadership for 10 s, the request that timed out and landed anyway, and the peer that
+  rejoins five minutes after you removed it. Read from the source and run on 2.14.6.
 - [[stream-placement]] — `server_tags`, tag intersection, and the two causes of
   `no suitable peers for placement` (10005).
 - [[js-api]] — `$JS.API` request-reply, paged listings, the `code` / `err_code` / `description`
@@ -121,6 +125,9 @@ exists to answer live in `inbox/question-bank.md`.
   have: `tls_cert_not_after` per listener, and `nats account tls` across the whole chain.
 - [[cross-domain-sourcing]] — copy a stream between JetStream domains: the `external` block, the
   prefix the CLI builds for you, and the export types that fail silently.
+- [[evict-a-sick-server]] — a server that is up but unhealthy: move leadership, peer-remove it
+  (and why that undoes itself in five minutes), kick its clients one cid at a time through the sick
+  server itself, and let the platform do the rest. The thread that asked was never answered.
 
 **Sizing**
 
@@ -181,6 +188,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[object-store-list-is-slow]] — `nats object ls` blows out while uploads run. **No public source
   answers this**; measured instead — object count is nearly free, concurrent writes are not, and a
   list is an ephemeral consumer created per call.
+- [[stream-leader-keeps-moving]] — six causes ranked, from a peer that went quiet for ten seconds to a
+  peer-removed server rejoining; the advisory that reports a flap but not its cause; and the one
+  public quorum-loss report (gh#7533) mapped line by line, with the part nobody has explained.
 
 ## Reference
 
@@ -372,6 +382,8 @@ exists to answer live in `inbox/question-bank.md`.
   `max_subscriptions`: the 8MB/64MB rule and their reload behaviour.
 - [[s-docs-monitoring-endpoints]] — the only prose source for the monitoring port; `slow_consumers`,
   `/connz?sort=pending`, and why an unscoped `/jsz` times out.
+- [[s-docs-monitor-raftz]] — the 173-byte reference page three learn chapters call "the full field
+  set": two request options, no response fields.
 
 **nats-server source**
 
@@ -393,6 +405,16 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-jetstream-resources]] — what "out of storage" actually means: the 75%-of-**free**
   disk default, `finalizeDynamicMaxStore` (new in 2.14.6), what `10047` compares, and the
   out-of-space handler's two callers.
+- [[s-nats-server-raftz]] — `/raftz` read from `monitor.go` and run: every field, the `acc` filter
+  that defaults to the system account, and the sweep that found six monitor reference pages printing
+  request names the HTTP endpoints ignore.
+- [[s-nats-server-kick-ldm-mqtt-session]] — the two per-client system requests (`KICK` disconnects,
+  `LDM` only informs) run against a live client, and the conditional publish behind an MQTT
+  session's `wrong last sequence: 0`.
+- [[s-nats-server-jetstream-cluster]] — the meta layer read at v2.14.6 and then run: no replica
+  count, quorum `size/2+1` over every JetStream server (gateways included), the 30-second orphan
+  check, the 10-second lie of a leader that lost its followers, the fate of a timed-out proposal,
+  the five-minute rejoin after a peer-remove, and the docs' wrong peer-remove subject.
 - [[s-nats-server-filestore-layout]] — the filestore read at v2.14.6 and then measured on the
   binary: `30 + len(subject)` per message, the block-size clamps, the never-compacted last block
   (8.5× on an idle stream), `index.db` per subject, and `max_file_store` bounding a logical figure.
@@ -494,6 +516,10 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-gh-7982-no-suitable-peers]] — a placement failure diagnosed with debug logs.
 - [[s-gh-7831-standalone-to-cluster]] — maintainers on why standalone cannot become a cluster
   in place.
+- [[s-gh-7533-quorum-loss-mqtt]] — quorum loss after days of stable operation, seen from the MQTT
+  bridge on 2.12.1: `10071`, `10008`, publish timeouts, `NO quorum`. Unanswered upstream.
+- [[s-gh-6892-evict-a-sick-node]] — a host at 100 % CPU dropped by its peers as a slow consumer and
+  still holding its clients for ten minutes. Unanswered upstream.
 - [[s-gh-6605-which-consumer-is-slow]] — an unanswered thread, recorded as unanswered.
 - [[s-gh-7190-asymmetric-cluster]] — one DNS name as the route address: nodes with **unequal route
   counts** and clients partitioned. Unanswered; the maintainer names the cause.
@@ -693,13 +719,15 @@ These are deliberately unresolved links; ingest a source to fill them.
 Concepts: *(none — `leafnode` and `gateway` were written 2026-08-31, together with
 `jetstream-domain` and `choosing-a-topology`; see the Concepts section above)*
 
-Internals: [[meta-layer]]
+Internals: *(none — `meta-layer` was written 2026-09-01 from `jetstream_cluster.go` and a three-node run;
+see the Internals section above)*
 
 `filestore-layout` was written 2026-08-31 and is in the Internals section above.
 
 Operations: *(none — `rotate-tls-certificates` was written 2026-08-31; see the Operations section above)*
 
-Gotchas: [[consumer-keeps-redelivering]] · [[stream-leader-keeps-moving]]
+Gotchas: [[consumer-keeps-redelivering]] *(`stream-leader-keeps-moving` was written 2026-09-01; see the
+Gotchas section above)*
 
 `jetstream-out-of-disk` was written 2026-08-31 and is in the Gotchas section above.
 `kv-watcher-misses-updates` has been **retired rather than written**: the thread it was wanted for
@@ -717,10 +745,11 @@ names now have pages — see the Entities section above. People: none yet.)*
 
 - `inbox/question-bank.md` — the questions this wiki must answer, with the page that answers each
 - `inbox/adr-toc.md` — one row per ADR of `nats-architecture-and-design`
-- `inbox/docs-issues.md` — **36** errors and gaps found in **public NATS documentation**, each verified
+- `inbox/docs-issues.md` — **48** errors and gaps found in **public NATS documentation**, each verified
   against the server at a release tag with file and line, kept so they can be sent to the maintainers.
   **None has been filed yet** — every row's `upstream` column reads `not filed`. Routed by a
-  `destination` column: 33 to `nats-docs`, 3 (#7, #30, #31) to the ADR repo.
+  `destination` column: 42 to `nats-docs`, 4 (#7, #30, #31, #37) to the ADR repo, 1 (#40) to `natscli`,
+  1 (#39) to a published blog post.
 - `inbox/server-issues.md` — **1** finding about **`nats-server` itself**, kept separate because a
   server finding cannot be settled the way a docs finding can: there is no higher authority to check it
   against, so entries are observations and questions rather than verdicts. `SI-1` is the
@@ -746,7 +775,9 @@ names now have pages — see the Entities section above. People: none yet.)*
 - `inbox/plan-delivery-timing-2026-09-01.md` — **proposed**, not started, and the newest file — so a
   bare `start the plan` takes this one. Four steps from the scout above; step 2 is a **server run** on
   v2.14.6 rather than a read, because the contradiction is behavioural
-- `inbox/plan-the-meta-layer-2026-09-01.md` — **proposed**, not started. The last structural hole in
+- `inbox/plan-the-meta-layer-2026-09-01.md` — **finished** 2026-09-01, all 3 steps; kept as the record.
+  Wrote `meta-layer`, `stream-leader-keeps-moving` and `evict-a-sick-server`, settled every open
+  `## To verify` item on `raft-in-nats`, and produced docs issues #43–#48 The last structural hole in
   the JetStream coverage: `meta-layer` and `stream-leader-keeps-moving`, the two remaining wanted
   pages, plus Q37 and Q40. **Name the file explicitly** when starting it — a bare `start the plan`
   takes the newest file

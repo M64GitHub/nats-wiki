@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -199,6 +199,17 @@ duration constants and the `stalled_clients` / `stalls` counters, above. The *di
 not: no source read explains what the server counts as a slow consumer or where it records which
 connection it dropped. When one does, that becomes an internals page and this page should link it.
 
+## A route slow consumer removes a server from its peers, not from its clients
+
+The same detection runs on routes. When a server stops draining its route fast enough, the healthy
+peers close the route as a slow consumer and log it — which is how the other servers in gh#6892
+reported that a host with its CPU pinned at 100 % "was removed from the cluster". But that server's
+own clients stayed connected to it and "still report system slowness until the host completely
+crashes after 10+ minutes": the route layer had let go, the client connections had not (source:
+[[s-gh-6892-evict-a-sick-node]]). What can be done about the clients from outside is
+[[evict-a-sick-server]].
+
+
 ## Related
 
 [[consumer]] · [[monitoring-endpoints]] · [[nats-cli]] · [[jetstream-sizing]] ·
@@ -210,4 +221,4 @@ connection it dropped. When one does, that becomes an internals page and this pa
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]]
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]]

@@ -2,13 +2,13 @@
 title: "no suitable peers for placement"
 type: gotcha
 area: [topology, jetstream]
-verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-against: nats-server 2.14.6
+verified-on: 2026-09-01
 tags: [10005, placement, server_tags, replicas, debug-logs]
 aliases: ["no suitable peers", 10005, "JSClusterNoPeersErrF", "cannot increase replicas"]
-sources: [s-gh-7982-no-suitable-peers, s-docs-placement, s-docs-sizing-and-resources, s-adr-7-server-error-codes, s-nats-server-mqtt-websocket-observed]
+sources: [s-gh-7982-no-suitable-peers, s-docs-placement, s-docs-sizing-and-resources, s-adr-7-server-error-codes, s-nats-server-mqtt-websocket-observed, s-nats-server-jetstream-cluster]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # "no suitable peers for placement"
@@ -163,8 +163,14 @@ out instead:
       request type "SL" on "$JS.API.STREAM.INFO.$MQTT_sess"
 ```
 
+That timeout is the meta layer, not placement: a JetStream API request that reaches a server which is
+**not** the meta leader is dropped without a reply, and a server answers `10008 JetStream system
+temporarily unavailable` only once it *knows* the group is leaderless — so while a leader is still
+being elected the only symptom is the client's own timeout ([[meta-layer]]; source:
+[[s-nats-server-jetstream-cluster]]).
+
 **How to confirm**: grep the server log for `Creating MQTT streams/consumers with replicas`, and
-compare that number against `/jsz?meta=1`'s `cluster_size`.
+compare that number against `/jsz`'s `meta_cluster.cluster_size`.
 
 ## Related
 
@@ -175,4 +181,4 @@ compare that number against `/jsz?meta=1`'s `cluster_size`.
 
 [[s-gh-7982-no-suitable-peers]] · [[s-docs-placement]] · [[s-docs-sizing-and-resources]] ·
 [[s-adr-7-server-error-codes]] ·
-[[s-nats-server-mqtt-websocket-observed]]
+[[s-nats-server-mqtt-websocket-observed]] · [[s-nats-server-jetstream-cluster]]

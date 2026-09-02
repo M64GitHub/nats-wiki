@@ -19,7 +19,7 @@ those are suggestions — the point of the report is the finding, not the patch.
 |---|---|
 | `★` | a **confirmed factual error with real impact** — following the documentation produces a broken result, **silently**. If you triage on one thing, triage on this |
 | `where` | the doc path. For docs.nats.io prefix `https://docs.nats.io/` |
-| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Three rows (#7, #30, #31) are ADR errors rather than docs errors, one (#40) is a **CLI defect**, and one (#39) is a **published blog post** rather than a repository at all |
+| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Four rows (#7, #30, #31, #37) are ADR errors rather than docs errors, one (#40) is a **CLI defect**, and one (#39) is a **published blog post** rather than a repository at all |
 | `kind` | `wrong-value` and `missing` are defects; `enhancement` is correct-but-unhelpful |
 | `severity` | our estimate of consequence, not of effort |
 | **`upstream`** | where this was filed and what became of it. `not filed` means we have not sent it yet |
@@ -102,6 +102,12 @@ row.
 | 40 | `nats pub --schedule-after` emits `Nats-Schedule: <RFC3339>` **without the `@at ` prefix**, which the server always rejects with `10189 message schedules pattern is invalid`. The flag cannot work at all; the sibling `--schedule-at`, `--schedule-every` and `--schedule-cron` emit valid patterns | nats CLI 0.4.0, `nats pub --schedule-after` | natscli | wrong-value | high | not filed | wiki documents `--schedule-at` and warns off the flag |
 | 41 | The JetStream header reference describes `Nats-Scheduler` as a "Scheduler ID" (it is **the subject holding the schedule**) and `Nats-Schedule-TTL` as "Time-to-live for **the schedule**" (it sets `Nats-TTL` on the **generated message**). `Nats-Schedule-Time-Zone` and `Nats-Schedule-Rollup` have **empty descriptions**, and the section never says the stream must set `allow_msg_schedules` | `reference/jetstream/api/headers.md` | nats-docs | wrong-value | high | not filed | wiki states the observed header values |
 | 42 | **The message scheduler has no prose page anywhere in the documentation.** Four release-note bullets across 2.12 and 2.14 announce it and all four link only to ADR-51; the whole tree's coverage is one header table and ten error codes. Verified against the **live** `docs.nats.io/llms.txt` on 2026-09-01: no entry mentions scheduling, cron or delayed publishing | `learn/jetstream/` (absent); `release-notes/upgrade-to-2.12.md`, `upgrade-to-2.14.md` | nats-docs | missing | high | not filed | wiki writes `message-scheduling` from ADR-51 and the binary |
+| 43 | ★ The JetStream API reference gets **two system-level subjects wrong**. The peer-remove endpoint is given as `$JS.API.META.SERVER.REMOVE` (meta index table and the page's own `## Subject`) while the server serves **`$JS.API.SERVER.REMOVE`** — which the same page's request/response captions use; a request to the documented subject is answered by the generic handler with `10039 JetStream not enabled for account`, so the mistake reads as a permissions problem. And account purge is given as `$JS.API.ACCOUNT.PURGE` where the server subscribes **`$JS.API.ACCOUNT.PURGE.<account>`**; the documented form gets **no reply at all** — and the same table marks it `System Account: No` where the handler returns unless the request comes from the system account. All 98 subject mentions in the 32 reference pages were swept against the server: these are the only wrong ones | `reference/jetstream/api/meta.md` line 7; `reference/jetstream/api/meta/server-remove.md` line 10; `reference/jetstream/api/account.md` line 7; `reference/jetstream/api/account/purge.md` lines 10, 14 | nats-docs | wrong-value | medium | not filed | wiki prints the server's subjects and says the docs disagree |
+| 44 | Nothing in the documentation says that a standalone server's streams are **deleted** when it is restarted as a cluster member — the orphan check runs 30 s after the meta log is recovered, logs one WARN line, and has no flag. The topology chapter narrates that exact growth path ("The cluster is three servers, each one a server like `n1`, added without removing the single server", "the layer below keeps working exactly as it did"); its own configs use fresh store directories, so following them literally is safe, but the consequence of reusing the store is stated nowhere. `orphan` does not occur in the tree in this sense | `learn/topologies/putting-it-together.md` line 38; `learn/topologies/your-first-cluster.md`; `learn/topologies/jetstream-in-a-cluster.md` (introduces the meta layer) | nats-docs | missing | high | not filed | wiki gotcha carries the mechanism, the observed timeline and the backup-first rule |
+| 45 | `learn/clustering/scaling-and-peers.md` calls the meta API reference "the full set of peer-management and stream-assignment operations"; that reference lists two subjects. The server's meta leader serves five system-account subjects, and `$JS.API.ACCOUNT.STREAM.MOVE.<account>.<stream>` / `…STREAM.CANCEL_MOVE.<account>.<stream>` — the mechanism behind moving a stream off a server — appear nowhere in the reference tree | `learn/clustering/scaling-and-peers.md` line 79; `reference/jetstream/api/meta.md` | nats-docs | missing | low | not filed | wiki lists both in the "absent from the API index" table |
+| 46 | `reference/config/jetstream/extension_hint.md` documents neither what the key does nor its two accepted values — `no_extend` and `will_extend` — which the server itself names in its startup notices (`manually disable Observer Mode by setting the JetStream Option "extension_hint: no_extend"`). The page body is "Requires Restart" and a type table reading `string`, `-`, `-` | `reference/config/jetstream/extension_hint.md` | nats-docs | missing | low | not filed | wiki explains the key on `jetstream-domain` |
+| 47 | The `/raftz` reference page — the one `learn/clustering/raft-and-leaders.md` and `replication-and-r3.md` send readers to for "the full set of RAFT internals", "its full field set", "append-entry batching, heartbeat intervals, log compaction" — is **173 bytes**: two request options and an empty response schema. Verified against the live site 2026-09-01. None of the promised parameters is an endpoint field; they are unexported constants in `raft.go` | `reference/system/monitor/raftz.md`; `learn/clustering/raft-and-leaders.md` lines 52, 162; `learn/clustering/replication-and-r3.md` line 257 | nats-docs | missing | medium | not filed | wiki prints the field set from `monitor.go` and the constants from `raft.go`, and says the page is empty |
+| 48 | ★ Six generated monitor reference pages — `accountz`, `jsz`, `leafz`, `subsz`, `gatewayz`, `raftz` — print the JSON field names of the `$SYS.REQ.SERVER.PING.<Z>` request payload (`account`, `consumer`, `subscriptions`, `leader_only`, …) as "Request options for the … monitoring endpoint". The HTTP handlers read other names (`acc`, `consumers`, `subs`, `leader-only`, …) and **silently ignore the documented ones**: `/accountz?account=NOPE` returns the normal page, `/accountz?acc=NOPE` answers `400`. `connz` and `healthz` print the right names, so the tree contradicts itself. 14 pages swept | `reference/system/monitor/accountz.md`, `jsz.md`, `leafz.md`, `subsz.md`, `gatewayz.md`, `raftz.md` (request schemas) | nats-docs | wrong-value | medium | not filed | wiki tables use the HTTP names and say which pages differ |
 
 ---
 
@@ -2228,6 +2234,209 @@ subject, target in the same stream), the header family, the 2.12/2.14 boundary, 
 the `@every` minimum, the tzdata requirement for named time zones, stopping a schedule, and the
 retention table — and link it from the four release-note bullets.
 
+## 43 · Two system-level subjects in the API reference are not the ones the server serves ★
+
+**Impact: a request or an ACL built from the reference silently targets nothing.** Sent on the system
+account to the documented subject, the request is answered by the generic `$JS.API.>` handler with an
+unrelated error, so an operator debugging it is steered toward credentials rather than the subject.
+
+**Docs:** `reference/jetstream/api/meta.md` line 7 — `| Meta server remove | … | $JS.API.META.SERVER.REMOVE | Yes |`;
+`reference/jetstream/api/meta/server-remove.md` line 10, under `## Subject` — `` `$JS.API.META.SERVER.REMOVE` ``.
+The **same page** captions its request and response "A request to the JetStream $JS.API.SERVER.REMOVE
+API" (line 14) and "A response from the JetStream $JS.API.SERVER.REMOVE API" (line 26).
+
+**Server, v2.14.6:** `server/jetstream_api.go:195` — `JSApiRemoveServer = "$JS.API.SERVER.REMOVE"`;
+subscribed by the meta leader at `server/jetstream_cluster.go:7525`. ADR-61 and ADR-62 both write
+`$JS.API.SERVER.REMOVE`.
+
+**Observed** (`raw/nats-server-src/jetstream-cluster-observed-v2.14.6.md` §12), nats CLI 0.4.0 on the
+system account:
+
+```
+$ nats req '$JS.API.META.SERVER.REMOVE' '{"peer":"nope"}'
+{"type":"io.nats.jetstream.api.v1.system_response","error":{"code":503,"err_code":10039,"description":"JetStream not enabled for account"}}
+$ nats req '$JS.API.SERVER.REMOVE' '{"peer":"nope"}'
+{"type":"io.nats.jetstream.api.v1.meta_server_remove_response","error":{"code":400,"err_code":10044,"description":"server is not a member of the cluster"}}
+```
+
+**The second subject: account purge.** `reference/jetstream/api/account.md` line 7 and
+`reference/jetstream/api/account/purge.md` lines 10 and 14 give `$JS.API.ACCOUNT.PURGE`. The server
+defines `JSApiAccountPurge = "$JS.API.ACCOUNT.PURGE.*"` and `JSApiAccountPurgeT =
+"$JS.API.ACCOUNT.PURGE.%s"` (`server/jetstream_api.go:200–201`) — the account is a subject token, and
+a NATS `*` wildcard does not match the absence of a token. Observed on the system account (same raw
+file, §12):
+
+```
+$ nats req '$JS.API.ACCOUNT.PURGE' '' --timeout 2s
+21:58:37 Sending request on "$JS.API.ACCOUNT.PURGE"
+(no response)
+$ nats req '$JS.API.ACCOUNT.PURGE.NOPE' '' --timeout 2s
+{"type":"io.nats.jetstream.api.v1.account_purge_response","initiated":true}
+```
+
+**The neighbours, checked.** Every `$JS.API.…` mention in the 32 pages under
+`reference/jetstream/api/` — 98 of them, with `{stream}`-style placeholders normalised — was compared
+with every `$JS.API.` string literal in `server/jetstream_api.go` at v2.14.6. Five mentions mismatch,
+all of them these two subjects; the other 93 agree.
+
+**The purge page's system-account column is also wrong.** `reference/jetstream/api/account.md` line 7
+reads `| Account purge | … | No |`; `jsLeaderAccountPurgeRequest` (`server/jetstream_api.go:2841–2856`)
+returns without replying when the request is not from the system account (`if acc != s.SystemAccount()
+{ return }`, line 2851) — it is subscribed with `systemSubscribe` alongside stepdown and server-remove
+(`server/jetstream_cluster.go:7537–7539`).
+
+**Suggested fix:** `$JS.API.SERVER.REMOVE` on the two meta lines, matching the page's own captions and
+the ADRs; `$JS.API.ACCOUNT.PURGE.{account}` on the three account lines, with the token documented, and
+`Yes` in the account table's system-account column.
+
+## 44 · Nothing says a standalone server's streams are deleted when it joins a cluster
+
+**Impact: silent, total loss of a standalone server's JetStream data on a migration the documentation
+itself narrates.** Not marked ★ because the chapter's literal configs use fresh server names and fresh
+`store_dir`s (`./js/n1-east`, not the single server's `./js/n1`) and say "the durable `ORDERS` stream
+isn't on `east` yet"; a reader who follows them exactly loses nothing. A reader who takes the
+composition claim at its word — keeps `n1`, adds a `cluster {}` block — loses every stream, 30 seconds
+after the restart, with one WARN line.
+
+**Docs:** `learn/topologies/putting-it-together.md` line 38 — "The cluster is three servers, each one a
+server like `n1`, added without removing the single server … the layer below keeps working exactly as
+it did." `learn/topologies/your-first-cluster.md` line 4 — "That server publishes `orders.*` and holds
+the `ORDERS` stream." `learn/topologies/jetstream-in-a-cluster.md` introduces the meta layer and never
+says what a stream without an assignment in it becomes. The word `orphan` occurs in the tree only for
+un-backed-up operator keys, object-store chunks and firewalled nodes.
+
+**Server, v2.14.6:** `server/jetstream_cluster.go:1507–1585` — `checkForOrphans` and `getOrphans`:
+"Streams and consumers are recovered from disk, and the meta layer's mappings should clean them up, but
+under crash scenarios there could be orphans"; scheduled by `time.AfterFunc(30*time.Second,
+js.checkForOrphans)` at the end of meta recovery; deletes every recovered stream absent from the
+assignment map, logging `Detected orphaned stream '%s > %s', will cleanup`. No option gates it.
+
+**Observed** (`raw/nats-server-src/jetstream-cluster-observed-v2.14.6.md` §10): a standalone server
+holding `ORPHAN` (R1, 3 messages), restarted with a `cluster {}` block joining a live three-node cluster:
+`Restored 3 messages for stream '$G > ORPHAN'` at 21:43:25.470, `JetStream cluster new metadata leader`
+at 21:43:26.018, `Detected orphaned stream '$G > ORPHAN', will cleanup` at 21:43:55.584; the stream and
+its directory were gone. The maintainers confirmed the behaviour and that in-place migration "is not
+planned" in `nats-io/nats-server` discussion #7831 (2026-03).
+
+**Suggested fix:** one paragraph on `learn/topologies/your-first-cluster.md` (or the Pitfalls list) and
+one on `jetstream-in-a-cluster.md` stating that a server's JetStream store must not be carried into a
+cluster: a stream with no meta-layer assignment is treated as an orphan and deleted 30 s after the
+server joins; back up and restore, or mirror across a leafnode, instead. A `learn/` note on the
+composition page that the reversibility claim covers the messaging layer, not JetStream state.
+
+## 45 · The meta API reference is called complete and omits the stream-move subjects
+
+**Impact: low** — the `nats` CLI and `nats-server` agree; only a reader building ACLs or tooling from
+the reference is affected.
+
+**Docs:** `learn/clustering/scaling-and-peers.md` line 79 — "The full set of peer-management and
+stream-assignment operations is documented in [Reference → meta API]". `reference/jetstream/api/meta.md`
+lists two rows: leader stepdown and server remove.
+
+**Server, v2.14.6:** `server/jetstream_api.go:187–212` defines five system-account subjects, and
+`server/jetstream_cluster.go:7522–7538` subscribes the meta leader to all five:
+`$JS.API.META.LEADER.STEPDOWN`, `$JS.API.SERVER.REMOVE`, `$JS.API.ACCOUNT.STREAM.MOVE.*.*`,
+`$JS.API.ACCOUNT.STREAM.CANCEL_MOVE.*.*`, `$JS.API.ACCOUNT.PURGE.*`. The sweep in #43 found the two
+`STREAM.MOVE` forms in no file under `reference/jetstream/api/`; account purge has its own page under
+`api/account/`.
+
+**Suggested fix:** two rows in `reference/jetstream/api/meta.md` (system account: yes) with pages for
+the move and cancel-move requests, or drop "full set" from the learn page.
+
+## 46 · `extension_hint` is documented without its purpose or its values
+
+**Impact: low.** The key matters only to leafnode deployments that share the system account, but for
+those it decides whether a server forms its own JetStream domain or waits, possibly forever, to extend
+another.
+
+**Docs:** `reference/config/jetstream/extension_hint.md` in full: the title, "Requires Restart", and a
+type table with `string` and two dashes. No description, no values.
+
+**Server, v2.14.6:** `server/jetstream.go:567–568` — `jsNoExtend = "no_extend"`,
+`jsWillExtend = "will_extend"`; `server/jetstream_cluster.go:1040` decides observer mode from it, and
+lines `1052–1055` / `1069–1071` print the operator instruction
+`manually disable Observer Mode by setting the JetStream Option "extension_hint: no_extend"`;
+`server/jetstream.go:509–513` prints the `will_extend` counterpart for a standalone server.
+
+**Suggested fix:** a description ("whether a server that solicits a leafnode connection sharing the
+system account should extend that JetStream domain or run its own") and the two values in the
+`Choices` column.
+
+## 47 · The `/raftz` reference page is empty, and three learn pages promise it is not
+
+**Impact: an operator sent to the reference for RAFT tuning or field meanings finds nothing, and may
+conclude the parameters exist somewhere else.** They do not exist as parameters at all.
+
+**Docs.** `reference/system/monitor/raftz.md`, fetched 2026-08-31 and re-fetched from the live site on
+2026-09-01 (173 bytes, identical), in full: `## Request Schema` — "Request options for raftz monitoring
+endpoint", `account` string, `group` string; `## Response Schema` — "Response from raftz monitoring
+endpoint", and nothing under it. Compare the sibling `jsz.md`, whose response schema lists its fields
+(`meta_cluster` object, …).
+
+What sends readers there: `learn/clustering/raft-and-leaders.md` line 52 — "The full set of RAFT
+internals it exposes is documented in Reference → /raftz: log compaction, the `$NRG.*` subjects peers
+vote over, snapshot timing."; line 162 — "the RAFT group monitoring endpoint and its full field set.";
+`learn/clustering/replication-and-r3.md` line 257 — "You'll find the full set of RAFT replication
+parameters (append-entry batching, heartbeat intervals, log compaction) in Reference."
+
+**Server, v2.14.6.** The response is `RaftzStatus` = `account → group → RaftzGroup`
+(`server/monitor.go:4195–4232`): `id`, `state`, `size`, `quorum_needed`, `observer`, `paused`,
+`overrun`, `overrun_count`, `committed`, `applied`, `catching_up`, `leader`, `leader_since`,
+`ever_had_leader`, `term`, `voted_for`, `pterm`, `pindex`, `system_account`, `traffic_account`, four
+`ipq_*_len` queue lengths, `wal`, `wal_error`, `peers{name, known, last_replicated_index, last_seen}`.
+The things the learn pages promise are not fields: heartbeat `1s`, election `4–9s`, lost-quorum `10s`
+(`server/raft.go:289–310`), append batch `256 KB / 512 entries` (`raft.go:3250–3251`), compaction
+thresholds in `server/jetstream_cluster.go` (`1601–1628`, `3188–3197`, `6602–6612`) — package
+constants, none exposed by any endpoint or set by any key (`opts.go` parses no key for them).
+
+**Observed** (`raw/nats-server-src/raftz-v2.14.6.md`): the endpoint's real output on a four-node
+cluster, follower and leader views.
+
+**Suggested fix:** generate the response schema from `RaftzGroup` as the sibling pages do; and on the
+two learn pages, either drop the parameter list or say plainly that heartbeat, election, batching and
+compaction are fixed in the server. The `$NRG.*` subjects would be a reasonable addition to the
+reference.
+
+## 48 · Six monitor reference pages document request options the HTTP endpoints ignore ★
+
+**Impact: a filter copied from the reference into a URL does nothing, silently.** The page returns its
+unfiltered form, which for `/jsz`, `/subsz` and `/raftz` looks like a plausible answer.
+
+**Docs, v2.14 tree.** Each page's `## Request Schema` opens "Request options for `<z>` monitoring
+endpoint" and then lists the JSON tags of the Go options struct that the **system request**
+`$SYS.REQ.SERVER.PING.<Z>` (and `nats server request <z>`) accepts:
+
+| page | documented names | what the HTTP handler reads (`server/monitor.go`) |
+|---|---|---|
+| `accountz.md` | `account` | `acc` (`HandleAccountz`) |
+| `jsz.md` | `account`, `consumer`, `direct_consumer`, `leader_only`, `stream_leader_only` | `acc`, `consumers`, `direct-consumers`, `leader-only`, `stream-leader-only` (`HandleJsz`) |
+| `leafz.md` | `account`, `subscriptions` | `acc`, `subs` (`HandleLeafz`) |
+| `subsz.md` | `account`, `subscriptions` | `acc`, `subs` (`HandleSubsz`) |
+| `gatewayz.md` | `account_name`, `name`, `subscriptions`, `subscriptions_detail` | `acc_name`, `gw_name`, `accs` (`HandleGatewayz`) |
+| `raftz.md` | `account` | `acc` (`HandleRaftz`, line 4241) |
+
+The decode lines are quoted with line numbers in `raw/nats-server-src/raftz-v2.14.6.md`. `connz.md`
+prints `acc` and matches its handler; `healthz.md` matches exactly. `routez`, `ipqueuesz`, `profilez`
+and `statsz` were not resolved by the sweep (their handlers parse differently) and are not claimed.
+
+**Observed, 2.14.6:**
+
+```
+/accountz?account=NOPE   → 200, the normal page
+/accountz?acc=NOPE       → 400 "Account NOPE does not exist"
+/raftz?account=NOPE      → 200, {"$SYS": {"_meta_": …}}
+/raftz?acc=NOPE          → 200, {}
+```
+
+**Why it happens** is visible in the pages themselves: the schema is generated from the request
+struct (`RaftzOptions{AccountFilter string \`json:"account"\`}`, `monitor.go:3021–3024`), whose tags
+name the system-request payload, while `HandleRaftz` reads `r.URL.Query().Get("acc")` (`4241`). Both
+interfaces are real; the pages describe one and are titled for the other.
+
+**Suggested fix:** per page, a second column or a note giving the HTTP query name, or a sentence
+saying the listed names are the `$SYS.REQ.SERVER.PING.<Z>` payload and the URL parameters differ —
+with `connz.md` as the model, since it already prints the HTTP names.
+
 ## Internal — where this wiki records each of these
 
 *Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
@@ -2276,3 +2485,9 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 40 | `wiki/concepts/message-scheduling.md` — *Limits and failure modes* item 4 and the cheat sheet; `wiki/summaries/s-nats-server-message-schedules-observed.md` |
 | 41 | `wiki/concepts/message-scheduling.md` — *What configures it* and *Where the documentation is*; `wiki/summaries/s-docs-jetstream-headers.md`; `wiki/concepts/message-ttl.md` |
 | 42 | `wiki/concepts/message-scheduling.md` — the whole page, and *Where the documentation is*; `wiki/summaries/s-adr-51-message-scheduler.md` |
+| 43 | `wiki/reference/js-api-subjects.md` — *Account*, *Meta* and *A docs error worth knowing*; `wiki/internals/meta-layer.md`; `wiki/summaries/s-nats-server-jetstream-cluster.md` |
+| 44 | `wiki/gotchas/streams-deleted-when-clustering-a-standalone-server.md` — *Confirmed on 2.14.6*; `wiki/internals/meta-layer.md` — *Orphans*; `wiki/summaries/s-nats-server-jetstream-cluster.md` |
+| 45 | `wiki/reference/js-api-subjects.md` — *Meta* and *Documented elsewhere, absent from the API index*; `wiki/summaries/s-nats-server-jetstream-cluster.md` |
+| 46 | `wiki/concepts/jetstream-domain.md` — *Observer mode, and what `extension_hint` does*; `wiki/internals/meta-layer.md`; `wiki/summaries/s-nats-server-jetstream-cluster.md` |
+| 47 | `wiki/reference/monitoring-endpoints.md` — *`/raftz` — scope it to an account*; `wiki/internals/raft-in-nats.md` — *`/raftz`, read and run*; `wiki/summaries/s-docs-monitor-raftz.md`; `wiki/summaries/s-nats-server-raftz.md` |
+| 48 | `wiki/reference/monitoring-endpoints.md` — the endpoint table and *A docs error worth knowing* under `/raftz`; `wiki/summaries/s-nats-server-raftz.md` |

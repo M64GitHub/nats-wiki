@@ -2,13 +2,13 @@
 title: "streams deleted when clustering a standalone server"
 type: gotcha
 area: [topology, jetstream, deploy]
-verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-against: nats-server 2.14.6
+verified-on: 2026-09-01
 tags: [orphan, standalone, cluster, migration, data-loss, meta-layer]
 aliases: ["orphaned streams", "streams marked orphan", "standalone to cluster", "R1 to R3 migration"]
-sources: [s-gh-7831-standalone-to-cluster, s-docs-raft-and-leaders, s-docs-surviving-node-loss]
+sources: [s-gh-7831-standalone-to-cluster, s-docs-raft-and-leaders, s-docs-surviving-node-loss, s-nats-server-jetstream-cluster]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-01
 ---
 
 # "streams deleted when clustering a standalone server"
@@ -58,6 +58,30 @@ record of owning.
 *How to confirm the diagnosis rather than something else:* the streams were R1 on a server with no
 `cluster` block before the change, and they disappear on the **first** start after the block is
 added.
+
+### Confirmed on 2.14.6: the orphan check, and the 30 seconds before it
+
+The mechanism is `checkForOrphans` in `server/jetstream_cluster.go`, whose own comment says what it is
+for: recovered streams and consumers that "the meta layer's mappings should clean up, but under crash
+scenarios there could be orphans". It runs **30 s after the server finishes replaying the meta log**,
+only if a meta leader exists and this server is current with it, and deletes every stream recovered
+from disk that has no assignment — logging exactly one line per stream. Reproduced: a standalone
+server holding `ORPHAN` (R1, three messages) was restarted with a `cluster {}` block joining a live
+cluster (source: [[s-nats-server-jetstream-cluster]]):
+
+```
+21:43:25.470 [INF]   Restored 3 messages for stream '$G > ORPHAN' in 1ms
+21:43:25.471 [INF] JetStream cluster bootstrapping
+21:43:26.018 [INF] JetStream cluster new metadata leader: n2/east
+21:43:55.584 [WRN] Detected orphaned stream '$G > ORPHAN', will cleanup
+```
+
+Three things follow. **The stream is restored first** — the `Restored N messages` line is not a sign
+it survived. **The window is 30 seconds**: the deletion happens only inside that check, so a server
+stopped before the warning still has its stream directories on disk (unverified: the timing was
+observed, the rescue was not tested). And **no INFO-level line announces it in advance**; the warning
+is the deletion. Full mechanism: [[meta-layer]].
+
 
 ## The fix — pick one, before the restart
 
@@ -130,4 +154,4 @@ from) · [[meta-layer]]
 
 ## Sources
 
-[[s-gh-7831-standalone-to-cluster]] · [[s-docs-raft-and-leaders]] · [[s-docs-surviving-node-loss]]
+[[s-gh-7831-standalone-to-cluster]] · [[s-docs-raft-and-leaders]] · [[s-docs-surviving-node-loss]] · [[s-nats-server-jetstream-cluster]]

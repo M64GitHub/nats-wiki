@@ -2,11 +2,11 @@
 title: RAFT in nats-server
 type: internals
 area: [topology, jetstream]
-verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-against: nats-server 2.14.6
+verified-on: 2026-09-01
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -127,9 +127,11 @@ latency on streams with many interior deletes (source: [[s-docs-upgrade-to-2.14]
 
 RAFT internals surface in the docs at `learn/clustering/raft-and-leaders.md` and
 `learn/clustering/replication-and-r3.md`; the monitoring surface is the `/raftz` endpoint. Peers
-vote over the `$NRG.*` subjects. Log compaction, snapshot timing and the append-entry batching and
-heartbeat parameters are documented with `/raftz` (source: [[s-docs-raft-and-leaders]]) — this wiki
-has not ingested that page yet; see [[monitoring-endpoints]].
+vote over the `$NRG.*` subjects. The docs say log compaction, snapshot timing and the append-entry
+batching and heartbeat parameters are "documented with `/raftz`" (source: [[s-docs-raft-and-leaders]]);
+**they are not** — that reference page lists two request options and no response fields (source:
+[[s-docs-monitor-raftz]]), and the parameters are constants in the server with no key to set them, all
+quoted in *What the meta layer adds* below and in the `/raftz` section that follows it.
 
 ## What you can observe
 
@@ -157,10 +159,10 @@ Cluster Information:
 `/raftz` gives a live view of a group's RAFT state: the current term, who the leader is, and each
 peer's status. It takes `account` and `group` query parameters — see [[monitoring-endpoints]].
 
-**The meta group has its own view**: `/jsz?meta=1` reports `meta_cluster.leader` and
-`meta_cluster.cluster_size`, which is how you confirm a meta leader exists at all before blaming
+**The meta group has its own view**: `/jsz` always carries `meta_cluster.leader` and
+`meta_cluster.cluster_size` (there is no `meta` query parameter; `?meta=1` is accepted and ignored — [[meta-layer]]), which is how you confirm a meta leader exists at all before blaming
 anything downstream on the group layer (source: [[s-docs-monitoring-endpoints]]). A JetStream
-operation that hangs while `/jsz?meta=1` shows no leader is waiting on the meta layer, not on the
+operation that hangs while `/jsz` shows no `meta_cluster.leader` is waiting on the meta layer, not on the
 stream's own group — the server says so directly in the log,
 `JetStream has not established contact with a meta leader`.
 
@@ -288,6 +290,52 @@ each survivor for 5 minutes — see [[disaster-recovery]]. Neither is a substitu
 when you retire it.
 
 
+## What the meta layer adds
+
+Read from `jetstream_cluster.go` and `raft.go` at v2.14.6 and then run on a three-node cluster
+(source: [[s-nats-server-jetstream-cluster]]); the full account is [[meta-layer]].
+
+- **The meta group has no replica count.** Its peers are every JetStream-enabled server the cluster
+  knows — including servers behind gateways, whose URLs count toward the expected size at bootstrap —
+  and quorum is `size/2 + 1`. Nothing relates it to a stream's `num_replicas`.
+- **The timing is constants, not configuration.** Heartbeat `1s`, election timer `4–9s`, lost-quorum
+  interval and check `10s` each, peer-remove timeout `5m`. Measured: bootstrap elected a meta leader in
+  0.28 s, a full-cluster restart in 5.3 s, a SIGKILLed leader was replaced in 3.5 s, a stepdown took
+  0.5 s because it is a *transfer* to a peer heard from within 3 s rather than an election.
+- **A leader that loses its followers keeps claiming leadership for ~10 s, up to ~20 s** — the
+  lost-quorum check runs on a 10-second ticker. Until it steps down, `/healthz` says `ok`, `/jsz` names
+  it, and a request it accepts cannot commit, so the client times out instead of hearing `10008`.
+- **A proposal that timed out on the client is still in the old leader's log.** It is committed if that
+  server wins the next election and discarded if another does — observed both ways for creates, and two
+  publishes that returned `nats: timeout` were both stored. Check before retrying differently.
+
+
+## `/raftz`, read and run — and the numbers the docs said it documents
+
+`/raftz?acc=<account>&group=<group>` (the account filter is `acc`, and it defaults to the system
+account, so a bare `/raftz` shows only `_meta_`) prints, per group, `state`, `term`, `leader`,
+`leader_since`, `committed` / `applied`, `size` / `quorum_needed`, the four internal queue lengths,
+the `wal` state, and — omitted when false — **`overrun`**, `overrun_count`, `catching_up`,
+`observer`, `paused`, plus `peers` with `known`, `last_seen` and (on the leader) `last_replicated_index`.
+A climbing `term` is the flap counter; `overrun: true` is the 2.14 stepdown about to happen; a growing
+`ipq_apply_len` is a node that cannot keep up (source: [[s-nats-server-raftz]]; the full table is on
+[[monitoring-endpoints]]).
+
+The parameters the docs say live there are **constants at v2.14.6, with no config key**
+(source: [[s-nats-server-jetstream-cluster]], [[s-nats-server-raftz]]):
+
+| what | value |
+|---|---|
+| heartbeat | `1s` |
+| election timer | `4s`–`9s` after the last heartbeat |
+| lost-quorum interval, and the leader's check ticker | `10s` each |
+| append-entry batch | up to **256 KB or 512 entries** per append |
+| meta-group snapshot | 1-minute ticker, or > 8 MB applied and 30 s since the last; forced on membership changes and on becoming leader; `meta_compact` / `meta_compact_size` (2.12, reloadable) turn the check into a threshold, default 0 = every check |
+| stream-group snapshot | 2-minute ticker (+ jitter), or 8 MB / 65,536 entries |
+| consumer-group snapshot | 2-minute ticker, or 64 KB / 1,024 entries |
+| peer-remove timeout (a removed peer may rejoin after) | `5m` |
+| observer election timer | `48h` |
+
 ## Version notes
 
 - `--preferred` on `nats stream cluster step-down` requires **nats-server 2.11 or newer**
@@ -300,12 +348,13 @@ when you retire it.
 
 ## To verify
 
-- The exact heartbeat interval ("by default about once a second") and the 4–9 second election-timer
-  range are as the docs state them in prose; no source ingested so far names the config keys that
-  set them, if any are exposed.
-- `/raftz`'s **field set** is still not ingested — [[monitoring-endpoints]] now records the
-  endpoint and its `account` and `group` query parameters, but not what it returns. Log compaction
-  and snapshot timing are documented with it and likewise unread.
+- ~~The exact heartbeat interval and the 4–9 second election-timer range~~ **Settled 2026-09-01** from
+  `raft.go` at v2.14.6: `hbInterval` 1 s, election timer 4–9 s, lost-quorum interval and check 10 s
+  each — package variables with **no config key**; see *What the meta layer adds* above (source:
+  [[s-nats-server-jetstream-cluster]]).
+- ~~`/raftz`'s field set is still not ingested~~ **Settled 2026-09-01**: read from `monitor.go` and
+  run — the field table is on [[monitoring-endpoints]], the compaction and snapshot numbers are in the
+  `/raftz` section above. The docs page that was supposed to hold them is empty (docs issue #47).
 
 ## The election as an observable: the leader-elected advisory
 
@@ -323,6 +372,12 @@ this page is *why* it can.
 
 Because advisories are published once and stored nowhere, catching a flap that happened overnight
 means a stream was already capturing `$JS.EVENT.ADVISORY.>` — not that someone was watching.
+
+What a flap looks like from the *application* side is on record too: an MQTT deployment on 2.12.1
+saw `10071` session-persist failures, then `10008`, then 5-second publish timeouts, then a consumer
+`NO quorum, stalled` — the meta group, a stream group and a consumer group losing quorum in that
+order — and nobody answered the thread (source: [[s-gh-7533-quorum-loss-mqtt]]). The causes, ranked,
+are on [[stream-leader-keeps-moving]].
 
 ## Related
 
@@ -344,4 +399,4 @@ means a stream was already capturing `$JS.EVENT.ADVISORY.>` — not that someone
 [[s-docs-scaling-and-peers]] · [[s-docs-your-first-cluster]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7463-jetstream-corruption]] ·
 [[s-nats-server-lame-duck]] · [[s-synadia-jetstream-memory-patterns]] ·
-[[s-nats-server-jetstream-resources]]
+[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]]

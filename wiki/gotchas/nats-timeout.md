@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [timeout, request-reply, no-responders, gomaxprocs, request_queue_limit, routes, kubernetes]
 aliases: ["nats: timeout", "Future cancelled, response not registered in time", "request timeout", "no responders available for request", "publish timeout"]
-sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag]
+sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -153,6 +153,15 @@ other side, where clients ended up partitioned.
 **The fix.** [[build-a-3-node-cluster]] has the route block; on Kubernetes the Helm chart already
 generates it ([[nats-helm-charts]]).
 
+**The meta-layer form of this cause, read from the source.** Every JetStream API request that changes
+something — create, update, delete, consumer create, stepdown, peer-remove, and `STREAM.INFO` on a
+work-queue or interest stream — is answered only by the **meta leader**. A server that is not the
+leader **returns without replying**; only a server that *knows* the group is leaderless answers
+`10008 JetStream system temporarily unavailable`. So during a meta election (4–9 s after a leader
+dies, ~10 s more if a survivor still believes it leads) the client sees its own timeout and nothing
+else — observed on 2.14.6 ([[meta-layer]]; source: [[s-nats-server-jetstream-cluster]]).
+
+
 ### 3. The server has fewer cores than you think
 
 From the second reporter's own startup log:
@@ -232,4 +241,4 @@ often they are the answer — there is no public evidence for that ordering.
 - [[s-gh-7190-asymmetric-cluster]] — the same single-DNS-name route defect, independently reported.
 - [[s-docs-monitoring-endpoints]] — `slow_consumers` and `/connz?sort=pending`.
 - [[s-docs-forming-a-cluster]] — what the `Routes` column counts. ·
-[[s-gh-6490-high-message-lag]]
+[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]]

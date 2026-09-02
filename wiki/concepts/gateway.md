@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, gossip, reject_unknown_cluster, 7222, stalled_clients]
 aliases: [gateways, super-cluster, supercluster, super cluster, cluster of clusters, geo-affinity, geo affinity]
-sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways]
+sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -180,13 +180,14 @@ counters that say so.
 [[s-docs-super-clusters]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-4823-leafnode-supercluster-duplicates]] ·
-[[s-gh-6328-jetstream-behind-gateways]]
+[[s-gh-6328-jetstream-behind-gateways]] · [[s-nats-server-jetstream-cluster]]
 
 ## To verify
 
-- The docs say a super-cluster's JetStream "relies on a global quorum" for stream and consumer
-  creation; the phrasing here comes from the asker in [[s-gh-7438-multi-region-availability]] and the
-  maintainer reply does not contradict it. The meta-group behaviour across gateways has **not** been
-  read from the server source in this wiki.
+- ~~The meta-group behaviour across gateways has not been read from the server source~~ **Settled
+  2026-09-01**: at bootstrap the meta group's expected peer size is `len(routes)` plus every
+  configured gateway URL, and creates are proposals the meta leader commits to a majority of that
+  group — one meta group per super-cluster, so a gateway does cost a global quorum. See
+  [[meta-layer]] (source: [[s-nats-server-jetstream-cluster]]).
 - `gateway.connect_retries` is documented as applying only to *discovered* gateways. Not verified
   against the source.

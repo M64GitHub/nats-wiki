@@ -3,10 +3,10 @@ title: JetStream domain
 type: concept
 area: [jetstream, topology, security]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-01
 tags: [jetstream-domain, domain, default_js_domain, js-domain, mapping, external, api-prefix, leafnode]
 aliases: [domain, js domain, js-domain, jetstream domains, "$JS.<domain>.API", default_js_domain]
-sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain, s-nats-server-object-store-leafnode, s-docs-mqtt-auth-and-clustering, s-natscli-stream-external]
+sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain, s-nats-server-object-store-leafnode, s-docs-mqtt-auth-and-clustering, s-natscli-stream-external, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -117,6 +117,21 @@ nats --js-domain leaf01a stream ls
 - **A domain is not a cluster.** A domain can be one server or a whole cluster; what it delimits is
   the JetStream meta group, not the route mesh.
 
+## Observer mode, and what `extension_hint` does
+
+A server that **solicits** a leafnode connection sharing the system account assumes it is extending
+the hub's JetStream domain rather than forming its own: it starts its meta node as an **observer** —
+it follows the hub's meta group and never campaigns (its election timer is set to 48 h) — and logs
+how to turn that off. `jetstream { extension_hint: no_extend }` forces an independent meta group;
+`extension_hint: will_extend` is the opposite override for a *standalone* server, which otherwise
+refuses to extend. The choice is remembered in the meta group's `peers.idx` so a restart does not wait
+for first contact again. The docs' reference page for `extension_hint` documents neither its purpose
+nor these two values (docs issue #46). When extension does begin, `meta.Reset()` discards the leaf's
+own meta state — leadership, every queued entry, the whole snapshots directory, the log, the peer set
+and the term — which is why a domain must be decided before a leaf holds data
+([[meta-layer]]; sources: [[s-nats-server-jetstream-cluster]], [[s-nats-server-leafnode-js-domains]]).
+
+
 ## Limits and failure modes
 
 - **Setting a domain is a restart, and on an existing leaf it is destructive to metagroup state.**
@@ -171,7 +186,7 @@ exists, because the leaf can reach JetStream through the hub.
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7881-cross-domain-sourcing]] ·
 [[s-gh-7834-leafnode-same-js-domain]] · [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-mqtt-auth-and-clustering]] ·
-[[s-natscli-stream-external]]
+[[s-natscli-stream-external]] · [[s-nats-server-jetstream-cluster]]
 
 ## To verify
 

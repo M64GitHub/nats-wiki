@@ -5,10 +5,10 @@ kind: runbook
 area: [topology, deploy, jetstream]
 since: [2.10]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-01
 tags: [cluster, routes, gossip, seed, cluster-name, no_advertise, failover, tls, 6222]
 aliases: [cluster, clustering, "form a cluster", "first cluster", routes, "cluster setup"]
-sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection, s-docs-encryption-and-tls, s-docs-putting-it-together, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-single-server, s-gh-5859-unexpected-nats-timeout, s-nats-server-systemd-units]
+sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection, s-docs-encryption-and-tls, s-docs-putting-it-together, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-single-server, s-gh-5859-unexpected-nats-timeout, s-nats-server-systemd-units, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -413,6 +413,26 @@ The remote logs the more useful half, naming all three values:
 See [[gateway]], [[leafnode]] and [[choosing-a-topology]] before adding either layer.
 
 
+## What the meta layer logs while you build it
+
+The lines to expect on a first start, from a run on 2.14.6 (source:
+[[s-nats-server-jetstream-cluster]]; [[meta-layer]]):
+
+```
+[INF] Creating JetStream metadata controller
+[INF] JetStream cluster bootstrapping                 # nothing on disk yet
+[WRN] JetStream has not established contact with a meta leader
+[INF] Self is new JetStream cluster metadata leader   # on one node, ~0.3 s later
+[INF] JetStream cluster new metadata leader: n1/east  # on the others
+```
+
+The expected peer count comes from each node's `routes` list (plus gateway URLs), so a node that
+lists two peers expects a group of three; `/jsz` then shows `meta_cluster.cluster_size: 3` on every
+node. A restart of an existing cluster logs `JetStream cluster recovering state` instead and can take
+the full 4–9 s election window, with `Healthcheck failed: "…"` once a second until a leader exists —
+that is normal, not a failure.
+
+
 ## Related
 
 [[install-nats-server]] · [[replicas]] · [[raft-in-nats]] · [[stream-placement]] ·
@@ -430,4 +450,4 @@ See [[gateway]], [[leafnode]] and [[choosing-a-topology]] before adding either l
 [[s-nats-server-topology]] · [[s-docs-super-clusters]] · [[s-adr-40-nats-connection]] ·
 [[s-docs-encryption-and-tls]] · [[s-docs-putting-it-together]] · [[s-docs-rolling-upgrades]] ·
 [[s-docs-scaling-and-peers]] · [[s-docs-single-server]] · [[s-gh-5859-unexpected-nats-timeout]] ·
-[[s-nats-server-systemd-units]]
+[[s-nats-server-systemd-units]] · [[s-nats-server-jetstream-cluster]]

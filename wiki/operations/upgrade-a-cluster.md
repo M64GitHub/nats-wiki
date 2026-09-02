@@ -5,10 +5,10 @@ kind: runbook
 area: [deploy, jetstream, topology]
 since: [2.10]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-01
 tags: [rolling-upgrade, lame-duck, SIGUSR2, meta-leader, downgrade, PodDisruptionBudget, ldm]
 aliases: [rolling upgrade, "upgrade NATS", "roll a cluster", lame duck, ldm, "upgrade nats-server"]
-sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption]
+sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -333,6 +333,18 @@ Reconnect behaviour after that is bounded by client defaults you do not control,
 down hard still delivers all of its clients to the survivors at once
 ([[how-clients-reach-a-cluster]]).
 
+## What the meta leader does on shutdown, from the source
+
+Two facts from `jetstream.go` and `raft.go` at v2.14.6 that explain the ordering above (source:
+[[s-nats-server-jetstream-cluster]]; [[meta-layer]]): on a clean shutdown a **meta leader transfers
+leadership itself** — it calls the group's stepdown, which hands over to a peer heard from within 3 s
+without an election, and waits up to 2 s for that to complete — which is why a drained meta leader costs
+about a second and a killed one 4–9 s (measured: 0.5 s for a stepdown, 3.5 s after a `kill -9`). And a
+follower that restarts **learns the leader from the next heartbeat** rather than voting (measured:
+0.55 s from `recovering state` to `new metadata leader`), so the only election in a well-ordered
+rolling restart is the last node's.
+
+
 ## Related
 
 [[install-nats-server]] · [[build-a-3-node-cluster]] · [[reload-server-config]] ·
@@ -348,4 +360,4 @@ down hard still delivers all of its clients to the survivors at once
 [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] · [[s-nats-server-systemd-units]] ·
 [[s-docs-scaling-and-peers]] · [[s-gh-4342-memory-stream-backup]] ·
 [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-40-nats-connection]] ·
-[[s-gh-7463-jetstream-corruption]]
+[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]]

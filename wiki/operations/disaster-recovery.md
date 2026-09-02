@@ -5,10 +5,10 @@ kind: runbook
 area: [jetstream, topology, deploy]
 since: [2.10]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-01
 tags: [disaster-recovery, promotion, failover, mirror, lag, rpo, 10065, meta-quorum, dr]
 aliases: [DR, failover, "promote a mirror", "site loss", "recover a stream", RPO]
-sources: [s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-docs-stream-backup-restore, s-natscli-backup-restore, s-docs-surviving-node-loss, s-adr-61-meta-quorum-rescue, s-nats-server-snapshot-restore, s-docs-config-and-jwt-backup, s-gh-7463-jetstream-corruption]
+sources: [s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-docs-stream-backup-restore, s-natscli-backup-restore, s-docs-surviving-node-loss, s-adr-61-meta-quorum-rescue, s-nats-server-snapshot-restore, s-docs-config-and-jwt-backup, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -236,6 +236,23 @@ last resort, and lowering a Raft quorum "weakens the guarantees Raft relies on t
 logs".
 
 
+## Peer-remove, from the source and the binary
+
+Three details of `nats server cluster peer-remove` that the runbook above relies on, read from
+`jetstream_api.go` / `raft.go` at v2.14.6 and run (source: [[s-nats-server-jetstream-cluster]];
+[[meta-layer]]):
+
+- **The reply comes only after a quorum holds the removal.** With no meta leader there is no reply at
+  all, and nats CLI 0.4.0 reports it as `did not receive a response from the meta leader, ensure the
+  account used has system privileges and appropriate permissions` — the credentials are fine; the
+  leader is missing. That is the ADR-61 situation, not a permissions problem.
+- **The removed server disables its own JetStream** (`[ERR] JetStream being DISABLED, our server was
+  removed from the cluster`, advisory `$JS.EVENT.ADVISORY.SERVER.REMOVED`) but keeps running core NATS.
+- **It is re-added after five minutes if it keeps running with the cluster block in place.** Observed:
+  removed at 21:43:59, restarted 88 s later, back in the leader's peer list by 21:49:57 with no log line
+  on either side. Stop the server, or remove its `cluster {}` block, inside that window.
+
+
 ## Related
 
 [[backup-and-restore-jetstream]] · [[backup-and-restore-identity]] · [[mirrors-and-sources]] ·
@@ -248,4 +265,4 @@ logs".
 [[s-docs-disaster-recovery]] · [[s-docs-mirrors-as-dr]] · [[s-docs-stream-backup-restore]] ·
 [[s-natscli-backup-restore]] · [[s-docs-surviving-node-loss]] · [[s-adr-61-meta-quorum-rescue]] ·
 [[s-nats-server-snapshot-restore]] · [[s-docs-config-and-jwt-backup]] ·
-[[s-gh-7463-jetstream-corruption]]
+[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]]

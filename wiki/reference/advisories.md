@@ -3,10 +3,10 @@ title: Advisories and system events
 type: reference
 area: [monitoring, jetstream, core]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-01
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -305,6 +305,22 @@ alert built on this subject is silent in exactly the situation where a worker po
 - **The `$SYS` connect/disconnect and `STATSZ` events have not been captured on the wire.** They need
   a system-account connection; the advisory captures above were made in the application account.
 
+## Observed: the server-removed advisory
+
+Produced on 2.14.6 by `nats server cluster peer-remove n4` against a running member, read off the
+system account (source: [[s-nats-server-jetstream-cluster]]; [[meta-layer]]):
+
+```
+[#1] Received on "$JS.EVENT.ADVISORY.SERVER.REMOVED"
+{"type":"io.nats.jetstream.advisory.v1.server_removed","id":"bzR3zrSqUL1nzvGi5ydtxI",
+ "timestamp":"2026-09-01T19:43:59.026488Z","server":"n4",
+ "server_id":"NDC35T3DSARUTDCY5LFIY6IH6ZQEBYS75ATG43HUTKLA6D67LGYH7NMK","cluster":"east"}
+```
+
+`domain` is omitted when unset. The removed server publishes it itself, just before it logs
+`JetStream being DISABLED, our server was removed from the cluster` and shuts its JetStream down.
+
+
 ## Related
 
 [[ack-and-redelivery]] · [[monitoring-endpoints]] · [[raft-in-nats]] · [[priority-groups]] ·
@@ -319,4 +335,4 @@ alert built on this subject is silent in exactly the situation where a worker po
 [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
 [[s-docs-advanced-publishing]] ·
-[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]]
+[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]]

@@ -2,11 +2,11 @@
 title: "$JS.API subjects"
 type: reference
 area: [jetstream, security]
-verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-against: nats-server 2.14.6
+verified-on: 2026-09-01
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers, s-nats-server-jetstream-cluster]
 created: 2026-08-31
 updated: 2026-09-01
 ---
@@ -71,7 +71,7 @@ The consumer name is **optional** on create (source: [[s-docs-consumer-config]])
 | operation | subject | system account |
 |---|---|---|
 | Account info | `$JS.API.INFO` | No |
-| Account purge | `$JS.API.ACCOUNT.PURGE` | No |
+| Account purge | **`$JS.API.ACCOUNT.PURGE.<account>`** — the docs print `$JS.API.ACCOUNT.PURGE` without the account token, and a request to that form gets no reply at all; served by the meta leader on the **system account** (docs issue #43) | **Yes** (server) / No (docs) |
 
 `$JS.API.INFO` is also the call clients should use to **assert the stream API level** rather than
 reading the connected server's version string — see [[key-value]] and [[message-ttl]].
@@ -81,9 +81,23 @@ reading the connected server's version string — see [[key-value]] and [[messag
 | operation | subject | system account |
 |---|---|---|
 | Meta leader stepdown | `$JS.API.META.LEADER.STEPDOWN` | **Yes** |
-| Meta server remove | `$JS.API.META.SERVER.REMOVE` | **Yes** |
+| Meta server remove | **`$JS.API.SERVER.REMOVE`** — the docs' index and page print `$JS.API.META.SERVER.REMOVE`, which the server does not serve (docs issue #43) | **Yes** |
 
-These two are the only system-account entries in the documented set. See [[raft-in-nats]].
+These two are the only system-account entries in the documented set — but not the only ones the
+server has. At v2.14.6 the meta leader subscribes on the system account to five subjects:
+`$JS.API.META.LEADER.STEPDOWN`, `$JS.API.SERVER.REMOVE`, `$JS.API.ACCOUNT.STREAM.MOVE.<account>.<stream>`,
+`$JS.API.ACCOUNT.STREAM.CANCEL_MOVE.<account>.<stream>` and `$JS.API.ACCOUNT.PURGE.<account>`; the
+two `STREAM.MOVE` forms appear nowhere in the reference tree (docs issue #45). Every request these
+and the ordinary create/update/delete subjects carry is answered only by the meta leader, with
+`10008 JetStream system temporarily unavailable` when it knows there is none — see [[meta-layer]]
+(source: [[s-nats-server-jetstream-cluster]]). The Raft mechanics are on [[raft-in-nats]].
+
+**A docs error worth knowing.** Two subjects in this table are not what the docs print. A request to
+the documented `$JS.API.META.SERVER.REMOVE` does get an
+answer — `10039 JetStream not enabled for account` from the generic `$JS.API.>` handler — so the
+mistake looks like a permissions problem rather than a typo; a request to the documented
+`$JS.API.ACCOUNT.PURGE` gets nothing, because the server's subject carries the account as a token. Both
+verified on the wire at 2.14.6 (source: [[s-nats-server-jetstream-cluster]]).
 
 ## Documented elsewhere, absent from the API index
 
@@ -96,6 +110,7 @@ if you are building ACLs from that tree alone:
 | **`$JS.API.DIRECT.GET.<stream>.>`** | **Subject-Appended** Direct Get: the tokens after the stream name *are* the `last_by_subj`. Exists so subject-level permissions and cross-account grants can restrict which subjects are readable. A request payload here is a `408` | [[s-adr-31-direct-get]] |
 | **`$JS.API.META.RESCUE`** | **2.15 only** (not in 2.14.6): broadcast on the **system account**, body `{"quorum_needed": <n>}`, temporarily lowering each surviving server's effective meta quorum for 5 minutes so a leader can be elected and dead peers removed. Rejects with `10224`; a request on any other account is silently ignored — [[disaster-recovery]] | [[s-adr-61-meta-quorum-rescue]] |
 | **`$JS.API.CONSUMER.RESET.<stream>.<consumer>`** | consumer delivery-state reset, **added in 2.14**. Empty payload = reset the delivery state, leaving the ack floor's *stream* sequence where it is; `{"seq":<n>}` = move that floor to one below `<n>`, so the next delivery is `msg.seq >= n`. Allowed only on `DeliverPolicy` `all`, `by_start_sequence` or `by_start_time`, and for the latter two only forward of what the start policy allowed. The reply is shaped like a consumer-create response plus the `ResetSeq` used | [[s-relnotes-2.14.0]] · [[s-adr-60-reliable-sourcing]] |
+| **`$JS.API.ACCOUNT.STREAM.MOVE.<account>.<stream>`** and **`…CANCEL_MOVE.<account>.<stream>`** | system-account requests to the meta leader to move a stream off a server, and to cancel that move — the mechanism behind [[rebalance-streams]]. Absent from the whole reference tree, although `learn/clustering/scaling-and-peers.md` calls that reference "the full set of peer-management and stream-assignment operations" (docs issue #45) | [[s-nats-server-jetstream-cluster]] |
 | **`$JS.API.CONSUMER.DURABLE.CREATE.<stream>.<consumer>`** | the **legacy** durable-create subject. Modern clients do not send it: they create durables on `$JS.API.CONSUMER.CREATE.<stream>.<name>` with the durable name in the **request body**. It matters for ACLs precisely because it is gone — a rule written against `DURABLE.CREATE` catches only clients that still send it | [[s-gh-5044-restrict-durable-consumers]] |
 
 Both Direct Get subjects exist **only when the stream sets `allow_direct`** — otherwise there is no
@@ -266,4 +281,4 @@ domain back out of as the **second token** (`stream.go:432–437`). See [[jetstr
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
 [[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]] ·
 [[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]] ·
-[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]]
+[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]] · [[s-nats-server-jetstream-cluster]]
