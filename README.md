@@ -78,3 +78,11 @@ Every page has YAML frontmatter (`title`, `type`, `kind`, `area`, `since`, `veri
 `[[slug]]` or `[[slug|text]]`, where `slug` is the filename without `.md`, unique across all wiki
 folders. No Obsidian-only syntax is used, so any Markdown renderer that resolves `[[slug]]` can
 display it.
+
+## License
+
+The wiki's own pages, summaries and tools are licensed under [Apache-2.0](LICENSE). The originals
+under `raw/` belong to their authors and keep their own licenses and copyright notices, recorded per
+collection in `raw/sources.md`: Apache-2.0 for the NATS docs, ADRs, server and client source and
+repository READMEs; the Synadia blog posts and the CNCF project page are reproduced there as the
+maintainer's citation anchors and remain © their owners.

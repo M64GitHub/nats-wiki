@@ -3318,3 +3318,10 @@ joins continuation lines. Starter self-test passes; the starter's changes are un
 **After:** built site has exactly one wanted link, `consumer-keeps-redelivering` (5 pages), as
 lint says; `priority-groups` shows `2.11+`; lint clean (broken links none, citation drift 0,
 unlanded ripples 0, staleness 0 behind 2.14.6); `inbox/staleness.md` unchanged.
+
+## 2026-09-02 — repo: published to GitHub
+
+Pushed to https://github.com/M64GitHub/nats-wiki, public, under Apache-2.0 (`LICENSE` added, README
+gains a *License* section saying what `raw/` keeps of its own). `site/` stays git-ignored; `raw/` is
+published in full, the user's decision. The goal stated for the repo: anyone can clone it and run
+their own agent in it.
