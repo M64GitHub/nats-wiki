@@ -3285,3 +3285,36 @@ wanted pages 3 → **1** (`consumer-keeps-redelivering`); binary and every `veri
 at **2.14.6**. The scratch cluster (n1–n4) is stopped; its logs stay in the session scratchpad.
 
 **Lint:** clean — broken links none, citation drift 0, unlanded ripples 0, staleness 0 behind 2.14.6.
+
+## 2026-09-02 — lint: the viewer's broken links that `tools/lint.py` could not see (frontmatter parsing)
+
+**Symptom** (reported by the user from the built site): on `mqtt` the *sources* row carried a link to
+`wanted/[s-docs-mqtt-your-first-mqtt-client, s-docs-mqtt-topics-and-subjects,.html`, while lint reported
+*broken links: none*. A fresh build showed the same on five more pages, plus a bogus `since` chip on
+`priority-groups` reading `[2.11]   # overflow and pinned_client; …`.
+
+**Cause:** the two tools parsed the frontmatter differently. `tools/lint.py` reads a `sources:` list with a
+multi-line regex; `tools/build-site.py` read the block one line at a time, so a `sources:` list wrapped
+over several indented lines became the single "slug" `[s-a, s-b,` (rendered as a wanted page) and a
+trailing YAML `# comment` stayed inside the value. `tools/add-section.py` had the same one-line regex
+and silently skipped the frontmatter on those pages; `tools/check-staleness.py` truncated their
+*verified from* column the same way.
+
+**Fixed, in `llm-wiki-starter` and pushed here with its `update-tools.sh`** (`build-site.py`,
+`add-section.py`, `lint.py`; lint also picks up the starter's newer `section()` — it was one commit
+behind, with no local changes): the viewer's `parse_frontmatter` now joins wrapped values, accepts
+block lists (`key:` then `  - a`) and drops trailing comments outside quotes; the ripple helper's
+`sources:` match spans lines and rewrites the list on one line; lint's `fm_list` tolerates a comment
+after `]`. **Also in `add-section.py`, while it was open:** the `## Sources` append is bounded to its
+own section — it used to land on the last line of the page, i.e. inside `## To verify` when one
+follows (the drift seen on 2026-09-01 on `jetstream-domain` and `multi-region-jetstream`). Tested on
+scratch copies of `jetstream-domain` and a re-wrapped `websocket`. The local `check-staleness.py`
+joins continuation lines. Starter self-test passes; the starter's changes are uncommitted there.
+
+**Pages normalised** (frontmatter only, `sources:` unwrapped onto one line, no claim touched):
+`object-store`, `websocket`, `filestore-layout`, `run-nats-behind-a-proxy`, `defaults-and-limits`.
+`CLAUDE.md` gains the convention: one line per frontmatter key.
+
+**After:** built site has exactly one wanted link, `consumer-keeps-redelivering` (5 pages), as
+lint says; `priority-groups` shows `2.11+`; lint clean (broken links none, citation drift 0,
+unlanded ripples 0, staleness 0 behind 2.14.6); `inbox/staleness.md` unchanged.

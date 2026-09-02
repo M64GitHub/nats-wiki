@@ -8,9 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [websocket, nginx, ingress, proxy, advertise, handshake_timeout, ping_interval, kubernetes, no_tls]
 aliases: [websocket behind nginx, nats behind a proxy, wss ingress, websocket proxy, proxy_read_timeout]
-sources: [s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection,
-  s-docs-websocket-browsers-and-origins, s-docs-websocket-leaf-nodes-over-websocket,
-  s-nats-server-mqtt-websocket-observed]
+sources: [s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed]
 created: 2026-09-01
 updated: 2026-09-01
 ---

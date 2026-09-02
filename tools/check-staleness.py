@@ -56,11 +56,13 @@ def frontmatter(text):
     if not text.startswith('---\n'):
         return {}
     fm = text.split('---\n', 2)[1]
-    out = {}
+    out, key = {}, None
     for line in fm.splitlines():
         m = re.match(r'^([a-z-]+):\s*(.*)$', line)
         if m:
-            out[m.group(1)] = m.group(2).strip()
+            key = m.group(1); out[key] = m.group(2).strip()
+        elif key and line.strip():          # a value wrapped over several indented lines
+            out[key] += ' ' + line.strip()
     return out
 
 

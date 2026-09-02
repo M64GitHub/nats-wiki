@@ -22,7 +22,7 @@ path,before,srcs=sys.argv[1],sys.argv[2],[s for s in sys.argv[3].split(',') if s
 text=sys.stdin.read().rstrip('\n')+'\n\n'
 doc=open(path,encoding='utf-8').read()
 # frontmatter sources
-m=re.search(r'^sources:\s*\[(.*?)\]\s*$',doc,flags=re.M)
+m=re.search(r'^sources:[ \t]*\[(.*?)\][ \t]*(?:#.*)?$',doc,flags=re.M|re.S)   # the list may wrap over several lines; it is rewritten on one
 if m:
     cur=[s.strip() for s in m.group(1).split(',') if s.strip()]
     for s in srcs:
@@ -43,7 +43,8 @@ doc='\n'.join(lines)
 # Sources line: last non-empty line after '## Sources'
 si=doc.rfind('\n## Sources')
 if si>=0:
-    tail=doc[si:]
+    ni=doc.find('\n## ',si+1)            # the section ends at the next heading, not at the end of the page --
+    tail,rest=(doc[si:],'') if ni<0 else (doc[si:ni],doc[ni:])   # a page with '## To verify' after it got the link there
     tl=tail.rstrip('\n').split('\n')
     # find last non-empty line
     for j in range(len(tl)-1,0,-1):
@@ -51,6 +52,6 @@ if si>=0:
             add=[f'[[{s}]]' for s in srcs if f'[[{s}]]' not in tl[j]]
             if add: tl[j]=tl[j].rstrip()+' · '+' · '.join(add)
             break
-    doc=doc[:si]+'\n'.join(tl)+'\n'
+    doc=doc[:si]+'\n'.join(tl)+'\n'+rest
 open(path,'w',encoding='utf-8').write(doc)
 print("updated",path)

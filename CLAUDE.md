@@ -137,6 +137,10 @@ updated: 2026-08-31
 ---
 ```
 
+- **One line per frontmatter key**, however long the list: `sources: [a, b, c]`, never
+  wrapped over several lines. Every tool that reads the frontmatter parses a wrapped list
+  too (since 2026-09-02), but `tools/add-section.py` rewrites it onto one line anyway, and a
+  single shape keeps the viewer, lint and the staleness report reading the same value.
 - **Versioning is existential here.** A page that states a default, a limit, a
   config key, a CLI flag or an API subject **must** carry `verified-against` and
   `verified-on`. When a source is version-specific, say so in the sentence too

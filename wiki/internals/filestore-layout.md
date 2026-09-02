@@ -6,9 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [filestore, block-size, index.db, tombstone, compaction, disk, sizing, psim, o.dat]
 aliases: [filestore, file store, blocks, blk, msg blocks, index.db, on-disk layout, storage overhead, bytes per message]
-sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources,
-  s-nats-server-object-store-observed, s-docs-object-store-chunking,
-  s-docs-object-store-under-the-hood]
+sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood]
 created: 2026-08-31
 updated: 2026-08-31
 ---

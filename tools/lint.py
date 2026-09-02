@@ -44,21 +44,22 @@ def fm_list(txt, key):
     """The value of a frontmatter list key, inline (`key: [a, b]`) or block (`key:\n  - a`). None if absent."""
     if not txt.startswith('---\n'): return None
     fm = txt.split('---\n', 2)[1]
-    m = re.search(rf'^{re.escape(key)}:[ \t]*\[(.*?)\][ \t]*$', fm, re.M | re.S)
+    m = re.search(rf'^{re.escape(key)}:[ \t]*\[(.*?)\][ \t]*(?:#.*)?$', fm, re.M | re.S)
     if m: return [x.strip() for x in m.group(1).split(',') if x.strip()]
     m = re.search(rf'^{re.escape(key)}:[ \t]*\n((?:[ \t]+-[ \t]*\S.*\n?)+)', fm, re.M)
     if m: return [x.strip() for x in re.findall(r'^[ \t]+-[ \t]*(.+?)[ \t]*$', m.group(1), re.M) if x.strip()]
     return None
 
 def section(txt, heading):
-    """The body of a `## Heading` section: the heading anchored at the start of its own line, up to the next
-    heading of the same or a higher level, or the end. None if the section is absent. Anchoring matters --
-    a plain substring search matches "## Sources and mirrors" first, and an unbounded read swallows the
-    sections that follow, so citations in a later "## To verify" would count as if they were in the list."""
-    m = re.search(r'^' + re.escape(heading) + r'[ \t]*$', txt, re.M)
+    """The body of a heading's section: the heading alone on its line, up to the next heading of the same or a
+    higher level, or the end of the file. None if the section is absent. Both halves matter -- a plain substring
+    search matches "## Sources and mirrors" before "## Sources", and an unbounded read swallows the sections that
+    follow, so a citation in a later "## To verify" would count as if it were in the list. The configured heading
+    may carry its `#` markers or not (`"## Sources"` and `"Sources"` both work), and any level matches."""
+    m = re.search(r'^(#{1,6})[ \t]*' + re.escape(heading.lstrip('#').strip()) + r'[ \t]*$', txt, re.M)
     if not m: return None
     rest = txt[m.end():]
-    nxt = re.search(r'^##\s', rest, re.M)
+    nxt = re.search(r'^#{1,%d}[ \t]' % len(m.group(1)), rest, re.M)
     return rest[:nxt.start()] if nxt else rest
 
 pages = {}

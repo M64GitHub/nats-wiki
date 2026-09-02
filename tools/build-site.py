@@ -226,17 +226,45 @@ def yaml_value(v):
     return unquote(v)
 
 
+def strip_comment(s):
+    """Drop a trailing YAML comment: a `#` at the start of the value or after whitespace, outside quotes."""
+    q = None
+    for i, c in enumerate(s):
+        if q:
+            if c == q: q = None
+        elif c in '"\'':
+            q = c
+        elif c == '#' and (i == 0 or s[i - 1] in ' \t'):
+            return s[:i].rstrip()
+    return s
+
+
 def parse_frontmatter(text):
+    """The `---` block as {key: value}. A value is a scalar, `true`/`false`, a `[a, b]` flow list -- which may
+    wrap over several indented lines -- or a block list (`key:` then `  - a` lines); a trailing `# comment` is
+    dropped. Lines that continue a wrapped value are joined to it: read a line at a time, a wrapped `sources:`
+    list became one bogus slug (`[s-a, s-b,`) and the viewer rendered it as a wanted page, while lint, which
+    reads the block with a multi-line regex, saw nothing wrong."""
     if not text.startswith('---\n'):
         return {}, text
     end = text.find('\n---\n', 4)
     if end < 0:
         return {}, text
-    fm = {}
+    items = []
     for line in text[4:end].split('\n'):
         m = re.match(r'^([\w-]+):\s*(.*)$', line)
         if m:
-            fm[m.group(1)] = yaml_value(m.group(2))
+            items.append((m.group(1), [m.group(2)]))
+        elif items and line.strip():
+            items[-1][1].append(line)
+    fm = {}
+    for key, raw in items:
+        raw = [strip_comment(l) for l in raw]
+        body = [l for l in raw[1:] if l.strip()]
+        if not raw[0].strip() and body and all(l.lstrip().startswith('- ') for l in body):
+            fm[key] = [unquote(l.lstrip()[2:]) for l in body]
+        else:
+            fm[key] = yaml_value(' '.join(l.strip() for l in raw))
     return fm, text[end + 5:]
 
 

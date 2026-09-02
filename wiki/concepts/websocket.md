@@ -7,9 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [websocket, ws, wss, no_tls, allowed_origins, same_origin, jwt_cookie, compress, LEAFNODE_WS, advertise]
 aliases: [WebSocket, websocket, "websocket {}", ws, wss, browser client, allowed_origins]
-sources: [s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins,
-  s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket,
-  s-nats-server-mqtt-websocket-observed]
+sources: [s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed]
 created: 2026-09-01
 updated: 2026-09-01
 ---

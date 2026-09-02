@@ -6,12 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [objectstore, chunks, digest, OBJ_, Nats-Rollup, soft-delete, links, chunk-size]
 aliases: [object store, OBJ_, "$O.", object bucket, OBJ_ stream]
-sources: [s-adr-20-object-store, s-docs-stream-config, s-docs-kv-ttl-and-limits,
-  s-docs-object-store-under-the-hood, s-docs-object-store-chunking,
-  s-docs-object-store-your-first-object, s-docs-object-store-metadata-and-links,
-  s-docs-object-store-watching-and-listing, s-nats-server-object-store-observed,
-  s-gh-6836-object-store-list-slow, s-nats-server-object-store-leafnode,
-  s-nats-server-leafnode-js-domains]
+sources: [s-adr-20-object-store, s-docs-stream-config, s-docs-kv-ttl-and-limits, s-docs-object-store-under-the-hood, s-docs-object-store-chunking, s-docs-object-store-your-first-object, s-docs-object-store-metadata-and-links, s-docs-object-store-watching-and-listing, s-nats-server-object-store-observed, s-gh-6836-object-store-list-slow, s-nats-server-object-store-leafnode, s-nats-server-leafnode-js-domains]
 created: 2026-08-31
 updated: 2026-08-31
 ---
