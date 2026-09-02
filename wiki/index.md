@@ -200,6 +200,14 @@ exists to answer live in `inbox/question-bank.md`.
   `index.db` (the five warnings that say which), more than a million subjects, a slow volume, and
   pre-2.11.11 serial recovery — measured on 2.14.6: 3–27 ms clean, 6.4 s after SIGKILL, 2.57 s for a
   1.6 GB sourcing stream with one empty source and 23 ms without it.
+- [[consumer-keeps-redelivering]] — `tries: 2` on messages the handler acked, the floor not moving, and
+  **nothing in the server log**. Five causes ranked: an ack deadline shorter than the work — including a
+  `backoff` whose first entry replaced `ack_wait`, in nanoseconds on the API, so `[10000]` is `Ack Wait:
+  10µs` and every acked message is processed `max_deliver` times (measured on 2.14.6: exactly twice);
+  a pull batch the workers cannot drain in time; no ack on the success path; a nak loop with
+  `max_deliver: -1`; and a table of server versions that redelivered acked messages (2.11.0–2.11.4
+  `last_per_subject`, fixed 2.11.5; before 2.11.3 after a leader change; before 2.10.17 on rollouts;
+  2.14.0 drifted state). The wiki's last wanted page, closed 2026-09-03.
 - [[stream-leader-keeps-moving]] — six causes ranked, from a peer that went quiet for ten seconds to a
   peer-removed server rejoining; the advisory that reports a flap but not its cause; and the one
   public quorum-loss report (gh#7533) mapped line by line, with the part nobody has explained.
@@ -610,6 +618,10 @@ exists to answer live in `inbox/question-bank.md`.
   a mirrored bucket failed because the client looked the stream up by subject (fixed in nats.go
   2024-02) and because a mirror needs `$O.<origin>.>` → `$O.<mirror>.>`; plus the three client
   issues that say a mirrored object store is still hand-built and "not general-purpose yet".
+- [[s-issue-6921-last-per-subject-acks]] — the closed defect behind the wiki's last wanted page: a
+  `last_per_subject` consumer with explicit acks on a stream with `max_msgs_per_subject: 5` stops
+  registering acks on 2.11.0–2.11.4 (floor frozen, `Outstanding Acks` at the cap), reproduced in .NET
+  and Rust, "worked" in Go only while `MaxAckPending: 1` was missing; bisected to fixed in 2.11.5.
 - [[s-nats-server-mirror]] — `stream.go` and `filestore.go` at v2.14.6: the `JS_MIRROR_<id>`
   consumer and its config, the 10 s stall check and 2 s retry gate, the gap → `skipMsgs` branch
   (one Raft entry per hole on a replicated mirror), `SkipMsgs` under the write lock, and the
@@ -630,9 +642,24 @@ exists to answer live in `inbox/question-bank.md`.
   6.4 s after SIGKILL, 9.5 s with `index.db` deleted), a 1.6 GB sourcing stream at 2.57 s with an
   empty source and 23 ms without, 1.2 M subjects at ~380 B of RSS each and no periodic `index.db`,
   `--max-msgs 10000000000` accepted, and a `*` inside a token that pending counts and delivery disagree on.
+- [[s-nats-server-redelivery-observed]] — runs G, H and I on 2.14.6: issue #6921's recipe delivering
+  once each with the floor following; a redelivery loop as `tries:`, `consumer info`, the JSON counters
+  and the `-DV` trace show it, with **nothing** at the default log level; `backoff: [10000]` stored as
+  `Ack Wait: 10µs`, a race the ack wins six pulls of seven on localhost and loses every time with 5 ms
+  of work — exactly `max_deliver` deliveries per acked message; and a redelivery needing a waiting pull.
 - [[s-relnotes-2.14.4]] — the interior-delete release (2026-07-30: #8403, #8405, #8406,
   `max_concurrent_io`, four security fixes), with the mirror and filestore lines of v2.14.1 and
   v2.14.2; the six patch bodies are in `raw/release-notes/`.
+- [[s-relnotes-2.11.5]] — where issue #6921 was fixed: `DeliverLastPerSubject` "now correctly deliver
+  messages and handles acks when there are interior deletes" (#7005, 2025-06-26), plus Raft on
+  monotonic time (#6999) and `healthz` no longer fixing up node skews (#7001).
+- [[s-relnotes-2.11.2]] — withdrawn for a regression ("upgrade to 2.11.3 instead"), and the release
+  that stopped replicated consumers redelivering acknowledged messages after a leader change, at a
+  stated throughput cost; with the 2.10.16 / 2.10.17 lines that fixed the same complaint around
+  restarts (#5419, #5482, #5533).
+- [[s-relnotes-2.14.1]] — the first 2.14 patch, read for its consumer lines: drifted redelivered state
+  on workqueue and interest streams with `max_deliver` (#8102), a consumer store not flushing a deleted
+  redelivery (#8168), the pending leak at max deliveries (#8156), and the `/varz` client-only counters.
 - [[s-nats-go-kv-object-mirror]] — nats.go v1.53.1: a KV mirror's read prefix is rewritten to the
   origin's only for an `external` mirror (`kv.go:1610–1618`), so a same-domain mirror is unreadable
   by its own name; the object store binds by stream name and derives its subjects from the bucket
@@ -650,6 +677,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-gh-4972-nak-with-delay-blocks]] — a delayed nak keeps its `max_ack_pending` slot for the whole
   delay. **Working as designed**, with a maintainer arguing in the same thread that it should not be.
 - [[s-gh-5631-nak-not-immediate]] — a nak that redelivered only after the ack timeout, on 2.10.14.
+- [[s-so-78603662-acked-but-redelivered]] — row 14's own thread, unanswered: "processed twice despite
+  `AckAsync`" was `Backoff = [10000]` — ten microseconds on the wire — becoming the ack deadline, so
+  every message is processed `MaxDeliver` times; reproduced on 2.14.6 to the letter.
   **Zero comments in two years**; the wiki answers it from the binary instead.
 - [[s-gh-7672-cron-schedules]] — cron schedules are 2.14, and on 2.12 they come back as
   `message schedules pattern is invalid` — a version problem wearing a syntax problem's clothes.
@@ -795,8 +825,9 @@ see the Internals section above)*
 
 Operations: *(none — `rotate-tls-certificates` was written 2026-08-31; see the Operations section above)*
 
-Gotchas: [[consumer-keeps-redelivering]] *(`stream-leader-keeps-moving` was written 2026-09-01; see the
-Gotchas section above)*
+Gotchas: *(none — `consumer-keeps-redelivering` was written 2026-09-03 from issue #6921, Stack Overflow
+#78603662, three runs on 2.14.6 and the five redelivery summaries; `stream-leader-keeps-moving` was
+written 2026-09-01. See the Gotchas section above.)*
 
 `jetstream-out-of-disk` was written 2026-08-31 and is in the Gotchas section above.
 `kv-watcher-misses-updates` has been **retired rather than written**: the thread it was wanted for

@@ -1,5 +1,7 @@
 # Plan — the runnable scouts, and the last wanted page (proposed 2026-09-02)
 
+**Result (2026-09-03).** All six steps done: rows 4, 5, 9, 13, 76, 91, 105 filled — every one *answered*, none needed `no-public-answer` — and `consumer-keeps-redelivering` written from issue #6921, Stack Overflow #78603662, three runs on 2.14.6 and the redelivery summaries; `python3 tools/lint.py` reports **wanted: none**; backlog sections 1 and 2 struck. Over the plan: 286 → 310 pages, bank 101 → 108 of 137, docs issues 48 → 53, server issues 2 → 3, six observed runs recorded. **Next: phase C** — `tools/triage-discussions.py` and the public form of the posed rows.
+
 Say **`start the plan inbox/plan-the-runnable-scouts-2026-09-02.md`** to work this file — name it
 explicitly, a bare `start the plan` takes the newest `inbox/plan-*.md`. `CLAUDE.md` → *Operation:
 plan* says how: one step at a time, `status:` rewritten in place, `wiki/log.md` appended, lint run,
@@ -81,7 +83,7 @@ stated bound, a gotcha page if the threads give a symptom (`jetstream-recovery-i
 likely slug), and [[nats-server-2.14]] if a release changed recovery. Fill rows 4, 9, 13; row 5 is
 expected to be **`no-public-answer`** — the page that says so is the answer, not an invented number.
 
-## Step 5 — `consumer-keeps-redelivering` · status: open
+## Step 5 — `consumer-keeps-redelivering` · status: done 2026-09-03 — s-issue-6921-last-per-subject-acks, s-so-78603662-acked-but-redelivered (a new `raw/stackoverflow/` collection; row 14's own thread, read for the first time), s-relnotes-2.11.5, s-relnotes-2.11.2 (with the 2.10.16/2.10.17 lines), s-relnotes-2.14.1, s-nats-server-redelivery-observed (6 summaries; runs G/H/I on 2.14.6 in `redelivery-observed-v2.14.6.md` with five scripts). Gotcha **`consumer-keeps-redelivering`** written: five causes ranked, a version table; lint **wanted: none**. Rows 14–19 gain the page. Docs issue #4 extended (the unit of every duration field is hidden with the node; #78603662 is the cost); no new docs issue, no `SI-`. Found: `backoff: [10000]` is `Ack Wait: 10µs` and every acked message is then processed exactly `max_deliver` times once the handler takes 5 ms; a redelivery needs a pull waiting when the deadline passes; #6921's fix is #7005 in v2.11.5, unnamed on the issue, and its recipe delivers cleanly on 2.14.6.
 
 ```
 ingest https://github.com/nats-io/nats-server/issues/6921
@@ -98,7 +100,7 @@ causes ranked by how often they are the answer — each with *how to confirm* an
 *Gotchas*, and fill the bank rows the page answers (check rows 16–19 and any row whose question is
 the symptom). Lint must report **wanted: none**.
 
-## Step 6 — close the backlog sections, and the log · status: open
+## Step 6 — close the backlog sections, and the log · status: done 2026-09-03 — backlog sections 1 and 2 struck with the scout files and steps; result line below the title; log entry written. Bank 101 → 108 / 137, wanted 1 → 0, pages 286 → 310, docs issues 48 → 53, server issues 2 → 3, unlanded 0 → 0.
 
 Strike sections 1 and 2 of `inbox/scout-backlog.md` with the scout files that closed them; the
 plan's result line; `wiki/log.md`. Report the bank (rows filled, `no-public-answer` rows named),

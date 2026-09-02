@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.14, feature_flags, js_ack_fc_v2]
 aliases: ["2.14", v2.14, v2.14.0, v2.14.6]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-filestore-recovery]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-filestore-recovery, s-relnotes-2.14.1]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -216,6 +216,20 @@ sourcing stream makes at every start; that is 2.15 ([[nats-server-2.15-preview]]
 [[jetstream-recovery-is-slow]]; source: [[s-nats-server-filestore-recovery]]).
 
 
+## The patch releases, for consumers
+
+**2.14.1 (2026-05-20)** is where the consumer accounting of 2.14.0 was corrected: "A number of paths
+that could leave consumer redelivered in a drifted state have been fixed, e.g. with workqueue or
+interest-based streams with `max_deliver`, on single message removal or after purges/compactions
+(#8102)"; "Consumer file stores will now correctly flush when deleting a single redelivery, avoiding
+unexpected further redeliveries (#8168)"; "Pending state no longer leaks when reaching max deliveries
+(#8156)"; the delivery policy on clustered workqueue streams enforced (#8126); consumers with
+`inactive_threshold` no longer losing local state when the metalayer clean-up proposal fails (#8198).
+The same release adds the `/varz` client-only counters `in_client_msgs`, `in_client_bytes`,
+`out_client_msgs`, `out_client_bytes` (#7851) and computes num pending only on consumer leaders
+(#8172) (source: [[s-relnotes-2.14.1]]). Symptom page: [[consumer-keeps-redelivering]].
+
+
 ## Related
 
 [[nats-server-2.12]] · [[nats-server-2.15-preview]] · [[raft-in-nats]] · [[retention-policies]] ·
@@ -226,4 +240,4 @@ sourcing stream makes at every start; that is 2.15 ([[nats-server-2.15-preview]]
 
 [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
 [[s-nats-server-jetstream-resources]] ·
-[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-filestore-recovery]]
+[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-filestore-recovery]] · [[s-relnotes-2.14.1]]

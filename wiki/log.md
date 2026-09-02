@@ -3595,3 +3595,71 @@ than as a question: the attribution is what the code does, and 2.15 removes the 
 Found and not pursued: clean restarts made within seconds of a bulk write took 1.8–7 s where the
 same restart with the disk idle took milliseconds; the disk was at ~800 MB/s of write-back in the
 worst case. Recorded in the raw file as observed, cause not isolated.
+
+## 2026-09-03 — ingest: `consumer-keeps-redelivering`, the last wanted page (phase B, step 5)
+
+Step 5 of `inbox/plan-the-runnable-scouts-2026-09-02.md`. **Sources first**: issue #6921 through the
+GraphQL `repository.issue(number:)` query the other `raw/gh-issues/` files were made with, cached in
+`local/scratch/gh/` and rendered into `raw/gh-issues/issue-6921.md`; the Stack Overflow thread row 14
+was mined from (#78603662, never read until today) through the Stack Exchange API into a **new
+collection `raw/stackoverflow/`**; and four release bodies from the cache into `raw/release-notes/`
+(`v2.10.16`, `v2.10.17`, `v2.11.2`, `v2.11.5`) because the v2.11.5 notes name the fix the issue does
+not (#7005), and the release archive turned out to hold a family of "acked, then redelivered" fixes
+worth a table. **Runs** through `NATS_LAB_FLAGS=-DV bash tools/lab/cluster.sh up 1` on v2.14.6 / CLI
+0.4.0, recorded in `raw/nats-server-src/redelivery-observed-v2.14.6.md` with five scripts beside it:
+**G** — #6921's own recipe delivers once each with the floor following (the defect is gone at
+2.14.6); **I** — a redelivery loop as `tries:`, `consumer info`, the JSON counters and the `-DV`
+trace show it, with **zero** `INF`/`WRN`/`ERR` lines about it; **H** — the Stack Overflow shape:
+`backoff: [10000]` is stored as `ack_wait: 10000` and printed as `Ack Wait: 10µs`; acked on arrival
+the ack wins six pulls of seven on localhost and the seventh redelivered ten messages ninety times in
+six milliseconds; with 5 ms of work before the ack every message is delivered exactly `max_deliver`
+times — twice, the poster's report to the letter; and a redelivery needs a pull *waiting* when the
+deadline passes (batch 10 against ten messages: none). The mechanism read at the tag:
+`checkPending` `:6003–6110`, `hasMaxDeliveries` `:2372`, `processAckMsgLocked` `:3717–3731`, the
+ack queue `:2778–2779` / `:5182`.
+
+**Ingested** (6 summaries): `s-issue-6921-last-per-subject-acks`,
+`s-so-78603662-acked-but-redelivered`, `s-relnotes-2.11.5`, `s-relnotes-2.11.2` (with the 2.10.16 /
+2.10.17 lines), `s-relnotes-2.14.1`, `s-nats-server-redelivery-observed`.
+
+**Pages.** New gotcha **`consumer-keeps-redelivering`** — symptom from run I verbatim; *rule out
+first* (a stall is not a loop; not the duplicate window; not a leafnode replay); five causes ranked:
+the deadline shorter than the work including a `backoff` in the wrong unit, a batch the workers cannot
+drain in `ack_wait`, no ack on the success path or a lost ack, a nak loop with `max_deliver: -1`, and
+a **table of server versions** that redelivered acked messages (2.11.0–2.11.4 `last_per_subject`
+fixed 2.11.5; before 2.11.3 after a leader change; before 2.10.17 on rollouts; 2.14.0 drifted state).
+Ripples: `ack-and-redelivery` — *Acked, and redelivered anyway — the three ways* (the unit, the
+waiting pull, when it was the server); `consumer` — *The redelivery rides the next pull*, *The entries
+are nanoseconds on the API*, *The reply subject carries the delivery count*, *Version notes: when the
+consumer was not at fault*; `nats-server-2.11` and `nats-server-2.14` — *The patch releases, for
+consumers*; `nats-server-2.10` — *Redelivery of acked messages, fixed in 2.10.16 and 2.10.17*;
+`nats-net` — its first **What bites you** (the `Backoff` unit; #6921 filed first as nats.net #860);
+`dead-letter-queue` — a version note on `max_deliver` accounting before 2.14.1. `verified-on` bumped
+to today on `ack-and-redelivery` and `consumer` (their claims were re-run). Index: the gotcha entry,
+six summary lines, the *Wanted pages* line for gotchas struck.
+
+**Bank.** Rows 14, 15, 16, 17, 18, 19 gain `[[consumer-keeps-redelivering]]`; no new row (nothing
+surfaced that the bank lacks). 108 / 137, unchanged.
+
+**Docs issues**: none new; **#4** extended with *evidence of harm* — the collapsed consumer node
+also hides the **unit** of every duration field, and #78603662 is what that costs. **Server
+issues**: none — the runaway in run H is a race the source explains, on a deadline the config asked
+for. Found and stated as unknown: the poster's "without `MaxDeliver`, once" is not what 2.14.6 does
+(unlimited redelivers more); whether NATS.Net passed `10000` through unchanged is inferred from the
+match, not read from the client.
+
+Lint: 310 pages (303 → 310), **wanted: none** (the finish-line measure for this plan), missing from
+index none, citation drift 0, unlanded ripples 0 → 0, unverified 12 across 9 pages, staleness 0
+behind 2.14.6.
+
+## 2026-09-03 — plan closed: the runnable scouts (phase B, step 6)
+
+Backlog sections 1 and 2 of `inbox/scout-backlog.md` struck, naming the scout files and the plan
+steps that closed them; the result line written at the top of
+`inbox/plan-the-runnable-scouts-2026-09-02.md`. Over the plan (2026-09-02 → 2026-09-03): bank
+**101 → 108** of 137 (rows 4, 5, 9, 13, 76, 91, 105 — all *answered*, none needed
+`no-public-answer`, including row 5 the backlog expected to), wanted **1 → 0**, pages **286 → 310**
+(22 summaries, 3 gotchas — `consumer-slow-on-a-sparse-stream`, `jetstream-recovery-is-slow`,
+`consumer-keeps-redelivering`), docs issues **48 → 53** (#49–#53; #4 extended), server issues
+**2 → 3** (SI-3), unlanded ripples 0 → 0, citation drift 0 → 0. Six observed runs on 2.14.6 recorded
+in `raw/nats-server-src/` with their scripts. Phase B's *done when* holds; phase C is next.

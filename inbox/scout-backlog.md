@@ -12,9 +12,19 @@ here into three scouts.
 
 **Update this file** when a scout is run: strike the group and name the scout file.
 
+**Update 2026-09-03:** sections 1 and 2 struck (phase B of the maintainer's programme, plan
+`inbox/plan-the-runnable-scouts-2026-09-02.md`); the wiki's last wanted page, `consumer-keeps-redelivering`,
+written the same day. Bank 108 / 137, wanted 0, unlanded 0, drift 0.
+
 ---
 
-## 1 · Mirror and replication internals — rows 76, 91, 105
+## ~~1 · Mirror and replication internals — rows 76, 91, 105~~ — struck 2026-09-03
+
+**Closed** by `inbox/scout-mirrors-and-replication-2026-09-02.md` and steps 1–2 of
+`inbox/plan-the-runnable-scouts-2026-09-02.md`: rows 76, 91, 105 *answered* (91 with the mechanism and a
+run, unanswered upstream); runs A/B/C in `raw/nats-server-src/mirrors-observed-v2.14.6.md`; gotcha
+`consumer-slow-on-a-sparse-stream`; docs issues #49–#51. The expected second `SI-` did not materialise —
+with no mirror the hub sees nothing of the leaf's bucket, so row 105 is not SI-1 restated.
 
 | row | question | asked at |
 |---:|---|---|
@@ -44,7 +54,13 @@ summary:
 
 **Expect:** 2 rows closed, 1 possible `SI-` entry. Row 91 may need a run to say anything at all.
 
-## 2 · Stream scale ceilings and the filestore — rows 4, 5, 9, 13
+## ~~2 · Stream scale ceilings and the filestore — rows 4, 5, 9, 13~~ — struck 2026-09-03
+
+**Closed** by `inbox/scout-stream-scale-2026-09-02.md` and steps 3–4 of
+`inbox/plan-the-runnable-scouts-2026-09-02.md`: rows 4, 5, 9, 13 *answered* — row 5 by a maintainer's
+"no hard limit", not the `no-public-answer` expected here; runs D/E/F in
+`raw/nats-server-src/stream-scale-observed-v2.14.6.md`; gotcha `jetstream-recovery-is-slow`; docs issues
+#52–#53; `SI-3` (a `*` inside a token), found on the way.
 
 | row | question | asked at |
 |---:|---|---|

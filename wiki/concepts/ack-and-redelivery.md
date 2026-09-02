@@ -3,12 +3,12 @@ title: Ack and redelivery
 type: concept
 area: [jetstream]
 verified-against: nats-server 2.14.6
-verified-on: 2026-09-01
+verified-on: 2026-09-03
 tags: [ack, nak, term, ack_wait, max_deliver, max_ack_pending, backoff, advisories]
 aliases: [acknowledgement, acknowledgment, ack, nak, term, at-least-once, AckWait, MaxDeliver]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-6628-ackwait-vs-dupe-window, s-nats-server-nak-backoff-observed, s-synadia-reliable-delivery-dlq, s-gh-5631-nak-not-immediate, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-6628-ackwait-vs-dupe-window, s-nats-server-nak-backoff-observed, s-synadia-reliable-delivery-dlq, s-gh-5631-nak-not-immediate, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.2, s-relnotes-2.14.1]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Ack and redelivery
@@ -314,6 +314,46 @@ Ranked by how often they are the answer.
    *"message was already acknowledged"*; other clients ignore or resend it, and the server ignores
    the duplicate either way. Ack each delivery exactly once, in one place in the handler.
 
+## Acked, and redelivered anyway — the three ways
+
+The symptom page is [[consumer-keeps-redelivering]]; the mechanisms belong here.
+
+### The `backoff`'s unit is nanoseconds, and its first entry is the deadline
+
+On the JetStream API a duration is a signed 64-bit count of nanoseconds. A client whose `backoff`
+field takes plain integers hands them over unchanged, so `backoff: [10000]` is stored as
+`ack_wait: 10000` — **ten microseconds** — and `nats consumer info` prints `Ack Wait: 10µs` (source:
+[[s-nats-server-redelivery-observed]], run H.1). That is the Stack Overflow question this wiki's row
+14 was mined from: `MaxDeliver = 2`, `Backoff = [10000]`, every message processed twice despite
+`AckAsync`, more times with a higher `MaxDeliver` (source: [[s-so-78603662-acked-but-redelivered]]).
+Measured on 2.14.6 with the same numbers and a handler that takes 5 ms before acking: exactly twice
+with `max_deliver: 2`, ten times each with it unlimited until the pull's batch ran out, once with
+`ack_wait: 30s`. Acked on arrival on localhost the ack usually wins the race (six pulls of seven); the
+seventh redelivered the same ten messages ninety times in six milliseconds. **The ack's arrival is
+what stops a redelivery; the timer does not wait for it.**
+
+### A redelivery needs a pull waiting when the deadline passes
+
+An expired message goes on the consumer's redelivery queue; it is *sent* when a pull is there to take
+it. A consume loop's standing pull is why the tail of an over-sized batch comes straight back; a pull
+sized exactly to the messages, acked one by one, saw no redelivery at all at the same 10 µs deadline —
+the acks cleared the queue before the next pull arrived (source:
+[[s-nats-server-redelivery-observed]], run H.3). An explicit ack clears the pending entry whichever
+delivery it names (`processAckMsgLocked`, `consumer.go:3717–3731` at 2.14.6), so the second ack of a
+doubled message is a no-op and the floor ends correct.
+
+### When it was the server
+
+Redelivery of acknowledged messages has been a server defect several times, each with a shape and a
+fix release: a `last_per_subject` consumer with explicit acks on a stream with `max_msgs_per_subject`
+above 1 on 2.11.0–2.11.4, fixed in 2.11.5 (source: [[s-issue-6921-last-per-subject-acks]]);
+replicated consumers after a leader change, fixed in 2.11.2 — withdrawn, so 2.11.3 — at a stated
+throughput cost that R1, `ack_policy: none` and ordered consumers do not pay, and restarts and
+rollouts on 2.10 before 2.10.16 / 2.10.17 (source: [[s-relnotes-2.11.2]]); drifted redelivered state
+on workqueue and interest streams with `max_deliver` on 2.14.0, fixed in 2.14.1 (source:
+[[s-relnotes-2.14.1]]). The table with the release lines is on [[consumer-keeps-redelivering]].
+
+
 ## What you can observe
 
 Three advisories make the loop visible (source: [[s-docs-acknowledgment]]):
@@ -433,4 +473,4 @@ create-time-only rule a consumer's `ack_wait` follows.
 [[s-docs-consumer-config]] · [[s-docs-policies]] · [[s-nats-server-constants-2.14.6]] ·
 [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-monitoring-advisories-and-events]] ·
-[[s-docs-worker-pool]] · [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-nats-server-nak-backoff-observed]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-5631-nak-not-immediate]] · [[s-docs-acknowledgment]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]]
+[[s-docs-worker-pool]] · [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-nats-server-nak-backoff-observed]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-5631-nak-not-immediate]] · [[s-docs-acknowledgment]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]]

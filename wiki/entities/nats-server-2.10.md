@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.10, compression, kv-sources, kv-mirrors]
 aliases: ["2.10", v2.10, v2.10.0, v2.10.29]
-sources: [s-adr-8-key-value-store, s-adr-20-object-store, s-gh-4535-unauthenticated-connections, s-gh-5202-max-unique-subjects]
+sources: [s-adr-8-key-value-store, s-adr-20-object-store, s-gh-4535-unauthenticated-connections, s-gh-5202-max-unique-subjects, s-relnotes-2.11.2]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -52,6 +52,19 @@ Dates and tags from `raw/release-notes/_tags-and-dates.md` (GitHub releases API,
   v2.10.2 has this hole**; the narrower trap that survives it — `no_auth_user`, and `$G` staying alive
   when you name only the system account — is on [[account]].
 
+## Redelivery of acked messages, fixed in 2.10.16 and 2.10.17
+
+Two consecutive releases fixed the same complaint from the restart side: "Fix potential redelivery of
+acked messages during server restarts (#5419)" in **2.10.16** (2024-05-21), then "Fix possible
+redelivery after successful ack during rollout restarts (#5482)", "Follower stores no longer inherit
+the redelivered consumer delivered sequence which could break ack gap fill (#5533)" and "Ensure ack
+processing is consistent and correct between leader and followers for replicated consumers (#5524)"
+in **2.10.17** (2024-06-27). 2.10.16 also carries a warning of its own — a possible startup panic on
+zero-byte `tav.idx` files, with the work-around of deleting them (source: [[s-relnotes-2.11.2]]). A
+2.10 cluster that redelivers acked messages around rolling restarts wants 2.10.17 or later; the
+symptom page is [[consumer-keeps-redelivering]].
+
+
 ## Why the version still matters
 
 It is the floor for **`compression: "s2"`** on KV and Object Store buckets, and for KV sources and
@@ -81,4 +94,4 @@ stream hold" — no configured maximum; RAM for the tree is the bound (source:
 
 ## Sources
 
-[[s-adr-8-key-value-store]] · [[s-adr-20-object-store]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5202-max-unique-subjects]]
+[[s-adr-8-key-value-store]] · [[s-adr-20-object-store]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5202-max-unique-subjects]] · [[s-relnotes-2.11.2]]

@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [dead-letter, dlq, max_deliver, advisories, term, replay, direct-get]
 aliases: [DLQ, dead letter, dead-lettering, poison message queue]
-sources: [s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-synadia-reliable-delivery-dlq, s-nats-server-nak-backoff-observed, s-docs-monitoring-advisories-and-events]
+sources: [s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-synadia-reliable-delivery-dlq, s-nats-server-nak-backoff-observed, s-docs-monitoring-advisories-and-events, s-relnotes-2.14.1]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Dead-letter queue
@@ -151,6 +151,16 @@ Ranked by how often they are the answer.
 7. **`allow_direct` must be on the source stream** for step 2, or the handler falls back to creating a
    consumer per fetch ([[direct-get]]).
 
+### A version note: `max_deliver` accounting before 2.14.1
+
+The pattern rests on the server's own count of deliveries. **2.14.1** (2026-05-20) fixed "a number of
+paths that could leave consumer redelivered in a drifted state … with workqueue or interest-based
+streams with `max_deliver`, on single message removal or after purges/compactions (#8102)" and
+"Pending state no longer leaks when reaching max deliveries (#8156)" (source: [[s-relnotes-2.14.1]]).
+On 2.14.0 the advisory and the drop happened as designed; the consumer's pending and redelivered
+numbers could disagree with them. The measured behaviour on this page is from 2.14.6.
+
+
 ## When *not* to use it
 
 - **When term is the whole answer.** If the handler can recognise a poison message, terming it and
@@ -184,4 +194,4 @@ message must appear on `dlq.<stream>.<consumer>` with its original body.
 
 [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] ·
 [[s-synadia-reliable-delivery-dlq]] · [[s-nats-server-nak-backoff-observed]] ·
-[[s-docs-monitoring-advisories-and-events]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-relnotes-2.14.1]]

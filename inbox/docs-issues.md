@@ -201,6 +201,16 @@ The values, for reference, from `server/consumer.go` at v2.14.6:
 | `inactive_threshold` (ephemeral) | `5s` | 576 |
 | `PriorityTimeout` | `2m` | 582 |
 
+**Evidence of harm, added 2026-09-03.** Because the node is collapsed, the reference also never says
+the **unit** of `ack_wait`, `backoff`, `inactive_threshold` or any other duration field on the
+consumer create request — the sibling response-field notes ("nanoseconds depicting a duration in
+time, signed 64 bit integer", e.g. `pause_remaining` on the same page, `expires` on `get-next.md`)
+are the only place the word appears. Stack Overflow #78603662 (2024-06-10, .NET, unanswered) is what
+that costs: `Backoff = [10000]` sent as a raw number is ten microseconds, the first entry becomes
+`ack_wait`, and every acked message is processed `MaxDeliver` times. Verified on 2.14.6: the server
+stores `ack_wait: 10000` and the CLI prints `Ack Wait: 10µs` (`raw/nats-server-src/redelivery-observed-v2.14.6.md`,
+run H). Suggested addition to the fix: expand the node **with units** on every duration field.
+
 **Suggested fix:** expand the `config` node the way `stream/create.md` does.
 
 ---
@@ -2609,7 +2619,7 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | # | wiki page |
 |---|---|
 | 1–3 | `wiki/reference/advisories.md` — *A docs error worth knowing* |
-| 4 | `wiki/summaries/s-docs-consumer-config.md`, `wiki/reference/defaults-and-limits.md` |
+| 4 | `wiki/summaries/s-docs-consumer-config.md`, `wiki/reference/defaults-and-limits.md`; the unit: `wiki/gotchas/consumer-keeps-redelivering.md` — cause 1, `wiki/summaries/s-so-78603662-acked-but-redelivered.md` |
 | 5 | `wiki/concepts/stream.md` — *The deduplication window*; `wiki/concepts/publishing.md` — *Exactly-once, honestly* |
 | 6 | `wiki/reference/defaults-and-limits.md` — *The 8 MB question* |
 | 7 | `wiki/concepts/priority-groups.md`, `wiki/entities/nats-server-2.11.md` |

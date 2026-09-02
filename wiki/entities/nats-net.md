@@ -7,9 +7,9 @@ verified-against: NATS .NET v3.2.0
 verified-on: 2026-08-31
 tags: [client, tier-1, dotnet, csharp, opentelemetry, net10, net6-dropped]
 aliases: [nats.net, "nats-io/nats.net", ".net client", "c# client", NATS.Net]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # nats.net
@@ -50,10 +50,31 @@ dotnet add package NATS.Net
 - **`netstandard2.0` is still a target**, so .NET Framework consumers are not cut off by the v3 jump
   the way `net6.0` apps are.
 
+## What bites you
+
+Two public reports, both from .NET, both looking like the client until they were not:
+
+- **A `Backoff` typed as numbers is in nanoseconds on the wire.** A `ConsumerConfig` with
+  `MaxDeliver = 2` and `Backoff = new List<long> { 10000 }` produced messages "processed twice despite
+  calling `msg.AckAsync()`", more times with a higher `MaxDeliver`, and the one Stack Overflow answer
+  (add a durable name) never touched the cause: the server stores the first backoff entry as
+  `ack_wait`, and `10000` is ten microseconds — `Ack Wait: 10µs` in `nats consumer info`. Reproduced
+  on 2.14.6 with the same numbers: exactly twice with 5 ms of work before the ack (source:
+  [[s-so-78603662-acked-but-redelivered]], [[s-nats-server-redelivery-observed]]). Whether the
+  client's model passed the number through unchanged at the poster's version is inferred from the
+  match, not read from the client's source.
+- **Issue #6921 was filed first as nats.net #860** — a `last_per_subject` consumer with explicit acks
+  whose floor froze on a stream with `max_msgs_per_subject: 5`. It reproduced in Rust, and in Go once
+  the Go code set the same `MaxAckPending`; it was a server defect in 2.11.0–2.11.4, fixed in 2.11.5
+  (source: [[s-issue-6921-last-per-subject-acks]]).
+
+The symptom page is [[consumer-keeps-redelivering]].
+
+
 ## Related
 
 [[orbit]] · [[nats-go]] · [[monitoring-endpoints]] · [[nats-server]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]]

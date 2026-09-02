@@ -3,12 +3,12 @@ title: Consumer
 type: concept
 area: [jetstream]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-03
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Consumer
@@ -282,6 +282,15 @@ per-message client call that no `nats consumer` command can set (source:
 [[s-gh-6350-exponential-backoff]]). The distinction and its consequences are on
 [[ack-and-redelivery]].
 
+### The redelivery rides the next pull
+
+An expired message is redelivered when a pull is waiting at the moment its deadline passes. A consume
+loop keeps one open, so the tail of an over-sized batch comes back the instant it expires; a fetch
+sized exactly to the messages and acked one by one saw no redelivery at a 10 µs deadline — the acks
+cleared the queue before the next pull arrived (source: [[s-nats-server-redelivery-observed]], run
+H.3). The symptom page is [[consumer-keeps-redelivering]].
+
+
 ## A `backoff` silently rewrites `ack_wait`
 
 Two consumer settings that look independent are not: **if a consumer has a `backoff`, its first entry
@@ -311,6 +320,15 @@ from the client — read the delivery counts here instead.
 start time, with `replay_policy: original` rather than `instant`, reproduces the intervals at which
 the messages first arrived — the source calls it "useful for realistic load reproduction"
 (source: [[s-synadia-reliable-delivery-dlq]]).
+
+### The entries are nanoseconds on the API
+
+`backoff` values reach the server as signed 64-bit nanosecond counts, whatever the client's type. A
+client whose `Backoff` takes plain integers sends `[10000]` as ten microseconds: stored as
+`ack_wait: 10000`, printed by the CLI as `Ack Wait: 10µs`, and every message is then processed
+`max_deliver` times however promptly it is acked (source: [[s-nats-server-redelivery-observed]]; the
+public case is [[s-so-78603662-acked-but-redelivered]]).
+
 
 ## `consumer info` is a debugging tool, not a control-loop primitive
 
@@ -367,6 +385,16 @@ This matters for two designs in particular:
 
 The CLI renders the same three numbers as `Last Delivered`, `Acknowledgment Floor` and
 `Outstanding Acks` (source: [[s-docs-delivery-and-acknowledgment]]).
+
+### The reply subject carries the delivery count
+
+Every delivered message's reply subject is
+`$JS.ACK.<stream>.<consumer>.<delivered>.<stream seq>.<consumer seq>.<timestamp>.<pending>`. The
+CLI's `tries:` is the `<delivered>` token, and at `-DV` the server's trace shows the whole subject on
+each `->> [MSG …]` line — delivery 2 of stream sequence 1, as consumer sequence 4, reads
+`$JS.ACK.LOOP.worker.2.1.4.…`. Nothing at the default log level records a redelivery (source:
+[[s-nats-server-redelivery-observed]]).
+
 
 ### Two sequences, and why they drift
 
@@ -445,6 +473,24 @@ Which number moved tells you which problem you have: rising `num_ack_pending` is
 rising `num_pending` is **not enough handlers**. [[stream-has-high-message-lag]] has the diagnostic
 that separates them from a crashed pool.
 
+## Version notes: when the consumer was not at fault
+
+- **2.11.0–2.11.4**: a `last_per_subject` consumer with explicit acks on a stream whose per-subject
+  limit leaves interior deletes (`max_msgs_per_subject` above 1) stops registering acks — the floor
+  freezes, `Outstanding Acks` sits at the cap, redeliveries follow. Fixed in **2.11.5** (#7005);
+  `deliver_policy: all` or `ack_policy: none` clears it meanwhile (source:
+  [[s-issue-6921-last-per-subject-acks]], [[s-relnotes-2.11.5]]). Not reproducible on 2.14.6.
+- **Before 2.11.3**, replicated consumers: acknowledged messages redelivered after a consumer leader
+  change. The 2.11.2 fix waits for delivered state to reach quorum before delivering more, at a
+  throughput cost that R1, `ack_policy: none` and ordered consumers do not pay — and 2.11.2 itself is
+  withdrawn for a regression (source: [[s-relnotes-2.11.2]]).
+- **2.10.16 / 2.10.17**: redelivery of acked messages during server restarts and rolling restarts
+  fixed (#5419, #5482), and followers no longer inherit a redelivered sequence that "could break ack
+  gap fill" (#5533) (source: [[s-relnotes-2.11.2]]).
+
+The symptom page for all three is [[consumer-keeps-redelivering]].
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
@@ -466,4 +512,4 @@ that separates them from a crashed pool.
 [[s-gh-4972-nak-with-delay-blocks]]
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]]
