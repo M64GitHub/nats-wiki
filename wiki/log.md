@@ -3408,3 +3408,16 @@ copied outside the repository and run with its own `NATS_LAB_DIR` gave a healthy
 one command. `inbox/plan-the-lab-2026-09-02.md` carries its result line. Lint: 286 pages, wanted 1,
 unverified 12 across 9 pages, drift 0, unlanded 0, staleness 0 behind 2.14.6. Bank unchanged at 137
 rows / 101 answered — this plan built a tool, not a page.
+
+## 2026-09-02 — scout: mirror and replication internals (plan: the runnable scouts, step 1)
+
+Phase B opened: `inbox/plan-the-runnable-scouts-2026-09-02.md` written from the megaplan's phase B
+(six steps: scout 1 → runs and ingest → scout 2 → run and ingest → `consumer-keeps-redelivering` →
+close the backlog sections). Step 1: `inbox/scout-mirrors-and-replication-2026-09-02.md` for rows 76,
+91, 105 — gh#8417, gh#8444 and issue #5106 fetched through the GraphQL API and read; `stream.go` and
+`filestore.go` at v2.14.6 read for the mirror consumer, `skipMsgs`, `SkipMsgs` and the linear-scan
+heuristic (line numbers in the scout); the v2.14.1–v2.14.6 release bodies grepped (the interior-delete
+work is v2.14.4, #8403/#8405/#8406); the client follow-ups (nats.go #1874 open, #1648 open, nats.js
+#155 closed) and the CLI's flags (`nats kv add --mirror --mirror-domain` exists, `nats object add
+--mirror` does not) checked; two Synadia posts skimmed and placed. Twelve candidates, three runs
+named, six summaries proposed. Nothing ingested; the user picks. Lint unchanged.
