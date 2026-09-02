@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [objectstore, chunks, digest, OBJ_, Nats-Rollup, soft-delete, links, chunk-size]
 aliases: [object store, OBJ_, "$O.", object bucket, OBJ_ stream]
-sources: [s-adr-20-object-store, s-docs-stream-config, s-docs-kv-ttl-and-limits, s-docs-object-store-under-the-hood, s-docs-object-store-chunking, s-docs-object-store-your-first-object, s-docs-object-store-metadata-and-links, s-docs-object-store-watching-and-listing, s-nats-server-object-store-observed, s-gh-6836-object-store-list-slow, s-nats-server-object-store-leafnode, s-nats-server-leafnode-js-domains]
+sources: [s-adr-20-object-store, s-docs-stream-config, s-docs-kv-ttl-and-limits, s-docs-object-store-under-the-hood, s-docs-object-store-chunking, s-docs-object-store-your-first-object, s-docs-object-store-metadata-and-links, s-docs-object-store-watching-and-listing, s-nats-server-object-store-observed, s-gh-6836-object-store-list-slow, s-nats-server-object-store-leafnode, s-nats-server-leafnode-js-domains, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 ---
 
 # Object Store
@@ -290,6 +290,64 @@ Whether this is a defect or an intended asymmetry is not established — no publ
 `$OBJ` against `$O.` at all, which is the documentation gap recorded as issue **#35** in
 `inbox/docs-issues.md`.
 
+## Mirroring a bucket
+
+A bucket is a stream, so it can be mirrored — into another cluster, or across a [[jetstream-domain]]
+through a leafnode, which is what people do with it: objects written at the edge, kept longer at the
+hub. Nothing builds it for you. `nats object add` has no `--mirror` (where `nats kv add` has
+`--mirror` and `--mirror-domain`), no client's `ObjectStoreConfig` has a `Mirror` field — nats.go
+#1874 asking for one has been open since 2025-05-15 — and the docs never mention it (docs issue
+#50). The recipe, from the one public thread that has it, re-run on 2.14.6 (sources:
+[[s-issue-5106-object-store-mirror-list]], [[s-nats-server-mirrors-observed]]):
+
+```json
+{"name": "OBJ_dms_mirror", "storage": "file", "retention": "limits", "discard": "new",
+ "allow_direct": true, "allow_rollup_hdrs": true, "num_replicas": 1,
+ "max_msgs": -1, "max_bytes": -1, "max_age": 0, "max_msgs_per_subject": -1, "max_msg_size": -1,
+ "mirror": {"name": "OBJ_dms", "external": {"api": "$JS.leaf.API"},
+            "subject_transforms": [{"src": "$O.dms.>", "dest": "$O.dms_mirror.>"}]}}
+```
+
+```
+nats stream add OBJ_dms_mirror --config mirror.json     # on the hub, domain hub; the bucket lives in domain leaf
+nats object ls dms_mirror
+```
+
+**The transform is not optional.** A client opens bucket `X` by binding the stream `OBJ_X` and then
+reads `$O.X.M.>` and `$O.X.C.>` — derived from the bucket name, not from the stream's contents
+(nats.go `jetstream/object.go:598–606`, source: [[s-nats-go-kv-object-mirror]]). Without the
+transform the mirror holds `$O.dms.…`, and on 2.14.6 with CLI 0.4.0 the result is not an error but
+an empty bucket: `nats object ls` lists `dms_mirror` with its 2.4 MiB, `nats object ls dms_mirror`
+prints `No entries found`, `nats object get` says `object not found`. In 2024 the same setup failed
+earlier, with `nats: error: nats: no stream matches subject`, because the client looked the stream
+up **by subject** and a mirror answers no subject lookup; nats.go #1568 (2024-02-26) changed it to
+bind by name. With the transform, list, info and a byte-identical get all work, and an object put on
+the leaf appears at the hub within seconds.
+
+What the mirror is, and is not:
+
+- **Read-only.** A put against `dms_mirror` on the hub gets `nats: error: nats: no response from
+  stream` — the mirror captures no subject.
+- **Its own retention, so deletes do not propagate.** "Deletes of objects will not propagete to
+  mirrors, as mirrors/sources have different limits than the original stream, by design" (a client
+  maintainer, nats.go #1874). Whether the soft-delete marker replicates and hides the object on the
+  mirror side was not tested here.
+- **Not general-purpose yet, in the maintainers' words.** "When we rethink and rework Object Store
+  … that should be safe for general purpose" (2025-05-28); nats.js closed its request with "Clients
+  don't have a strategy for supporting this right now" (2025-07-02).
+- **Do not dodge the transform by reusing the stream name on both sides** of the domain boundary. It
+  appears to work; a server maintainer's answer to exactly that was "Same stream in multiple domains
+  has numerous bugs and issues. You absolutely should not do that … Certain kinds of consumers
+  break and can potentially double ack between streams" — and the SI-1 finding above is another
+  reason.
+- With **no mirror at all** the hub sees nothing of the leaf's bucket (`No Object Store buckets
+  found`, `bucket not found`) — the convergence in *A bucket is not isolated by a JetStream domain*
+  needs a same-named bucket on both sides; a mirror is a separate, deliberate thing.
+
+The cross-domain plumbing (`external.api`, what the server checks, the export/import pair when the
+accounts differ too) is [[cross-domain-sourcing]]; how a mirror keeps up is [[mirrors-and-sources]].
+
+
 ## What the spec says does not exist
 
 The ADR lists these as *possible future features*, i.e. **not implemented**: event notifications,
@@ -352,4 +410,4 @@ in place".
 [[s-docs-object-store-your-first-object]] · [[s-docs-object-store-metadata-and-links]] ·
 [[s-docs-object-store-watching-and-listing]] · [[s-nats-server-object-store-observed]] ·
 [[s-gh-6836-object-store-list-slow]] ·
-[[s-nats-server-object-store-leafnode]] · [[s-nats-server-leafnode-js-domains]]
+[[s-nats-server-object-store-leafnode]] · [[s-nats-server-leafnode-js-domains]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]]

@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Mirrors and sources
@@ -197,6 +197,50 @@ The WorkQueue overlap rule still applies to the durable consumer: it blocks any 
 an overlapping filter, so a WorkQueue stream that is both worked and mirrored wants to be an Interest
 or Limits stream instead.
 
+## How a mirror catches up
+
+What "an internal consumer" actually is, from `server/stream.go` at 2.14.6 (source:
+[[s-nats-server-mirror]]) and a run that watched it (source: [[s-nats-server-mirrors-observed]]):
+
+- **The consumer.** The mirror asks its upstream for a consumer named **`JS_MIRROR_<id>`** (a
+  sourcing stream: `JS_SRC_<id>`): `deliver_policy` by start sequence from the mirror's own
+  `LastSeq + 1`, **no filter** unless the mirror has one, `ack_policy: none`, `ack_wait` 22 h,
+  `max_deliver` 1, a **1 s** idle heartbeat, flow control, `direct: true`, `sourcing: true`,
+  `inactive_threshold` **10 s**, and metadata `_nats.mirror.stream` / `_nats.mirror.acc` (and
+  `.domain` when the server has one). `nats consumer ls` on the upstream does not list it and
+  `consumer_count` stays 0; only `/jsz?…&direct-consumers=true` shows it. The name is stable per
+  mirror. If the upstream is too old to know `sourcing`, the request is retried without it under
+  `JS_MIRROR_<id>_<random>`.
+- **The loop.** `processMirrorMsgs` drains what the consumer delivers. A heartbeat carries
+  `Nats-Last-Consumer`; when that does not match what the mirror has seen, the consumer is
+  re-created. Every **10 s** the loop also checks whether anything arrived at all; if not, the
+  mirror is *stalled* and re-creates the consumer (`Retrying mirror consumer for '<acc> > <stream>'`,
+  at debug level). Re-creation is throttled to one per **2 s** and, after repeated failures, backs
+  off by 10 s per failure up to **2 min**.
+- **The holes.** The consumer delivers only live messages. When the upstream's sequence jumps but the
+  consumer's delivery sequence does not, "the upstream stream has expired or deleted messages", and
+  the mirror writes the gap itself with `skipMsgs` before storing the message — that is how it keeps
+  the upstream's sequence numbers. On an R1 mirror it is one `SkipMsgs` store call per gap; on a
+  **replicated** mirror it is **one Raft entry per skipped sequence**, proposed in batches of
+  10,000 — or one `DeleteRange` entry when `feature_flags { js_raft_delete_range }` is on, which
+  needs every peer to understand it. Measured: the mirror of a 400,000-key bucket whose sequence
+  space was 83 % holes received exactly 400,000 deliveries (`delivered.consumer_seq`) against a
+  `stream_seq` of 3,140,054.
+- **How fast, on one host.** 400,000 live messages over 2.4 M sequences reached `Lag` 0 in
+  **1.24 s** on file storage and **0.74 s** on memory; 1 M over 4 M in 2.6 s and 1.1 s. The public
+  report of a file mirror syncing at ~2,000 msg/s over a leafnode (source:
+  [[s-gh-8417-kv-mirror-file-vs-memory]]) was never explained upstream and did not reproduce.
+- **Readers slow it down.** Three consumers scanning the mirror during its catch-up made the same
+  catch-up **3.4–3.9×** slower on file storage and **3.1–3.4×** on memory. The public report saw
+  2.89× with one reader and has **no maintainer answer** as of 2026-09-02 (source:
+  [[s-gh-8444-mirror-catchup-under-a-reader]]). Bring readers up when `Lag` reaches 0; the whole
+  symptom is [[consumer-slow-on-a-sparse-stream]].
+- **Since when.** The `JS_MIRROR_` names, `sourcing: true` and the durable variant are 2.14
+  ([[s-adr-60-reliable-sourcing]]); v2.14.1 made a last-sequence mismatch retry immediately
+  (#8152), and v2.14.4 made the delete-map work a sparse catch-up does cheaper (#8403, #8406)
+  (source: [[s-relnotes-2.14.4]]).
+
+
 ## Reading the replication state when `Lag` is not enough
 
 Three things ADR-59 documents that no CLI output shows (source: [[s-adr-59-sourcing-and-mirroring]]):
@@ -214,9 +258,12 @@ rather than a human. See [[error-codes]].
 curl -s 'http://127.0.0.1:8222/jsz?streams=true&consumers=true&direct-consumers=true&config=true&acc=APP'
 ```
 
-`direct_consumer_detail` then carries full `ConsumerInfo` for each `mirror-<id>` / `src-<id>`
+`direct_consumer_detail` then carries full `ConsumerInfo` for each **`JS_MIRROR_<id>`** / **`JS_SRC_<id>`**
 consumer, whose delivered and ack-floor positions can be compared against the upstream's state — the
-detail behind `lag`, `active` and `error`.
+detail behind `lag`, `active` and `error`. (Through 2.12 the names were a random `mirror-<id>` /
+`src-<id>`, and only when a filter was set; ADR-59 still says so, which is docs issue #49 in
+`inbox/docs-issues.md` — the 2.14 server names them as above, always, `stream.go:3561` and `4019`
+at 2.14.6, source: [[s-nats-server-mirror]].)
 
 **Where a message came from.** Every sourced message carries
 `Nats-Stream-Source: <stream> <sequence> <filter> <dest> <original-subject>`, with `>` meaning
@@ -300,6 +347,24 @@ turning up as the answer to problems that sound like something else:
   [[streams-deleted-when-clustering-a-standalone-server]]).
 
 
+## A mirror of a bucket answers to the origin's subjects
+
+A mirror stores the upstream's subjects unchanged unless it carries a transform. For a plain stream
+that is the point; for a **bucket** it decides which name a client can read (sources:
+[[s-nats-go-kv-object-mirror]], [[s-nats-server-mirrors-observed]]):
+
+- A KV mirror built with `nats kv add M --mirror B` in the **same** domain holds `$KV.B.>`, and the
+  client reads bucket `M` at `$KV.M.>` — `nats kv ls M` prints `No keys found in bucket` while
+  `nats kv info M` shows every value. Read the **origin's** name instead (`mirror_direct` routes the
+  read to the nearest mirror, see above), or build the mirror as a stream with the transform
+  `$KV.B.>` → `$KV.M.>`. A **cross-domain** KV mirror (`--mirror-domain`) *is* readable by its own
+  name, because for a mirror with an `external` block the client rewrites its read prefix to the
+  origin's. Details on [[key-value]].
+- An **object-store** mirror always needs `$O.B.>` → `$O.M.>`, no client or CLI adds it, and without
+  it the bucket lists as empty (source: [[s-issue-5106-object-store-mirror-list]]). Details on
+  [[object-store]].
+
+
 ## Transforming subjects while copying
 
 Each `sources` entry, and a `mirror`, can carry its own **subject transform**, so messages can be
@@ -335,6 +400,12 @@ is why deduplication behaves differently on a copy than on the original ([[strea
 
 The promotion procedure that turns a mirror into a writable primary is [[disaster-recovery]];
 what a snapshot protects that a mirror cannot is [[backup-and-restore-jetstream]].
+
+Further reading, not ingested: Synadia's *Mirror Streams in NATS JetStream: One-Way Replication Made
+Simple* (2026-02-18, https://www.synadia.com/blog/mirror-streams-jetstream — written for 2.12, before
+ADR-60 lifted the WorkQueue and Interest restrictions) and *Mirror, Merge, or Consume* (2026-05-18,
+https://www.synadia.com/blog/nats-edge-event-architecture-8-mirror-merge-or-consume — the edge-to-core
+pattern choice, for the topology pattern pages).
 
 
 [[stream]] · [[replicas]] · [[direct-get]] · [[error-codes]] · [[key-value]] · [[message-ttl]] ·
@@ -373,15 +444,10 @@ per-message delay at all**" (source: [[s-synadia-delayed-scheduling]]). NATS's a
 stream **cannot** have while it mirrors or sources another.
 
 
-## To verify
-
-- Whether a **KV mirror on file storage** is materially slower than on memory storage
-  (question-bank Q76) is not addressed by any source read here.
-
 ## Sources
 
 [[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] · [[s-adr-31-direct-get]] · [[s-natscli-stream-external]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-60-reliable-sourcing]] · [[s-docs-subject-mapping]] ·
 [[s-adr-57-kv-subject-transforms]] · [[s-docs-disaster-recovery]] · [[s-docs-get-direct]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-5606-cross-account-jetstream]] ·
 [[s-gh-6328-jetstream-behind-gateways]] · [[s-gh-7017-kv-across-accounts]] ·
-[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]]
+[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]]

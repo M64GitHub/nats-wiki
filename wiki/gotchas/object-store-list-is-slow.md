@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [objectstore, list, watch, last_per_subject, ephemeral-consumers, timeout, measured]
 aliases: ["nats obj ls slow", "object store list timeout", "object listing times out", "nats object ls slow during upload"]
-sources: [s-gh-6836-object-store-list-slow, s-nats-server-object-store-observed, s-docs-object-store-watching-and-listing, s-docs-object-store-under-the-hood, s-docs-object-store-chunking]
+sources: [s-gh-6836-object-store-list-slow, s-nats-server-object-store-observed, s-docs-object-store-watching-and-listing, s-docs-object-store-under-the-hood, s-docs-object-store-chunking, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 ---
 
 # Listing an object-store bucket is slow while uploads run
@@ -133,6 +133,16 @@ itself running long.
 **How to confirm**: raise `--timeout` and see whether the same call succeeds slowly. If it does, you
 are queueing behind the JetStream API, not waiting on data.
 
+## If the bucket is a mirror: empty, not slow
+
+A different failure that arrives at the same command. `nats object ls <bucket>` on a bucket that is a
+**mirror** of another bucket prints `No entries found` at once (and in 2024 failed with `nats: error:
+nats: no stream matches subject`) unless the mirror carries the transform `$O.<origin>.>` →
+`$O.<mirror>.>` — the client reads the metadata subjects derived from the mirror's own name. Not a
+timing problem, and not this page: see *Mirroring a bucket* on [[object-store]] (sources:
+[[s-issue-5106-object-store-mirror-list]], [[s-nats-server-mirrors-observed]]).
+
+
 ## Prevention
 
 - **Replace polling with a watch.** One consumer, no per-poll churn, metadata only.
@@ -158,4 +168,4 @@ are queueing behind the JetStream API, not waiting on data.
 
 [[s-gh-6836-object-store-list-slow]] · [[s-nats-server-object-store-observed]] ·
 [[s-docs-object-store-watching-and-listing]] · [[s-docs-object-store-under-the-hood]] ·
-[[s-docs-object-store-chunking]]
+[[s-docs-object-store-chunking]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]]

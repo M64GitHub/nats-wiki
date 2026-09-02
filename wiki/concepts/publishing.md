@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [PubAck, Nats-Msg-Id, duplicate, duplicate_window, async-publish, atomic-batch, fast-ingest, AllowAtomicPublish, AllowBatchPublish, Nats-Batch-Id, Nats-Expected-Last-Subject-Sequence, exactly-once, persist_mode]
 aliases: [publish, PubAck, pub ack, exactly once, exactly-once, deduplication, dedup, Nats-Msg-Id, msg id, async publish, atomic batch, batch publish, fast ingest, publish acknowledgement]
-sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed]
+sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Publishing to a stream
@@ -224,6 +224,24 @@ term on every path.
 - **`max_payload` bounds a single message** (`1MB` by default), and a batch does not get around it —
   each message is still a message ([[defaults-and-limits]]).
 
+### A publisher that never waits for an ack can be dropped at the stream
+
+A core-NATS publish into a stream's subject has no back-pressure. The stream queues inbound
+messages in an internal queue capped at **100,000 messages or 128 MB**
+(`streamDefaultMaxQueueMsgs`, `streamDefaultMaxQueueBytes`, `stream.go:441–442` at 2.14.6, source:
+[[s-nats-server-mirror]]); past that the server drops and logs once:
+
+```
+[WRN] Dropping messages due to excessive stream ingest rate on '$G' > 'KV_DNS': IPQ len limit reached
+```
+
+Observed on 2.14.6: 2,400,000 publishes fired at a file-backed KV stream over loopback without
+waiting for any `PubAck` left 337,733 messages stored; the same publisher keeping 4,000 in flight
+lost none at ~200,000 msg/s (source: [[s-nats-server-mirrors-observed]]). Fire-and-forget into
+JetStream is not a publish mode; use async publish with a bounded pending window and read every
+ack.
+
+
 ## A fifth mode: publish now, store for later
 
 **Since 2.12** a publish can carry a *schedule* instead of being stored as an ordinary message: the
@@ -280,4 +298,4 @@ schedule and publishes a message as one atomic operation (source: [[s-adr-51-mes
 - [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] — the releases the two batch modes shipped
   in.
 - [[s-relnotes-2.14.0]] — the `Nats-Batch-Commit: eob` end-of-batch commit.
-- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]]
+- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]]

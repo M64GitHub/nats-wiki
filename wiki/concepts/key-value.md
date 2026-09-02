@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [kv, bucket, tombstone, watch, direct-get]
 aliases: [KV, key value, KV bucket, KV_]
-sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-object-store-watching-and-listing, s-docs-object-store-metadata-and-links, s-adr-20-object-store, s-adr-31-direct-get, s-docs-get-direct, s-docs-mirrors-and-sources, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains]
+sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-object-store-watching-and-listing, s-docs-object-store-metadata-and-links, s-adr-20-object-store, s-adr-31-direct-get, s-docs-get-direct, s-docs-mirrors-and-sources, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-relnotes-2.14.4]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Key-Value
@@ -357,6 +357,42 @@ conforming client writes a specific stream config, and knowing it makes `nats st
   remapped between buckets (`$KV.INVENTORY.warehouse.*.product.>` → `$KV.PRODUCTS.>` turns
   `warehouse.nyc.product.item123` into `item123`).
 
+### Reading a mirror: which name, which storage, which filter
+
+Three things a mirrored bucket does that the origin does not, all measured on nats-server 2.14.6
+with `nats` CLI 0.4.0 / nats.go 1.53.1 (sources: [[s-nats-server-mirrors-observed]],
+[[s-nats-go-kv-object-mirror]]):
+
+**Which name.** `nats kv add DNS_FILE --mirror DNS --storage file` builds a mirror that holds
+`$KV.DNS.>` — no transform is added, exactly as ADR-57 specifies — but the client reads a bucket at
+its *own* prefix, so `nats kv ls DNS_FILE` prints `No keys found in bucket` and `nats kv get DNS_FILE
+k1` says `key not found` (the trace: `$JS.API.DIRECT.GET.KV_DNS_FILE.$KV.DNS_FILE.k1`) while
+`nats kv info DNS_FILE` reports every value. Two ways out: **read the origin's name** and let
+`mirror_direct` route the get to the nearest mirror — the design ADR-57 describes; or build the
+mirror as a stream with `$KV.DNS.>` → `$KV.DNS_TR.>` (`nats stream add KV_DNS_TR --config …` with
+`max_msgs_per_subject: 1`, `allow_direct`, `mirror_direct`, `discard: new`, `deny_delete`,
+`allow_rollup_hdrs`), which is readable by name at once. A **cross-domain** mirror
+(`--mirror-domain leaf`) is readable by its own name without any of that: for a mirror with an
+`external` block the client rewrites the read prefix to the origin's (`jetstream/kv.go:1610–1618`).
+Writes through a mirror bucket always go to the origin.
+
+**Which storage.** The same mirror on memory storage synced 400,000 live keys over 2.4 M sequences
+in 0.74 s against 1.24 s on file, and read at the same speed with or without a filter. A **file**
+mirror read with the bucket's own filter `$KV.DNS.>` ran at 267,866 msg/s against 1,740,462
+without it — the sequence space of a bucket with a hot key space is mostly holes, a mirror has no
+subjects of its own, and the file store's linear-scan heuristic then sends every lookup through the
+per-subject state (source: [[s-nats-server-mirror]]; the public report measured 65× on 2.14.2,
+[[s-gh-8417-kv-mirror-file-vs-memory]]). The origin bucket is immune: its filter *is* its subject.
+
+**Which filter.** Everything that reads a whole bucket passes that filter — a watch, `nats kv ls`
+(a `last_per_subject`, `headers_only` push consumer on `$KV.<bucket>.>`), a `last_per_subject`
+consumer. `nats kv ls` on a 400,000-key file mirror took 1.533 s against 0.427 s on the origin. So
+for a file mirror that is meant to be *scanned*, either leave the filter off the consumer, or scan
+the origin, or make the hot-read mirror a memory one. 2.14.4 made the delete-map lookups cheaper but
+did not change the heuristic (source: [[s-relnotes-2.14.4]]). The symptom page:
+[[consumer-slow-on-a-sparse-stream]].
+
+
 ## Keys are subjects, and nothing escapes them for you
 
 A key is a subject token path under `$KV.<bucket>.`, so a key containing a space, or a dot meaning
@@ -557,4 +593,4 @@ See [[filestore-layout]] for the mechanism and [[jetstream-sizing]] for sizing a
 [[s-docs-object-store-watching-and-listing]] · [[s-docs-object-store-metadata-and-links]] ·
 [[s-adr-20-object-store]] · [[s-adr-31-direct-get]] · [[s-docs-get-direct]] ·
 [[s-docs-mirrors-and-sources]] · [[s-gh-6328-jetstream-behind-gateways]] ·
-[[s-nats-server-leafnode-js-domains]]
+[[s-nats-server-leafnode-js-domains]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-relnotes-2.14.4]]

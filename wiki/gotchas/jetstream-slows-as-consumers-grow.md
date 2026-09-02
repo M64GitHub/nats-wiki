@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [consumer-count, consumer-info, meta-leader, raft-traffic, subject-filters, republish]
 aliases: ["too many consumers", "100k consumers", "consumer info is slow", "throughput collapses with many consumers"]
-sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings]
+sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # JetStream slows down as the consumer count grows
@@ -139,6 +139,17 @@ one per client. See [[kv-watchers-stall-the-cluster]] and [[slow-consumer-detect
 *Fix:* prefer long-lived consumers where the design allows; Synadia names consumer lifecycle as one
 of the three things memory follows ([[jetstream-sizing]]).
 
+### 5. Readers on a mirror that is still catching up
+
+Not a count problem but the same shape — consumers competing with the stream's own writes. A
+mirror doing its initial catch-up from a sparse upstream writes each gap and each message under the
+store's exclusive lock; readers scanning it hold the read lock per block walk. Three readers made a
+file mirror's catch-up 3.4–3.9× slower on 2.14.6 (a memory mirror's 3.1–3.4×); the public report,
+unanswered upstream, measured 2.89× with one reader on 2.14.2 (sources:
+[[s-gh-8444-mirror-catchup-under-a-reader]], [[s-nats-server-mirrors-observed]]). Gate readers on
+`Lag` reaching 0 — [[consumer-slow-on-a-sparse-stream]].
+
+
 ## Designing consumers away
 
 Two alternatives that remove the consumer entirely
@@ -214,4 +225,4 @@ not make the info call cheap.
 [[s-synadia-jetstream-anti-patterns]] · [[s-adr-17-ordered-consumer]] · [[s-relnotes-2.14.0]] ·
 [[s-docs-raft-and-leaders]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6746-watch-many-keys]] ·
 [[s-gh-5044-restrict-durable-consumers]] · [[s-docs-get-direct]] ·
-[[s-nats-server-jetstream-log-warnings]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]]

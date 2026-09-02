@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [external, api-prefix, deliver-prefix, jetstream-domain, sourcing, mirror, service-import, 10021, 10022, 10024]
 aliases: [cross-domain sourcing, cross domain mirror, source from another domain, external stream, api prefix, deliver prefix]
-sources: [s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-gh-5606-cross-account-jetstream, s-docs-cross-account, s-gh-7438-multi-region-availability, s-adr-59-sourcing-and-mirroring, s-docs-mirrors-as-dr]
+sources: [s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-gh-5606-cross-account-jetstream, s-docs-cross-account, s-gh-7438-multi-region-availability, s-adr-59-sourcing-and-mirroring, s-docs-mirrors-as-dr, s-nats-server-mirrors-observed, s-issue-5106-object-store-mirror-list]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 ---
 
 # Cross-domain JetStream sourcing
@@ -152,6 +152,25 @@ The server derives the domain back out of the prefix by taking its **second toke
 (`ExternalStream.Domain()`, `stream.go:432–437`), which is why the `$JS.<domain>.API` shape is not a
 convention you may vary.
 
+### 5 · A bucket rather than a stream
+
+The same `external` block moves a KV or object bucket across the domain, with one difference per
+kind, run on 2.14.6 against the hub/leaf pair (sources: [[s-nats-server-mirrors-observed]],
+[[s-issue-5106-object-store-mirror-list]]):
+
+```
+nats kv add CFG_M --mirror CFG --mirror-domain leaf        # on the hub: a KV mirror of the leaf's CFG, readable by name at once
+nats stream add OBJ_dms_mirror --config mirror.json        # an object bucket: no flag exists; the config needs the transform
+```
+
+`--mirror-domain` composes `$JS.leaf.API` for you and the KV client rewrites its read prefix to the
+origin's, so `nats kv get CFG_M k1` on the hub returns the leaf's value. An object bucket has no flag
+in `nats object add` and no `Mirror` field in any client; the JSON must carry `"mirror": {"name":
+"OBJ_dms", "external": {"api": "$JS.leaf.API"}, "subject_transforms": [{"src": "$O.dms.>", "dest":
+"$O.dms_mirror.>"}]}` or the mirrored bucket lists as empty. Both mirrors are read-only from the hub
+side. [[object-store]] has the full config; [[key-value]] the naming rules.
+
+
 ## Verify
 
 ```
@@ -223,7 +242,7 @@ added only for this.
 [[s-nats-server-leafnode-js-domains]] · [[s-docs-mirrors-and-sources]] · [[s-docs-mirrors-as-dr]] ·
 [[s-gh-5606-cross-account-jetstream]] · [[s-docs-cross-account]] ·
 [[s-gh-7438-multi-region-availability]] ·
-[[s-adr-59-sourcing-and-mirroring]]
+[[s-adr-59-sourcing-and-mirroring]] · [[s-nats-server-mirrors-observed]] · [[s-issue-5106-object-store-mirror-list]]
 
 ## To verify
 

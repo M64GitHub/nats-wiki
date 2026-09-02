@@ -3,12 +3,12 @@ title: Filestore layout on disk
 type: internals
 area: [jetstream, deploy]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-02
 tags: [filestore, block-size, index.db, tombstone, compaction, disk, sizing, psim, o.dat]
 aliases: [filestore, file store, blocks, blk, msg blocks, index.db, on-disk layout, storage overhead, bytes per message]
-sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood]
+sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 ---
 
 # Filestore layout on disk
@@ -177,6 +177,64 @@ stream stops getting one.
 `obs/<consumer>/o.dat` holds the delivered/ack-floor/pending position, not messages. It is bounded
 by the ack-pending set, so by `max_ack_pending` — see [[ack-and-redelivery]].
 
+### Interior deletes, and what they cost a reader
+
+A KV overwrite, a per-subject limit, a purge by subject: each removes a message from the *middle*
+of the sequence space. The record stays in its block (the tombstone above), the sequence goes into
+the block's **delete map** (`mb.dmap`, an AVL sequence set), and it stays there for as long as the
+block lives — compaction prunes deletes at a block's head and tail, never interior ones. **A block
+never starts with a deleted sequence**: "`1.blk` would start at sequence 1, and have deleted entries
+stored in its `mb.dmap` from 1000-1999 … `2.blk` would start at sequence 2000" (source:
+[[s-gh-8417-kv-mirror-file-vs-memory]]). A KV bucket with a hot key space therefore spends most of
+its sequence range on holes — 83 % in the public report, 75 % in another — while its message count
+stays flat.
+
+**What that costs on the read path** (`firstMatching`, `filestore.go:3031–3150` at 2.14.6, source:
+[[s-nats-server-mirror]]). A consumer with a wildcard filter is served either by a *linear scan* of
+the block, skipping `dmap` entries, or by a walk of the block's per-subject state (`fss`) to find
+the next matching subject. The choice:
+
+```go
+  3095		doLinearScan := isAll || (wc && len(subjs) == 1 && subjs[0] == filter)
+  3100		if !doLinearScan && wc && mb.cacheAlreadyLoaded() {
+  3101			doLinearScan = mb.fss.Size()*4 > int(lseq-fseq)
+  3102		}
+```
+
+`isAll` is an empty filter or `>`; the second clause is true when the filter *is* the stream's only
+subject (a KV bucket's own `$KV.<bucket>.>`). Otherwise the block is scanned linearly only if it
+holds fewer than four sequences per subject — measured on the **sequence range, holes included**. A
+sparse block fails that test, and every message lookup becomes an `fss.Match` over the block's
+subjects. On a **mirror** — a stream with `subjects: null` — even the bucket's own filter takes that
+path. Measured on 2.14.6: a filter that matches everything read a file mirror at 267,866 msg/s where
+no filter read it at 1,740,462; on the origin the same filter cost nothing; at 1 M subjects over 4 M
+sequences the gap was 9.4× (source: [[s-nats-server-mirrors-observed]]). The symptom page is
+[[consumer-slow-on-a-sparse-stream]].
+
+**What it costs a writer that is a mirror.** A mirror records each upstream hole itself with
+`SkipMsgs` (`filestore.go:5465–5530`): under the store's exclusive lock it inserts every skipped
+sequence into the last block's `dmap`, starts a new block when that map would pass **64 K** entries,
+and writes one 30-byte placeholder record. So a mirror of a sparse stream takes the write lock twice
+per live message — once for the gap, once for the message — against readers whose `LoadNextMsg`
+holds the read lock for a whole block walk (`9427–9433`). Three readers scanning a mirror during its
+catch-up made the catch-up 3.4–3.9× slower on file storage (and 3.1–3.4× on memory, so on that host
+the lock is not the whole story; source: [[s-nats-server-mirrors-observed]],
+[[s-gh-8444-mirror-catchup-under-a-reader]]).
+
+**What 2.14.4 changed.** "Calculating and looking up sequences in delete maps for file-backed
+streams with large numbers of interior deletes is now faster and holds locks for less time (#8403)",
+faster AVL sequence sets (#8406), and snapshot buffers sized up front for streams "with large
+numbers of interior deletes" (#8405); v2.14.2 fixed the per-subject state's last block for
+`max_msgs_per_subject: 1` (#8254) (source: [[s-relnotes-2.14.4]]). The linear-scan heuristic is
+unchanged at 2.14.6.
+
+**What a mirror does to the layout.** Because it replays live messages in order, a file mirror
+re-packs: the same 400,000 messages that occupied 51 block files and 128,220 KB on the origin (2.2×
+the reported bytes) occupied 29 files and 58,536 KB on the mirror (1.0×); the public report saw
+81 % against 98 % live bytes (sources: [[s-nats-server-mirrors-observed]],
+[[s-gh-8417-kv-mirror-file-vs-memory]]). It reads no faster for it.
+
+
 ## What you can observe
 
 ```
@@ -262,4 +320,4 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
 - [[s-docs-object-store-chunking]] — the docs' unquantified per-message-overhead claim these
   numbers answer.
 - [[s-docs-object-store-under-the-hood]] — the qualitative disk-reclamation warning the bulk-delete
-  measurement narrows.
+  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]]

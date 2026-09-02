@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [jetstream-domain, domain, default_js_domain, js-domain, mapping, external, api-prefix, leafnode]
 aliases: [domain, js domain, js-domain, jetstream domains, "$JS.<domain>.API", default_js_domain]
-sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain, s-nats-server-object-store-leafnode, s-docs-mqtt-auth-and-clustering, s-natscli-stream-external, s-nats-server-jetstream-cluster]
+sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain, s-nats-server-object-store-leafnode, s-docs-mqtt-auth-and-clustering, s-natscli-stream-external, s-nats-server-jetstream-cluster, s-issue-5106-object-store-mirror-list]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # JetStream domain
@@ -117,6 +117,16 @@ nats --js-domain leaf01a stream ls
 - **A domain is not a cluster.** A domain can be one server or a whole cluster; what it delimits is
   the JetStream meta group, not the route mesh.
 
+## Mirroring a bucket across the boundary
+
+A KV or object bucket crosses a domain the way a stream does — a mirror with `external.api =
+$JS.<domain>.API` — and each kind has one extra rule: a KV mirror built with `nats kv add --mirror
+--mirror-domain` is readable by its own name, an object-store mirror must be built by hand with the
+transform `$O.<origin>.>` → `$O.<mirror>.>` or it lists as empty (source:
+[[s-issue-5106-object-store-mirror-list]]; the recipe is on [[object-store]], the runbook is
+[[cross-domain-sourcing]]).
+
+
 ## Observer mode, and what `extension_hint` does
 
 A server that **solicits** a leafnode connection sharing the system account assumes it is extending
@@ -186,7 +196,7 @@ exists, because the leaf can reach JetStream through the hub.
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7881-cross-domain-sourcing]] ·
 [[s-gh-7834-leafnode-same-js-domain]] · [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-mqtt-auth-and-clustering]] ·
-[[s-natscli-stream-external]] · [[s-nats-server-jetstream-cluster]]
+[[s-natscli-stream-external]] · [[s-nats-server-jetstream-cluster]] · [[s-issue-5106-object-store-mirror-list]]
 
 ## To verify
 

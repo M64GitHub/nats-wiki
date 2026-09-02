@@ -3421,3 +3421,55 @@ work is v2.14.4, #8403/#8405/#8406); the client follow-ups (nats.go #1874 open, 
 #155 closed) and the CLI's flags (`nats kv add --mirror --mirror-domain` exists, `nats object add
 --mirror` does not) checked; two Synadia posts skimmed and placed. Twelve candidates, three runs
 named, six summaries proposed. Nothing ingested; the user picks. Lint unchanged.
+
+## 2026-09-02 — ingest: mirror and replication internals, runs A/B/C (plan: the runnable scouts, step 2)
+
+Sources, all fetched 2026-09-02: `raw/gh-discussions/gh-8417.md` and `gh-8444.md`,
+`raw/gh-issues/issue-5106.md` and `client-issues-object-store-mirror.md` (nats.go #1874, #1648,
+nats.js #155), `raw/release-notes/v2.14.1.md` … `v2.14.6.md`, `raw/nats-server-src/mirror-v2.14.6.md`
+(`stream.go` / `filestore.go` ranges, plus the `mirror-%s` naming at v2.10.0 and v2.12.0),
+`raw/nats-go-src/kv-object-mirror-v1.53.1.md`, and the runs in
+`raw/nats-server-src/mirrors-observed-v2.14.6.md` with their client `mirrorlab.py`. Seven summaries:
+`s-gh-8417-kv-mirror-file-vs-memory`, `s-gh-8444-mirror-catchup-under-a-reader`,
+`s-issue-5106-object-store-mirror-list`, `s-nats-server-mirror`, `s-nats-server-mirrors-observed`,
+`s-relnotes-2.14.4`, `s-nats-go-kv-object-mirror`.
+
+**The runs** (nats-server v2.14.6, nats CLI 0.4.0). A: a 400,000-key bucket with 2,000,000 overwrites
+(83 % holes) mirrored on file and on memory — sync 1.24 s / 0.74 s; the everything-matching filter
+`$KV.DNS.>` read the file mirror at 267,866 msg/s against 1,740,462 without it (6.5×; 9.4× at 1 M keys
+over 4 M sequences), no gap on the memory mirror or on the origin — the mechanism gh#8417's answer
+names, alive at 2.14.6. B, third form: three `nats bench js ordered` readers made the mirror's catch-up
+3.4–3.9× slower on file and 3.1–3.4× on memory (gh#8444's 2.89× reproduces; not file-store-specific
+here). C: an object bucket mirrored from the leaf into the hub across two domains — empty without the
+`$O.dms.> → $O.dms_mirror.>` transform, whole with it; a KV mirror across the same boundary readable by
+its own name at once; a same-domain KV mirror (`nats kv add --mirror`) not readable by its own name at
+all. Found on the way: an un-acked publish flood is dropped at the stream's 100,000-message inbound
+queue with one `[WRN] Dropping messages due to excessive stream ingest rate` line (`stream.go:441–442`).
+
+**Pages.** New gotcha `consumer-slow-on-a-sparse-stream` (row 76's symptom; causes: the filter on a
+mirror, readers during catch-up, pre-2.14.4 interior deletes). `mirrors-and-sources`: *How a mirror
+catches up* (the `JS_MIRROR_<id>` consumer and its config, the 10 s stall check, the 2 s retry gate,
+the gap → `skipMsgs` branch, one Raft entry per hole on a replicated mirror), *A mirror of a bucket
+answers to the origin's subjects*, the `mirror-<id>` line corrected to the 2.14 names, the `## To
+verify` item on row 76 settled and removed, two dated Synadia pointers. `filestore-layout`: *Interior
+deletes, and what they cost a reader* (the delete map, the linear-scan heuristic with its lines,
+`SkipMsgs`, what 2.14.4 changed, the mirror's re-packing). `key-value`: *Reading a mirror: which name,
+which storage, which filter*. `object-store`: *Mirroring a bucket* (the config, the transform, what
+the mirror is not, the maintainers' warnings). Sections or pointers on `object-store-list-is-slow`,
+`cross-domain-sourcing` (step 5), `consumer`, `nats-go` (*What bites you*), `nats-cli`,
+`nats-server-2.14` (the patch releases table), `jetstream-slows-as-consumers-grow` (cause 5),
+`publishing` (the inbound-queue drop), `jetstream-domain`.
+
+**Bank.** Rows 76, 91, 105 filled — 91 answered with the mechanism and the run, marked unanswered
+upstream on the page. 104 / 137 answered, 33 open.
+
+**Docs issues** #49 (ADR-59 still names the replication consumer `mirror-<id>` / `src-<id>`; the 2.14
+server names it `JS_MIRROR_<id>` / `JS_SRC_<id>` unconditionally — verified at v2.10.0, v2.12.0,
+v2.14.6 and observed), #50 (nothing in the docs says an object bucket can be mirrored or needs the
+`$O.` transform — grep over the whole tree), #51 (ADR-57 never says which name a mirror bucket is read
+by, and nats.go reads a same-domain mirror at its own prefix and a cross-domain one at the origin's —
+`jetstream/kv.go:1610–1618`). 51 docs issues total. **No new server issue**: with no mirror the hub sees
+nothing of the leaf's bucket, so row 105 is not SI-1 restated; run B's effect has a public analysis and
+no contradiction with the source. `raw/sources.md` rows extended; index updated; the scout's *Status*
+line carries the candidate → summary map. Lint: 294 pages, wanted 1 (`consumer-keeps-redelivering`),
+unverified 12 across 9 pages, drift 0, unlanded ripples 0 → 0, staleness 0 behind 2.14.6.

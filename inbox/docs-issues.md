@@ -108,6 +108,9 @@ row.
 | 46 | `reference/config/jetstream/extension_hint.md` documents neither what the key does nor its two accepted values — `no_extend` and `will_extend` — which the server itself names in its startup notices (`manually disable Observer Mode by setting the JetStream Option "extension_hint: no_extend"`). The page body is "Requires Restart" and a type table reading `string`, `-`, `-` | `reference/config/jetstream/extension_hint.md` | nats-docs | missing | low | not filed | wiki explains the key on `jetstream-domain` |
 | 47 | The `/raftz` reference page — the one `learn/clustering/raft-and-leaders.md` and `replication-and-r3.md` send readers to for "the full set of RAFT internals", "its full field set", "append-entry batching, heartbeat intervals, log compaction" — is **173 bytes**: two request options and an empty response schema. Verified against the live site 2026-09-01. None of the promised parameters is an endpoint field; they are unexported constants in `raft.go` | `reference/system/monitor/raftz.md`; `learn/clustering/raft-and-leaders.md` lines 52, 162; `learn/clustering/replication-and-r3.md` line 257 | nats-docs | missing | medium | not filed | wiki prints the field set from `monitor.go` and the constants from `raft.go`, and says the page is empty |
 | 48 | ★ Six generated monitor reference pages — `accountz`, `jsz`, `leafz`, `subsz`, `gatewayz`, `raftz` — print the JSON field names of the `$SYS.REQ.SERVER.PING.<Z>` request payload (`account`, `consumer`, `subscriptions`, `leader_only`, …) as "Request options for the … monitoring endpoint". The HTTP handlers read other names (`acc`, `consumers`, `subs`, `leader-only`, …) and **silently ignore the documented ones**: `/accountz?account=NOPE` returns the normal page, `/accountz?acc=NOPE` answers `400`. `connz` and `healthz` print the right names, so the tree contradicts itself. 14 pages swept | `reference/system/monitor/accountz.md`, `jsz.md`, `leafz.md`, `subsz.md`, `gatewayz.md`, `raftz.md` (request schemas) | nats-docs | wrong-value | medium | not filed | wiki tables use the HTTP names and say which pages differ |
+| 49 | ADR-59 §*Internal consumers* says the replication consumer "is created with an explicit name following the pattern `mirror-<id>` or `src-<id>`" when a filter is set, and gets a server-generated name otherwise. That was `stream.go` at v2.10.0 and v2.12.0. The 2.14 server names it `JS_MIRROR_<id>` / `JS_SRC_<id>` unconditionally (`stream.go:3561`, `4019` at v2.14.6), which is what `/jsz?direct-consumers=true` prints and what ADR-60 specifies; ADR-59 revision 2 (2026-04-29) was not updated | `raw/adr/ADR-59.md` line 654 (§ *Internal consumers*) | ADR repo | wrong-value | low | not filed | wiki names both forms with their versions on `mirrors-and-sources` |
+| 50 | Nothing in the docs tree says an object-store bucket can be mirrored, that the mirror needs the transform `$O.<origin>.>` → `$O.<mirror>.>`, or that `nats object add` has no `--mirror` while `nats kv add` does. The six `learn/object-store/` pages never contain the word *mirror*; `learn/jetstream/mirrors-and-sources.md` never mentions a bucket; the KV chapter has one paragraph for KV. The only public route is nats-server issue #5106 (closed 2024-03-04), and the obvious procedure without it yields a bucket that lists as empty (observed on 2.14.6 / CLI 0.4.0) | `learn/object-store/*.md`, `learn/jetstream/mirrors-and-sources.md` | nats-docs | missing | medium | not filed | wiki: *Mirroring a bucket* on `object-store` |
+| 51 | ADR-57 §*Mirror Configuration* says a KV mirror gets `MirrorDirect` and a `KV_` prefix and thereby "Support[s] direct reads via the Direct GET API", but never says which subjects a client reads a mirror bucket at. The reference client reads a **same-domain** mirror at `$KV.<mirror>.>` (which the mirror does not hold — `nats kv ls M` prints `No keys found in bucket`) and a **cross-domain** mirror at `$KV.<origin>.>` (nats.go `jetstream/kv.go:1610–1618`, v1.53.1). Observed on 2.14.6: same-domain `kv get` → `key not found`, cross-domain `kv get` → the value | `raw/adr/ADR-57.md` lines 19–40 (§ *Mirror Configuration*) | ADR repo | missing | low | not filed | wiki: *Reading a mirror* on `key-value`; the asymmetry on `nats-go` |
 
 ---
 
@@ -2437,6 +2440,102 @@ interfaces are real; the pages describe one and are titled for the other.
 saying the listed names are the `$SYS.REQ.SERVER.PING.<Z>` payload and the URL parameters differ —
 with `connz.md` as the model, since it already prints the HTTP names.
 
+## 49 · ADR-59 names the replication consumer `mirror-<id>` / `src-<id>`; the 2.14 server names it `JS_MIRROR_<id>` / `JS_SRC_<id>`
+
+**Impact: an operator reading ADR-59 to find the internal consumer on an upstream (to inspect it, or
+to know which consumer not to delete) looks for a name the 2.14 server never uses.** ADR-59 is
+marked *Implemented* and calls itself "the authoritative reference for stream sourcing and mirroring".
+
+**ADR.** `raw/adr/ADR-59.md` line 654, § *Internal consumers*: "When a filter subject is configured
+(either directly via `filter_subject` or from a single `subject_transforms` entry), the consumer is
+created with an explicit name following the pattern `mirror-<id>` or `src-<id>` using the extended
+consumer create API. When no filter is present (or multiple subject transforms are configured), the
+consumer is created via `$JS.API.CONSUMER.CREATE.<stream>` and receives a randomly generated name
+from the server." Revision 1 (2026-03-03) "documents features up to 2.12.5"; revision 2
+(2026-04-29) touched only the Mirror Direct section.
+
+**Server.** At **v2.10.0** `server/stream.go:2558` and at **v2.12.0** `:3258` the code is
+`req.Config.Name = fmt.Sprintf("mirror-%s", createConsumerName())` inside `if
+req.Config.FilterSubject != _EMPTY_`, exactly as the ADR says. At **v2.14.6** the request is built
+with `Name: fmt.Sprintf("JS_MIRROR_%s", id)` unconditionally (`stream.go:3561`; the source
+equivalent `JS_SRC_%s` at `:4019`), where `id` is a stable hash, and the same name is recomputed to
+delete the consumer (`:2797`, `:2805`); a fallback `JS_MIRROR_<id>_<random>` is used only when the
+upstream rejects `sourcing` (`:3741`). ADR-60 (the 2.14 durable-sourcing spec) states the new form:
+"Should be named in the form `JS_MIRROR_<suffix>`" (line 46) and `JS_SRC_<suffix>` (line 50).
+
+**Observed** (`raw/nats-server-src/mirrors-observed-v2.14.6.md`, run A2): two mirrors of `KV_DNS`
+on 2.14.6 produced `JS_MIRROR_OQyMJ0fQ-7i1hqwDz` and `JS_MIRROR_HNs8w7PP-7H9l9Nd5` in
+`/jsz?…&direct-consumers=true`, both with `filter: null` — no filter, and still an explicit name.
+
+**Suggested fix:** in ADR-59 § *Internal consumers*, state the 2.14 form (`JS_MIRROR_<id>` /
+`JS_SRC_<id>`, always explicit, hidden from the consumer API by `Direct`) with a pointer to ADR-60,
+and keep the `mirror-<id>` / `src-<id>` sentence as the ≤ 2.12 behaviour with that version on it.
+
+## 50 · The docs never say an object-store bucket can be mirrored, or how
+
+**Impact: the obvious procedure — `nats stream add OBJ_X_mirror --mirror OBJ_X` with the domain
+import — produces a bucket that `nats object ls` lists but that lists as empty and whose objects
+cannot be fetched; nothing in the docs says why, or that a transform is required.** The only public
+statement of the recipe is a closed GitHub issue from 2024.
+
+**Docs.** `grep -ril mirror raw/nats-docs/learn/object-store/` → nothing (six pages:
+`your-first-object.md`, `chunking.md`, `metadata-and-links.md`, `watching-and-listing.md`,
+`under-the-hood.md`, `where-next.md`). `learn/jetstream/mirrors-and-sources.md` → no match for
+`object`, `bucket` or `$O.`. Across the whole tree (861 pages) the files containing both *mirror* and
+*object store* are the index pages and `learn/key-value/where-next.md`, whose one paragraph is
+about KV: "A bucket can be sourced from or mirrored into another bucket … kept in sync by a subject
+transform from `$KV.SRC.>` to `$KV.DST.>`". `nats object add --help` (CLI 0.4.0) has no `--mirror`;
+`nats kv add --help` has `--mirror` and `--mirror-domain`.
+
+**Server and client.** A mirror has no subjects, and the client derives the metadata and chunk
+subjects from the *bucket name* (`$O.<bucket>.M.>`, nats.go `jetstream/object.go:480–483`,
+`598–606` at v1.53.1), so a mirror named differently from its origin must carry
+`subject_transforms: [{"src": "$O.<origin>.>", "dest": "$O.<mirror>.>"}]`. Issue #5106
+(`raw/gh-issues/issue-5106.md`) is where a client maintainer states this; nats.go #1874 (open) is
+the request to make it first-class, declined for now.
+
+**Observed** (`raw/nats-server-src/mirrors-observed-v2.14.6.md`, run C): without the transform,
+`nats object ls dms_mirror` → `No entries found`, `nats object get dms_mirror f1.bin` → `nats:
+error: nats: object not found`; with it, list, info, a byte-identical get, and live replication.
+
+**Suggested fix:** a short section in the object-store chapter (or on
+`learn/jetstream/mirrors-and-sources.md`): a bucket is a stream and can be mirrored; there is no
+CLI or client flag; the stream config needs the `$O.` transform; the mirror is read-only and keeps
+its own retention, so deletes on the origin do not propagate; do not reuse the stream name on both
+sides of a domain instead (a server maintainer's warning in nats.go #1874).
+
+## 51 · ADR-57 does not say how a mirrored KV bucket is *read*, and the reference client reads it two different ways
+
+**Impact: `nats kv add M --mirror B` in one domain yields a bucket whose `nats kv ls M` prints `No
+keys found in bucket` and whose every `nats kv get M <key>` answers `key not found`, while
+`nats kv info M` reports all its values; the same command with `--mirror-domain` yields a bucket that
+reads normally. No document explains the difference.**
+
+**ADR.** `raw/adr/ADR-57.md` lines 19–40, § *Mirror Configuration*: clients "Prefix the mirror
+stream name with `KV_` if not already prefixed" and "Enable `MirrorDirect` on the underlying stream
+configuration", which "ensures that mirrored buckets … Support direct reads via the Direct GET API
+… Automatically participate in RTT-based replica selection". Sources get an automatic
+`$KV.<src>.>` → `$KV.<bucket>.>` transform (§ *Source Configuration*); mirrors deliberately get
+none. Nothing says whether a client opening the *mirror* bucket by name reads `$KV.<mirror>.` or
+`$KV.<origin>.`.
+
+**Client, nats.go v1.53.1** (`raw/nats-go-src/kv-object-mirror-v1.53.1.md`): `mapStreamToKVS`
+sets the read prefix to `$KV.<this bucket>.` (`jetstream/kv.go:1599`); for a mirror it rewrites the
+**write** prefix to the origin's, and rewrites the **read** prefix to the origin's only when the
+mirror has `external.api` set (`1610–1618`). So same-domain and cross-domain mirrors of the same
+bucket answer differently to the same `Get`.
+
+**Observed** (`raw/nats-server-src/mirrors-observed-v2.14.6.md`, run A4 and run C §8): same
+domain — `$JS.API.DIRECT.GET.KV_DNS_FILE.$KV.DNS_FILE.k0000001` → `key not found`; across a domain —
+`$JS.API.DIRECT.GET.KV_CFG_M.$KV.CFG.k1` → the value.
+
+**Suggested fix:** state in ADR-57 which name a mirror bucket is meant to be read by. If the
+intent is "always read the origin's name and let `mirror_direct` route it", say so and have the
+same-domain client path either rewrite the read prefix as the cross-domain path does or refuse to
+open the mirror by name; if the intent is "a mirror is readable by its own name", the client must
+add the transform it adds for sources. Either way the two branches of `mapStreamToKVS` should
+agree.
+
 ## Internal — where this wiki records each of these
 
 *Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
@@ -2491,3 +2590,6 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 46 | `wiki/concepts/jetstream-domain.md` — *Observer mode, and what `extension_hint` does*; `wiki/internals/meta-layer.md`; `wiki/summaries/s-nats-server-jetstream-cluster.md` |
 | 47 | `wiki/reference/monitoring-endpoints.md` — *`/raftz` — scope it to an account*; `wiki/internals/raft-in-nats.md` — *`/raftz`, read and run*; `wiki/summaries/s-docs-monitor-raftz.md`; `wiki/summaries/s-nats-server-raftz.md` |
 | 48 | `wiki/reference/monitoring-endpoints.md` — the endpoint table and *A docs error worth knowing* under `/raftz`; `wiki/summaries/s-nats-server-raftz.md` |
+| 49 | `wiki/concepts/mirrors-and-sources.md` — *How a mirror catches up* and the note under *The internal consumers, on demand*; `wiki/summaries/s-nats-server-mirror.md` |
+| 50 | `wiki/concepts/object-store.md` — *Mirroring a bucket*; `wiki/operations/cross-domain-sourcing.md` — step 5; `wiki/summaries/s-issue-5106-object-store-mirror-list.md` |
+| 51 | `wiki/concepts/key-value.md` — *Reading a mirror: which name, which storage, which filter*; `wiki/entities/nats-go.md` — *What bites you*; `wiki/summaries/s-nats-go-kv-object-mirror.md` |

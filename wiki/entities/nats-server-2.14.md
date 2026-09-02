@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.14, feature_flags, js_ack_fc_v2]
 aliases: ["2.14", v2.14, v2.14.0, v2.14.6]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # nats-server 2.14
@@ -181,6 +181,25 @@ Verified on **v2.14.6** (source: [[s-nats-server-message-schedules-observed]]):
 See [[message-scheduling]] for the whole feature and the ten error codes it can return.
 
 
+## The patch releases, for mirrors and sparse streams
+
+The six patch bodies are in `raw/release-notes/v2.14.1.md` … `v2.14.6.md` (fetched 2026-09-02;
+phase D ingests them whole). The lines that decide which patch an operator of mirrors or KV buckets
+with a hot key space wants (source: [[s-relnotes-2.14.4]]):
+
+| release | date | what changed |
+|---|---|---|
+| v2.14.1 | 2026-05-20 | mirror consumers retried immediately on a last-sequence mismatch (#8152); skip-message errors surfaced (#8152); no source-consumer "setup storms" (#8111) |
+| v2.14.2 | 2026-06-02 | per-subject state's last block stored correctly with `max_msgs_per_subject: 1` (#8254); no block-skip check on streams with extremely high subject counts (#8227) |
+| v2.14.4 | 2026-07-30 | delete-map lookups on file streams with many interior deletes faster and holding locks for less time (#8403); faster AVL sequence sets (#8406); snapshot buffers sized up front (#8405); `max_concurrent_io` in `jetstream {}` (default 4096 slots, #8336); four security fixes (`no_auth_user` with auth callout, whitespace-only JWT permissions, queue-subscription permission checks, `verify_and_map` with blank passwords) |
+| v2.14.6 | 2026-08-27 | the dynamic `max_file_store` fix above |
+
+The public report of a KV mirror reading 65× slower on file storage ran on v2.14.2
+([[s-gh-8417-kv-mirror-file-vs-memory]]); the maintainer's answer was the consumer's filter, not the
+release, and the 6.5× re-measured on v2.14.6 shows the heuristic survived 2.14.4 —
+[[consumer-slow-on-a-sparse-stream]].
+
+
 ## Related
 
 [[nats-server-2.12]] · [[nats-server-2.15-preview]] · [[raft-in-nats]] · [[retention-policies]] ·
@@ -191,4 +210,4 @@ See [[message-scheduling]] for the whole feature and the ten error codes it can 
 
 [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
 [[s-nats-server-jetstream-resources]] ·
-[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]]
+[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]]

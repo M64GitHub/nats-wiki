@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Consumer
@@ -177,6 +177,17 @@ be given **fewer** replicas than its stream when its state is cheap to rebuild, 
 On `interest` and `workqueue` streams the consumer's replica count **must match** the stream's
 (source: [[s-docs-surviving-node-loss]]). Consumer replicas buy failover, not throughput: one
 consumer leader does all the work and the followers only stand by.
+
+### A filter that matches everything is not free on a mirror
+
+`filter_subject` on a stream's own subject — `$KV.DNS.>` on the bucket `DNS` — costs nothing: the
+file store sees that the filter *is* the stream's subject and scans linearly. The same filter on a
+**mirror** of that bucket, which has no subjects of its own, sends every lookup through the block's
+per-subject state once the sequence space is mostly interior deletes, and a KV bucket with a hot key
+space always is. Measured: 267,866 against 1,740,462 msg/s on nats-server 2.14.6; the public report
+saw 65× (sources: [[s-gh-8417-kv-mirror-file-vs-memory]], [[s-nats-server-mirror]]). Leave the
+filter empty when you mean "everything"; see [[consumer-slow-on-a-sparse-stream]].
+
 
 ## Limits and failure modes
 
@@ -455,4 +466,4 @@ that separates them from a crashed pool.
 [[s-gh-4972-nak-with-delay-blocks]]
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]]

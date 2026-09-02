@@ -7,9 +7,9 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # natscli (the nats CLI)
@@ -385,6 +385,30 @@ ran the command* (source: [[s-docs-putting-it-together]]). See [[leafnode]] and 
 for both prefixes and requires both, because those are **your local import subjects** — none of this
 is in the docs (source: [[s-natscli-stream-external]]). See [[cross-domain-sourcing]].
 
+## Mirrors of buckets — what the CLI builds, and what it cannot read
+
+Checked on CLI 0.4.0 against nats-server 2.14.6 (sources: [[s-nats-server-mirrors-observed]],
+[[s-nats-go-kv-object-mirror]], [[s-issue-5106-object-store-mirror-list]]):
+
+```
+nats kv add DNS_M --mirror DNS --storage memory          # a KV mirror; same domain: nats kv ls DNS_M prints "No keys found in bucket"
+nats kv add CFG_M --mirror CFG --mirror-domain leaf      # across a domain: readable by its own name at once
+nats stream add KV_DNS_TR --config kv-mirror.json        # a KV mirror readable by name: add "$KV.DNS.>" -> "$KV.DNS_TR.>" yourself
+nats stream add OBJ_dms_mirror --config obj-mirror.json  # an object bucket: no --mirror on `nats object add`; the transform is required
+nats consumer add S C --pull --deliver subject …         # "last per subject" is spelled `subject`; `last-per-subject` is rejected
+nats bench js consume --stream S --consumer C …          # binds an existing durable only (10014 consumer not found otherwise)
+```
+
+- `nats kv add` has `--mirror` and `--mirror-domain`; `nats object add` has neither, and `nats
+  stream add` sets a mirror's `external` and transform only interactively or through `--config`.
+- `nats kv ls` is a `last_per_subject`, `headers_only` push consumer filtered on `$KV.<bucket>.>`;
+  on a **file mirror** with a hot key space that is the slow path — 1.533 s against 0.427 s on the
+  origin for 400,000 keys ([[consumer-slow-on-a-sparse-stream]]).
+- `nats object put` into a mirror bucket answers `nats: error: nats: no response from stream`;
+  `nats stream purge` on a `KV_` stream asks for a confirmation the KV warning explains, and refuses
+  without a terminal.
+
+
 ## Related
 
 [[nsc]] · [[nk]] · [[nats-box]] · [[nats-top]] · [[jsm-go]] · [[monitoring-endpoints]] ·
@@ -404,4 +428,4 @@ is in the docs (source: [[s-natscli-stream-external]]). See [[cross-domain-sourc
 [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-kubernetes]] ·
 [[s-docs-single-server]] · [[s-docs-stream-backup-restore]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7684-certificate-expiry]] ·
-[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]]
+[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]]

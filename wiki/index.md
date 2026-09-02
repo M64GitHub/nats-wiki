@@ -188,6 +188,11 @@ exists to answer live in `inbox/question-bank.md`.
 - [[object-store-list-is-slow]] — `nats object ls` blows out while uploads run. **No public source
   answers this**; measured instead — object count is nearly free, concurrent writes are not, and a
   list is an ephemeral consumer created per call.
+- [[consumer-slow-on-a-sparse-stream]] — a consumer on a **mirror** crawls on file storage while the
+  memory mirror and the origin fly; the mirror's catch-up takes 3–4× longer while consumers read it.
+  Cause 1: a filter that matches everything on a stream with no subjects and a sequence space that
+  is mostly interior deletes (the KV hot-key shape) — measured 6.5–9.4× on 2.14.6, 65× in the
+  public report. Cause 2: readers during catch-up — gate them on `Lag` 0; unanswered upstream.
 - [[stream-leader-keeps-moving]] — six causes ranked, from a peer that went quiet for ten seconds to a
   peer-removed server rejoining; the advisory that reports a flap but not its cause; and the one
   public quorum-loss report (gh#7533) mapped line by line, with the part nobody has explained.
@@ -575,6 +580,36 @@ exists to answer live in `inbox/question-bank.md`.
   architecture is answered; **both questions about the downsides are not**.
 - [[s-gh-7881-cross-domain-sourcing]] — the exact question the docs cannot answer, **with no
   maintainer reply**, and the `service import not authorized` error that names the missing export.
+- [[s-gh-8417-kv-mirror-file-vs-memory]] — the answered thread behind row 76: a KV mirror on file
+  storage read 65× slower than on memory because the consumer's `FilterSubject` matched everything
+  and a mirror has no subjects, so the file store took the per-subject path across 83 % holes;
+  without the filter, 150k+ msg/s. The initial sync's slowness was never explained.
+- [[s-gh-8444-mirror-catchup-under-a-reader]] — the unanswered thread behind row 91: mirror
+  catch-up 2.89× slower under one cold-scanning consumer, with a reproduction; one community comment
+  argues the file store's lock structure (`SkipMsgs` + `StoreMsg` per live message against readers'
+  `RLock`s) and says to start readers at `Lag` 0.
+- [[s-issue-5106-object-store-mirror-list]] — the closed issue behind row 105: `nats object ls` on
+  a mirrored bucket failed because the client looked the stream up by subject (fixed in nats.go
+  2024-02) and because a mirror needs `$O.<origin>.>` → `$O.<mirror>.>`; plus the three client
+  issues that say a mirrored object store is still hand-built and "not general-purpose yet".
+- [[s-nats-server-mirror]] — `stream.go` and `filestore.go` at v2.14.6: the `JS_MIRROR_<id>`
+  consumer and its config, the 10 s stall check and 2 s retry gate, the gap → `skipMsgs` branch
+  (one Raft entry per hole on a replicated mirror), `SkipMsgs` under the write lock, and the
+  linear-scan heuristic `mb.fss.Size()*4 > lseq-fseq` — with the `mirror-<id>` names at v2.10.0
+  and v2.12.0 for docs issue #49, and the stream's 100,000-message inbound queue cap.
+- [[s-nats-server-mirrors-observed]] — the three runs on 2.14.6: a mirror's sync in 1.24 s (file)
+  and 0.74 s (memory) for 400k live over 2.4 M sequences; 267,866 vs 1,740,462 msg/s with and
+  without the everything-matching filter on the file mirror, no gap on memory or on the origin;
+  three readers making catch-up 3.4–3.9× (file) and 3.1–3.4× (memory) slower; an object bucket
+  mirrored across two domains, empty without the transform and whole with it; a same-domain KV
+  mirror unreadable by its own name; an un-acked flood dropped at the stream's inbound queue.
+- [[s-relnotes-2.14.4]] — the interior-delete release (2026-07-30: #8403, #8405, #8406,
+  `max_concurrent_io`, four security fixes), with the mirror and filestore lines of v2.14.1 and
+  v2.14.2; the six patch bodies are in `raw/release-notes/`.
+- [[s-nats-go-kv-object-mirror]] — nats.go v1.53.1: a KV mirror's read prefix is rewritten to the
+  origin's only for an `external` mirror (`kv.go:1610–1618`), so a same-domain mirror is unreadable
+  by its own name; the object store binds by stream name and derives its subjects from the bucket
+  name, so a mirror needs the transform.
 - [[s-gh-5941-restrict-leafnode-subjects]] — deny lists, and an accepted answer that has no
   implementation in config mode. The follow-up proving it is unanswered.
 - [[s-gh-4823-leafnode-supercluster-duplicates]] — a leaf bridging into a supercluster twice.
