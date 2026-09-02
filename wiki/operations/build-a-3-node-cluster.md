@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [cluster, routes, gossip, seed, cluster-name, no_advertise, failover, tls, 6222]
 aliases: [cluster, clustering, "form a cluster", "first cluster", routes, "cluster setup"]
-sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection, s-docs-encryption-and-tls, s-docs-putting-it-together, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-single-server, s-gh-5859-unexpected-nats-timeout, s-nats-server-systemd-units, s-nats-server-jetstream-cluster]
+sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection, s-docs-encryption-and-tls, s-docs-putting-it-together, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-single-server, s-gh-5859-unexpected-nats-timeout, s-nats-server-systemd-units, s-nats-server-jetstream-cluster, s-nats-server-meta-layer-rerun-observed]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Build a 3-node cluster
@@ -429,8 +429,9 @@ The lines to expect on a first start, from a run on 2.14.6 (source:
 The expected peer count comes from each node's `routes` list (plus gateway URLs), so a node that
 lists two peers expects a group of three; `/jsz` then shows `meta_cluster.cluster_size: 3` on every
 node. A restart of an existing cluster logs `JetStream cluster recovering state` instead and can take
-the full 4–9 s election window, with `Healthcheck failed: "…"` once a second until a leader exists —
-that is normal, not a failure.
+the full 4–9 s election window (5.1–5.3 s on two runs), with a `Healthcheck failed: "…"` line for every
+`/healthz` probe that arrives before a leader exists — one a second if your probe polls once a second,
+none if nothing polls (source: [[s-nats-server-meta-layer-rerun-observed]]). That is normal, not a failure.
 
 
 ## Related
@@ -450,4 +451,4 @@ that is normal, not a failure.
 [[s-nats-server-topology]] · [[s-docs-super-clusters]] · [[s-adr-40-nats-connection]] ·
 [[s-docs-encryption-and-tls]] · [[s-docs-putting-it-together]] · [[s-docs-rolling-upgrades]] ·
 [[s-docs-scaling-and-peers]] · [[s-docs-single-server]] · [[s-gh-5859-unexpected-nats-timeout]] ·
-[[s-nats-server-systemd-units]] · [[s-nats-server-jetstream-cluster]]
+[[s-nats-server-systemd-units]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-meta-layer-rerun-observed]]

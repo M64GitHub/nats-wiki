@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # Monitoring endpoints
@@ -159,9 +159,10 @@ or one named stream or consumer. **`js-enabled` is deprecated in favour of `js-e
 `JetStream has not established contact with a meta leader` (no leader known), `JetStream is not current
 with the meta leader` (a leader is known but not heard from within 2 s — **what a dead leader looks
 like** until its term ends), `JetStream is still recovering meta layer`, `JetStream meta layer is not
-running`, `JetStream meta layer write error: …`. The startup log repeats the first one as
-`Healthcheck failed: "…"` once a second until a leader exists ([[meta-layer]]; source:
-[[s-nats-server-jetstream-cluster]]).
+running`, `JetStream meta layer write error: …`. Whatever the state, the server logs each failing request as
+`Healthcheck failed: "…"` — the line is written by the HTTP handler (`monitor.go:3584–3589`), **once
+per request**, so a probe polling every second produces one line a second and an unpolled server
+produces none ([[meta-layer]]; sources: [[s-nats-server-jetstream-cluster]], [[s-nats-server-meta-layer-rerun-observed]]).
 
 Since **2.14** a filestore I/O error **freezes the affected stream and reports unhealthy here**,
 with the error text containing `write error`; the server keeps serving core traffic and needs a
@@ -534,4 +535,4 @@ states the replica count it derived for MQTT state — see [[mqtt]].
 [[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-nats-server-monitoring-observed]] · [[s-gh-7362-routez-connz-rtt]] ·
 [[s-gh-7483-varz-cpu-in-containers]] · [[s-docs-monitoring-profiling]] ·
-[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]]

@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [meta-layer, meta-group, meta-leader, raft, quorum, orphan, peer-remove, election, 10008, healthz, jsz, meta_compact, extension_hint, observer, snapshot]
 aliases: [meta group, meta leader, metadata controller, metalayer, meta-layer, "_meta_", JetStream meta layer, metadata leader, meta controller]
-sources: [s-nats-server-jetstream-cluster, s-docs-jetstream-in-a-cluster, s-docs-raft-and-leaders, s-adr-61-meta-quorum-rescue, s-gh-7831-standalone-to-cluster, s-nats-server-leafnode-js-domains, s-docs-scaling-and-peers, s-gh-7438-multi-region-availability, s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-raftz]
+sources: [s-nats-server-jetstream-cluster, s-docs-jetstream-in-a-cluster, s-docs-raft-and-leaders, s-adr-61-meta-quorum-rescue, s-gh-7831-standalone-to-cluster, s-nats-server-leafnode-js-domains, s-docs-scaling-and-peers, s-gh-7438-multi-region-availability, s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-raftz, s-nats-server-meta-layer-rerun-observed]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # The meta layer
@@ -86,9 +86,9 @@ What happens depends on *how* it was lost, measured on 2.14.6 (source:
 
 | event | new leader after | while it lasted |
 |---|---|---|
-| first start of an empty cluster | **0.28 s** | bootstrap campaigns immediately |
-| all three servers restarted | **5.3 s** | the election timer, 4–9 s from the last heartbeat; each node logs `Healthcheck failed: "JetStream has not established contact with a meta leader"` once a second |
-| `nats server cluster step-down` | **0.5 s** | a leadership *transfer* to a peer heard from within 3 s; no election timer |
+| first start of an empty cluster | **0.28 s** (0.30 s on the 2026-09-02 re-run) | bootstrap campaigns immediately |
+| all three servers restarted | **5.3 s** (5.1 s on the re-run) | the election timer, 4–9 s from the last heartbeat. A node logs `Healthcheck failed: "JetStream has not established contact with a meta leader"` **once per `/healthz` request** it fails, not on a timer — a probe polling every second sees one a second, an unpolled node logs nothing (`monitor.go:3584–3589`; source: [[s-nats-server-meta-layer-rerun-observed]]) |
+| `nats server cluster step-down` | **0.5 s** (both runs) | a leadership *transfer* to a peer heard from within 3 s; no election timer |
 | meta leader `kill -9` | **3.5 s** | creates time out, then resume; an R3 stream kept accepting publishes throughout; `/healthz` said `JetStream is not current with the meta leader` |
 | a follower restarted | **0.55 s** to learn the leader | no election at all |
 | two of three servers `kill -9` | never | the survivor **kept reporting itself leader for 10 s** — `/healthz` ok, `/jsz` naming itself — then logged `JetStream cluster no metadata leader`; only from then do creates get `10008` instead of a timeout |
@@ -200,7 +200,7 @@ Self is new JetStream cluster metadata leader
 JetStream cluster new metadata leader: n3/east        # <server>/<cluster>
 JetStream cluster no metadata leader
 [WRN] JetStream has not established contact with a meta leader
-[WRN] Healthcheck failed: "JetStream has not established contact with a meta leader"   # once a second at startup
+[WRN] Healthcheck failed: "JetStream has not established contact with a meta leader"   # one line per failed /healthz request, not a timer
 [WRN] Detected orphaned stream '$G > ORPHAN', will cleanup
 [ERR] JetStream being DISABLED, our server was removed from the cluster
 [WRN] JetStream cluster stream '$G > ORDERS' has NO quorum, stalled                    # the stream's group, not meta
@@ -293,4 +293,4 @@ to the system account (source: [[s-nats-server-raftz]]; field table on [[monitor
 [[s-nats-server-jetstream-cluster]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-docs-raft-and-leaders]] · [[s-adr-61-meta-quorum-rescue]] ·
 [[s-gh-7831-standalone-to-cluster]] · [[s-nats-server-leafnode-js-domains]] ·
-[[s-docs-scaling-and-peers]] · [[s-gh-7438-multi-region-availability]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-raftz]]
+[[s-docs-scaling-and-peers]] · [[s-gh-7438-multi-region-availability]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-raftz]] · [[s-nats-server-meta-layer-rerun-observed]]

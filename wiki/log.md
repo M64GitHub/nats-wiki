@@ -3362,3 +3362,49 @@ layout table so anyone who clones the repo can carry their own instructions with
 public rulebook. Here it holds the maintainer's multi-session programme (`local/megaplan.md`, started
 2026-09-02, entered with "start the megaplan") — a tracker, not wiki content: every source, plan,
 scout and page it produces goes into the public tree as usual.
+
+## 2026-09-02 — plan: the lab, step 1 — `tools/lab/cluster.sh`
+
+Phase A of the maintainer's programme, `inbox/plan-the-lab-2026-09-02.md`. `tools/lab/cluster.sh`
+(`up [n]`, `down [--purge]`, `status`, `logs k`, `conf k`, `stop k [-9]`, `start k`, `url k`) and the
+two templates in `tools/lab/conf/` render and start the scratch cluster every
+`raw/nats-server-src/*-observed-v2.14.6.md` run described in prose: `n1`…`n4`, cluster `east`, ports
+`429k` / `629k` / `829k`, a `$SYS` user `sys`, JetStream stores under `${TMPDIR:-/tmp}/nats-lab`,
+nothing in the repo. `up` prints `nats-server --version` and refuses a binary that is not
+`NATS_LAB_VERSION` (default `v2.14.6`), so a run is always attributable to the release the pages'
+`verified-against` names. Verified: `up 3` healthy in 0.9 s; `nats server report jetstream` shows
+the meta table with the same peer ids as the 2026-09-01 run; `up 1`, `up 4`, a SIGKILL-and-restart
+of one node, and the version refusal. No page changed; lint unchanged (285 pages, wanted 1,
+unverified 12, drift 0, unlanded 0).
+
+## 2026-09-02 — plan: the lab, step 2 — `tools/lab/README.md`
+
+What the script starts (names and ports), the commands, where the scratch files live, the version
+gate and why it exists, the fourteen `raw/nats-server-src/*-observed-v2.14.6.md` files with the shape
+each was run on — two on this cluster, §14 of a third, the rest single servers or hub/leaf pairs on
+their own ports — and how a run is recorded. No page changed.
+
+## 2026-09-02 — ingest: the meta-layer run repeated through the lab (plan: the lab, step 3)
+
+Source: `raw/nats-server-src/jetstream-cluster-lab-rerun-observed-v2.14.6.md` — §1, §2 and §6 of
+`jetstream-cluster-observed-v2.14.6.md` run again with `bash tools/lab/cluster.sh up 3`, plus a probe
+and `server/monitor.go` 3573–3589 at v2.14.6. Summary: `s-nats-server-meta-layer-rerun-observed`.
+Numbers: bootstrap 303 ms (282 ms on 2026-09-01), restart-to-leader 5.07 s (5.32 s), stepdown 0.54 s
+(0.53 s), and the same three meta peer ids on freshly purged stores. **Correction:** the original
+record said every node logs `Healthcheck failed: "…"` once a second until a leader exists; the re-run
+showed the two unpolled nodes logging it zero times, and the probe showed 0 lines in 5 s without a
+request and exactly one line per `/healthz` request — the handler writes it (`monitor.go:3584–3589`).
+Pages fixed and citing the summary: `meta-layer` (outage table row, log legend),
+`build-a-3-node-cluster` (the restart sentence), `monitoring-endpoints` (the `?js-meta-only=true`
+paragraph). Not a docs issue: the wrong sentence was this wiki's own observation. `raw/sources.md`
+`nats-server-src` row extended; index updated. Bank unchanged (Q36, Q38 gain a second run). Lint:
+286 pages, drift 0, unlanded ripples 0 → 0.
+
+## 2026-09-02 — plan: the lab, step 4 — README, and the plan finished
+
+`README.md` gains *Reproducing the observed runs* (the three commands, the version gate, the pointer
+to `tools/lab/README.md`) and a `tools/lab/` row in the layout table. Fresh-clone check: `tools/lab/`
+copied outside the repository and run with its own `NATS_LAB_DIR` gave a healthy three-node cluster in
+one command. `inbox/plan-the-lab-2026-09-02.md` carries its result line. Lint: 286 pages, wanted 1,
+unverified 12 across 9 pages, drift 0, unlanded 0, staleness 0 behind 2.14.6. Bank unchanged at 137
+rows / 101 answered — this plan built a tool, not a page.

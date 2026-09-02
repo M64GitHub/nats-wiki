@@ -1,0 +1,18 @@
+# tools/lab/conf/standalone.conf.tmpl — one standalone JetStream server (no cluster {} block).
+# Rendered by tools/lab/cluster.sh for `up 1` (the @…@ fields); do not run this file as it is.
+#
+# The same shape n4 had before it joined the cluster in §10 of
+# raw/nats-server-src/jetstream-cluster-observed-v2.14.6.md: its store is $G/streams/<name> only,
+# and there is no $SYS/_js_/_meta_ directory at all.
+
+server_name: @NAME@
+listen: 127.0.0.1:@CLIENT_PORT@
+http: 127.0.0.1:@HTTP_PORT@
+
+jetstream {
+  store_dir: "@STORE_DIR@"
+}
+
+accounts {
+  $SYS { users: [ { user: sys, password: sys } ] }
+}

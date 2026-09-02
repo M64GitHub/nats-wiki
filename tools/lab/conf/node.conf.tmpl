@@ -1,0 +1,25 @@
+# tools/lab/conf/node.conf.tmpl — one clustered node of the wiki's scratch cluster `east`.
+# Rendered by tools/lab/cluster.sh (the @…@ fields); do not run this file as it is.
+#
+# This is the whole configuration the runs in raw/nats-server-src/*-observed-v2.14.6.md were made
+# with: a name, a client listener, a monitoring port, JetStream with a store directory, a full
+# routes list of the peers, and a $SYS user so `nats server …` commands work. Nothing else —
+# no meta_compact*, no domain, no extension_hint, no TLS.
+
+server_name: @NAME@
+listen: 127.0.0.1:@CLIENT_PORT@
+http: 127.0.0.1:@HTTP_PORT@
+
+jetstream {
+  store_dir: "@STORE_DIR@"
+}
+
+cluster {
+  name: east
+  listen: 127.0.0.1:@CLUSTER_PORT@
+  routes: [ @ROUTES@ ]
+}
+
+accounts {
+  $SYS { users: [ { user: sys, password: sys } ] }
+}

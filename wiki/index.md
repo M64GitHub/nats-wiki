@@ -2,7 +2,7 @@
 title: Index
 type: index
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-02
 ---
 
 # NATS Wiki — Index
@@ -454,6 +454,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-message-schedules-observed]] — the message scheduler run rather than read: every
   ADR-51 rule held, ten error codes pinned to their conditions, the two header rows the docs get
   wrong, `nats pub` without `-J` hiding a rejection, and `--schedule-after` broken at CLI 0.4.0.
+- [[s-nats-server-meta-layer-rerun-observed]] — the meta-layer run repeated through `tools/lab/`: the same
+  bootstrap, restart and stepdown numbers by a different route, the same peer ids on a purged store, and the
+  correction that `Healthcheck failed` is one log line per `/healthz` request, not one a second.
 
 **The `nats.go` client source**
 

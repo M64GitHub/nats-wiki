@@ -35,6 +35,7 @@ nats-server <version>` and `verified-on: <date>`. A stale page is worse than a m
 | `tools/fetch-docs.py` | mirror a doc site into `raw/` from its `llms.txt` — here: `python3 tools/fetch-docs.py https://docs.nats.io --collection nats-docs <prefix…>` |
 | `tools/build-config-table.py` | turn the generated config reference into `inbox/config-keys-table.md` |
 | `tools/triage-adrs.py` | turn `raw/adr/` into `inbox/adr-toc.md` |
+| `tools/lab/` | the scratch cluster behind the observed runs — `bash tools/lab/cluster.sh up 3` (see `tools/lab/README.md`) |
 | `site/` | generated web viewer (git-ignored; `python3 tools/build-site.py`) |
 | `local/` | git-ignored overlay: put your own `CLAUDE-MD-EXTENSION.md` there (what you are working on, local conventions) and the agent reads it after `CLAUDE.md` |
 | `wiki/index.md` | catalog of every page — start here |
@@ -58,6 +59,25 @@ Open Claude Code in this folder and say:
 - `scout <topic>` — find candidate sources on the web, without ingesting
 - `start the plan` — work the newest `inbox/plan-*.md`, step by step, logging as it goes
 - `build` — regenerate the viewer (`python3 tools/build-site.py --serve` for a live preview)
+
+## Reproducing the observed runs
+
+Every `raw/nats-server-src/*-observed-v2.14.6.md` file records what the `nats-server` binary did when a
+page's claim was checked against it — election timings, `/jsz` fields, log lines, CLI output. Most of
+those runs used one scratch cluster, and `tools/lab/` starts it:
+
+```
+bash tools/lab/cluster.sh up 3      # n1–n3, cluster `east`, JetStream on, system user sys/sys
+bash tools/lab/cluster.sh status    # one line per node, with the meta leader
+bash tools/lab/cluster.sh down      # stops them; `down --purge` also deletes the stores
+```
+
+`up` prints `nats-server --version` and refuses a binary that is not the release the pages name
+(`v2.14.6`; set `NATS_LAB_VERSION` to run another one deliberately), so a run is always attributable to
+the version in the pages' `verified-against`. Ports, the store location, single-node commands and
+which observed file ran on which shape are in `tools/lab/README.md`. The first run made this way,
+`raw/nats-server-src/jetstream-cluster-lab-rerun-observed-v2.14.6.md`, repeats the meta-layer
+numbers to within a few percent.
 
 ## The viewer
 
