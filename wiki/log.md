@@ -2,7 +2,7 @@
 title: Log
 type: log
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-02
 ---
 
 # Log
@@ -3473,3 +3473,64 @@ nothing of the leaf's bucket, so row 105 is not SI-1 restated; run B's effect ha
 no contradiction with the source. `raw/sources.md` rows extended; index updated; the scout's *Status*
 line carries the candidate → summary map. Lint: 294 pages, wanted 1 (`consumer-keeps-redelivering`),
 unverified 12 across 9 pages, drift 0, unlanded ripples 0 → 0, staleness 0 behind 2.14.6.
+
+## 2026-09-02 — scout: stream scale ceilings and the filestore (plan: the runnable scouts, step 3)
+
+*Operation: scout* for question-bank rows 4, 5, 9 and 13, backlog section 2, written to
+`inbox/scout-stream-scale-2026-09-02.md`: 15 candidates, none blocked. Read in the scratchpad, not
+ingested: six discussions through the GraphQL API (gh#8001, gh#8333, gh#7147, gh#7032, plus gh#5202
+and gh#3772 found by a discussion search), `server/filestore.go`, `stream.go`, `jetstream.go`,
+`server.go` and five more files at v2.14.6, PRs #8282, #8516, #8227, #8403, #7526, #7876, #7783,
+#7787, #6684, the release bodies of all 198 2.10–2.14 releases (grep for recovery lines; phase D
+fetches them into `raw/`), the v2.15.0-preview.1 body, one Synadia blog post and two Synadia
+*insights* check pages, issue #4424.
+
+**The finding.** Row 13's thread (gh#8001, 50 M messages, `Restored … in 6m38s` after a clean
+shutdown, no maintainer reply after the reporter posted a goroutine dump) is answerable from the dump
+the maintainers never read back: goroutine 111 sits in `startingSequenceForSources` →
+`LoadPrevMsgMulti` → `prevMatchingMulti` → `loadMsgsWithLock` — a stream with `sources` (the
+reporter had about twenty) scans backwards through every block at every start to find the last
+message from each source, and a source with nothing in the stream sends the scan to sequence 1.
+`stream.go:4787–4895` at v2.14.6 still does it; the `Restored … in` timer (`jetstream.go:1555–1659`)
+wraps it, so the log charges the scan to "restore". The 2.15 preview fixes exactly this
+(`sources.db`, #8282, #8516: *"Restarts and leader changes previously required expensive backward
+scans"*). Underneath: `recoverFullState` (`filestore.go:1927–2216`) reads `index.db` and stats the
+blocks; five `Filestore [<stream>] Stream state …` warnings name the reasons it is refused; above
+`highCardinalityThreshold` (1,000,000 subjects or interior deletes, `:390`, `:12006`) the periodic
+write is skipped and only a clean stop writes one (`:12254`). Rows 4 and 5: no one-billion constant
+anywhere in the server, `uint64` sequences, a maintainer's stream at 1,174,510,552 messages, and
+gh#7032's marked answer *"There is no hard limit to the size of a stream"* — row 5 is answerable,
+not the `no-public-answer` the backlog expected. Row 9: gh#8333 (~100 MB of RAM per 1 M small
+subjects, unmarked maintainer comment), gh#5202 (the in-memory ART index since 2.10.9, marked),
+Synadia's "a few hundred bytes" per subject, and the three places the 1 M constant changes behaviour.
+
+**Runs named** for step 4, ~9 GB, through `tools/lab/cluster.sh up 1`: D (50 M fill, four restarts
+— clean, `-9`, no `index.db`, and a sourcing stream with an idle source), E (1.2 M subjects against
+6, RSS and restart both ways), F (`--max-msgs 1000000000` accepted). Docs-issue candidate: the docs
+tree never states the per-subject RAM term, the threshold, or that recovery cost depends on a clean
+stop; `concepts/subjects.md` says subjects are "essentially free". `SI-3` only if run D reproduces
+the attribution. Nothing in the wiki changed; the bank is unchanged (104 / 137). Lint: 294 pages,
+wanted 1, unverified 12, drift 0, unlanded 0, staleness 0 behind 2.14.6. Picked the same day, as proposed; the pick is the scout file's
+*Status* line. Step 4 starts in a fresh session.
+
+## 2026-09-02 — tools and rulebook: `tools/fetch-discussion.py`, and a scratch cache that outlives the session
+
+The scout above was fetched into the per-session scratchpad, which does not survive to the next
+session: six rendered threads, ten server source files at v2.14.6, the release bodies and the
+GraphQL-to-Markdown renderer would all have had to be fetched and rewritten again for step 4 — the
+third time for the renderer (`raw/sources.md` has said "rendered by a small script" since
+2026-08-31 without the script existing anywhere). The user asked for a durable place. Two changes:
+**`tools/fetch-discussion.py`** — `gh api graphql` for one or more discussion numbers (any repo,
+`--repo`), pages comments past 100, writes the JSON and the rendering to a cache (default
+`local/scratch/gh/`) and, with `--out raw/gh-discussions`, promotes the rendering at ingest time
+without ever overwriting a file there; slugs follow the manifest's convention (`gh-<n>`, else
+`<repo>-<n>`). Checked against the file already in `raw/`: a re-fetch of gh#8417 differed from
+`raw/gh-discussions/gh-8417.md` only in carriage returns (GitHub bodies arrive CRLF; the 2026-09-02
+renderer had stripped them, and three older raw files — gh-3569, gh-4342, gh-4535 — still carry them,
+left as they are because `raw/` is immutable), so the tool normalises bodies to LF and, re-rendered
+with `--render-only`, is byte-identical to the raw copy, which it refused to overwrite. Registered in the `CLAUDE.md` map. And, in the local overlay only (it is a
+per-clone convention): **`local/scratch/`** with an `INDEX.md`, laid out by purpose (`gh/`,
+`src/<tag>/`, `releases/`, `runs/<topic>/`), a cache and never a source — nothing in it may be
+cited, the ingest copies the picked files into `raw/` with a manifest row, and a scout's *Status*
+line names the cache paths the next step starts from. This session's material is in it now. Nothing
+in `wiki/` changed; lint unchanged.

@@ -88,6 +88,9 @@ nats-wiki/
                        inbox/check-defaults-<tag>.md), check-staleness.py (pages whose
                        version-bearing claims are behind the release they name -> inbox/staleness.md,
                        and a warning line in lint.py),
+                     fetch-discussion.py (GitHub discussions via the GraphQL API -> the
+                       raw/gh-discussions/ rendering; `python3 tools/fetch-discussion.py 8001
+                       --out raw/gh-discussions`, cached first in a local dir),
                      fetch-docs.py (a doc site -> raw/, driven by its llms.txt; for this
                        wiki: `python3 tools/fetch-docs.py https://docs.nats.io
                        --collection nats-docs <prefix…>`),
