@@ -66,7 +66,7 @@ nats-wiki/
   raw/               IMMUTABLE sources, one subfolder per collection
     sources.md       manifest: origin URL/path, date fetched, license notes
   inbox/             question bank, triage tables, scout results, plans — not wiki
-    question-bank.md   the questions this wiki must answer; the scope test and the scoreboard
+    question-bank.md   the questions this wiki must answer, asked in public or posed here; the map and the scoreboard
     docs-issues.md     errors and gaps found in the public docs, verified against the
                        server source — a report to send upstream, not a wiki page
     server-issues.md   behaviours of nats-server itself that are surprising, inconsistent or
@@ -256,22 +256,36 @@ answers (question-bank numbers) · Pages touched.
 
 ## The question bank
 
-`inbox/question-bank.md` is the wiki's scope test and its scoreboard: a table of
-the real questions operators ask, each with where it was asked (a URL), an area,
-flags, and the page that answers it. It is rendered by the viewer as a
-filterable table (`Questions` in the nav).
+`inbox/question-bank.md` is the wiki's map and its scoreboard: a table of the
+questions a solution architect, designer or operator asks, each with where it
+was asked (a URL) or `own`, an area, flags, and the page that answers it. It is
+rendered by the viewer as a filterable table (`Questions` in the nav).
 
-- **Scope test**: if no question in the bank needs a page, that page probably
-  does not belong in this wiki. When you want to write something the bank does
-  not cover, add the question first — with a real source for someone asking it.
+- **The test for a page is the reader in *Focus***: would someone holding a
+  production problem or a design decision ask for it? If yes, write the question
+  into the bank and write the page. Until 2026-09-02 a row needed a public URL
+  and a page needed a row — "no question, no page". That rule seeded the wiki
+  well and was **retired** when it began to block the pages the wiki most needed:
+  design and architecture questions are rarely asked in one public thread in the
+  form an architect holds them. The bank's role did not change; who may write a
+  row did.
+- **Two kinds of rows.** *Asked* rows carry a URL: GitHub Discussions and issues
+  on `nats-io/nats-server`, Stack Overflow, the docs' own FAQ, NATS by Example,
+  blog posts and talk Q&A. *Posed* rows carry `own` in `asked at`: the maintainer
+  or the user wrote the question because the reader would ask it. Prefer a URL
+  when one exists, scout for one when one might, and replace `own` with the URL
+  when it turns up — but never hold a page back for the lack of one. A posed row
+  counts like an asked one on the scoreboard; it is only weaker evidence that
+  people ask it, so a bank that is mostly `own` is a warning about scope.
+- **Design questions** carry the `design` flag (a filter in the viewer) and are
+  written the way an architect holds them, with the trade-off in the question
+  ("one stream per tenant, or one stream with a tenant prefix — which, and
+  when?"), not as a symptom. `kind: pattern` pages answer them, resting on the
+  concept pages the trade-off turns on.
 - **Scoreboard**: after every ingest, fill the `answered by` column for the
   questions the new pages now answer (`[[slug]]`), and add questions the source
   revealed. A question is only "answered" when a page states the answer *with a
   citation and a version*, not when a page merely touches the topic.
-- Questions come from public places where people actually ask them: GitHub
-  Discussions and issues on `nats-io/nats-server`, Stack Overflow, the docs'
-  own FAQ, NATS by Example, blog posts and talk Q&A. Record the URL — a
-  question with no source is a guess.
 
 ## Operation: ingest <source>
 
@@ -461,8 +475,9 @@ synthesis.
 2. **The thinnest reader pages on the best-sourced topics** — sort reader pages
    by size, grep the summaries for each one's config keys, subjects and symptoms.
 3. **Reader pages that should exist and do not**, where the material is spread
-   over many summaries with no page owning it — and a question in
-   `inbox/question-bank.md` needs it. No question, no page.
+   over many summaries with no page owning it Write the bank row with
+   it — a URL if someone asked it in public, `own` if the reader would — so the
+   scoreboard stays complete.
 
 **Method for one page** (this is the part a script cannot do):
 

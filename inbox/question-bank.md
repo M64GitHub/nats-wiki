@@ -1,18 +1,22 @@
 # Question bank — what this wiki must answer
 
-The scope test and the scoreboard. Every row is a question an operator or architect actually
-asked **in public**, with a link to where it was asked. A page belongs in this wiki if it helps
-answer a row here; a row is *answered* only when a page states the answer with a citation and a
-version — not when a page merely touches the topic.
+The map and the scoreboard. Every row is a question a solution architect, designer or operator
+asks — either **asked in public**, with a link to where, or **posed here** because the reader would
+ask it (`own` in *asked at*). A row is *answered* only when a page states the answer with a citation
+and a version — not when a page merely touches the topic.
 
 - `★` marks the questions that must be answerable for the wiki to be useful at all.
+- `design` marks a solution-architecture question, written with its trade-off in the question
+  rather than as a symptom; `kind: pattern` pages answer these.
 - `no-public-answer` marks a row this wiki searched for and could not answer from public sources.
   Its `answered by` cell names the page that says so, in bold — a stated dead end is an answer; an
   empty cell is unfinished work.
 - `answered by` holds `[[wikilinks]]`; the viewer counts filled rows as "ingested" and the
   filters at the top let you see what is still open.
-- Add rows whenever a query, an ingest or a thread reveals a question the bank does not cover.
-  Never add a question without a source for someone asking it — that is a guess, not a question.
+- Add rows whenever a query, an ingest, a thread or a design session reveals a question the bank
+  does not cover. Give the URL when someone asked it in public; write `own` when the maintainer or
+  the user posed it, and replace `own` with a URL when one turns up. Until 2026-09-02 a row without
+  a URL was not allowed; that rule was retired (`CLAUDE.md`, *The question bank*).
 
 Seeded 2026-08-31 by mining `nats-io/nats-server` GitHub Discussions (484 threads read by title,
 Q&A and General categories) and the Stack Overflow `nats-jetstream` / `nats.io` / `nats-server`
@@ -370,3 +374,33 @@ search of `nats-io/nats-server` discussions for a public question about profilin
 `CLAUDE.md`'s scope test says a page needs a question behind it, so the material landed as sections on
 [[jetstream-sizing]] and [[monitoring-endpoints]] rather than as a runbook, and no question was
 invented to justify one.
+| 108 | One stream per tenant or service, or one stream with a tenant prefix in the subject — which, and at what count does "many streams" start to cost you (meta layer, account limits, consumers)? | jetstream security | own | design pattern sizing |  |
+| 109 | How should I design a subject hierarchy for JetStream — token order, where the wildcards go, and what subject cardinality costs the filestore and filtered consumers? | jetstream core | own | design pattern |  |
+| 110 | Limits, Interest or WorkQueue — how do I choose retention for a task queue, an event log and a cache, and what breaks when I choose wrong? | jetstream | own | design concept |  |
+| 111 | Filtered consumers on one large stream, or many small streams — which scales better for fan-out to N services, and where do `max_consumers` and per-consumer state bite? | jetstream | own | design pattern sizing |  |
+| 112 | `Nats-Msg-Id` deduplication or `Nats-Expected-Last-Subject-Sequence` — which gives me exactly-once-ish publishing for my case, and what does each cost? | jetstream | own | design pattern | [[publishing]] · [[stream]] |
+| 113 | R1, R3 or R5, memory or file — how do I pick a stream's replica count and storage for a given availability, durability and throughput target? | jetstream | own | design sizing | [[replicas]] |
+| 114 | Mirror, source, or a filtered consumer on the original stream — which replication shape for read replicas, fan-in and cross-region copies, and what does each cost? | jetstream topology | own | design pattern |  |
+| 115 | Pull or push, ordered or not, a queue group or one pull consumer shared by every replica — what is the consumer design for a service with N replicas reading one stream? | jetstream clients | own | design pattern | [[worker-pool]] |
+| 116 | How do I set `max_ack_pending`, batch size, `ack_wait` and `max_deliver` together for a worker pool with a throughput target and a failure budget? | jetstream | own | design sizing | [[worker-pool]] · [[ack-and-redelivery]] |
+| 117 | Durable or ephemeral consumers — when does a durable consumer become a liability (inactive threshold, orphaned state, a redelivery storm after a long outage)? | jetstream | own | design gotcha |  |
+| 118 | One KV bucket per tenant or one bucket with key prefixes; how much history and which TTL — what does each cost, and how big can a bucket get before watchers and key listing suffer? | kv | own | design pattern sizing |  |
+| 119 | KV as a config store, a service registry, a cache or a coordination primitive — which uses fit, which should be a stream or a database, and what does a KV get promise during a leader change? | kv | own | design pattern |  |
+| 120 | Object store or external blob storage — when is the NATS object store the right choice, and how do chunk size, `max_payload` and bucket limits constrain the design? | objectstore | own | design pattern |  |
+| 121 | Accounts or subject-prefix permissions for tenant isolation — when does a tenant need its own account, and what do imports and exports cost as tenants multiply? | security | own | design pattern |  |
+| 122 | Operator mode with JWTs, config-file accounts, or auth callout — which authentication model for which organisation, and how hard is moving between them later? | security | own | design pattern |  |
+| 123 | How should per-account JetStream limits (`max_memory`, `max_file`, `max_streams`, `max_consumers`) be apportioned in a shared cluster, and what does a tenant see at the limit? | security jetstream | own | design sizing |  |
+| 124 | Cluster, supercluster or leafnodes for multi-region — for a given latency and failure-domain requirement, which topology, and where does stream placement go? | topology | own | design pattern | [[choosing-a-topology]] · [[multi-region-jetstream]] |
+| 125 | Edge sites with intermittent connectivity: a leafnode with its own JetStream domain mirroring to the hub, or direct clients to the hub — how do I design for the link being down? | topology jetstream | own | design pattern |  |
+| 126 | Three or five servers, and how spread across availability zones — what is the quorum arithmetic, and what fails in a two-zone layout? | topology deploy | own | design sizing |  |
+| 127 | Should JetStream run on every server or on dedicated nodes, and should the system account, monitoring and client traffic share them — how do I partition roles in a cluster? | topology deploy | own | design pattern |  |
+| 128 | Capacity planning: how do I derive node count, disk, RAM and IOPS from message rate, size, retention, replicas and consumer count — and what runs out first? | deploy jetstream | own | design sizing | [[jetstream-sizing]] |
+| 129 | What is the minimum alert set for production JetStream — quorum, lag, disk, consumer pending, redeliveries — and which endpoint or metric feeds each? | monitoring | own | design runbook |  |
+| 130 | Rolling upgrade design: node order, the mixed-version window, API levels, and when a minor upgrade is not rollback-safe? | deploy | own | design runbook | [[upgrade-a-cluster]] |
+| 131 | Kubernetes, VMs or bare metal for JetStream — storage classes, a PVC per replica, anti-affinity, and what the Helm chart decides for you? | deploy | own | design pattern |  |
+| 132 | Backup and disaster-recovery design: snapshots, a mirror in a second cluster, or trusting R3 — what RPO and RTO does each give, at what cost? | deploy jetstream | own | design pattern | [[disaster-recovery]] · [[backup-and-restore-jetstream]] |
+| 133 | Core NATS or JetStream for a given flow — how do I decide per subject, and what does a mixed design (core for request/reply, JetStream for events) look like? | core jetstream | own | design pattern |  |
+| 134 | Request/reply at scale without JetStream: queue groups, timeouts, scatter-gather and no-responders — how do I design a service layer on core NATS? | core | own | design pattern |  |
+| 135 | Large messages: raise `max_payload`, chunk in the application, or use the object store — where is each the right answer? | core objectstore | own | design pattern |  |
+| 136 | Migrating from Kafka or RabbitMQ: how do topics, partitions, consumer groups and offsets map onto streams, subjects, consumers and acks — and where do the semantics differ? | jetstream interop | own | design pattern |  |
+| 137 | Built-in MQTT or a broker in front of NATS — when does each fit, and what do sessions, QoS levels and retained messages cost in JetStream storage? | interop | own | design pattern |  |

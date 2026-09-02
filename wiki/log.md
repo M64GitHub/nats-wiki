@@ -3325,3 +3325,31 @@ Pushed to https://github.com/M64GitHub/nats-wiki, public, under Apache-2.0 (`LIC
 gains a *License* section saying what `raw/` keeps of its own). `site/` stays git-ignored; `raw/` is
 published in full, the user's decision. The goal stated for the repo: anyone can clone it and run
 their own agent in it.
+
+## 2026-09-02 — rulebook: the scope test retired, posed questions allowed
+
+The user's call, after the state-of-the-wiki review: "no question, no page" with a public URL behind
+every row seeded the bank well but now blocks the pages the wiki most needs — design and
+architecture questions are rarely asked in one public thread in the form an architect holds them.
+`CLAUDE.md` *The question bank* rewritten: the test for a page is the reader in *Focus*; a row may be
+*asked* (URL) or *posed* (`own` in `asked at`); a `design` flag marks architecture questions answered
+by `kind: pattern` pages; *Operation: consolidate* item 3 loses "No question, no page". Same change
+in the bank's header, the map line and the README line; `wiki.json` gains a `design` filter on the
+Questions table. No rows changed.
+
+## 2026-09-02 — bank: seeded with 30 posed design rows (108–137)
+
+The first use of the retired scope test. Thirty `design` rows, `asked at` = `own`, one per
+architecture decision: stream-per-tenant vs prefix, subject hierarchy and cardinality, retention
+choice, one stream vs many for fan-out, dedup by `Nats-Msg-Id` vs expected-sequence, replica count
+and storage, mirror vs source vs filtered consumer, consumer design for N replicas, worker-pool
+tuning, durable vs ephemeral, KV bucket design and KV uses, object store vs blob storage, accounts vs
+subject permissions, operator mode vs config vs auth callout, per-account limit apportioning,
+topology for multi-region, edge with intermittent links, 3 vs 5 across zones, role partitioning,
+capacity planning, minimum alert set, rolling-upgrade design, Kubernetes vs VMs, backup/DR design,
+core vs JetStream, a service layer on core NATS, large messages, migrating from Kafka/RabbitMQ,
+built-in MQTT vs a broker. **8 filled** from pages whose sections state the answer (`publishing`,
+`stream`, `replicas`, `worker-pool`, `ack-and-redelivery`, `choosing-a-topology`,
+`multi-region-jetstream`, `jetstream-sizing`, `upgrade-a-cluster`, `disaster-recovery`,
+`backup-and-restore-jetstream`); **22 open**. Bank 107 → **137 rows, 101 answered**.
+`inbox/scout-backlog.md` gains section 5 with the two scouts these rows call for. No page changed.

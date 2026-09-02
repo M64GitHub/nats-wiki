@@ -26,7 +26,7 @@ nats-server <version>` and `verified-on: <date>`. A stale page is worse than a m
 | `CLAUDE.md` | the maintainer rulebook the agent reads before every operation |
 | `wiki.json` | site name, page types/folders, kinds, facets, TOC tables — read by the tools |
 | `raw/` | immutable original sources (`raw/sources.md` is the manifest) |
-| `inbox/question-bank.md` | the questions the wiki must answer — scope test and scoreboard |
+| `inbox/question-bank.md` | the questions the wiki must answer, asked in public or posed by the maintainer — the map and the scoreboard |
 | `inbox/adr-toc.md` | one row per ADR of `nats-architecture-and-design` |
 | `inbox/config-keys-table.md` | every documented config key with type, default and reload behaviour |
 | `inbox/plan-*.md` | the step list a session works through — say `start the plan` |

@@ -137,3 +137,21 @@ both came out of running the binary, not out of reading.
 Be prepared for `no-public-answer` to be the right result more often here than in earlier rounds. The
 easy rows were answered first; **what is left is disproportionately the questions nobody public has
 answered**, and a stated dead end with a date on it is the most valuable row in the table.
+
+---
+
+## 5 · The posed design rows — 108–137 (added 2026-09-02)
+
+Thirty rows written by the maintainer under the retired scope test (`CLAUDE.md`, *The question
+bank*, 2026-09-02): `own` in *asked at*, `design` in *flags*, one per architecture decision an
+operator or solution architect holds — stream and subject design, consumer design, KV and object
+store, multi-tenancy and auth, topology, capacity, upgrades, DR, core-versus-JetStream, migration,
+MQTT. Eight were filled on the day from pages whose sections state the answer; **22 are open** and
+are the work queue for `kind: pattern` pages.
+
+**Two scouts follow from them.** (a) A scout for the **public form** of each posed row — a
+discussion, an issue, a Stack Overflow question, a talk — so `own` can be replaced with a URL; the
+2026-08-31 mining read 484 discussions by *title*, and design questions hide in bodies and replies.
+(b) A scout per **pattern page** before it is written: the Synadia *Design Patterns for Scaling NATS*
+series, NATS by Example, and the docs' unread `learn/core-nats`, `learn/resilient-clients` and
+`learn/services` chapters are the first places to look. Run (b) page by page, not all at once.
