@@ -1,0 +1,2754 @@
+{
+ "data": {
+  "rateLimit": {
+   "cost": 1,
+   "remaining": 4989
+  },
+  "repository": {
+   "discussions": {
+    "totalCount": 484,
+    "pageInfo": {
+     "hasNextPage": true,
+     "endCursor": "Y3Vyc29yOnYyOpK0MjAyMy0wMy0yMVQyMToyNTo1NVrOAEwhzQ=="
+    },
+    "nodes": [
+     {
+      "number": 3077,
+      "title": "It is safe to use a Service name in routes in a helm chart?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3077",
+      "createdAt": "2019-07-04T15:20:16Z",
+      "updatedAt": "2022-06-21T12:41:53Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "howkey666"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 9
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello,\r\nI am trying to write a helm chart for NATS streaming using the fault tolerance mode. In a yaml file specifying a `StatefulSet` I have a few `args` but the important are:\r\n\r\n```\r\n\"--cluster\", \"nats://0.0.0.0:{{ .Values.service.clusterPort }}\",\r\n\"--routes\", \"nats://{{ .Values.service.name }}:{{ .Values.service.clusterPort }}\"]\r\n```\r\n\r\nI run 3 replicas so I have 3 pods named `nats-0`, `nats-1` and `nats-2`. \r\nFrom a log I can see that nats server on `nats-0` is set as an active and others are in standby mode. When I manually delete the `nats-0` pod then a new active server is elected from the last two servers. That's expected and that meas that they know about each other.\r\n\r\nBut what is confusing for me is that in a log for particular server I see `x.x.x.x:6222 - rid:6 - Route connection created` where `x.x.x.x` is a `Service` IP and on another line the `x.x.x.x` is a pod IP. In kubernetes we are using IPVS proxy mode https://kubernetes.io/docs/concepts/services-networking/service/#proxy-mode-ipvs and if I understand it correctly, it means that a client (in this case it can be any nats server running within cluster) will not know about a real IP of the pod where it runs but it will know about the `Service` IP only. \r\nMy assumption is that this isn't any problem. But I can be wrong because I don't know how the routing internally works and I were unable to find any resources other then source code.\r\n\r\nIs my assumption correct? Can someone write more info about how the routing works? Would be great to have an explanaiton of this proces step by step with some example.\r\n\r\nThank you very much.\r\n \r\n\r\n"
+     },
+     {
+      "number": 5221,
+      "title": "NATS compared to Azure ServiceBus",
+      "url": "https://github.com/nats-io/nats-server/discussions/5221",
+      "createdAt": "2020-02-27T08:51:43Z",
+      "updatedAt": "2024-03-18T01:00:23Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "mariomuja"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 5
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "We are not sure, whether we shall use NATS or Azure ServiceBus.\r\nMicrosoft lists the following advanced features for ServiceBus.\r\nCan you please tell us, whether NATS supports the same features?\r\n\r\n1. When should I use Azure ServiceBus instead of NATS?\r\n\r\n2. When should I use NATS instead of Azure ServiceBus?\r\n\r\n3. \"NATS is a fire-and-forget messaging system. If you need higher levels of service, you can use NATS Streaming or build additional reliability into your client\"\r\n\r\nDoes that mean that NATS does NOT provide the level of reliability that Azure ServiceBus provides (like transactions and other features listed below) ?\r\n\r\nThanks a lot for your help,\r\nMario\r\n\r\n\r\n---- Features listed by Microsoft for Azure ServiceBus ----\r\nMessage sessions\r\nTo create a first-in, first-out (FIFO) guarantee in Service Bus, use sessions. Message sessions enable joint and ordered handling of unbounded sequences of related messages. For more information, see Message sessions: first in, first out (FIFO).\r\n\r\nAutoforwarding\r\nThe autoforwarding feature chains a queue or subscription to another queue or topic. They must be part of the same namespace. With autoforwarding, Service Bus automatically removes messages from a queue or subscription and puts them in a different queue or topic. For more information, see Chaining Service Bus entities with autoforwarding.\r\n\r\nDead-letter queue\r\nService Bus supports a dead-letter queue (DLQ). A DLQ holds messages that can't be delivered to any receiver. It holds messages that can't be processed. Service Bus lets you remove messages from the DLQ and inspect them. For more information, see Overview of Service Bus dead-letter queues.\r\n\r\nScheduled delivery\r\nYou can submit messages to a queue or topic for delayed processing. You can schedule a job to become available for processing by a system at a certain time. For more information, see Scheduled messages.\r\n\r\nMessage deferral\r\nA queue or subscription client can defer retrieval of a message until a later time. This deferral might be because of special circumstances in the application. The message remains in the queue or subscription, but it's set aside. For more information, see Message deferral.\r\n\r\nBatching\r\nClient-side batching enables a queue or topic client to delay sending a message for a certain period of time. If the client sends additional messages during this time period, it transmits the messages in a single batch. For more information, see Client-side batching.\r\n\r\nTransactions\r\nA transaction groups two or more operations together into an execution scope. Service Bus supports grouping operations against a single messaging entity within the scope of a single transaction. A message entity can be a queue, topic, or subscription. For more information, see Overview of Service Bus transaction processing.\r\n\r\nFiltering and actions\r\nSubscribers can define which messages they want to receive from a topic. These messages are specified in the form of one or more named subscription rules. For each matching rule condition, the subscription produces a copy of the message, which can be differently annotated for each matching rule. For more information, see Topic filters and actions.\r\n\r\nAutodelete on idle\r\nAutodelete on idle enables you to specify an idle interval after which a queue is automatically deleted. The minimum duration is 5 minutes. For more information, see the QueueDescription.AutoDeleteOnIdle Property.\r\n\r\nDuplicate detection\r\nAn error could cause the client to have a doubt about the outcome of a send operation. Duplicate detection enables the sender to resend the same message. Another option is for the queue or topic to discard any duplicate copies. For more information, see Duplicate detection.\r\n\r\nSecurity protocols\r\n\r\nService Bus supports security protocols such as Shared Access Signatures (SAS), Role Based Access Control (RBAC) and Managed identities for Azure resources.\r\n"
+     },
+     {
+      "number": 5222,
+      "title": "Investigate why NATS subscribe lower than Kafka in Watermill benchmark?",
+      "url": "https://github.com/nats-io/nats-server/discussions/5222",
+      "createdAt": "2020-04-28T19:16:19Z",
+      "updatedAt": "2024-03-18T01:03:27Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "kokizzu"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 7
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": " - [x] Verification Request\r\n\r\nhttps://github.com/ThreeDotsLabs/watermill#benchmarks\r\n \r\n\r\n"
+     },
+     {
+      "number": 2175,
+      "title": "Any events on websocket-client disconnect?",
+      "url": "https://github.com/nats-io/nats-server/discussions/2175",
+      "createdAt": "2021-05-04T06:49:20Z",
+      "updatedAt": "2022-07-21T05:45:31Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "a-marchenko"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "aricart"
+       },
+       "createdAt": "2021-05-04T13:47:59Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I need to know that the client (nats.ws) has disconnected without constantly polling all clients every few seconds.\r\nI'm wondering if there are some NATS events that I could subscribe to in other services?\r\nOr how do I need to modify the nats-server code in order to timely learn about the broken connection to the websocket client?"
+     },
+     {
+      "number": 2200,
+      "title": "Is NATS-server FIPS compliant",
+      "url": "https://github.com/nats-io/nats-server/discussions/2200",
+      "createdAt": "2021-05-10T12:25:02Z",
+      "updatedAt": "2025-11-24T21:58:26Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "JosephTharayil"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2023-11-28T22:45:01Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi Team,\r\n\r\nCan i know if the nats-server is FIPS compliant, and what is the crypto library used? \r\n\r\nThanks,\r\nJo "
+     },
+     {
+      "number": 2229,
+      "title": "Is there any plan to support HTTP2 as transport?",
+      "url": "https://github.com/nats-io/nats-server/discussions/2229",
+      "createdAt": "2021-05-19T21:40:32Z",
+      "updatedAt": "2022-06-21T12:02:56Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 2,
+      "author": {
+       "login": "masokan"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I am using gRPC in a project and exploring the possibility of using nats.io in another.  Is there any plan to support HTTP2 as transport in the future?  Thanks."
+     },
+     {
+      "number": 2259,
+      "title": "IM server",
+      "url": "https://github.com/nats-io/nats-server/discussions/2259",
+      "createdAt": "2021-06-05T14:02:09Z",
+      "updatedAt": "2022-07-07T11:37:06Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "carr123"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "ripienaar"
+       },
+       "createdAt": "2021-06-05T14:17:45Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Is nats-server suitable for serving as an IM server ?\r\nmany clients (say 10K) connect to a nats server cluster, each client subscribe an unique topic(userid as topic name).  and exchange messages between each other.\r\nis nats-server work fine in this scenario ? \r\nthanks a lot."
+     },
+     {
+      "number": 2350,
+      "title": "Validate the messages that arrive on the NATS server",
+      "url": "https://github.com/nats-io/nats-server/discussions/2350",
+      "createdAt": "2021-07-07T13:53:46Z",
+      "updatedAt": "2022-06-16T18:10:29Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "remyduthu"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-01-07T14:49:33Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Is it possible to validate the messages that arrive on the NATS server using a JSON Schema for example?"
+     },
+     {
+      "number": 2400,
+      "title": "TLS-Handshake error",
+      "url": "https://github.com/nats-io/nats-server/discussions/2400",
+      "createdAt": "2021-08-03T14:49:15Z",
+      "updatedAt": "2022-06-26T06:45:41Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "sachusachin622"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi\r\n\r\nI am using the nats certificates ca.pem server-cert.pem and server-key.pem in this path \"nats_client/nats.c-2.3.0/test/certs\".\r\nRunning the nats-server using this command:\r\n\"nats-server -config nats.config --tls --tlscacert=/usr/sbin/ca.pem -tlscert=/usr/sbin/server.pem --tlskey=/usr/sbin/server-key.pem\"\r\nRunning the nats-client using this command:\r\n\"nats-client -s SERVER_IP:4222 -tls -tlscacert /usr/sbin/ca.pem\"\r\n\r\nOn server side am getting TLS Handhake error logs as\r\n\r\n[12987] 2021/08/03 14:39:58.994906 [INF] Server is ready\r\n[12987] 2021/08/03 14:39:58.994971 [INF] Cluster name is bnngfVp5iXEJNSlmBBwUoJ\r\n[12987] 2021/08/03 14:39:58.995016 [WRN] Cluster name was dynamically generated, consider setting one\r\n[12987] 2021/08/03 14:39:58.995188 [INF] Listening for route connections on 0.0.0.0:4248\r\n[12987] 2021/08/03 14:40:09.760608 [DBG] 10.12.34.36:47173 - cid:3 - Client connection created\r\n[12987] 2021/08/03 14:40:09.760954 [DBG] 10.12.34.36:47173 - cid:3 - Starting TLS client connection handshake\r\n[12987] 2021/08/03 14:40:09.804615 [ERR] 10.12.34.36:47173 - cid:3 - TLS handshake error: remote error: tls: bad certificate\r\n[12987] 2021/08/03 14:40:09.804741 [DBG] 10.12.34.36:47173 - cid:3 - Client connection closed: TLS Handshake Failure\r\n\r\nPlease help on this.\r\n\r\nThanks.\r\nSachin"
+     },
+     {
+      "number": 2487,
+      "title": "kv store feature",
+      "url": "https://github.com/nats-io/nats-server/discussions/2487",
+      "createdAt": "2021-09-04T10:59:32Z",
+      "updatedAt": "2022-06-12T05:24:44Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "carr123"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2021-09-04T16:40:55Z"
+      },
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "hello, i learned from nats.io that there are key value and object store on the roadmap.\r\ni don't find detailed description or doc about that cool feature.\r\nis that something like redis or Amazon S3 ?\r\n"
+     },
+     {
+      "number": 2492,
+      "title": "The key_file of nats-server is not encrypted!",
+      "url": "https://github.com/nats-io/nats-server/discussions/2492",
+      "createdAt": "2021-09-06T07:12:38Z",
+      "updatedAt": "2022-07-12T15:19:04Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "z00407087"
+      },
+      "category": {
+       "name": "Ideas"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "The key_file of nats-server is not encrypted! It is unsafe. Can we encrypt the key_file like the server password."
+     },
+     {
+      "number": 2626,
+      "title": "how to migrate from legacy restful systems to equivalent event base system by NATS.IO",
+      "url": "https://github.com/nats-io/nats-server/discussions/2626",
+      "createdAt": "2021-10-15T22:55:22Z",
+      "updatedAt": "2022-08-12T20:53:09Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "lusicsmusics1"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 0
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "what time we should migrate to such systems"
+     },
+     {
+      "number": 2664,
+      "title": "websocket native client",
+      "url": "https://github.com/nats-io/nats-server/discussions/2664",
+      "createdAt": "2021-11-02T00:03:56Z",
+      "updatedAt": "2022-08-29T21:55:02Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "carr123"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2021-11-02T00:06:50Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "hello, is there any doc describing how to access nats-server in a golang(c, python, java ...) client  through websocket ?"
+     },
+     {
+      "number": 2730,
+      "title": "What are strategies for moving a stream to a different set of nodes in the cluster?",
+      "url": "https://github.com/nats-io/nats-server/discussions/2730",
+      "createdAt": "2021-12-05T14:14:42Z",
+      "updatedAt": "2023-10-14T02:31:47Z",
+      "closed": true,
+      "closedAt": "2023-10-14T02:31:43Z",
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "bruth"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "jnmoyne"
+       },
+       "createdAt": "2023-10-14T02:31:43Z"
+      },
+      "comments": {
+       "totalCount": 6
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "The driving motivation is to deal with situations when and existing NATS cluster need to be migrated to new VMs/servers/hardware. The goal would be to not require clients to change the address they are connecting to. Obviously if client connections are temporarily interrupted and auto-reconnect, then that is fine (no different then a network hiccup).\r\n\r\nTo setup a scenario, let's assume I have a 3-node cluster with Jetstream enabled on all nodes. I have one or more streams some of which are configured to have 3 replicas. The problem is that I am running out of storage and need to add more storage for existing streams but also new streams.\r\n\r\nI am aware that additional nodes can be added to a cluster with JS enabled and NATS will distribute stream replicas across the set of available nodes. My understanding is that replication/quorum happens on a per stream basis.\r\n\r\nWould it be possible to increase the size of the cluster, with the new nodes having the new storage requirements, and the stream be moved transparently to these new nodes? I know a mirror could be setup, but this would require clients to know to switch over to publishing and consuming to this new stream.\r\n\r\nIs there some other transparent way of handling this?"
+     },
+     {
+      "number": 2731,
+      "title": "Time-sensitive messages",
+      "url": "https://github.com/nats-io/nats-server/discussions/2731",
+      "createdAt": "2021-12-06T13:45:50Z",
+      "updatedAt": "2022-08-26T07:01:54Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 8,
+      "author": {
+       "login": "c16a"
+      },
+      "category": {
+       "name": "Ideas"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "It would be nice if NATS supported time-sensitive message to solve the below use cases\r\n1. Only deliver this message from the stream if it's not expired yet.\r\n2. Defer the delivery of this message until a certain time.\r\n\r\nI'm a long time user of NATS, but very new to contributing. So here is how I think we can approach this problem.\r\n### Add support for expiring and deferred messages via NATS headers\r\nTwo additional headers can be set by clients to configure time sensitivity\r\n1. The `Nats-Before` header expires the message at the Unix timestamp provided in the header\r\n2. The `Nats-Not-Before` header prevents the message to be consumed before the Unix timestamp provided in the header\r\n\r\nIt is possible that users are already building some of this functionality on the client-side using similar headers. So we could make `Nats-Before` and `Nats-Not-Before` header keys configurable by user.\r\n\r\n### Enable Jetstream messages to be evicted if the `Nats-Before` header passes\r\nCould start a timer and remove the message from the stream. Perhaps KV could also be used?\r\n\r\n### Enable Jetstream to selectively skip messages until the `Nats-Not-Before` timestamp passes\r\nNeed Jetstream to not push messages to consumers until `Nats-Not-Before` passes.\r\n\r\nWill look into this in detail and post updates here."
+     },
+     {
+      "number": 2740,
+      "title": "Are there benefits to be gained performance-wise by using the same encryption/decryption mechanism when clients communicate via messages sent-to/received-from the same nats server?",
+      "url": "https://github.com/nats-io/nats-server/discussions/2740",
+      "createdAt": "2021-12-12T15:03:33Z",
+      "updatedAt": "2022-08-25T19:52:20Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dsidirop"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "tbeets"
+       },
+       "createdAt": "2021-12-13T17:14:43Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "**Forward Warning: I take it for granted that the nats-server does indeed support having different clients connect to it using their own encryption-decryption schemes/keys. If I'm missing something please feel free to point it out.**\r\n\r\nEssentially what the subject says.\r\n\r\nConsider for instance the following two scenarios for nats-based communication:\r\n\r\n-----\r\n\r\nScenario#1:\r\n\r\n- A publisher (P) is publishing over to nats on subject \"foo.bar\", using encryption-decryption-scheme (A) with his own encryption-key (A)\r\n\r\n- A consumer (C) is subscribed to nats-subject \"foo.bar\", using encryption-decryption-scheme (B) with his own encryption-key (B)\r\n\r\nIn this scenario I assume that that nats-server will decrypt messages published by (P) using decryption scheme (A) examine the subject and forward \"foo.bar\" messages over to consumer  (C) after having re-encrypted these messages using encryption-scheme (B).\r\n\r\n-----\r\n\r\nScenario#2:\r\n\r\n- A publisher (P) is publishing over to nats on subject \"foo.bar\", using encryption-decryption-scheme (A) with his own encryption-key (A)\r\n\r\n- A consumer (C) is subscribed to nats-subject \"foo.bar\", using the **exact same encryption-decryption-scheme (A) as the publisher**\r\n\r\nIn this scenario **I assume** that that nats-server would only need to decrypt just the **subject** of the message published by (P) using decryption scheme (A) and after examining the subject it would forward \"foo.bar\" messages over to consumer  (C) by \"copy-pasting\" the payload (data) of the message \"as-is\" since the encryption-decryption mechanism is the exact same.\r\n\r\nI guess this symmetry in encryption-decryption should lead to a considerable performance boost when the load is high.\r\n\r\nAm I right in these assumptions? Or do I miss something? I haven't seen anyone pointing out scenario#2 as a means to boost performance and reduce latency (potentially reducing error rates as well).\r\n\r\nThoughts? Insights? Links to relevant documentation?"
+     },
+     {
+      "number": 2758,
+      "title": "Smart-cancellation between competing consumers",
+      "url": "https://github.com/nats-io/nats-server/discussions/2758",
+      "createdAt": "2021-12-24T22:56:23Z",
+      "updatedAt": "2022-06-12T05:53:00Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dsidirop"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2021-12-25T00:06:28Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "We have the following article of the official documentation mentioning competing consumers (subscribers):\r\n\r\nhttps://docs.nats.io/nats-concepts/core-nats/reqreply\r\n\r\n![image](https://user-images.githubusercontent.com/7284501/147373739-5ae8c862-bbd8-415c-80b6-d126fc6df94d.png)\r\n\r\nLet's assume that after we distribute a task to these consumers, one of the consumers takes (say) 100ms to return a reply, while the rest take 500ms.\r\n\r\nIs Nats smart enough to somehow automatically communicate with the slow consumers and tell them to stop trying past the 100ms mark? And if so how does Nats do that? Does it set some kind of golang-context to \"cancelled\"?\r\n\r\nI'm asking because if one of the consumers has indeed completed the task within 100ms, the rest can simply stop working on the task - there is no point for them to continue working on it anymore.\r\n\r\nPS: If this type of feature is not provided out of the box I guess one would have to implement it \"by hand\" and send some kind of custom nats message to the consumers right after receiving the first response from the fastest consumer - it works but its a lot of error-prone hassle."
+     },
+     {
+      "number": 2760,
+      "title": "Specializing Websocket connections between \"read-only\" (subscribe) vS \"write-only\" (publish)",
+      "url": "https://github.com/nats-io/nats-server/discussions/2760",
+      "createdAt": "2021-12-26T00:27:11Z",
+      "updatedAt": "2022-08-29T21:53:39Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dsidirop"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2021-12-26T00:54:27Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Quick question just to be sure because I couldn't find any explicit information about this in the official docs ... (sorry if this has been answered elsewhere - feel free to point out any links)\r\n\r\nIn regard to best programming practices for a single client connecting to nats-servers using websocket:\r\n\r\nWould it make sense to keep 2 connections up for this client:\r\n\r\n- one to .Subscribe()\r\n- and a separate one to .Publish() messages\r\n\r\nI'm simply exploring whether the nats-server optimizes the connections for these two cases to make the most out of them.\r\n\r\nI'm aware of the following facts:\r\n\r\n- That allowing remote clients over the web to publish messages to nats directly is something that in principle mandates tremendous caution\r\n- That having 2 connections instead of 1 per client will strain resources in the server so there needs to be good justification for this approach\r\n\r\nThanks in advance!"
+     },
+     {
+      "number": 2770,
+      "title": "Max Number of WebSocket Connections that a Single Nats Server can Sustain Reliably",
+      "url": "https://github.com/nats-io/nats-server/discussions/2770",
+      "createdAt": "2022-01-06T13:31:35Z",
+      "updatedAt": "2022-06-01T06:54:23Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 4,
+      "author": {
+       "login": "dsidirop"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-01-06T14:22:57Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "( Assume below that the nats-server in question has 128GB of RAM and \"beast-mode\" ARM CPUs )\r\n\r\n1. Are there any rules of thumb documented somewhere for teams interested in figuring out what is the max-client limit for a core-nats-server when said clients connect to the nats-server using **WebSocket** connections (no leaf-nodes involved) with a specific network-usage profile?\r\n\r\n2. For example if on average every client is expected to transfer 1000 messages/hour with message size ~= 1kb every single day, then how many WebSocket connections can a single nats-server sustain without facing issues? (connections getting dropped etc)\r\n\r\n3. Does the resulting max-number change if JetStream is involved? Or does the \"formula\" remain the same regardless?\r\n\r\n4. Does the resulting max-number change if WebTransport is used later on (upgrade from WebSocket)? Or does the \"formula\" remain the same regardless?\r\n\r\nPS: I'm sorry if this has been answered elsewhere but I just couldn't spot anything anywhere in the official docs"
+     },
+     {
+      "number": 2783,
+      "title": "Fending of DoS attacks against nats-server by auto-revoking auth-keys",
+      "url": "https://github.com/nats-io/nats-server/discussions/2783",
+      "createdAt": "2022-01-13T08:55:32Z",
+      "updatedAt": "2022-06-12T05:24:03Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dsidirop"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-01-13T15:14:03Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Let's assume we have 100k accounts in a nats-fueled infrastructure each one enjoying their own auth-credentials.\r\n\r\nLet's assume that one of them has his auth-credentials leaked and attackers exploit the credentials to launch an attack against nats by either (a) spamming a huge volume of traffic towards nats (b) opening millions of connections towards nats\r\n\r\nIt's indeed documented that nats does in fact support revoking the auth-keys of the affected account:\r\n\r\nhttps://docs.nats.io/using-nats/nats-tools/nsc/revocation \r\n\r\nHow would you advise making the revocation process automatic to make the system recover elegantly all by itself from these DoS attacks?\r\n\r\n(a) Does nats support setting some \"auto-revoke\" policy for auth-keys so that if it detects that a certain account is misbehaving to knock it out of commission by promptly revoking its auth-key?\r\n\r\n(b) If nats doesn't have the aforementioned auto-revoke feature (and there are no plans to implement it either) is it possible to use something like 'nats top' or some rest-api to scrape metrics and send them to prometheus (or w/e) in order to alert ourselves in case we notice a DoS attack and revoke the auth-key(s) involved there to deactivate the exploited account(s) that the attackers are abusing?\r\n\r\nThanks in advance!"
+     },
+     {
+      "number": 2788,
+      "title": "Using JWT-SVID for authentication",
+      "url": "https://github.com/nats-io/nats-server/discussions/2788",
+      "createdAt": "2022-01-13T23:38:14Z",
+      "updatedAt": "2022-07-26T20:36:46Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 2,
+      "author": {
+       "login": "jwalters-gpsw"
+      },
+      "category": {
+       "name": "Ideas"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 0
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I've started to look at the possibility of using SPIFFE [JWT-SVIDs](https://github.com/spiffe/spiffe/blob/main/standards/JWT-SVID.md) for NATS authentication and it's really making my head hurt.\r\n\r\nThe top level idea is to use [SPIFFE/SPIRE](https://spiffe.io/docs/latest/deploying/svids/) generated identities as the NATS identities. I **_think_** you can even jack in claims to SPIRE to provide the authorization. But my first hurdle is understanding whether:\r\n\r\n- the fields set for identity is what NATS is looking for (I can probably suss this out with a little more effort), and\r\n- whether the `Ed25519` requirement is matched by one of the `algs` listed in the supported algs list [here](https://github.com/spiffe/spiffe/blob/main/standards/JWT-SVID.md#21-algorithm).\r\n\r\nOn the later, if not, then I'll probably put this on my 'review later' list.\r\n\r\n \r\n\r\n"
+     },
+     {
+      "number": 2794,
+      "title": "how to recover from DiscardNew policy?",
+      "url": "https://github.com/nats-io/nats-server/discussions/2794",
+      "createdAt": "2022-01-17T16:00:23Z",
+      "updatedAt": "2022-06-29T04:18:06Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "lukasGemela"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-01-17T16:19:24Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "hey guys, have a question related to jetstream's discard policy new\r\nThe Discard Policy sets how messages are discarded when limits set by LimitsPolicy are reached. The DiscardOld option removes old messages making space for new, while DiscardNew refuses any new messages.\r\nThis to me somehow indicates that new messages wont be accepted until some old messages are ACKed and deleted from stream.\r\n\r\nBut I tested this scenario and apparently that's not how it works:\r\nI have stream with 3 maxMsgs\r\nI publish 3 messages\r\nI consume and ACK 3 messages\r\nI publish one more message, got exception that stream is full\r\nI never consume more messages and messages are not cleared out from stream.\r\n\r\nIs this expected behaviour?\r\n\r\nI'm trying to archieve  behaviour that our producer starts to fail when stream is full (return error to client or whatever), but can recover from failure when consumers catch up later. If I keep discard policy to old and consumers starts to fail for some reason we might start to loose messages"
+     },
+     {
+      "number": 2798,
+      "title": "Fair sharding",
+      "url": "https://github.com/nats-io/nats-server/discussions/2798",
+      "createdAt": "2022-01-19T12:19:44Z",
+      "updatedAt": "2022-09-13T15:30:18Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 12,
+      "author": {
+       "login": "thinkbeforecoding"
+      },
+      "category": {
+       "name": "Ideas"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "# Problem Overview\r\n\r\nThere is currently an ADR in progress about [Ordered Consumer Groups](https://github.com/nats-io/nats-architecture-and-design/pull/36/files#). The current proposal enables consuming messages in parallel as long as messages sharing a common subject or header are processed sequentially on the same consumer.\r\n\r\nMy experience with this (14 years on the topic as an architect at [D-Edge/Accor](https://www.d-edge.com/)) shows that this solution is acceptable as long as traffic relatively homogenous between shards/partition keys. But it's problematic as soon as some shards can randomly be published in burst, especially in the presence of slow consumers (when consumers are fast, things are too easy). When a burst occurs on a shard key, messages published for other shard keys after the burst can be impacted and delayed until all messages from the burst are processed.\r\n\r\nThis is typical with static consistent hashing (here an example with 3 partitions, allocated using a mod3):\r\n* Partition0: M0, M0,M0,M0, M0, M0, M0, M0, M0, M0, M0, M3\r\n* Parition1: M1, M4\r\n* Partition2: M2\r\n\r\npartitions 1 and 2 will quickly be empty, but the Message M3 for partition key 3, is blocked behind all messages for partition key 0. It would be fair to process M3 just after the first M0 message, as it would be compatible with sequentiallity by partition key, and ordering in a partition key.\r\n\r\n# Current solution\r\n\r\nI implemented a fair sharding strategy on MSMQ that has been in use with success for several years, and managed to port it to Nats/Jets Stream.\r\n\r\nMessages are persisted to a stream configured with Work Queue retention.\r\n\r\nA dispatcher service starts an [ephemeral consumer](ephemeral) in [HeadersOnly](https://github.com/nats-io/nats.net/blob/master/src/NATS.Client/JetStream/ConsumerConfiguration.cs#L483) mode, with an infinite [AckWait](https://github.com/nats-io/nats.net/blob/master/src/NATS.Client/JetStream/ConsumerConfiguration.cs#L48).\r\n\r\nThe dispatcher maintains a queue map, initially empty, associating an in-memory queue of message sequence numbers (and message ack subject) to a partition key. It also maintains a queue of partition keys, initially empty too, as a ring buffer.\r\nWhen receiving a message, the dispatcher extract the partition key (it can be a part of the subject, or the value of a header) from the message and checks whether there is already a queue for the partition key in the queue map.\r\n* if not:\r\n    * it creates an in-memory queue and push the message sequence number.\r\n    * it adds add the queue to the queue map under the partition key\r\n    * it appends the partition key to the ring buffer, indicating there is some work to be done for this partition key\r\n* if the queue exists:\r\n   * it adds the message to the in-memory queue.  \r\n\r\nThe dispatcher will use these in memory structures to dispatch the work to workers (subscribers). When workers start, they signal themselves over a known subject, indicating a worker specific subject to be notified of work to do. The dispatcher enrolls the worker in a list. If the dispatcher is starting after the workers, it signal itself on a known subject, and workers respond with their specific subject.\r\n\r\nWhen a message arrived, when a workers is enrolled, or when a message has just been processed, the dispatcher tries to allocate a message to a worker. It first check if there is any available worker (enrolled and not already busy). The it pops the first partition key from the ring buffer queue. It then find the in memory queue in the queue map and pops the first message from the queue. It then sends the sequence number and the ack subject to the worker.\r\n\r\nThe worker receive the information reply with an ack (to the dispatcher) to indicate that it received it and is ready to start work. The worker emit a GET request using the stream name and the sequence number to retrieve the message body. It then process the message. Once done, it sends a +ACK on the transmitted ack subject to remove the message for JS work queue.\r\n\r\nWhen sending a message to the worker, the dispatcher starts to also listen on the message ack subject to be notified of the ack. Once acked, the dispatcher can check whether there are other messages in the in-memory queue. If true, it re-enqueues the partition key in the ring buffer. If not, it removes the in-memory queue from the queue map, and doesn't re-enqueue the partition key in the ring buffer. \r\n  \r\nSince partition key are dequeued from the ring buffer while work for this partition key is in progress, it ensures that messages for this partition key cannot be processed concurrently. For a single partition key, messages are dequeued from the  in-memory queue, so they are processed in order. Once work has been done for a partition key, it is re-queued at the end of the ring buffer. It will have to wait for all other partition keys to be served before being served again.\r\n\r\nthe preceding sample, the dispatcher will contain 5 (0..4) in-memory queues, one for each partition key. The ring buffer will contain one instance of each partition key. It will first get the 0 partition key, dequeue the first M0 message and send it to a worker. If another worker is available, it will get the 1 partition key and and dequeue the M1 message. When M0 is processed, there is more work to do, and partition key 0 is re-queued to the end of the ring buffer. The next messages will be for partition key 2 and 3 and 4, and only after, 0 will be considered again. As there are no more messages for 1,2,3,4 the queues are removed from the queue map freeing some resources. The dispatcher will continue to distribute M0 messages sequentially.\r\n\r\n# Implementation in JetStream / nats-server\r\n\r\nImplementing this sharding strategy inside JetStream would have several advantages.\r\n\r\n## Reduce message\r\nThe current implementation involves a lot of messages:\r\n    * Pushing message from JS to dispatcher\r\n    * Pushing sequence number from dispatcher to Worker\r\n    * Asking to JS messages body (request response)\r\n    * Sending the ack from Worker to JS and dispatcher\r\n   \r\nAn implementation inside nats-server would directly send message with the body from JS to worker. And the worker would just ack the message as expected.\r\n\r\n## Reduce memory usage\r\nThe current implementation must keep track of messages in the service. All this information is already in jetstream. JetStream would just need to have in-memory queues of messages sequence numbers.\r\n\r\n## Make it available for all clients\r\nThe current implementation has been developed for .Net. Using it in Node, Php, or Java requires to rewrite all the logic in these languages.\r\n\r\nWith an implementation in jets stream, Client just have to indicate they're available as a worker for a stream, and wait for messages from JS with the work to do, and ack it when done.\r\n\r\n"
+     },
+     {
+      "number": 2799,
+      "title": "Jetstream durable queue-group subscription based MaxAckPending",
+      "url": "https://github.com/nats-io/nats-server/discussions/2799",
+      "createdAt": "2022-01-19T21:03:47Z",
+      "updatedAt": "2022-05-30T18:58:31Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "ccapuano-ssc"
+      },
+      "category": {
+       "name": "Ideas"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "### Problem\r\nWorking on a recent project where we are moving from NATS streaming to JetStream. We have, and would like to maintain, async push subscriptions to a Jetstream Consumer created as a durable queue group. The issue we are facing is when additional subscriptions are created, the MaxAckPending property of the Consumer does not change based on the number of subscribers. \r\n\r\n### Proposed Solution\r\nOur requirement would be to allow a subscription to define a MaxAckPending rather than on the consumer. This would allow a level of elastic scalability with push subscriptions we don't seem to be able to achieve in the current version (2.6.6). \r\n\r\nIn practice, we would like to have a additional subscriptions to the consumer take up to a configured amount of messages. In an example, if we specified a MaxSubscriptionAckPending of 5, and subscribed 3 times we should have a Consumer MaxAckPending of 15 with each subscription not receiving more than 5 messages at a time."
+     },
+     {
+      "number": 2802,
+      "title": "Support for websocket-connection-limits on a per-user basis",
+      "url": "https://github.com/nats-io/nats-server/discussions/2802",
+      "createdAt": "2022-01-20T16:25:03Z",
+      "updatedAt": "2022-06-16T18:09:32Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dsidirop"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "stevedischinger1"
+       },
+       "createdAt": "2022-01-20T17:39:19Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "It's documented that NATS does support setting the websocket-connection-limit per Account. For example:\r\n\r\n            server_name: S22\r\n            max_connections: 1024\r\n            \r\n            no_auth_user: nats22\r\n\r\n            accounts {\r\n              default: {\r\n                users = [ { user: nats22 } ]\r\n                limits = {\r\n                    max_connections: 256\r\n            \tmax_payload: 4k\r\n                }\r\n              }\r\n            }\r\n\r\nQuestion: **How can we set the websocket-connection-limit per User (instead of per Account)?**\r\n\r\nI'm asking this because in Synadia NGS managed service, even though it's true that from a technical standpoint there is no reason to have a limit to the number of accounts, practically it's not easy, at least not currently, to have thousands upon thousands of Accounts (typically a company only gets 2 or 3 accounts in NGS at the time of this writing due to billing constraints).\r\n\r\nIf a company uses NATS to run its drone-swarm that is comprised of 30k+ swarms then each one of these swarm will have its own user. And all these users live under just 1 Account.\r\n\r\nSetting the connection-limit globally for the Account is nice for sure. But being able to fine-tune the connection-limits per user would really make the nats-server far more robust and alluring when it comes to industrial scenarios such as the aforementioned one.\r\n\r\nJust my 2c."
+     },
+     {
+      "number": 2809,
+      "title": "Is it possible to explicitly ask from JetStream to (re)send the last few messages it received in subject foo.*?",
+      "url": "https://github.com/nats-io/nats-server/discussions/2809",
+      "createdAt": "2022-01-21T15:48:53Z",
+      "updatedAt": "2022-06-02T02:40:08Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dsidirop"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "jnmoyne"
+       },
+       "createdAt": "2022-01-22T01:16:29Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "`Forward Clarification: I understand that the operations I'm referring to are not exactly \"mainstream\" but they could come in handy in certain situations (N-Message Replay in low-traffic backends). I'm just thinking out loud here so please bare with me.\r\n`\r\n\r\nTo get all the messages that JetStream holds within the last 1.5second we can do something like this:\r\n\r\n       now := time.Now()\r\n       oneAndHalfSecondAgo := now.Add(time.Millisecond * -1500)\r\n\r\n       js, _ := nc.JetStream()\r\n       sub, err := js.SubscribeSync(\r\n            \"foo.*\",\r\n            nats.OrderedConsumer(),\r\n            nats.StartTime(oneAndHalfSecondAgo),\r\n       )\r\n\r\n       for {\r\n           msg, err := sub.NextMsg(10 * time.Second) //oldest->newer ones\r\n           if err != nil {\r\n               log.Fatal(err)\r\n           }\r\n\r\n           // 1. check timestamp of message and if its after \u2018now\u2019 then we break out of the for loop here\r\n\r\n           // 2. if the message is before now we can push it in an array here\r\n       }\r\n\r\nQuestions:\r\n\r\n1. Is it possible to also place an upper-bound limit too? For example:\r\n\r\n       sub, err := js.SubscribeSync(\r\n            \"foo.*\",\r\n            nats.OrderedConsumer(),\r\n            nats.StartTime(oneAndHalfSecondAgo),\r\n            nats.EndTime(now),    <--- any chance of supporting this?\r\n       )\r\n\r\n2. Is it possible to introduce a \"single-fetch\" version of SubscribeSync() called 'ScoopSync()' or something? This method will bring the whole array of results in one go (instead of requesting .NextMsg() again and again making multiple fetches from the server). I suspect that there is a chance that this approach doesn't bode really well with how Jetstream's event-log should be operated upon so I'd be happy to stand corrected in this regard :)\r\n\r\n       results, err := js.ScoopSync(    <--- results is an array[] now\r\n            \"foo.*\",\r\n            nats.StartTime(oneAndHalfSecondAgo),\r\n            nats.EndTime(now),    <--- let's assume that this is indeed supported\r\n       )\r\n       \r\n3. Is it possible to request the last N-messages from a certain moment of time and on?\r\n\r\n       results, err := js.ScoopSync(\r\n            \"foo.*\",\r\n            nats.OrderedConsumer(),\r\n            nats.StartTime(oneAndHalfSecondAgo),\r\n            nats.NumberOfMessages(17), <--- any chance of supporting this?\r\n       )\r\n       \r\n       This will only fetch 17 messages - no more. If only 8 messages can be found at that particular moment then it will return just 8.\r\n\r\nThank you for everything and keep up the good work guys - NATS is awesome!"
+     },
+     {
+      "number": 2818,
+      "title": "Are the metrics for in/out bytes and message-count that are reported by the nats-server (and fed into utilities like nats-top) 100% accurate or are they approximations?",
+      "url": "https://github.com/nats-io/nats-server/discussions/2818",
+      "createdAt": "2022-01-25T21:18:39Z",
+      "updatedAt": "2022-06-21T11:55:20Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dsidirop"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-01-25T22:18:40Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Essentially what the subject says. Based on a quick look in the source-code I tend to believe that the data-usage reported by nats-server (and displayed by the 'nats-top' utility) accounts for every single byte and message that goes through NATS.\r\n\r\nIs my assumption correct? (just need to be 100% certain)\r\n\r\nThank you for the great product and the immense quality that you guys are putting into it!"
+     },
+     {
+      "number": 2965,
+      "title": "+1 for an official dart/websocket client implementation",
+      "url": "https://github.com/nats-io/nats-server/discussions/2965",
+      "createdAt": "2022-02-08T17:37:23Z",
+      "updatedAt": "2022-03-28T16:37:32Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "aktxyz"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": ""
+     },
+     {
+      "number": 2855,
+      "title": "Could I publish message with wildcards",
+      "url": "https://github.com/nats-io/nats-server/discussions/2855",
+      "createdAt": "2022-02-09T08:55:56Z",
+      "updatedAt": "2022-06-21T09:52:27Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "fy2462"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-02-09T15:27:24Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Could I use some wildcards to broadcast message?\r\n\r\n`publish_topic: \"abc.*.cd.>\" ?`\r\n\r\nI found only subjects can use wildcards, right?\r\n\r\nThanks."
+     },
+     {
+      "number": 2869,
+      "title": "2 Node High Availability  cluster for nats stream",
+      "url": "https://github.com/nats-io/nats-server/discussions/2869",
+      "createdAt": "2022-02-15T07:08:24Z",
+      "updatedAt": "2024-11-30T08:19:17Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "msg2man"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I need to create a HA cluster for nats jetstream, my limitations are:-\r\n- only 2 nodes are there, hence using the standard nats streaming cluster with odd number of nodes (to achieve raft quorum) is not possible.\r\n- there is no shared storage between both the nodes or a common nfs mount, so using a fault tolerance nats cluster is also not possible.\r\n\r\nSo is there a better way of achieving the HA clustering with 2 nodes, or explicitly rsyncing the stream store periodically to the standby node  would be the only way for this ?\r\n\r\nThank you.\r\n\r\n"
+     },
+     {
+      "number": 2964,
+      "title": "Couldn't do a hot update of nats.config",
+      "url": "https://github.com/nats-io/nats-server/discussions/2964",
+      "createdAt": "2022-02-24T15:49:01Z",
+      "updatedAt": "2022-06-21T11:54:29Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "mgonzalez-etra"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "\r\nWe have a docker container with the nats image (we tryed with alpine and linux versions) and the command for changing the config without restarting the container didn't work. As there is no bash (or didn't find) I used the following command: \r\n\r\n`docker exec -ti nats_server.imagekey /nats-server --signal reload`\r\n\r\nThe response from the container was: \r\n\r\n\"nats-server: unable to resolve pid, try providing one\"\r\n\r\nDid I miss something in the command or is it some kind of bug?\r\n\r\nAs the intention was to just change the nats users, there was no need to restart the whole container but we found no other solution for that. Also, the version of the image was nats and later tryed with nats:linux, all today.\r\n\r\nThats for the attention\r\n"
+     },
+     {
+      "number": 2963,
+      "title": "Can I use http protocol",
+      "url": "https://github.com/nats-io/nats-server/discussions/2963",
+      "createdAt": "2022-03-02T12:20:57Z",
+      "updatedAt": "2023-10-30T16:06:34Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "happy-v587"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Can I use as `http://127.0.0.1:4222`?"
+     },
+     {
+      "number": 2962,
+      "title": "for commercial use",
+      "url": "https://github.com/nats-io/nats-server/discussions/2962",
+      "createdAt": "2022-03-09T02:02:39Z",
+      "updatedAt": "2022-06-10T16:47:07Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "carr123"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "hello, i embed nats-server codes in my commercial and NOT open-sourced product, \r\nwhat files shoud be attached or other stuff shoud i do ?\r\nthanks."
+     },
+     {
+      "number": 2919,
+      "title": "Websocket TLS handshake error EOF",
+      "url": "https://github.com/nats-io/nats-server/discussions/2919",
+      "createdAt": "2022-03-10T03:35:07Z",
+      "updatedAt": "2022-05-31T16:51:40Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "game5413"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello, currently i'm trying to setup nats websocket with tls based example configuration on this [reference](https://docs.nats.io/running-a-nats-service/configuration/websocket/websocket_conf) on my local environment, tls that i'm use was self signing certificate from mkcert, then mounting them into docker container alongside with my nats server configuration.\r\n\r\nnats-server.conf\r\n```\r\n# Client port of 4222 on all interfaces\r\nport: 4222\r\n\r\n# HTTP monitoring port\r\nmonitor_port: 8222\r\n\r\nauthorization {\r\n\tdefault_permissions: {\r\n\t\tpublish: \"SANDBOX.*\"\r\n\t\tsubscribe: [\"PUBLIC.>\", \"_INBOX.>\"]\r\n\t}\r\n\tADMIN: {\r\n\t\tpublish: \">\"\r\n\t\tsubscribe: \">\"\r\n\t}\r\n\tWS_USER: {\r\n\t\tpublish: [\"cmd.req\", \"_INBOX.>\"]\r\n\t\tsubscribe: [\"notifications.*\", \"_INBOX.>\"]\r\n\t}\r\n\tusers: [\r\n\t\t{ user: admin, password: \"admin\", permissions: $ADMIN, allowed_connection_types: [\"STANDARD\"] }\r\n\t\t{ user: user, pass: \"user\", permissions: $WS_USER, allowed_connection_types: [\"WEBSOCKET\"] }\r\n\t]\r\n\ttimeout: 15.0\r\n}\r\n\r\n# This is for clustering multiple servers together.\r\ncluster {\r\n  name: \"executive-nats-cluster\"\r\n\r\n  port: 6222\r\n\r\n  authorization {\r\n    user: \"cUser\"\r\n    password: \"cPassword\"\r\n    timeout: 2\r\n  }\r\n\r\n  routes = []\r\n}\r\n\r\nwebsocket {\r\n    port: 6969\r\n\r\n    tls {\r\n          cert_file: \"/etc/nats/mkcert-server-cert.pem\"\r\n          key_file: \"/etc/nats/mkcert-server-key.pem\"\r\n    }\r\n\r\n    authorization {\r\n\t\ttimeout: 3.0\r\n    }\r\n}\r\n```\r\nWith config above, i'm tried connecting to websocket using [nats.ws](https://github.com/nats-io/nats.ws) as client, with example code like below, and got an error message unknown error\r\n\r\n![image](https://user-images.githubusercontent.com/37659721/157583054-1be11514-3072-4e2e-aa51-36c8cd6b012e.png)\r\n\r\nafter that, i'm checking container logs on docker and see an error logs that say `TLS handshake error EOF` like on picture below\r\n\r\n![image](https://user-images.githubusercontent.com/37659721/157582074-2e89fb0c-2d49-48e3-9fe3-6e6d8370d44f.png)\r\n\r\nIs there something wrong with SSL Certificate or Nats server configuration ?\r\n\r\nEnvironment:\r\n\r\n- Windows 10 Pro 21H2\r\n- WSL2\r\n- Docker Desktop\r\n"
+     },
+     {
+      "number": 2933,
+      "title": "NATS client-server architecture problem",
+      "url": "https://github.com/nats-io/nats-server/discussions/2933",
+      "createdAt": "2022-03-18T15:31:46Z",
+      "updatedAt": "2022-06-19T08:52:40Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "michallm"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-03-18T21:07:37Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello,\r\n\r\nI'm having trouble designing consumers on multiple target devices.\r\n\r\nI have one main nats-server (jetstream) that connects multiple devices. One stream is created on the server, let's assume the name ORDERS.\r\n\r\nEach device is to receive events from the server. Eg device1 will get orders.created event and device2 too.\r\n\r\nShould I create a separate consumer for each topic? For 5 themes, it will be 5 consumers on the server. For two devices, it will be 10 consumers.\r\n![image](https://user-images.githubusercontent.com/64835708/159033564-1c5013ba-ff96-4acd-9417-98903b375da8.png)\r\n\r\nIs it possible to subscribe to different topics with the same consumer and process them separately?"
+     },
+     {
+      "number": 2934,
+      "title": "Is NATS officialy supported pipelining?",
+      "url": "https://github.com/nats-io/nats-server/discussions/2934",
+      "createdAt": "2022-03-19T09:30:08Z",
+      "updatedAt": "2022-06-10T16:42:58Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "neuecc"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-03-19T14:34:42Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Does NATS support the pipelining as described in the Redis documentation?\r\nhttps://redis.io/topics/pipelining\r\nWhen I tried it, messages delimited by `\\r\\n` could be sent in the pipeline.\r\n\r\n`\"ping\\r\\nsub foo.* 1\\r\\nsub bar.* 2\\r\\npub foo.try 5\\r\\nabcde\\r\\n\"`\r\n\r\n```\r\nPONG\r\n+OK\r\n+OK\r\n+OK\r\nMSG foo.try 1 5\r\nabcde\r\n```"
+     },
+     {
+      "number": 2961,
+      "title": "JS and Core Can Use a cluster together",
+      "url": "https://github.com/nats-io/nats-server/discussions/2961",
+      "createdAt": "2022-03-25T09:23:14Z",
+      "updatedAt": "2022-06-16T18:07:49Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "ltDamon"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "If I want to use these two features at the same time\uff0cJetStream and Core. I must to deploy two cluster?\r\n\r\n![image](https://user-images.githubusercontent.com/62693485/160092823-c516e61f-ebe4-423a-9527-8d9c7a8a852f.png)\r\n"
+     },
+     {
+      "number": 3021,
+      "title": "Account Question",
+      "url": "https://github.com/nats-io/nats-server/discussions/3021",
+      "createdAt": "2022-04-11T09:11:06Z",
+      "updatedAt": "2022-06-19T02:04:55Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "zbindenren"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-04-12T13:58:56Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi\r\n\r\nWe have a configuration similart to:\r\n\r\n```\r\naccounts: {\r\n    A: {\r\n        jetstream: enable\r\n        users: [\r\n            { nkey: UDH...  }\r\n        ]\r\n    },\r\n    B: {\r\n        jetstream: enable\r\n        users: [\r\n            { nkey: UD2...  }\r\n        ]\r\n    },\r\n    SYS: {\r\n        users: [\r\n            { nkey: UD3... }\r\n        ]\r\n    },\r\n}\r\n\r\nsystem_account: SYS\r\n\r\n```\r\n\r\nIf I try to list streams with the SYS account I get:\r\n\r\n\r\n```console\r\n$ nats stream list\r\nnats: error: could not list streams: context deadline exceeded, try --help\r\n```\r\n\r\nThis is probably because it is not allowed to enable jetstream for SYS the account.\r\n\r\nWould it be possible to create an account that is able to list all streams and consumers for all accounts?"
+     },
+     {
+      "number": 3037,
+      "title": "Nats Authorization -- block node.*, but allow node.id",
+      "url": "https://github.com/nats-io/nats-server/discussions/3037",
+      "createdAt": "2022-04-14T15:16:52Z",
+      "updatedAt": "2022-06-24T13:47:13Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "cbrake"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Is there any in NATS permissions that would allow blocking subscribers from doing wildcard subscriptions:\r\n\r\n`node.*`\r\n\r\nBut allow them to subscribe to specific IDs:\r\n\r\n`node.ID`\r\n\r\nObviously, the ID would have to be \"secure\" (like a token). Not sure if this is a good idea, but might simplify a use case I'm considering."
+     },
+     {
+      "number": 3095,
+      "title": "message timestamp and clock skew",
+      "url": "https://github.com/nats-io/nats-server/discussions/3095",
+      "createdAt": "2022-05-02T20:59:34Z",
+      "updatedAt": "2022-06-29T08:08:52Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 2,
+      "author": {
+       "login": "stereosteve"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-05-02T21:19:22Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello - \r\n\r\nWas curious to better understand the variability of Timestamp field in [MsgMetadata](https://pkg.go.dev/github.com/nats-io/nats.go#MsgMetadata).\r\n\r\nIs that assigned using the leader's system clock?  Does NATS jetstream cluster attempt to detect clock skew?"
+     },
+     {
+      "number": 3111,
+      "title": "configuration reference",
+      "url": "https://github.com/nats-io/nats-server/discussions/3111",
+      "createdAt": "2022-05-08T22:10:17Z",
+      "updatedAt": "2022-10-11T07:51:43Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "idc77"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I don't like the documentation very much, because it's all over the place.\r\n\r\nFor instance I'd like to run nats-server with jetstream and also websocket.\r\nIt's all very complicated. All I wanted is to notify a user that they received a new message.\r\nBut for that I need to configure nats-server, send a JWT, configure the nats server for jwt auth and it's all too much.\r\nFor instance I have a keycloak server to manage the user credentials and generate JWT. It's an oidc server.\r\nI would probably have to manuall extract the public keys from the `/.well-known/openid-configuration`\r\n\r\nI think I might be better off not using nats and just a plain old websocket connection, be it reliable or not.\r\n\r\nBut  why I made this thread, except to vent my frustration is, I'm missing a complete server configuration reference.\r\nThe whole deal in 1 place, so I don't have to jump around grey on white menu items (the readability is poop).\r\nAlso the docs could use dark mode. Working at night burns my eyes with the white background.\r\n\r\nI liked nats (gnatsd) because it was simple and accessible.\r\nNow it has become something not simple and rather inaccessible.\r\nWhen asking about the robustness of nats-ws I receive a marketing babble response without answering my concrete question.\r\nNats is becoming yet another monster hidden behind heaps of text that you have to search through, wasting time or just wiggle that credit card and use the hosted service.\r\n\r\nSending messages, not a very complicated topic. And the clients look simple enough.\r\nBut there should be some quickstarts for certain scenarios. Using an oidc server is not unheard of (IAM for you cloudheads).\r\nTLS is also a default.\r\n\r\nTo not waste more time: A complete configuration reference would be great to have, not this topic based thing with badly readable menu items.\r\n\r\nWhy quickstarts? Because when you're just getting into a topic your head is full of everything. You just want to solve your problem and you want to get started, now, not in 2 days when you've devoured the documentation is went back n forth of various configuration topics,which then lead to github repo text etc. All over the place. Not a good learning experience."
+     },
+     {
+      "number": 3125,
+      "title": "Consumer payload-based filtering",
+      "url": "https://github.com/nats-io/nats-server/discussions/3125",
+      "createdAt": "2022-05-15T11:30:40Z",
+      "updatedAt": "2024-05-05T19:59:18Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 2,
+      "author": {
+       "login": "bruth"
+      },
+      "category": {
+       "name": "Ideas"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 7
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "This feature may be out of scope since NATS is intentionally payload agnostic, however, related discussions have come up in Slack a handful of times so I wanted to start a discussion to document ideas.\r\n\r\nWhat prompted me this time, was that I came across a recent Tim Bray [post](https://www.tbray.org/ongoing/When/202x/2022/05/12/Quamina) and [Go library](https://github.com/timbray/quamina) which implements JSON-based structural pattern matching. He had worked for AWS and help implement the EventBridge pattern matcher. This new library is a re-implementation of that and he boasts that it is quite fast (but is it *NATS* fast :wink:).\r\n\r\nCurrently, a consumer supports filtering on a single subject ([multiple subjects have been requested](#2515)). For users using JSON-encoded payloads, one or more _JSON patterns_ could be defined on the consumer for additional layer of server-side filtering. Here is [an example](https://www.tbray.org/ongoing/When/202x/2022/05/12/Quamina#p-7) from the post.\r\n\r\nThe _big_ trade-off here, is that this introduces runtime cost and possible defects (bad JSON payload) although there may be ways to prevent bad data by checking for JSON validity when a published message is received. That said, this would be opt-in and the default fast path would remain the same. Only if the pattern matching configuration is specified would this additional runtime work need to be performed.\r\n\r\nAnother idea that had been discussed before was to use a wasm module, however that would require more effort (IMO) on both server-side integration and on developers at this time."
+     },
+     {
+      "number": 3145,
+      "title": "nsc operator sharing/config",
+      "url": "https://github.com/nats-io/nats-server/discussions/3145",
+      "createdAt": "2022-05-23T18:49:51Z",
+      "updatedAt": "2025-02-19T21:13:15Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 8,
+      "author": {
+       "login": "ccapuano-ssc"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello all,\r\nWe have successfully brought up a decentralized auth cluster of nats nodes using the \"FULL\" resolver, and everything is looking/working as we expect, however I have some questions about best practices around maintaining the local state directories of nsc and operations groups that would ultimately maintain them. I have tried setting up another terminal and \"nsc pull\"ing the config into a new environment to see if I could manage from there, but have not been successful. I am sure I can source control the \"root\" config inclusive of the operator, sys account and  keys, which I think I can then \"nsc pull\" to get the most up to date config, but that feels dirty. Is there a recommended approach to maintaining the state files in respect with the nats nodes so that multiple users of nsc can manage the accounts? I wasn't able to find any documentation pointing to best practices in this area.\r\n\r\nThanks in advance,\r\nChris"
+     },
+     {
+      "number": 3164,
+      "title": "Does jetstream work with the embedded test server?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3164",
+      "createdAt": "2022-06-02T17:51:27Z",
+      "updatedAt": "2023-10-19T17:31:56Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 2,
+      "author": {
+       "login": "jkwatson-verta"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-06-02T21:20:09Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I'm trying to use the test server from `\"github.com/nats-io/nats-server/test\"`. It works fine with bare NATS, but when I try to add a jetstream stream, it fails with a \"context deadline exceeded\" error. There doesn't appear to be an option to enable Jetstream in the options that are available.\r\n\r\nSample code: \r\n```go\r\nimport (\r\n\t\"github.com/nats-io/gnatsd/server\"\r\n\tnatsServer \"github.com/nats-io/nats-server/test\"\r\n\t\"github.com/nats-io/nats.go\"\r\n\t\"testing\"\r\n)\r\n\r\nfunc TestEmbeddedJetstream(t *testing.T) {\r\n        opts := &natsServer.DefaultTestOptions\r\n\topts.Port = server.RANDOM_PORT\r\n\r\n\tembeddedServer := natsServer.RunServer(opts)\r\n\tdefer embeddedServer.Shutdown()\r\n\r\n\tserverAddress := embeddedServer.Addr().String()\r\n\tconnection, err := nats.Connect(\"nats://\"+serverAddress, nats.RetryOnFailedConnect(true))\r\n\tif err != nil {\r\n\t\tt.Fatal(err)\r\n\t}\r\n\r\n\tjetstream, err := connection.JetStream()\r\n\tif err != nil {\r\n\t\tt.Fatal(err)\r\n\t}\r\n\t_, err = jetstream.AddStream(&nats.StreamConfig{Name: \"test_stream\"})\r\n\tif err != nil {\r\n\t\tt.Fatal(err)\r\n\t}\r\n}\r\n```"
+     },
+     {
+      "number": 3171,
+      "title": "raft: snapshot can not be installed while catchups running",
+      "url": "https://github.com/nats-io/nats-server/discussions/3171",
+      "createdAt": "2022-06-07T12:21:20Z",
+      "updatedAt": "2022-06-08T20:10:03Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "1995parham"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-06-08T18:40:25Z"
+      },
+      "comments": {
+       "totalCount": 4
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "We are getting this error:\r\n\r\n```\r\nraft: snapshot can not be installed while catchups running\r\n```\r\n\r\nIn the time that we have this error, we don't receive any messages."
+     },
+     {
+      "number": 3198,
+      "title": "How to achieve horizontal scaling with multiple Nats Server?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3198",
+      "createdAt": "2022-06-16T18:05:13Z",
+      "updatedAt": "2022-06-16T18:39:42Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 2,
+      "author": {
+       "login": "nileshsoni97"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-06-16T18:32:18Z"
+      },
+      "comments": {
+       "totalCount": 4
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello guys i'm thinking to move my production from socket.io to Nats.io and the first question come to my mind is how i can scale it with load balancing and horizontal scaling where each nats server communicate to master or main server please explain it with details some sample code to achieve this."
+     },
+     {
+      "number": 3210,
+      "title": "has NO quorum, stalled on jetstream consumers",
+      "url": "https://github.com/nats-io/nats-server/discussions/3210",
+      "createdAt": "2022-06-22T21:08:25Z",
+      "updatedAt": "2023-06-14T15:52:09Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 3,
+      "author": {
+       "login": "1995parham"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2023-06-13T16:32:41Z"
+      },
+      "comments": {
+       "totalCount": 5
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "We have the following log on one of the cluster nodes:\r\n\r\n```\r\n2022/06/22 20:30:25.131266 [WRN] JetStream cluster consumer '$G > rides > golchin-ride-cancel-passenger-new_ride' has NO quorum, stalled.\r\n```\r\n\r\nfor one, of the consumers and this cause clients to get the following error:\r\n\r\n```\r\nnats: JetStream system temporarily unavailable\r\n```"
+     },
+     {
+      "number": 3230,
+      "title": "Shared config across NATS clusters",
+      "url": "https://github.com/nats-io/nats-server/discussions/3230",
+      "createdAt": "2022-06-29T18:33:32Z",
+      "updatedAt": "2022-07-05T08:12:08Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "3goats"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 10
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "So I just spun up a 3 node NATS cluster and created some users on node a. in its config file. Will/does this then propagate to nodes b & c or is there something I've missed. Can't seem to find anything on this in the docs."
+     },
+     {
+      "number": 3312,
+      "title": "Jepsen for JetStream",
+      "url": "https://github.com/nats-io/nats-server/discussions/3312",
+      "createdAt": "2022-07-30T17:49:42Z",
+      "updatedAt": "2025-12-09T19:00:35Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 9,
+      "author": {
+       "login": "jessekv"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 6
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Earlier this year Redpanda went through the Jepsen audit process: http://jepsen.io/analyses/redpanda-21.10.1\n\nWondering if there is a plan to do something similar for JetStream?"
+     },
+     {
+      "number": 3330,
+      "title": "NATS Pub-Sub with storing messages in NATS when there is no subscribers?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3330",
+      "createdAt": "2022-08-04T09:45:57Z",
+      "updatedAt": "2022-08-04T10:49:08Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dmitryrn"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "ripienaar"
+       },
+       "createdAt": "2022-08-04T09:59:52Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I know there is JetStream, but I'm wondering, can you use NATS' Pub-Sub and guarantee to not lose messages when all subscriber services are down and someone is publishing a message? Presumable storing there messages in NATS cluster in RAM."
+     },
+     {
+      "number": 3384,
+      "title": "Nats self publish a scheduled cron message?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3384",
+      "createdAt": "2022-08-22T01:43:40Z",
+      "updatedAt": "2025-08-28T09:38:05Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 7,
+      "author": {
+       "login": "NOT-HAL9000"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 4
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I'm looking to publish a message to a stream at a certain interval.\r\n\r\nI can set up a cron job and publish a message, however I'm wondering if it's possible (or planned) to be able to schedule a message to have the nats server self publish messages at set intervals? Basically a light implementation of cron jobs on top of jetstream. \r\n\r\nThanks"
+     },
+     {
+      "number": 3405,
+      "title": "Consumer Filtering Performance",
+      "url": "https://github.com/nats-io/nats-server/discussions/3405",
+      "createdAt": "2022-08-25T21:43:26Z",
+      "updatedAt": "2023-11-10T15:24:14Z",
+      "closed": true,
+      "closedAt": "2023-11-10T15:24:14Z",
+      "isAnswered": true,
+      "upvoteCount": 2,
+      "author": {
+       "login": "baldugus"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-08-25T23:13:50Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi nats-io team, \r\n\r\nI thought of using NATS with multiple streams consuming overlapping subjects, but soon realized the right way to do it is by having a big stream with multiple consumers filtering the subjects by what they want.\r\n\r\nMy concern with that model is that, in my usage i need flexibility over the way topics are viewed, and i might need to replay them oftenly, so i don't know if as data grows, this filtering might get slow as it would need to skip messages not matching it.\r\n\r\nFor example, if i created a stream consuming the subject `foo.bar.>` with a million messages on it and now i needed to create a new consumer filtering subject `foo.bar.baz.xyz` but it has only one message matching it in the middle of the stream, would it go through the whole stream to find this message? Does it have some sort of index which would reduce the impact in similar scenarios?\r\n\r\nThanks in advance for the answer and all the time spent developing this awesome software."
+     },
+     {
+      "number": 3415,
+      "title": "How to define channel specific configuration in nats-jetstream",
+      "url": "https://github.com/nats-io/nats-server/discussions/3415",
+      "createdAt": "2022-08-30T06:30:03Z",
+      "updatedAt": "2023-07-05T10:45:18Z",
+      "closed": true,
+      "closedAt": "2023-07-05T10:45:18Z",
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "anil1996"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "ripienaar"
+       },
+       "createdAt": "2022-08-30T13:42:29Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello,\r\n\r\nWe are planning to move to nats-jetstream from nats-streaming.\r\nIs there any option available to define channel specific configuration in jetstream, like how it is available in nats-streaming?\r\nFor example: \r\nstan.conf content\r\n\r\n# Maximum Payload allowed \r\nmax_payload: 4MB\r\n# stan message bus configuration file\r\nstore_limits: {\r\n    # Override some global limits\r\n    max_msgs: 200 \r\n    # Global limit for all topics\r\n    max_bytes: 128MB \r\n    max_age: \"5m\"\r\n\r\n    # Per channel configuration.\r\n    # Can be channels, channels_limits, per_channel, per_channel_limits or ChannelsLimits\r\n    channels: {\r\n        \"test1\": {\r\n            # Possible options are the same than in the store_limits section, except\r\n            # for max_channels. Not all limits need to be specified.\r\n            max_msgs: 0\r\n        }\r\n    }\r\n}\r\n\r\nhow can I achieve same configuration in jetstream???\r\n"
+     },
+     {
+      "number": 3417,
+      "title": "Cluster can't tolerate more than one service failure",
+      "url": "https://github.com/nats-io/nats-server/discussions/3417",
+      "createdAt": "2022-08-30T13:13:25Z",
+      "updatedAt": "2022-09-02T09:04:47Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "AhmedAbouelkher"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "kozlovic"
+       },
+       "createdAt": "2022-08-30T15:27:00Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi,\r\nI'm trying to create a cluster to serve as a messaging queue using pull consumers using docker composer.\r\n\r\n### docker-compose.yml\r\n```yaml\r\nversion: \"3.9\"\r\n\r\nservices:\r\n  nats:\r\n    image: \"nats:2.8.4-alpine3.15\"\r\n    container_name: nats\r\n    ports:\r\n    - \"4222:4222\"\r\n    - \"8222:8222\"\r\n    volumes:\r\n    - ~/Downloads/nats-storage/cluster/jetstream-c1:/tmp/nats/jetstream\r\n    - ./config.c.conf:/config.conf\r\n    command: \"--config /config.conf --server_name S1\"\r\n    networks:\r\n    - nats\r\n\r\n  nats-c2:\r\n    image: \"nats:2.8.4-alpine3.15\"\r\n    container_name: \"nats-c2\"\r\n    ports:\r\n    - \"5222:4222\"\r\n    volumes:\r\n    - ~/Downloads/nats-storage/cluster/jetstream-c2:/tmp/nats/jetstream\r\n    - ./config.c.conf:/config.conf\r\n    command: \"--config /config.conf --server_name S2\"\r\n    depends_on:\r\n    - nats\r\n    networks:\r\n    - nats\r\n\r\n  nats-c3:\r\n    image: \"nats:2.8.4-alpine3.15\"\r\n    container_name: \"nats-c3\"\r\n    ports:\r\n    - \"6222:4222\"\r\n    volumes:\r\n    - ~/Downloads/nats-storage/cluster/jetstream-c3:/tmp/nats/jetstream\r\n    - ./config.c.conf:/config.conf\r\n    command: \"--config /config.conf --server_name S3\"\r\n    depends_on:\r\n    - nats\r\n    networks:\r\n    - nats\r\n\r\nnetworks:\r\n  nats:\r\n   external: true\r\n```\r\n\r\n### config.c.conf\r\n\r\n```conf\r\ndebug: true\r\ntrace: false\r\n\r\nhttp_port: 8222\r\nlisten: 0.0.0.0:4222\r\n\r\njetstream = {}\r\n\r\ncluster = {\r\n    name: \"NATS\"\r\n\r\n    listen: \"0.0.0.0:4123\"\r\n\r\n    authorization = {\r\n      user: route_user\r\n      password: pwd\r\n      timeout: 5\r\n    }\r\n\r\n    routes = [\r\n        nats://route_user:pwd@nats:4123\r\n        nats://route_user:pwd@nats-c2:4123\r\n        nats://route_user:pwd@nats-c3:4123\r\n    ]\r\n}\r\n```\r\n\r\nI'm using Golang client version `v1.16.0`."
+     },
+     {
+      "number": 3444,
+      "title": "How to delete an unacked subject message?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3444",
+      "createdAt": "2022-09-07T08:55:13Z",
+      "updatedAt": "2022-09-07T21:32:38Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "AhmedAbouelkher"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-09-07T16:08:32Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "hi,\r\nI want to delete an unacked messages by id for example from the published to the subject.\r\n\r\nFor example, when the service user performs a destructive queue action, which will need to cancel the already published message."
+     },
+     {
+      "number": 3466,
+      "title": "KeyValue Revision is KeyStore wide? How can we cherry pick from a single key history?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3466",
+      "createdAt": "2022-09-12T08:00:25Z",
+      "updatedAt": "2022-09-12T15:21:25Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "andrea-tomassi"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "ripienaar"
+       },
+       "createdAt": "2022-09-12T08:02:38Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello,\r\nI'm not sure I understand the concept of revision.\r\n\r\n```\r\nkvStore.put(\"k1\", System.currentTimeMillis());\r\nkvStore.put(\"k2\", System.currentTimeMillis());\r\nkvStore.put(\"k2\", System.currentTimeMillis());\r\nkvStore.put(\"k3\", System.currentTimeMillis());\r\n\r\nSystem.out.println(kvStore.get(\"k1\").getRevision());\r\nSystem.out.println(kvStore.get(\"k2\").getRevision());\r\nSystem.out.println(kvStore.get(\"k3\").getRevision());\r\n```\r\n\r\nIf you run this super-simple test you get:\r\n\r\n1\r\n3\r\n4\r\n\r\nThis means that the \"revision\" value is not \"key-related\", but it seems to be \"keystore-wide\" instead.\r\nIn fact the revision you got for a brand new key and value (i.e. k3) is different from 1 (except for the very first key).\r\n\r\n**Is that correct and someway expected?** \r\n\r\nIf it is, how can we manage the following scenario:\r\n\r\nkvStore.put(\"k1\", System.currentTimeMillis());\r\n\r\nkvStore.put(\"kX\", System.currentTimeMillis());\r\nkvStore.put(\"kY\", System.currentTimeMillis());\r\n[...] // unknown put number from other processes\r\nkvStore.put(\"k1\", System.currentTimeMillis());\r\nkvStore.put(\"k1\", System.currentTimeMillis());\r\nkvStore.put(\"kX\", System.currentTimeMillis());\r\nkvStore.put(\"kY\", System.currentTimeMillis());\r\n[...] // unknown put number from other processes\r\nkvStore.put(\"k1\", System.currentTimeMillis());\r\n\r\netc\r\n\r\nAt this point I get the very last k1 entry and I find the revision == 2345\r\n\r\nNow, I'd like the previous 3 values from K1 **without selecting all the \"max-history\" entries**. (Assume I set max-history to 64 and I want to avoid this overhead).\r\n\r\nUnfortunately, I cannot assume 2344 and 2343 are the appropriate revision numbers for K1 to select from its history. \r\n\r\nMore in general, how the method \r\n\r\n`KeyValueEntry get(String key, long revision) \r\n`\r\ncould be userd in an appropriate way ?\r\n\r\n\r\nThanks a lot\r\n\r\n\r\n\r\n\r\n\r\n\r\n\r\n"
+     },
+     {
+      "number": 3467,
+      "title": "Is the consumer holding too many config?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3467",
+      "createdAt": "2022-09-12T13:22:24Z",
+      "updatedAt": "2022-10-03T16:36:04Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "dkishere"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I am from nats streaming, maybe my concept is a bit\r\n\r\nI use the durable function so as I understand it creates a consumer for me. Later on, I found the max ack pending is too high so I add sub opt to the subscription. It throws an error saying my config is conflicted with the consumer...\r\n\r\nIs that I need to delete the consumer and create again so I will lose my durable position?"
+     },
+     {
+      "number": 3479,
+      "title": "How to move stream and consumer replica?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3479",
+      "createdAt": "2022-09-20T02:13:56Z",
+      "updatedAt": "2022-09-20T05:48:49Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "wade19870531"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Sometimes servers NATS server are running on need to maintain or abnormal.\r\nIs there any api for move replicas of stream/consumer to specific server or move away from a server?\r\nI found this merge [https://github.com/nats-io/nats-server/pull/3217](url)\r\n$JS.API.SERVER.STREAM.MOVE seem can move away from a server.\r\nBut I don't know how to execute? In the following, no response. Any document?\r\n`nats request '$JS.API.STREAM.PEER.REMOVE' '{\"peer\":\"nats-server-6-0\"}'`\r\n\r\nenv:\r\nnats 2.9.0\r\nnatscli: 0.0.34\r\n\r\n"
+     },
+     {
+      "number": 3488,
+      "title": "Supporting scoop",
+      "url": "https://github.com/nats-io/nats-server/discussions/3488",
+      "createdAt": "2022-09-22T15:43:37Z",
+      "updatedAt": "2022-10-13T19:41:36Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "Lemorz56"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I was looking at the choco package but found that it seems outdated which led me to find an issue asking for scoop support. I'm not sure if there are any preferred way to run a nats-server, but to be able to install it through scoop would be handy, at least for me.\n\nI took the freedom to create a manifest for this.\nThe scoop manifest also has the ability to auto-update via github releases without having to edit the manifest file every time you make a release.\r\n\r\nI forked scoop's manifest repo and added the nats-server as you can see here: https://github.com/Lemorz56/Main/commit/3ac8e1523e379c54db3fb8dd796637457015848d\n\r\nI wanted to check with you before making a PR to add this manifest to the official scoop bucket repo\ud83d\ude04"
+     },
+     {
+      "number": 3495,
+      "title": "Sharding Jetstream",
+      "url": "https://github.com/nats-io/nats-server/discussions/3495",
+      "createdAt": "2022-09-25T06:02:19Z",
+      "updatedAt": "2022-09-25T21:32:28Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 2,
+      "author": {
+       "login": "maxpert"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-09-25T16:54:28Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "First and foremost I am in instant love with the project. I have been implementing a [Marmot](https://github.com/maxpert/marmot) and one of things I was spending a lot of time on was distributed reliable streams of change log. While NATS solve most of my problems, I am still struggling with two things:\r\n - For a given JetStream when I am setting it up how can I make sure that when I am publishing something on the stream only the nodes are responsible for storing the stream information and replicas are involved. And it doesn't add any extra load to Raft leader? Another way to ask the question this would be for publishing/committing a log entry to a JS is the Primary only involved in holding meta information about who to talk for primary and replica committing or primary is required throughout the process? \r\n - What is the best recommended way of sharding JetStreams? Right now I am manually creating specific JetStreams with specific subjects attached to them, and then only publishing to those subjects. The main problem I am trying to solve is sharding change data log coming out of SQLite among nats cluster nodes. "
+     },
+     {
+      "number": 3507,
+      "title": "Will Jetstream support external DB like postgres for persistence",
+      "url": "https://github.com/nats-io/nats-server/discussions/3507",
+      "createdAt": "2022-09-28T11:31:36Z",
+      "updatedAt": "2023-07-15T10:55:09Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 2,
+      "author": {
+       "login": "raricent"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-09-28T20:16:32Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "We used postgres with nats-streaming for persistence. We replicated the DB ourselves. With Jetstream, I do not see an option for postgres. Will it not be supported?"
+     },
+     {
+      "number": 3534,
+      "title": "Message prioritization to certain consumers",
+      "url": "https://github.com/nats-io/nats-server/discussions/3534",
+      "createdAt": "2022-10-10T00:51:31Z",
+      "updatedAt": "2025-11-21T15:37:55Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "plaisted"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 4
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I have a data processing application that runs in a kubernetes cluster that uses NATS Jetstream work queues and pull subscriptions.  As it stands now the consumer that gets a message is relatively random (combination of round robin from NATS and timing of an open worker). I'm looking for a way to promote data locality, in this case when a message is published it would prefer to be read by a worker on the same node (so that a local cache would be used to read the results of the last step) but if there are no local workers available it could be pulled by a worker on another node.\r\n\r\nI could publish to node specific topics (eg. work.{node name}) and have the stream read all the topics for the work queue but don't see a way to get it routed locally if possible without writing some sort of custom message broker to route the work around. Is there some existing functionality that could support a use case like this that I've missed?"
+     },
+     {
+      "number": 3540,
+      "title": "Embedded Server",
+      "url": "https://github.com/nats-io/nats-server/discussions/3540",
+      "createdAt": "2022-10-10T20:46:10Z",
+      "updatedAt": "2022-10-10T20:48:42Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "cbrake"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Looking at the roadmap, what is meant by the \"Embedded Server (no TCP)\" feature?"
+     },
+     {
+      "number": 3546,
+      "title": "How data is handled after the gateway's transmission failed",
+      "url": "https://github.com/nats-io/nats-server/discussions/3546",
+      "createdAt": "2022-10-12T07:26:09Z",
+      "updatedAt": "2022-10-12T08:48:55Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "hufan-ola"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-10-12T08:48:48Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "1. Does NATA Server will retry  or just drop this message?\r\n2. How data is handled in the simplest PUB-SUB, the subscribe do not receive the data "
+     },
+     {
+      "number": 3554,
+      "title": "Jetstream partitioning without impact on consumers",
+      "url": "https://github.com/nats-io/nats-server/discussions/3554",
+      "createdAt": "2022-10-14T09:08:38Z",
+      "updatedAt": "2022-10-17T19:46:53Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "OpenGuidou"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "scottf"
+       },
+       "createdAt": "2022-10-15T15:41:06Z"
+      },
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello,\r\n\r\nI have a high-throughput use case with the following architecture:\r\nStreams definitions:\r\n\r\nStream 1:\r\n - subject test1.>\r\n \r\nStream 2:\r\n - subject test2.>\r\n\r\n\r\nMessage flow:\r\n```\r\nMessage on \"test1.>\"   \r\n  ->  consumed by App-A \r\n       -> producing on subject test2.1.2.3 \r\n            -> consumed by App-B on test2.1.>\r\n            -> consumed by App-C on test2.>\r\n```\r\n\r\nThere is one jetstream subscription per App-B instance, to test2.1.>\r\nThere is one jetstream subscription per App-C instance, to test2.>\r\n\r\nApp-B and App-C should be able to consume past events, as they can be offline for some time (explaining the need for jetstream).\r\n\r\nWith a 3 nats nodes cluster, I noticed a very high activity on one of the nodes, and very few activity for the others.\r\nThe consumption latency for App-B and App-C (after being produced from App-A)  started to degrade as well.\r\n\r\nReading the doc, one idea could be to use the subject mapping to distribute the load on several server nodes.\r\nWith a setup like;\r\n\r\nMapping:\r\n   -  test2.*.*.* :  test2.$1.$2.$3.{{partition(3,1)}}\r\n\r\nStream 1:\r\n  - subject test1.>\r\n\r\nStream 2:\r\n  - subject test2.*.*.*.1\r\n\r\nStream 3:\r\n  - subject test2.*.*.*.2\r\n \r\nStream 4:\r\n  - subject test2.*.*.*.3\r\n\r\nI'd still like my App-B  and App-C to receive all the messages from Stream 2, 3 and 4 transparently, by using the same subjects, but it doesn't seem to work (\"No matching streams for subject.\" when creating the consumer).\r\n\r\nSubscriptions are created this way:\r\n```\r\nSubscription sub = nc.jetStream().subscribe(\"test2.>\", dispatcher, messageHandler, false,  \r\n      PushSubscribeOptions.builder().deliverGroup(\"App-C\").durable(\"App-C\")).build());\r\n```\r\n(Taking example from https://github.com/nats-io/nats.java/blob/main/src/examples/java/io/nats/examples/jetstream/NatsJsPushSubQueueDurable.java)\r\n\r\nDid I get all of that correctly ? Is there a way to achieve such a scenario ?\r\n"
+     },
+     {
+      "number": 3569,
+      "title": "ERR Log \"attempted to connect to route port\"",
+      "url": "https://github.com/nats-io/nats-server/discussions/3569",
+      "createdAt": "2022-10-18T04:14:08Z",
+      "updatedAt": "2022-10-18T09:04:34Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "hufan-ola"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "Jarema"
+       },
+       "createdAt": "2022-10-18T06:19:05Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "In Cluster model, when I pub a message to cluster addr, subscribe **can receive** message, but  we got an ERR log\r\n```\r\nnats sub foo -s nats://192.168.0.3:6222\r\n\r\n[15355] 2022/10/18 11:30:00.638646 [ERR] 192.168.0.3:57824 - rid:10 - attempted to connect to route port\r\n```\r\nwhat\u2019s the problem, what should i do ?\r\nPlease\r\n\r\nconfig file as below\r\n- main.conf\r\n```\r\nlisten: 192.168.0.3:4222\r\nhttp: 192.168.0.3:8222\r\ndebug: true\r\ntrace: false\r\n\r\ncluster {\r\n  name: pressure1\r\n  listen: 192.168.0.3:6222\r\n}\r\n\r\n```\r\n\r\n- slave.conf\r\n```\r\nlisten: 192.168.0.3:4223\r\nhttp: 192.168.0.3:8223\r\ndebug: true\r\ntrace: false\r\n\r\ncluster {\r\n  name: pressure1\r\n  listen: 192.168.0.3:6223\r\n\r\n  routes = [\r\n    nats-route://192.168.0.3:6222\r\n  ]\r\n}\r\n```"
+     },
+     {
+      "number": 3594,
+      "title": "How to pause consuming for a while?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3594",
+      "createdAt": "2022-10-31T14:15:33Z",
+      "updatedAt": "2024-08-25T15:22:04Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "AhmedAbouelkher"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "bruth"
+       },
+       "createdAt": "2022-10-31T14:28:06Z"
+      },
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi,\r\n\r\nI have a very simple use case, I want to pause a consumer for a while (almost 5 hrs) to do some maintenance and fixes and at the same time to prevent any message loss.\r\n\r\nI'm using Jetstream with pre-created durable consumers."
+     },
+     {
+      "number": 3607,
+      "title": "Podman pod using Windows and WSL supported ?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3607",
+      "createdAt": "2022-11-04T08:54:38Z",
+      "updatedAt": "2022-11-04T10:35:21Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "tdesaules"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "ripienaar"
+       },
+       "createdAt": "2022-11-04T10:27:49Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello podman community !\r\n\r\nSince a few days I try without success to play with pod on a Windows WSL2 podman install without any success.\r\nI'm worried if it's actually supported.\r\n\r\nWhen I try to create pod podman freeze and I have to restart the podman machine to unlock it.\r\nAlso If I try to remove a pod (partially created) It detect some lock and I don't have no choice but to reset the podman machine to clean this.\r\n\r\nSome info\r\n\r\nWindows build : \r\n```\r\n22621.674\r\n```\r\n\r\nWSL version : \r\n```\r\nWSL version: 0.70.4.0\r\nKernel version: 5.15.68.1\r\nWSLg version: 1.0.45\r\nMSRDC version: 1.2.3575\r\nDirect3D version: 1.606.4\r\nDXCore version: 10.0.25131.1002-220531-1700.rs-onecore-base2-hyp\r\nWindows version: 10.0.22621.674\r\n```\r\n\r\nPodman info : \r\n```\r\nhost:\r\n  arch: amd64\r\n  buildahVersion: 1.27.0\r\n  cgroupControllers:\r\n  - cpuset\r\n  - cpu\r\n  - cpuacct\r\n  - blkio\r\n  - memory\r\n  - devices\r\n  - freezer\r\n  - net_cls\r\n  - perf_event\r\n  - net_prio\r\n  - hugetlb\r\n  - pids\r\n  - rdma\r\n  cgroupManager: cgroupfs\r\n  cgroupVersion: v1\r\n  conmon:\r\n    package: conmon-2.1.4-3.fc36.x86_64\r\n    path: /usr/bin/conmon\r\n    version: 'conmon version 2.1.4, commit: '\r\n  cpuUtilization:\r\n    idlePercent: 99.86\r\n    systemPercent: 0.07\r\n    userPercent: 0.07\r\n  cpus: 16\r\n  distribution:\r\n    distribution: fedora\r\n    variant: container\r\n    version: \"36\"\r\n  eventLogger: journald\r\n  hostname: DESKTOP-IVUMN45\r\n  idMappings:\r\n    gidmap: null\r\n    uidmap: null\r\n  kernel: 5.10.102.1-microsoft-standard-WSL2\r\n  linkmode: dynamic\r\n  logDriver: journald\r\n  memFree: 6429392896\r\n  memTotal: 7198777344\r\n  networkBackend: netavark\r\n  ociRuntime:\r\n    name: crun\r\n    package: crun-1.6-2.fc36.x86_64\r\n    path: /usr/bin/crun\r\n    version: |-\r\n      crun version 1.6\r\n      commit: 18cf2efbb8feb2b2f20e316520e0fd0b6c41ef4d\r\n      spec: 1.0.0\r\n      +SYSTEMD +SELINUX +APPARMOR +CAP +SECCOMP +EBPF +CRIU +YAJL\r\n  os: linux\r\n  remoteSocket:\r\n    exists: true\r\n    path: /run/podman/podman.sock\r\n  security:\r\n    apparmorEnabled: false\r\n    capabilities: CAP_CHOWN,CAP_DAC_OVERRIDE,CAP_FOWNER,CAP_FSETID,CAP_KILL,CAP_NET_BIND_SERVICE,CAP_SETFCAP,CAP_SETGID,CAP_SETPCAP,CAP_SETUID,CAP_SYS_CHROOT\r\n    rootless: false\r\n    seccompEnabled: true\r\n    seccompProfilePath: /usr/share/containers/seccomp.json\r\n    selinuxEnabled: false\r\n  serviceIsRemote: true\r\n  slirp4netns:\r\n    executable: /usr/bin/slirp4netns\r\n    package: slirp4netns-1.2.0-0.2.beta.0.fc36.x86_64\r\n    version: |-\r\n      slirp4netns version 1.2.0-beta.0\r\n      commit: 477db14a24ff1a3de3a705e51ca2c4c1fe3dda64\r\n      libslirp: 4.6.1\r\n      SLIRP_CONFIG_VERSION_MAX: 3\r\n      libseccomp: 2.5.3\r\n  swapFree: 2147209216\r\n  swapTotal: 2147483648\r\n  uptime: 0h 31m 40.00s\r\nplugins:\r\n  authorization: null\r\n  log:\r\n  - k8s-file\r\n  - none\r\n  - passthrough\r\n  - journald\r\n  network:\r\n  - bridge\r\n  - macvlan\r\n  volume:\r\n  - local\r\nregistries:\r\n  search:\r\n  - registry.fedoraproject.org\r\n  - registry.access.redhat.com\r\n  - docker.io\r\n  - quay.io\r\nstore:\r\n  configFile: /usr/share/containers/storage.conf\r\n  containerStore:\r\n    number: 6\r\n    paused: 0\r\n    running: 2\r\n    stopped: 4\r\n  graphDriverName: overlay\r\n  graphOptions:\r\n    overlay.mountopt: nodev,metacopy=on\r\n  graphRoot: /var/lib/containers/storage\r\n  graphRootAllocated: 1081101176832\r\n  graphRootUsed: 452104192\r\n  graphStatus:\r\n    Backing Filesystem: extfs\r\n    Native Overlay Diff: \"false\"\r\n    Supports d_type: \"true\"\r\n    Using metacopy: \"true\"\r\n  imageCopyTmpDir: /var/tmp\r\n  imageStore:\r\n    number: 9\r\n  runRoot: /run/containers/storage\r\n  volumePath: /var/lib/containers/storage/volumes\r\nversion:\r\n  APIVersion: 4.2.1\r\n  Built: 1662580699\r\n  BuiltTime: Wed Sep  7 21:58:19 2022\r\n  GitCommit: \"\"\r\n  GoVersion: go1.18.5\r\n  Os: linux\r\n  OsArch: linux/amd64\r\n  Version: 4.2.1\r\n```\r\n\r\nA strange part is that the podman machine return a 4.2.1 version vs the podman remote windows client : \r\n```\r\n\u276f podman version\r\nClient:       Podman Engine\r\nVersion:      4.3.0\r\nAPI Version:  4.3.0\r\nGo Version:   go1.18.7\r\nGit Commit:   ad42af94903ce4f3c3cd0693e4e17e4286bf094b\r\nBuilt:        Wed Oct 19 19:53:21 2022\r\nOS/Arch:      windows/amd64\r\n\r\nServer:       Podman Engine\r\nVersion:      4.2.1\r\nAPI Version:  4.2.1\r\nGo Version:   go1.18.5\r\nBuilt:        Wed Sep  7 21:58:19 2022\r\nOS/Arch:      linux/amd64\r\n```\r\nNot sure this is the normal setup but during the init stage it always download the same fedora image : fedora-podman-v36.0.69.tar.xz\r\n\r\n\r\n\r\n"
+     },
+     {
+      "number": 3621,
+      "title": "NATS Config hot-reload using file watcher",
+      "url": "https://github.com/nats-io/nats-server/discussions/3621",
+      "createdAt": "2022-11-14T09:13:59Z",
+      "updatedAt": "2022-12-24T15:36:39Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 8,
+      "author": {
+       "login": "AloysA"
+      },
+      "category": {
+       "name": "Ideas"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 0
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "We currently use and love NATS, but we deploy our software on Windows in sensitive customer environments. NATS and our own applications run as Windows Services with limited privileges. This eliminates our chances of doing a config reload, because that requires administrative privileges using `nats-server.exe --signal reload`.\r\n\r\nI propose a new feature in which the configuration can be hot-reloaded via file watching. This is not uncommon and could be easily opt-in by specifying in the configuration file itself whether hot-reloading the config file based on a file watcher should be enabled or not.\r\n\r\nBy using this mechanism we can modify the NATS configuration if our system dynamically changes without needing the administrative privileges. I believe this might suit more Windows users of NATS.\r\n\r\n(Unfortunately I have zero experience with Go, so creating a pull request myself is too far reached at this time).\r\n\r\nIt seems that file watcher can be implemented cross platform relatively easily using: https://github.com/fsnotify/fsnotify"
+     },
+     {
+      "number": 3628,
+      "title": "Is there a way to increase message priority in JetStream ?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3628",
+      "createdAt": "2022-11-15T10:33:57Z",
+      "updatedAt": "2024-06-14T09:30:20Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "AhmedAbouelkher"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi,\r\nI've already pushed messages and not acked yet, so I need to prioritize one.\r\n\r\nIs is possible?"
+     },
+     {
+      "number": 3632,
+      "title": "How to prevent starvation?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3632",
+      "createdAt": "2022-11-15T19:08:20Z",
+      "updatedAt": "2022-11-17T17:43:58Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "AhmedAbouelkher"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-11-17T17:43:51Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi,\r\n\r\nI encountered an issue today, one of my clients pushed more than 100 messages to be processed which made the stream busy for so long as each message is waiting for its turn.\r\n\r\nExample:\r\nUser 1: pushed 100 messages\r\nUser 2: pushed 1 message\r\n\r\nResult: User 2 message will be processed after all of user 1's messages."
+     },
+     {
+      "number": 3637,
+      "title": "WorkQueuePolicy - understand \"disjoint filter subjects\"",
+      "url": "https://github.com/nats-io/nats-server/discussions/3637",
+      "createdAt": "2022-11-16T19:40:59Z",
+      "updatedAt": "2022-11-17T00:15:10Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "Kilio22"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-11-16T22:26:07Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi,\r\n\r\nI am new to NATS, and I am playing with Jetstream and the different retention policies, especially the WorkQueuePolicy.  \r\nI noticed in the following example https://natsbyexample.com/examples/jetstream/workqueue-stream/go that you cannot create two consumers with overlaping filtrer subjects.\r\n\r\nHowever, I manage to do the following using nats-cli and a local nats-server started in Jetstream mode:\r\n* create a stream with `toto.>` as subject\r\n* create a first pull consumer with `toto.*.tata` as subject\r\n* create a second pull consumer with `toto.>` as subject\r\n\r\nHere, to me the subjects are overlaping, as both can match a message published on a subject such as `toto.tutu.tata`.  \r\nI was thinking that maybe it would result in receiving a message published on subject `toto.tutu.tata` only on the first consumer, but no, it is received by both consumers.\r\n\r\nCould you explain why please?\r\n\r\nThanks!"
+     },
+     {
+      "number": 3654,
+      "title": "Distribute all partitions to a delivery group & trigger rebalance events on disconnected consumers.",
+      "url": "https://github.com/nats-io/nats-server/discussions/3654",
+      "createdAt": "2022-11-20T20:35:42Z",
+      "updatedAt": "2022-12-05T20:11:34Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 15,
+      "author": {
+       "login": "Tazer"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello,\r\n\r\nWe are looking into a PoC with NATS (currently using RabbitMQ and some PoC with Kafka). \r\n\r\nThe only problem I'm not being able to solve theoretically at least is:\r\n\r\n**Background**\r\nWe have some services that are not really good at \"horizontal scaling\" cause they need to keep an in memory state, and load it on startup. \r\nSo they are stateful. This mean that it's fine IF only one consumer is working a single partition. \r\n\r\n**Kafka solution**\r\nThe kafka solution is to use partition key and then each \"connected\" consumer in the group will gets `1..n` partitions. \r\nIF a consumer is disconnecting then there will be a rebalance event for all consumers so remaning consumers get `1..n`  partitions and each consumer can \"reload states\"\r\n\r\n**NATS Jetstream**\r\nFeels its close with Subject Mapping & Partitioning and using a DeliverGroup for the consumers. \r\nThe missing parts are:\r\n* Can I distribute all existing partitions to connected consumers but only like consumer 1 get partition 0 and 1 and consumer 2 get partition 2 and 3.\r\n* IF consumer 2 disconnects, is there a good way to listning for those events (consumer disconnect in the client) so actions can be taken for consumer 1 to stop, reload state , start processing all 4 partitions. \r\n\r\nThere are some talk about something similar here but not the exact use case. https://github.com/nats-io/nats-server/issues/2043\r\n\r\nIf it doesn't make sense I can try to clarify any parts. "
+     },
+     {
+      "number": 3669,
+      "title": "Work queue cancellation",
+      "url": "https://github.com/nats-io/nats-server/discussions/3669",
+      "createdAt": "2022-11-26T23:20:43Z",
+      "updatedAt": "2022-12-07T15:47:05Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "ealeykin"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2022-11-27T16:33:49Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi,\r\n\r\nI'm impressed with the way how NATS handles queues, however have a question about work queue items cancellation.\r\n\r\nInput data is the following: `source` queue (stream) and `event` queue (stream). `Source` worker produces multiple events into `event` queue. I want to cancel entire source processing with it's sub-events.\r\n\r\nExample:\r\n\r\n`sources` stream - work queue with subjects `source.<id>`\r\n`events` stream - work queue with subjects `event.<id>`\r\n\r\nAnd cancellation as follows:\r\n\r\nstream purge `sources` with subject `*.ID`\r\nstream purge `events` with subject `*.ID`\r\n\r\nWhat do you say about this approach or perhaps you would advise a better way to work out cancellation?"
+     },
+     {
+      "number": 3731,
+      "title": "Subscriptions Question",
+      "url": "https://github.com/nats-io/nats-server/discussions/3731",
+      "createdAt": "2022-12-21T06:10:24Z",
+      "updatedAt": "2022-12-22T03:06:02Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "daudcanugerah"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "<img width=\"1373\" alt=\"Screen Shot 2022-12-21 at 12 59 13\" src=\"https://user-images.githubusercontent.com/34634382/208832515-2c9eba71-2dbe-4a2e-b0bd-b5185e1a1bd8.png\">\r\n\r\ndoes the value of gnatsd_varz_subscriptions mean the total subscribers currently running . if true, how do you find out which subscriber has a problem. after reaching 2m nats server becomes slow.\r\ni am using one nats server with version 2.8.4.\r\nI'm not sure if this issue (https://github.com/nats-io/nats-server/issues/2170) is related. Thank you."
+     },
+     {
+      "number": 3739,
+      "title": "Question: Can JetStream support multiple partitions so that they can be distributed to multiple machines, such as partition in kafka?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3739",
+      "createdAt": "2022-12-23T03:22:30Z",
+      "updatedAt": "2023-01-03T09:03:29Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "Doslin"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "Jarema"
+       },
+       "createdAt": "2022-12-23T07:58:25Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "My scenario is: I have a large amount of data in this subject and I want to have JetStream stored on multiple machines, using 3 backups and 10 shard (such as partition in kafka) to make my data more disaster resistant"
+     },
+     {
+      "number": 3759,
+      "title": "How to add new instances to the nats cluster?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3759",
+      "createdAt": "2023-01-03T07:29:25Z",
+      "updatedAt": "2023-01-06T09:14:10Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "Doslin"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "[I see that TiKV can be scaled up or down using the cli command](https://docs.pingcap.com/tidb/v6.1/scale-tidb-using-tiup#scale-out-a-tidbpdtikv-cluster), is there a similar operation on natscli?\r\nor do you have a recommended operation ?\r\n\r\n\r\n"
+     },
+     {
+      "number": 3762,
+      "title": "Cross account jetstream subscription on a single Nats node",
+      "url": "https://github.com/nats-io/nats-server/discussions/3762",
+      "createdAt": "2023-01-05T14:49:28Z",
+      "updatedAt": "2023-01-05T14:49:29Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 3,
+      "author": {
+       "login": "ovesco"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 0
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I'm trying to setup Jetstream cross account on a single Nats node following [this tutorial](https://github.com/nats-io/jetstream-leaf-nodes-demo#connect-streams-cross-accounts). My configuration is the following:\r\n\r\n```\r\njetstream: {\r\n  domain: ch\r\n}\r\n\r\naccounts: {\r\n  SERVER: {\r\n    users: [\r\n      {user: server, password: a},\r\n    ]\r\n    exports: [\r\n      {service: requests.> }\r\n      {service: \"$JS.ch.API.CONSUMER.>\", response_type: stream}\r\n      {stream: deliver.> }\r\n    ]\r\n    jetstream: enabled\r\n  }\r\n  CLIENT-1: {\r\n    users: [\r\n      {user: client-1, password: b},\r\n    ]\r\n    imports: [\r\n      {service: { account: SERVER, subject: \"$JS.ch.API.CONSUMER.>\" }, to: JS.client-1@ch.API.CONSUMER.> }\r\n      {stream: { account: SERVER, subject: deliver.client-1.> }}\r\n      {service: { account: SERVER, subject: requests.> }}\r\n    ]\r\n    jetstream: enabled\r\n  }\r\n}\r\n\r\njetstream {\r\n   store_dir: '/etc/nats/data'\r\n}\r\n```\r\n\r\nI'm testing it with a small javascript script:\r\n\r\n```js\r\nimport * as nats from 'nats';\r\nimport { consumerOpts, StringCodec } from 'nats';\r\n\r\nconst codec = StringCodec();\r\n\r\n(async () => {\r\n  const server = await nats.connect({\r\n    servers: 'localhost:4222',\r\n    user: 'server',\r\n    pass: 'a',\r\n  });\r\n\r\n  // Creating streams, note that we create them\r\n  // from the 'server' connection, which is part of the\r\n  // account exporting both stream and service\r\n  const jsm = await server.jetstreamManager();\r\n  await jsm.streams.add({\r\n    name: 'requests',\r\n    subjects: ['requests.>'],\r\n  });\r\n  await jsm.streams.add({\r\n    name: 'deliveries',\r\n    subjects: ['deliver.>'],\r\n  });\r\n\r\n  // Server subscribe to messages from client\r\n  const opts = consumerOpts();\r\n  opts.deliverTo('here');\r\n  opts.ackAll();\r\n  const saSub = await server.jetstream().subscribe('requests.>', opts);\r\n  (async () => {\r\n    for await (const msg of saSub) {\r\n      console.log(\r\n        'client to server msg on ' + msg.subject,\r\n        codec.decode(msg.data),\r\n      );\r\n    }\r\n  })();\r\n\r\n  // Client\r\n  const client = await nats.connect({\r\n    servers: 'localhost:4222',\r\n    user: 'client-1',\r\n    pass: 'b',\r\n  });\r\n\r\n  const clientJsm = await client.jetstreamManager();\r\n  await clientJsm.streams.add({\r\n    name: 'client-1-deliveries',\r\n    mirror: {\r\n      name: 'deliveries',\r\n      filter_subject: 'deliver.client-1.>',\r\n      external: {\r\n        api: 'JS.client-1@ch.API',\r\n        deliver: 'deliver.client-1',\r\n      },\r\n    },\r\n  });\r\n\r\n  // Client publishes a message for the server\r\n  // This works and is correctly retrieved by the server\r\n  await client\r\n    .jetstream()\r\n    .publish('requests.client-1.hello', codec.encode('hello from client'));\r\n\r\n  const optsClient = consumerOpts();\r\n  optsClient.deliverTo('here');\r\n  optsClient.ackAll();\r\n\r\n  // Setup a subscription for the client to listen for server messages\r\n  const csub = await client\r\n    .jetstream()\r\n    .subscribe('deliver.client-1.>', optsClient);\r\n  (async () => {\r\n    for await (const msg of csub) {\r\n      console.log('server to client message', codec.decode(msg.data));\r\n    }\r\n  })();\r\n  // --> error: no stream matches subject\r\n})();\r\n```\r\n\r\nIt prints the following\r\n```\r\nclient to server msg on requests.client-1.hello hello from client\r\n\r\nError: no stream matches subject\r\n```\r\n\r\nThe problem is that I have a `No stream matches subject` when the client-1 tries to create its subscription.\r\nMirror streams can not have any subject set so I do not really understand where my error lies.\r\nThanks a lot for your help !"
+     },
+     {
+      "number": 3764,
+      "title": "NATS storage problem",
+      "url": "https://github.com/nats-io/nats-server/discussions/3764",
+      "createdAt": "2023-01-05T17:07:50Z",
+      "updatedAt": "2023-01-06T00:11:36Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "bautistamad"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 5
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi, I am using the Interest policy of nats in kubernetes with 3 replicas, and I have the following problem:\r\nWhat is indicated in the stream is not what is actually stored on disk, the disk has much more capacity, I do not know if it is because the delated messages are stored, and the problem I have now is that I am filling the storage very quickly without knowing why.\r\n![image](https://user-images.githubusercontent.com/75149705/210838775-a10e1436-1cb4-487f-a188-be52b91f29ae.png)\r\n\r\n![image](https://user-images.githubusercontent.com/75149705/210839477-d5395509-f883-40f8-a4a2-e3b575208976.png)\r\n\r\nThis is the storage of my disks\r\n![image](https://user-images.githubusercontent.com/75149705/210839636-d82fa88d-ed23-491e-a42c-ee8e07c61cfa.png)\r\n"
+     },
+     {
+      "number": 3772,
+      "title": "Using Nats Jetstream as an event store",
+      "url": "https://github.com/nats-io/nats-server/discussions/3772",
+      "createdAt": "2023-01-08T14:07:30Z",
+      "updatedAt": "2025-03-26T11:34:29Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 10,
+      "author": {
+       "login": "cloudcompute"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "bruth"
+       },
+       "createdAt": "2023-01-08T19:48:07Z"
+      },
+      "comments": {
+       "totalCount": 5
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "a. Can we use NATS JetStream for Event Sourcing? Does it have the capability to store millions of events at a time without affecting the speed and performance of an application?\r\n\r\nb. I read that we can archive the event logs to cold storage. But I have not come across an example that demonstrates how we can move the logs to, let's say, S3 storage. Is this \"cold storage\" feature as powerful as Pulsar's Tiered Storage? \r\n\r\nc. Are there any applications who are using it as an Event Store in production? If yes, any feedback?\r\n\r\nThank you all for making such a great software and make it available to all of us."
+     },
+     {
+      "number": 3778,
+      "title": "How to easily and elegantly roll-up nats-server instances to the latest version within a cluster",
+      "url": "https://github.com/nats-io/nats-server/discussions/3778",
+      "createdAt": "2023-01-12T02:46:00Z",
+      "updatedAt": "2023-01-15T14:04:42Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "Doslin"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "How to easily and elegantly roll-up nats-server instances to the latest version within a cluster"
+     },
+     {
+      "number": 3843,
+      "title": "How to test non self-signed certificate on NATs",
+      "url": "https://github.com/nats-io/nats-server/discussions/3843",
+      "createdAt": "2023-01-15T16:49:25Z",
+      "updatedAt": "2024-01-15T12:25:50Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "danielserrao"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi,\r\n\r\nI'm using the nats helm-chart at http://github.com/nats-io/k8s and I did setup TLS by enabling it at https://github.com/nats-io/k8s/blob/main/helm/charts/nats/values.yaml#L290. After that the pods were running successfully and the certificates are installed at `/etc/nats-certs/clients/default-ssl-cert/`, so it seems fine, but when I tested with the command `openssl s_client -tls1_2 -showcerts -connect <nats-url>:8222` from another pod in the same cluster I get:\r\n\r\n```\r\nCONNECTED(00000003)\r\n140592798729536:error:1408F10B:SSL routines:ssl3_get_record:wrong version number:../ssl/record/ssl3_record.c:331:\r\n---\r\nno peer certificate available\r\n---\r\nNo client certificate CA names sent\r\n---\r\nSSL handshake has read 5 bytes and written 188 bytes\r\nVerification: OK\r\n---\r\nNew, (NONE), Cipher is (NONE)\r\nSecure Renegotiation IS NOT supported\r\nCompression: NONE\r\nExpansion: NONE\r\nNo ALPN negotiated\r\nSSL-Session:\r\n    Protocol  : TLSv1.2\r\n    Cipher    : 0000\r\n    Session-ID:\r\n    Session-ID-ctx:\r\n    Master-Key:\r\n    PSK identity: None\r\n    PSK identity hint: None\r\n    SRP username: None\r\n    Start Time: 1673799711\r\n    Timeout   : 7200 (sec)\r\n    Verify return code: 0 (ok)\r\n    Extended master secret: no\r\n---\r\n```\r\n\r\nThis seems to be because nats send first an answer with the INFO protocol before sending the TLS ack according to https://github.com/nats-io/nats-server/issues/2804#issuecomment-1017941830.\r\n\r\nSo I tried to test it by executing the command `curl http://<nats-url>:8222` because apparently we can test it by accessing it via browser with HTTPS (https://docs.nats.io/running-a-nats-service/configuration/securing_nats/tls#creating-self-signed-certificates-for-testing) but I get the following error:\r\n\r\n`curl: (35) error:1408F10B:SSL routines:ssl3_get_record:wrong version number`\r\n\r\nOn the nats pods logs I don't get any error.\r\n\r\nI also tried to test connectivity with the command `nats account info --server nats://<nats-url>:4222 --user=<username> --password=\"<password>\"` which returned the connection information without any errors.\r\n\r\nI have the following questions:\r\n\r\n- Does these tests confirm that TLS is NOT working properly?\r\n- If yes, what kind of troubleshooting can I do to find the root cause and fix it? If no, what kind of test can I make to make sure that TLS is working properly?\r\n- Why did you decide to make nats return an answer with the INFO protocol instead of returning immediately an TLS ack like almost every other app? This is not a standard and is making other developers life harder, I think."
+     },
+     {
+      "number": 3790,
+      "title": "How to remove existing instances/nodes from the nats/jetstream cluster?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3790",
+      "createdAt": "2023-01-18T11:37:48Z",
+      "updatedAt": "2023-01-31T15:42:45Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 3,
+      "author": {
+       "login": "arpanps"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "jnmoyne"
+       },
+       "createdAt": "2023-01-18T21:16:58Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "In nats streaming we can remove a node by sending a NATS message to _STAN.raft.<cluster ID>.node.remove with the payload being the node ID we want to remove. like https://github.com/nats-io/nats-streaming-server/issues/1166 \r\n\r\nhow can be we do same in nats-server with jetstream?\r\n\r\nI do see some conversation around it https://github.com/nats-io/nats-server/issues/338 however it does not provide concrete answer."
+     },
+     {
+      "number": 3842,
+      "title": "[Core NATS] Upgrading from v2.0.4 to v2.9.7",
+      "url": "https://github.com/nats-io/nats-server/discussions/3842",
+      "createdAt": "2023-01-25T20:37:14Z",
+      "updatedAt": "2023-02-04T16:46:07Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "chichunhua"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 12
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I upgraded the version from 2.0.4 to 2.9.7 and then it became not working well. It suppose to have MSG_PAYLOAD every 30s but not, the intervals vary a lot, sometimes 10 min sometimes 1min. NATs server is running, and all pub/sub client can connect to it, based on the monitoring endpoint, under connections, I can see in_msgs amount, but not out_msgs amount.  also in NATs logs, I can see the msg_payload, not in regular interval though. Did I missing any config? or something else related? Looking forwards your kind reply. Thank you!\r\n\r\nThe config:\r\n```\r\n# Client port of 4222 on all interfaces\r\nport: xxxx\r\n\r\n# HTTP monitoring port\r\n#monitor_port: xxxx\r\n\r\n# This is for clustering multiple servers together.\r\ncluster {\r\n  # Route connections to be received on any interface on port 6222\r\n  port: xxxx\r\n  routes = []\r\n \r\n # number of retries to connect to a discovered route\r\n  connect_retries: 25\r\n}\r\n\r\n# logging configurations\r\ndebug: true\r\ntrace: true\r\nlogtime: true\r\n```\r\n\r\nSubscriptions:\r\n```\r\n{\r\nnum_subscriptions: 312,\r\nnum_cache: 10,\r\nnum_inserts: 483,\r\nnum_removes: 171, // what does this mean?\r\nnum_matches: 113210,\r\ncache_hit_rate: 0.00009716456143450225,\r\nmax_fanout: 4, // is this mean only 4 msgs were consumed?\r\navg_fanout: 3.2\r\n}\r\n```\r\n\r\nIn logs: I can see bunch of the trace logs below, and seems like my actual message is not there in regular interval. \r\n```\r\n[RMSG $SYS $SYS.SERVER.ACCOUNT.$G.CONNS 550]\r\n[RMSG $SYS $SYS.SERVER.NDZGNWXWKBRFPFBHYI2MSNMPQEU535UMDHFQTIQCJHBGQASHGQWBOC5M.STATSZ 1060]\r\nMSG_PAYLOAD: [\"{\\\"type\\\":\\\"io.nats.server.advisory.v1.account_connections\\\",\\\"id\\\":\\\"IBNKsj1motiyiaTm6pTtRB\\\",\\\"timestamp\\\":\\\"2023-01-25T20:21:06.788445383Z\\\",\\\"server\\\":{\\\"name\\\":\\\"NDZGNWXWKBRFPFBHYI2MSNMPQEU535UMDHFQTIQCJHBGQASHGQWBOC5M\\\",\\\"host\\\":\\\"0.0.0.0\\\",\\\"id\\\":\\\"NDZGNWXWKBRFPFBHYI2MSNMPQEU535UMDHFQTIQCJHBGQASHGQWBOC5M\\\",\\\"cluster\\\":\\\"vJXipA5NGT31HzqFlLB7QY\\\",\\\"ver\\\":\\\"2.9.7\\\",\\\"seq\\\":1639,\\\"jetstream\\\":false,\\\"time\\\":\\\"2023-01-25T20:21:06.788460073Z\\\"},\\\"acc\\\":\\\"$G\\\",\\\"conns\\\":3,\\\"leafnodes\\\":0,\\\"total_conns\\\":3,\\\"sent\\\":{\\\"msgs\\\":0,\\\"bytes\\\":0},\\\"received\\\":{\\\"msgs\\\":5280,\\\"bytes\\\":1275711},\\\"slow_consumers\\\":0}\"] | [15] 2023/01/25 20:21:06.788801 [TRC] 10.226.28.212:6222 - rid:6 - <<- MSG_PAYLOAD: [\"{\\\"type\\\":\\\"io.nats.server.advisory.v1.account_connections\\\",\\\"id\\\":\\\"IBNKsj1motiyiaTm6pTtRB\\\",\\\"timestamp\\\":\\\"2023-01-25T20:21:06.788445383Z\\\",\\\"server\\\":{\\\"name\\\":\\\"NDZGNWXWKBRFPFBHYI2MSNMPQEU535UMDHFQTIQCJHBGQASHGQWBOC5M\\\",\\\"host\\\":\\\"0.0.0.0\\\",\\\"id\\\":\\\"NDZGNWXWKBRFPFBHYI2MSNMPQEU535UMDHFQTIQCJHBGQASHGQWBOC5M\\\",\\\"cluster\\\":\\\"vJXipA5NGT31HzqFlLB7QY\\\",\\\"ver\\\":\\\"2.9.7\\\",\\\"seq\\\":1639,\\\"jetstream\\\":false,\\\"time\\\":\\\"2023-01-25T20:21:06.788460073Z\\\"},\\\"acc\\\":\\\"$G\\\",\\\"conns\\\":3,\\\"leafnodes\\\":0,\\\"total_conns\\\":3,\\\"sent\\\":{\\\"msgs\\\":0,\\\"bytes\\\":0},\\\"received\\\":{\\\"msgs\\\":5280,\\\"bytes\\\":1275711},\\\"slow_consumers\\\":0}\"]\r\nMSG_PAYLOAD: [\"{\\\"server\\\":{\\\"name\\\":\\\"NDV7U5LHSWC364O2X7YH7YC7YEVUNTMDJATZVAQXPVPN366VAUARR2QD\\\",\\\"host\\\":\\\"0.0.0.0\\\",\\\"id\\\":\\\"NDV7U5LHSWC364O2X7YH7YC7YEVUNTMDJATZVAQXPVPN366VAUARR2QD\\\",\\\"cluster\\\":\\\"vJXipA5NGT31HzqFlLB7QY\\\",\\\"ver\\\":\\\"2.9.7\\\",\\\"seq\\\":1642,\\\"jetstream\\\":false,\\\"time\\\":\\\"2023-01-25T20:21:05.972367605Z\\\"},\\\"statsz\\\":{\\\"start\\\":\\\"2023-01-25T15:53:03.893871113Z\\\",\\\"mem\\\":16752640,\\\"cores\\\":8,\\\"cpu\\\":0,\\\"connections\\\":5,\\\"total_connections\\\":27,\\\"active_accounts\\\":2,\\\"subscriptions\\\":307,\\\"sent\\\":{\\\"msgs\\\":3204,\\\"bytes\\\":2556471},\\\"received\\\":{\\\"msgs\\\":148519,\\\"bytes\\\":19015407},\\\"slow_consumers\\\":0,\\\"routes\\\":[{\\\"rid\\\":10,\\\"name\\\":\\\"NCGQGRWM54SJJK2SBF6GX7UAQJ2KIX3R2M2NRXNINNUGPMCZ323D744X\\\",\\\"sent\\\":{\\\"msgs\\\":1067,\\\"bytes\\\":851467},\\\"received\\\":{\\\"msgs\\\":936,\\\"bytes\\\":776151},\\\"pending\\\":0},{\\\"rid\\\":9,\\\"name\\\":\\\"NDZGNWXWKBRFPFBHYI2MSNMPQEU535UMDHFQTIQCJHBGQASHGQWBOC5M\\\",\\\"sent\\\":{\\\"msgs\\\":1067,\\\"bytes\\\":851467},\\\"received\\\":{\\\"msgs\\\":1067,\\\"bytes\\\":849792},\\\"pending\\\":0},{\\\"rid\\\":8,\\\"name\\\":\\\"NBRYMRJ6EC4VLQYHCLPCC2QTNN34I2ZTP3XR5WGSUY3RTUYL7ENP6GLY\\\",\\\"sent\\\":{\\\"msgs\\\":1070,\\\"bytes\\\":853537},\\\"received\\\":{\\\"msgs\\\":895,\\\"bytes\\\":753896},\\\"pending\\\":0}],\\\"active_servers\\\":4}}\"] | [15] 2023/01/25 20:21:05.972672 [TRC] 10.226.28.42:6222 - rid:7 - <<- MSG_PAYLOAD: [\"{\\\"server\\\":{\\\"name\\\":\\\"NDV7U5LHSWC364O2X7YH7YC7YEVUNTMDJATZVAQXPVPN366VAUARR2QD\\\",\\\"host\\\":\\\"0.0.0.0\\\",\\\"id\\\":\\\"NDV7U5LHSWC364O2X7YH7YC7YEVUNTMDJATZVAQXPVPN366VAUARR2QD\\\",\\\"cluster\\\":\\\"vJXipA5NGT31HzqFlLB7QY\\\",\\\"ver\\\":\\\"2.9.7\\\",\\\"seq\\\":1642,\\\"jetstream\\\":false,\\\"time\\\":\\\"2023-01-25T20:21:05.972367605Z\\\"},\\\"statsz\\\":{\\\"start\\\":\\\"2023-01-25T15:53:03.893871113Z\\\",\\\"mem\\\":16752640,\\\"cores\\\":8,\\\"cpu\\\":0,\\\"connections\\\":5,\\\"total_connections\\\":27,\\\"active_accounts\\\":2,\\\"subscriptions\\\":307,\\\"sent\\\":{\\\"msgs\\\":3204,\\\"bytes\\\":2556471},\\\"received\\\":{\\\"msgs\\\":148519,\\\"bytes\\\":19015407},\\\"slow_consumers\\\":0,\\\"routes\\\":[{\\\"rid\\\":10,\\\"name\\\":\\\"NCGQGRWM54SJJK2SBF6GX7UAQJ2KIX3R2M2NRXNINNUGPMCZ323D744X\\\",\\\"sent\\\":{\\\"msgs\\\":1067,\\\"bytes\\\":851467},\\\"received\\\":{\\\"msgs\\\":936,\\\"bytes\\\":776151},\\\"pending\\\":0},{\\\"rid\\\":9,\\\"name\\\":\\\"NDZGNWXWKBRFPFBHYI2MSNMPQEU535UMDHFQTIQCJHBGQASHGQWBOC5M\\\",\\\"sent\\\":{\\\"msgs\\\":1067,\\\"bytes\\\":851467},\\\"received\\\":{\\\"msgs\\\":1067,\\\"bytes\\\":849792},\\\"pending\\\":0},{\\\"rid\\\":8,\\\"name\\\":\\\"NBRYMRJ6EC4VLQYHCLPCC2QTNN34I2ZTP3XR5WGSUY3RTUYL7ENP6GLY\\\",\\\"sent\\\":{\\\"msgs\\\":1070,\\\"bytes\\\":853537},\\\"received\\\":{\\\"msgs\\\":895,\\\"bytes\\\":753896},\\\"pending\\\":0}],\\\"active_servers\\\":4}}\"]\r\n```"
+     },
+     {
+      "number": 3836,
+      "title": "Ability to fill KeyValue (KV) bucket from stream",
+      "url": "https://github.com/nats-io/nats-server/discussions/3836",
+      "createdAt": "2023-01-31T23:39:26Z",
+      "updatedAt": "2023-02-01T20:47:49Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "jalaziz"
+      },
+      "category": {
+       "name": "Ideas"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Since the KV feature is built off of streams (if I'm not mistaken), it would amazing if we could have a KV bucket automatically populated and updated from a stream.\r\n\r\nThe use case here is actually quite simple. We have a stream composed of a series of subjects that are all pushing regular updates. We have consumers that wish to receive all updates in relative real-time, while we have other consumers that simply want to be able to lookup the latest value for one or more subjects.\r\n\r\nWhile we could support both using `DeliverLastPerSubject` and `MaxMsgsPerSubject` to support both uses, the KV interface can be much simpler for looking up the latest values for known subjects.\r\n\r\nIf this is something that is worthy of implementation, it would also be great if we could define a mapping between the subject and key name within the bucket."
+     },
+     {
+      "number": 3850,
+      "title": "signal SIGSEGV: segmentation violation code=0x1 addr=0xe0 pc=0x960cd9",
+      "url": "https://github.com/nats-io/nats-server/discussions/3850",
+      "createdAt": "2023-02-07T04:54:25Z",
+      "updatedAt": "2023-07-05T10:43:32Z",
+      "closed": true,
+      "closedAt": "2023-07-05T10:42:44Z",
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "anil1996"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello,\r\n\r\nRecently I saw panics on NATS code\r\n\r\n2023-01-28T08:26:26.01669679Z stderr F goroutine 52 [running]:\r\n2023-01-28T08:26:26.016708559Z stderr F panic({0xa08380, 0xed8ae0})\r\n2023-01-28T08:26:26.016720386Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/panic.go:987 +0x3ba fp=0xc0000c97f8 sp=0xc0000c9738 pc=0x436a5a\r\n2023-01-28T08:26:26.01673168Z stderr F runtime.panicmem(...)\r\n2023-01-28T08:26:26.016743056Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/panic.go:260\r\n2023-01-28T08:26:26.016754251Z stderr F runtime.sigpanic()\r\n2023-01-28T08:26:26.01676616Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/signal_unix.go:835 +0x2f6 fp=0xc0000c9848 sp=0xc0000c97f8 pc=0x44d6f6\r\n2023-01-28T08:26:26.016778015Z stderr F github.com/nats-io/nats-server/v2/server.(*stream).updateWithAdvisory(0xc0002d6000, 0xc0001c1196?, 0x1)\r\n2023-01-28T08:26:26.016789398Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/stream.go:1575 +0x659 fp=0xc0000c9f50 sp=0xc0000c9848 pc=0x960cd9\r\n2023-01-28T08:26:26.016800953Z stderr F github.com/nats-io/nats-server/v2/server.(*stream).update(...)\r\n2023-01-28T08:26:26.016812279Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/stream.go:1423\r\n2023-01-28T08:26:26.016834595Z stderr F github.com/nats-io/nats-server/v2/server.(*Server).jsStreamUpdateRequest(0xc000162000, 0x4400000000000000?, 0xc000416000, 0x5d?, {0xc0001c1180, 0x32}, {0xc0001d85a0, 0x11}, {0xc000510000, 0x1af, ...})\r\n2023-01-28T08:26:26.016880885Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/jetstream_api.go:1447 +0xbc5 fp=0xc0000ca388 sp=0xc0000c9f50 pc=0x8240e5\r\n2023-01-28T08:26:26.016894019Z stderr F github.com/nats-io/nats-server/v2/server.(*Server).jsStreamUpdateRequest-fm(0x80?, 0x1c0?, 0x0?, {0xc0001c1180?, 0x0?}, {0xc0001d85a0?, 0x9cbc33?}, {0xc000510000, 0x1af, 0x1c0})\r\n2023-01-28T08:26:26.016905722Z stderr F \t<autogenerated>:1 +0x77 fp=0xc0000ca3f0 sp=0xc0000ca388 pc=0x995b37\r\n2023-01-28T08:26:26.016917092Z stderr F github.com/nats-io/nats-server/v2/server.(*jetStream).apiDispatch(0xc00023c000, 0xc0002220c0, 0xc000416000, 0xc00007c000, {0xc0001c1180, 0x32}, {0xc0001d85a0, 0x11}, {0xc000510000, 0x1af, ...})\r\n2023-01-28T08:26:26.016928393Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/jetstream_api.go:764 +0x25f fp=0xc0000ca4b8 sp=0xc0000ca3f0 pc=0x81cfdf\r\n2023-01-28T08:26:26.016939558Z stderr F github.com/nats-io/nats-server/v2/server.(*jetStream).apiDispatch-fm(0xba7210?, 0x9eacc0?, 0x1?, {0xc0001c1180?, 0x9d187c?}, {0xc0001d85a0?, 0xc0004037c0?}, {0xc000510000, 0x1af, 0x1c0})\r\n2023-01-28T08:26:26.016950732Z stderr F \t<autogenerated>:1 +0x77 fp=0xc0000ca520 sp=0xc0000ca4b8 pc=0x995437\r\n2023-01-28T08:26:26.016962428Z stderr F github.com/nats-io/nats-server/v2/server.(*client).deliverMsg(0xc000416000, 0x0, 0xc0002220c0, 0x0?, {0xc0001c1100, 0x32, 0x40}, {0xc0001d8588, 0x11, 0x18}, ...)\r\n2023-01-28T08:26:26.016974314Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/client.go:3194 +0xade fp=0xc0000ca770 sp=0xc0000ca520 pc=0x79789e\r\n2023-01-28T08:26:26.016985718Z stderr F github.com/nats-io/nats-server/v2/server.(*client).processMsgResults(0xc000416000, 0xc00007c000, 0xc0001a6d20, {0xc000510000, 0x1b1, 0x1c0}, {0x0, 0x0, 0xc00008ec80?}, {0xc0001c1100, ...}, ...)\r\n2023-01-28T08:26:26.016997042Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/client.go:4235 +0xb10 fp=0xc0000cad30 sp=0xc0000ca770 pc=0x79d6d0\r\n2023-01-28T08:26:26.017008127Z stderr F github.com/nats-io/nats-server/v2/server.(*client).processServiceImport(0xc000416000, 0xc000248ab0, 0xc0000dc900, {0xc0004162a5, 0x131, 0xfa3})\r\n2023-01-28T08:26:26.017019447Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/client.go:4020 +0x1145 fp=0xc0000cb030 sp=0xc0000cad30 pc=0x79c405\r\n2023-01-28T08:26:26.017030601Z stderr F github.com/nats-io/nats-server/v2/server.(*Account).addServiceImportSub.func1(0xa?, 0x1?, 0xc000403128?, {0x1?, 0x1?}, {0xba7210?, 0x9eacc0?}, {0xc0004162a5, 0x131, 0xfa3})\r\n2023-01-28T08:26:26.017041866Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/accounts.go:1962 +0x32 fp=0xc0000cb070 sp=0xc0000cb030 pc=0x768352\r\n2023-01-28T08:26:26.01705301Z stderr F github.com/nats-io/nats-server/v2/server.(*client).deliverMsg(0xc000416000, 0x0, 0xc000223680, 0x0?, {0xc000416248, 0x32, 0x1000}, {0xc00041627b, 0x26, 0xfcd}, ...)\r\n2023-01-28T08:26:26.017064281Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/client.go:3192 +0xb89 fp=0xc0000cb2c0 sp=0xc0000cb070 pc=0x797949\r\n2023-01-28T08:26:26.017075539Z stderr F github.com/nats-io/nats-server/v2/server.(*client).processMsgResults(0xc000416000, 0xc0000dc900, 0xc0001a6cc0, {0xc0004162a5, 0x131, 0xfa3}, {0x0, 0x0, 0xc00042c000?}, {0xc000416248, ...}, ...)\r\n2023-01-28T08:26:26.017086797Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/client.go:4235 +0xb10 fp=0xc0000cb880 sp=0xc0000cb2c0 pc=0x79d6d0\r\n2023-01-28T08:26:26.017097865Z stderr F github.com/nats-io/nats-server/v2/server.(*client).processInboundClientMsg(0xc000416000, {0xc0004162a5, 0x131, 0xfa3})\r\n2023-01-28T08:26:26.017117812Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/client.go:3660 +0xaa8 fp=0xc0000cbaa8 sp=0xc0000cb880 pc=0x799d28\r\n2023-01-28T08:26:26.017132207Z stderr F github.com/nats-io/nats-server/v2/server.(*client).processInboundMsg(0xc000416000?, {0xc0004162a5?, 0x5d?, 0x0?})\r\n2023-01-28T08:26:26.017153617Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/client.go:3507 +0x3d fp=0xc0000cbad8 sp=0xc0000cbaa8 pc=0x7990fd\r\n2023-01-28T08:26:26.01716583Z stderr F github.com/nats-io/nats-server/v2/server.(*client).parse(0xc000416000, {0xc0001daa00, 0x94, 0x200})\r\n2023-01-28T08:26:26.017177236Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/parser.go:497 +0x210a fp=0xc0000cbd50 sp=0xc0000cbad8 pc=0x908d0a\r\n2023-01-28T08:26:26.017188743Z stderr F github.com/nats-io/nats-server/v2/server.(*client).readLoop(0xc000416000, {0x0, 0x0, 0x0})\r\n2023-01-28T08:26:26.017200123Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/client.go:1238 +0xf36 fp=0xc0000cbfb0 sp=0xc0000cbd50 pc=0x78b1f6\r\n2023-01-28T08:26:26.017211564Z stderr F github.com/nats-io/nats-server/v2/server.(*Server).createClient.func1()\r\n2023-01-28T08:26:26.017222606Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/server.go:2646 +0x29 fp=0xc0000cbfe0 sp=0xc0000cbfb0 pc=0x94f349\r\n2023-01-28T08:26:26.017234546Z stderr F runtime.goexit()\r\n2023-01-28T08:26:26.017245669Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/asm_amd64.s:1594 +0x1 fp=0xc0000cbfe8 sp=0xc0000cbfe0 pc=0x46a761\r\n2023-01-28T08:26:26.017256698Z stderr F created by github.com/nats-io/nats-server/v2/server.(*Server).startGoRoutine\r\n2023-01-28T08:26:26.017267681Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/server.go:3077 +0x85\r\n2023-01-28T08:26:26.017278172Z stderr F \r\n2023-01-28T08:26:26.017288952Z stderr F goroutine 1 [chan receive]:\r\n2023-01-28T08:26:26.017300266Z stderr F runtime.gopark(0x9a6e74?, 0xac39b2?, 0xa?, 0x0?, 0xc00005d040?)\r\n2023-01-28T08:26:26.017311666Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/proc.go:363 +0xd6 fp=0xc0000cfe10 sp=0xc0000cfdf0 pc=0x439ab6\r\n2023-01-28T08:26:26.017323788Z stderr F runtime.chanrecv(0xc00009e3c0, 0x0, 0x1)\r\n2023-01-28T08:26:26.017335208Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/chan.go:583 +0x49b fp=0xc0000cfea0 sp=0xc0000cfe10 pc=0x40665b\r\n2023-01-28T08:26:26.017346345Z stderr F runtime.chanrecv1(0xc0000cff38?, 0x1?)\r\n2023-01-28T08:26:26.017357515Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/chan.go:442 +0x18 fp=0xc0000cfec8 sp=0xc0000cfea0 pc=0x406158\r\n2023-01-28T08:26:26.017368625Z stderr F github.com/nats-io/nats-server/v2/server.(*Server).WaitForShutdown(...)\r\n2023-01-28T08:26:26.017379665Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/server/server.go:2057\r\n2023-01-28T08:26:26.017390888Z stderr F main.main()\r\n2023-01-28T08:26:26.017402178Z stderr F \t/home/travis/gopath/src/github.com/nats-io/nats-server/main.go:139 +0x485 fp=0xc0000cff80 sp=0xc0000cfec8 pc=0x9a77c5\r\n2023-01-28T08:26:26.017413407Z stderr F runtime.main()\r\n2023-01-28T08:26:26.017424638Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/proc.go:250 +0x212 fp=0xc0000cffe0 sp=0xc0000cff80 pc=0x4396f2\r\n2023-01-28T08:26:26.017435828Z stderr F runtime.goexit()\r\n2023-01-28T08:26:26.017446986Z stderr F \t/home/travis/.gimme/versions/go1.19.3.linux.amd64/src/runtime/asm_amd64.s:1594 +0x1 fp=0xc0000cffe8 sp=0xc0000cffe0 pc=0x46a761\r\n2023-01-28T08:26:26.017457412Z stderr F \r\n\r\n\r\n\r\n\r\n\r\nbut I am not sure what could have triggered this. It happened only once. Will it be possible to know the cause?\r\n\r\n\r\n2023-01-28T08:26:16.70430472Z stderr F [6] 2023/01/28 08:26:16.672626 [INF] Starting nats-server\r\n2023-01-28T08:26:16.704402058Z stderr F [6] 2023/01/28 08:26:16.672779 [INF]   Version:  2.9.6\r\n2023-01-28T08:26:16.70441494Z stderr F [6] 2023/01/28 08:26:16.672786 [INF]   Git:      [289a9e1]\r\n2023-01-28T08:26:16.704426948Z stderr F [6] 2023/01/28 08:26:16.672792 [INF]   Name:     NCHS7TQ3KJ3VYPLLFOKXGDKNNB5DSJ6XQEN6NQOXHRY3ZF6HQGSAY3QX\r\n2023-01-28T08:26:16.704439023Z stderr F [6] 2023/01/28 08:26:16.672819 [INF]   Node:     uULQFxRT\r\n2023-01-28T08:26:16.704450171Z stderr F [6] 2023/01/28 08:26:16.672825 [INF]   ID:       NCHS7TQ3KJ3VYPLLFOKXGDKNNB5DSJ6XQEN6NQOXHRY3ZF6HQGSAY3QX\r\n2023-01-28T08:26:16.704461823Z stderr F [6] 2023/01/28 08:26:16.672837 [INF] Using configuration file: /etc/nats/nats-server.conf\r\n2023-01-28T08:26:16.704473158Z stderr F [6] 2023/01/28 08:26:16.674219 [INF] Starting http monitor on 0.0.0.0:8222\r\n2023-01-28T08:26:16.704484134Z stderr F [6] 2023/01/28 08:26:16.674335 [INF] Starting JetStream\r\n2023-01-28T08:26:16.704495253Z stderr F [6] 2023/01/28 08:26:16.674745 [INF]     _ ___ _____ ___ _____ ___ ___   _   __  __\r\n2023-01-28T08:26:16.704506369Z stderr F [6] 2023/01/28 08:26:16.674784 [INF]  _ | | __|_   _/ __|_   _| _ \\ __| /_\\ |  \\/  |\r\n2023-01-28T08:26:16.704524494Z stderr F [6] 2023/01/28 08:26:16.674789 [INF] | || | _|  | | \\__ \\ | | |   / _| / _ \\| |\\/| |\r\n2023-01-28T08:26:16.70453635Z stderr F [6] 2023/01/28 08:26:16.674793 [INF]  \\__/|___| |_| |___/ |_| |_|_\\___/_/ \\_\\_|  |_|\r\n2023-01-28T08:26:16.70454797Z stderr F [6] 2023/01/28 08:26:16.674797 [INF] \r\n2023-01-28T08:26:16.704559037Z stderr F [6] 2023/01/28 08:26:16.674801 [INF]          https://docs.nats.io/jetstream\r\n\r\n\r\njetstream.conf\r\njetstream {\r\n  max_file: 0\r\n}"
+     },
+     {
+      "number": 3857,
+      "title": "Can anyone tell me how to get information about consumer pending metrics on  nats-surveyor or prometheus-nats-exporter",
+      "url": "https://github.com/nats-io/nats-server/discussions/3857",
+      "createdAt": "2023-02-08T11:12:34Z",
+      "updatedAt": "2023-02-09T02:29:38Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "Doslin"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "\r\n![image](https://user-images.githubusercontent.com/29807388/217513721-d691da61-24a1-44f3-9041-ea37084cf0b6.png)\r\n"
+     },
+     {
+      "number": 3866,
+      "title": "Active-active, eventually consistent replication for JetStream?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3866",
+      "createdAt": "2023-02-14T00:37:10Z",
+      "updatedAt": "2024-06-24T14:16:33Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "lewisl9029"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi NATS team! :)\r\n\r\nThe product I'm building (https://reflame.app) has a bunch of use cases that require global replication and are very sensitive to local write latency, so I've built them on top of a bunch of different tech that allows for \"fast\" local writes (i.e. no need to wait for ~300ms+ for global consensus) and eventually consistent global replication, namely DynamoDB for app state, S3 for binary blobs, KeyDB for caching, etc.\r\n\r\nI've been following the development of NATS for a while, and I absolutely love the idea of unifying these use cases under the same tech with NATS JetStream and the KV/Object store abstractions, but all the replication approaches I could find in the docs seems to be either:\r\n\r\n1. uni-directional in the case of mirroring: https://docs.nats.io/running-a-nats-service/nats_admin/jetstream_admin/replication\r\n\r\nor\r\n\r\n2. requires consensus in the case of clustering https://docs.nats.io/running-a-nats-service/configuration/clustering/jetstream_clustering \r\n\r\nIf I missed something and this in fact possible, I'd really appreciate some pointers on how to set it up! Cheers!"
+     },
+     {
+      "number": 3871,
+      "title": "Is Tiered Storage currently planned?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3871",
+      "createdAt": "2023-02-15T14:41:29Z",
+      "updatedAt": "2025-03-26T11:29:47Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 7,
+      "author": {
+       "login": "shafqatevo"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi,\r\n\r\nCouldn't find Tiered Storage in the roadmap (https://nats.io/about/#roadmap). Can anyone pls share what's the current plan for this much-needed feature? What timeframe can it be expected?"
+     },
+     {
+      "number": 3879,
+      "title": "invalid subscription waiting for 5 seconds",
+      "url": "https://github.com/nats-io/nats-server/discussions/3879",
+      "createdAt": "2023-02-18T08:31:01Z",
+      "updatedAt": "2023-02-18T10:55:42Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "daudcanugerah"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "when the app subscribes to subject i get this error, \"invalid subscription waiting for 5 seconds\", what does this error mean ?\r\n\r\nservers 2.8.4\r\ngolang-client: v1.13.1"
+     },
+     {
+      "number": 3883,
+      "title": "Delivery guarantee",
+      "url": "https://github.com/nats-io/nats-server/discussions/3883",
+      "createdAt": "2023-02-18T22:56:25Z",
+      "updatedAt": "2023-02-18T23:14:02Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "kotyara85"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello everyone,\r\nDoes NATS guarantees message is delivered to consumer, similar to rabbitmq?\r\nThanks"
+     },
+     {
+      "number": 3889,
+      "title": "Can K/V key creation fail with \"wrong last sequence\" even if key was previously deleted?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3889",
+      "createdAt": "2023-02-20T12:11:46Z",
+      "updatedAt": "2023-02-21T10:20:40Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 1,
+      "author": {
+       "login": "pcsegal"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "During an experiment, I came across the following scenario:\r\n\r\n* A key was deleted in a K/V bucket at time T.\r\n* A bit less than 2 minutes later, a create operation was attempted, with the same key that was previously deleted. However, the create operation failed with a \"wrong last sequence\" error, as if the key had not been deleted at T.\r\n\r\nAfter the fact, I verified that, from the key's history (using the `nats kv history` command), the last operation on this key was in fact `DELETE`, the creation timestamp of the operation matched the logged time T, and the logged timestamp of the creation attempt was about 2 minutes after the `DELETE` operation's timestamp.\r\n\r\nEnvironment:\r\n* NATS server version 2.9.14 running locally on localhost\r\n* nats.go client version 1.19.0\r\n* Ubuntu 20.04.5 on WSL2 on Windows 10\r\n\r\nUnfortunately, I have not been able to reproduce it, which is why I didn't create an issue with the \"bug\" label. However, I still wanted to ask whether there is any known scenario where create could fail with \"wrong last sequence\" after a delete was issued."
+     },
+     {
+      "number": 3908,
+      "title": "Ordering guarantees per entity",
+      "url": "https://github.com/nats-io/nats-server/discussions/3908",
+      "createdAt": "2023-02-24T08:30:22Z",
+      "updatedAt": "2024-03-07T02:56:13Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 2,
+      "author": {
+       "login": "arnarg"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 3
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I need to process events for an \"entity\", and these events are just metadata for said entity. There are \"entity creation\", \"entity modification\" and \"entity deletion\" event types, all going on the same subject (per entity ID). The processing involves creating some resources in a cloud environment so can take up to 10-20 seconds but the destruction can take up to a minute.\r\n\r\nIn order to add some scalability but still strict ordering per entity ID I have constructed the following idea:\r\n\r\n- A stream capturing the subject `APPLICATION.entity.*` and has a re-publish rule with source `APPLICATION.entity.*` and destination `APPLICATION.q.entity.{{partition(100,1)}}.{{wildcard(1)}}` to enable partitioning by the entity ID.\r\n- Another stream with retention of `WorkQueuePolicy` captures subject `APPLICATION.q.entity.*.*`.\r\n- In that second stream 100 consumers are created, each only specifying a certain number from 0-99 in the partition position and having `MaxAckPending` of 1.\r\n- Then each instance of the application, written in go, creates 100 goroutines, 1 for each consumer.\r\n\r\n> Bonus idea: Adding `AllowRollup` on the second work queue stream and publish the deletion events with `Nats-Rollup` header so that any unprocessed events for the entity gets removed. But I haven't verified that this would work.\r\n\r\nThis gives me the ordering guarantees per entity but still some parallel processing happening. I however saw some problems with this approach.\r\n\r\n- Each instance of the application can be quite overloaded as I would _like_ to run fewer parallel goroutines in the application itself.\r\n- We can only process 100 entities in parallel. The number of partitions can of course just be increased but that only makes the previous issue worse and there is still a set limit, although higher.\r\n\r\nIs there any way of achieving my goals without these issues. I do not want to _have to_ run many instances of the application, 1 instance should be able to process all of them but scaling it to more instances should be faster. I don't want keep a huge amount of state myself, ideally.\r\n\r\nThanks in advance!"
+     },
+     {
+      "number": 5220,
+      "title": "does nats client support message finish notification to control the work balance? thanks.",
+      "url": "https://github.com/nats-io/nats-server/discussions/5220",
+      "createdAt": "2023-02-27T17:58:30Z",
+      "updatedAt": "2024-03-17T13:09:48Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "postgetme"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": ""
+     },
+     {
+      "number": 3940,
+      "title": "MQTT and Certificates",
+      "url": "https://github.com/nats-io/nats-server/discussions/3940",
+      "createdAt": "2023-03-02T20:48:28Z",
+      "updatedAt": "2023-03-08T11:51:11Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 1,
+      "author": {
+       "login": "JimmyBjorklund"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2023-03-08T10:55:34Z"
+      },
+      "comments": {
+       "totalCount": 5
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi I am looking to see if i can replace out mqtt servers with nats servers, but in order to do this i need to be able to setup the \r\ntopics so that clients only can subscribe to /client/clientId/>, where clientId is the common name of the client certificate. \r\nI cannot figure out how to do this in the config or if its even possible.\r\nIf any one know its possible or if it impossible it would be greate to know ;) \r\nThanks  "
+     },
+     {
+      "number": 3941,
+      "title": "Creating a new NATS connection per each subscriber",
+      "url": "https://github.com/nats-io/nats-server/discussions/3941",
+      "createdAt": "2023-03-03T06:09:48Z",
+      "updatedAt": "2023-03-05T05:12:14Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 1,
+      "author": {
+       "login": "vedadiyan"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "I am working on creating a fully automated microservice framework and I found that if I create a new connection for each subscriber I may get the following benefits:\r\n\r\n- I can name the connection and I can get out-of-the-box health monitoring through the built-in monitoring endpoint\r\n- I can simplify service binding by eliminating global variables. This is useful if two microservices would need to connect to two different servers, however this is a very rare case. \r\n\r\nHowever, my concern is: \r\n\r\n- In case there would be too many subscribers and in case each subscriber runs in cluster mode by being attached to a queue, would it cause port exhaustion in the server? \r\n- Will the server get slow due to too many connection? \r\n\r\nIn my opinion this approach has it's pros and cons, but I need to clarify this so I really appreciate if someone helps me better analyze this case to make sure it is production wise. \r\n\r\n"
+     },
+     {
+      "number": 3944,
+      "title": "Getting info about existing subjects in stream",
+      "url": "https://github.com/nats-io/nats-server/discussions/3944",
+      "createdAt": "2023-03-06T12:48:27Z",
+      "updatedAt": "2023-03-06T14:52:33Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 2,
+      "author": {
+       "login": "BinaryArchaism"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "derekcollison"
+       },
+       "createdAt": "2023-03-06T13:41:26Z"
+      },
+      "comments": {
+       "totalCount": 1
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi! \r\n\r\nI have stream with subject `info.*.>` and few publishers (e.g. `info.first_pub.super_info`,  `info.second_pub.super_info`,  etc). So I want to get all info from this `info.*.>` except `info.first_pub.super_info`, how can I do it?\r\n\r\nOne of solution that came to mind is to subscribe to `info.*.>` and simply ack every msg of unnecessary subject without reading it. But I think this is not really good solution. \r\nMay be I should create subscription for every `info.*.super_info` except unnecessary, but how can I know full name of other subjects? Stream only give info about subject `info.*.>`\r\n\r\nThanks!"
+     },
+     {
+      "number": 3955,
+      "title": "NATS Jetstream Internals",
+      "url": "https://github.com/nats-io/nats-server/discussions/3955",
+      "createdAt": "2023-03-12T07:47:47Z",
+      "updatedAt": "2023-03-14T16:22:30Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": true,
+      "upvoteCount": 2,
+      "author": {
+       "login": "beatrausch"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": {
+       "author": {
+        "login": "beatrausch"
+       },
+       "createdAt": "2023-03-13T10:56:50Z"
+      },
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hi all,\r\n\r\nthx for building nats, it\u2019s a great piece of software. \r\n\r\nI would like to learn a bit more about the internals of nats, especially the design of the Jetstream. What I understood so far based on the [docs](https://docs.nats.io/running-a-nats-service/configuration/clustering/jetstream_clustering): There are multiple raft groups that are responsible for replicating/storing certain aspects of the Jetstream like streams, consumer and meta-data. \r\n\r\nCan you share some more details about the Jetstream design? Especially, how data is stored? Is the data of raft groups stored in a partitioned manner? I am basically familiar with raft based databased systems. Typically, there are tables, tables are split into tablets, tables are replicated based on raft. How does it work in nats Jetstream?\r\n\r\nAccording to the [documentation](https://docs.nats.io/running-a-nats-service/configuration/clustering/jetstream_clustering#cluster-size) the recommend number of Jetstream enabled servers is 3/5. Does it mean this is recommend maximum number of Jetstream enabled servers? If so, I am not sure how this affects scalability, because this would mean, that all related Jetstream data hast to be stored on the Jetstream servers. \r\n\r\nRegards\r\n"
+     },
+     {
+      "number": 3974,
+      "title": "NATS /JetStream persistent storage in docker context for Stream, Subjects, Durable Consumers, Messages",
+      "url": "https://github.com/nats-io/nats-server/discussions/3974",
+      "createdAt": "2023-03-16T12:05:08Z",
+      "updatedAt": "2023-03-21T11:21:12Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": null,
+      "upvoteCount": 3,
+      "author": {
+       "login": "andronachev"
+      },
+      "category": {
+       "name": "General"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Hello, \r\n\r\nWe are facing the following: \r\n- deployed nats-jetstream in a docker pod using Deployments \r\n- configured the Stream, Subjects, and durable consumers at runtime of the client service(s), using NATS.NET \r\n- everything is configured using storage: \"File\" (files on disk on the docker pod) \r\n- we do this configuration at runtime only when Subscribing, not when publishing, and we do it if we receive NATS.NET **NATSJetStreamClientException**   with Id SUB-90007  (subject not existing). This is in order to not create overhead of upserting all configuration, when doing day-do-day operations after the server is configured. \r\n\r\n\r\nHowever, the **complete state of the server is lost** at redeployment time or when pod is recreated automatically... storage \"File\" works on simple container restart, but not on container recreation.  This means the client services are automatically reconnected, out of the box with NATS.NET, but the subscription is lost, durable consumers are lost, streams and subjects as well.\r\n\r\nIs there a suggested approach on handling this ? unfortunately I did not find it in the documentation. We did find the \"SQL Store\" approach but that is in the legacy nats-streaming:  https://docs.nats.io/legacy/stan/changes/configuring/persistence/sql_store  . We would require something similar, I imagine. \r\n\r\nWe are also considering making the client applications 100% resilient, meaning to configure at runtime, also at publish not only at Subscribe time, and to also recreate the subscriptions and consumers on the Reconnect event handler. \r\n\r\nThank you\r\n\r\n\r\n\r\n\r\n\r\n"
+     },
+     {
+      "number": 3984,
+      "title": "Are there tradeoffs with `AllowDirect: true`?",
+      "url": "https://github.com/nats-io/nats-server/discussions/3984",
+      "createdAt": "2023-03-21T21:25:55Z",
+      "updatedAt": "2026-06-09T17:02:48Z",
+      "closed": false,
+      "closedAt": null,
+      "isAnswered": false,
+      "upvoteCount": 2,
+      "author": {
+       "login": "jgaskins"
+      },
+      "category": {
+       "name": "Q&A"
+      },
+      "answer": null,
+      "comments": {
+       "totalCount": 2
+      },
+      "labels": {
+       "nodes": []
+      },
+      "body": "Is there ever a reason to avoid `AllowDirect: true` when creating a stream? Are there tradeoffs being made?\r\n\r\nJust trying to understand why it's optional and, from what I can tell, not the default (other than for KV)."
+     }
+    ]
+   }
+  }
+ }
+}

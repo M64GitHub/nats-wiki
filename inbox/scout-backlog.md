@@ -156,7 +156,7 @@ answered**, and a stated dead end with a date on it is the most valuable row in 
 
 ---
 
-## 5 · The posed design rows — 108–137 (added 2026-09-02)
+## 5 · The posed design rows — 108–137 (added 2026-09-02) — **(a) struck 2026-09-03**, (b) open
 
 Thirty rows written by the maintainer under the retired scope test (`CLAUDE.md`, *The question
 bank*, 2026-09-02): `own` in *asked at*, `design` in *flags*, one per architecture decision an
@@ -171,3 +171,24 @@ discussion, an issue, a Stack Overflow question, a talk — so `own` can be repl
 (b) A scout per **pattern page** before it is written: the Synadia *Design Patterns for Scaling NATS*
 series, NATS by Example, and the docs' unread `learn/core-nats`, `learn/resilient-clients` and
 `learn/services` chapters are the first places to look. Run (b) page by page, not all at once.
+
+**(a) done 2026-09-03** — `inbox/scout-posed-rows-public-form-2026-09-03.md`, on the discussions
+index of `inbox/gh-discussions-toc.md` (titles and original posts), the comment cache of
+`tools/triage-discussions.py --with-comments`, and the Stack Overflow tags. **21 rows got a URL**
+(108, 109, 110, 111, 113, 114, 115, 117, 118, 119, 120, 121, 122, 124, 125, 126, 129, 130, 135, 136,
+137 — eight of them for one half of the row, named in the scout file). **Searched, not found — do not
+search again without a new source:**
+
+| row | what was searched | nearest, and why it is not the row |
+|---|---|---|
+| 112 | `Nats-Msg-Id`, `Nats-Expected-Last-Subject-Sequence`, dedup, exactly-once, idempotent, optimistic concurrency; SO "deduplication", "exactly once", "msg-id" | gh#3772's answer and gh#4417 explain `Nats-Expected-*`; nobody poses dedup *versus* expected-sequence |
+| 116 | `max_ack_pending` with batch or `ack_wait`, tuning, throughput; SO `max_ack_pending`, `ack_wait`, "batch consumer" | gh#5211 / gh#4972 (rows 15, 19) ask about one knob each; so#67174521 asks how to commit by batch; the joint setting is never asked |
+| 123 | account limits, `max_memory` / `max_file` / `max_streams` / `max_consumers`, quota, apportion; SO "account limits", "limits", `max_file` | gh#5128 asks how many streams a cluster takes, not how to share it between accounts |
+| 127 | JetStream on all / some / dedicated servers, `jetstream: enabled` per node, mixed clusters, separate roles; SO "dedicated", "jetstream enabled", "some servers" | gh#2730 and so#71587299 are placement of a stream, not the role of a server |
+| 128 | capacity, sizing, hardware requirements, disk/RAM/nodes derivation; SO "hardware", "capacity", "disk memory" | so#70550060 (score 18) asks how JetStream scales and gets "~250k msg/s R3 filestore"; rows 1, 3, 11 hold the asked pieces; the derivation is never one question |
+| 131 | Kubernetes vs VM / bare metal, storage class, PVC, anti-affinity, chart decisions; SO "kubernetes", "storage class", "bare metal" | gh#6594 (row 68) is a throughput drop after a move; gh#7749 (row 66) is `hostPath`; so#72917865 / so#75588016 are chart PVC mechanics |
+| 132 | disaster, RPO / RTO, backup strategy, second cluster, standby, restore elsewhere; SO "backup", "disaster", "mirror cluster" | gh#5614 and so#68767392 ask *how to back everything up*; neither weighs snapshot against mirror against R3 |
+| 133 | core vs JetStream, when to use / need JetStream, persistence on core, pub/sub or request/reply with a stream; SO "core jetstream", "jetstream or core", "persistence" | gh#4984 (8 upvotes) asks for micro *plus* JetStream — a feature request, not a choice; so#74129868 asks whether JetStream can be the source of truth |
+| 134 | request/reply at scale, RPC, scatter-gather, no-responders, service layer / mesh, queue-group load balancing, timeouts; SO "request reply timeout", "queue group", "no responders", "scatter" | gh#2758 (cancelling slow responders), gh#4911 (routing by id ranges), gh#4761 (no-responders across accounts), so#67502707 (the exception) — pieces, no design question |
+
+(b) stays open — phase G runs it page by page.

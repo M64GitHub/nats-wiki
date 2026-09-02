@@ -28,6 +28,7 @@ nats-server <version>` and `verified-on: <date>`. A stale page is worse than a m
 | `raw/` | immutable original sources (`raw/sources.md` is the manifest) |
 | `inbox/question-bank.md` | the questions the wiki must answer, asked in public or posed by the maintainer — the map and the scoreboard |
 | `inbox/adr-toc.md` | one row per ADR of `nats-architecture-and-design` |
+| `inbox/gh-discussions-toc.md` | one row per `nats-io/nats-server` GitHub discussion — the place the hard questions are asked, with a ★ rule and the bank rows each thread already feeds |
 | `inbox/config-keys-table.md` | every documented config key with type, default and reload behaviour |
 | `inbox/plan-*.md` | the step list a session works through — say `start the plan` |
 | `inbox/` | scout results and plans waiting to be processed |
@@ -35,6 +36,7 @@ nats-server <version>` and `verified-on: <date>`. A stale page is worse than a m
 | `tools/fetch-docs.py` | mirror a doc site into `raw/` from its `llms.txt` — here: `python3 tools/fetch-docs.py https://docs.nats.io --collection nats-docs <prefix…>` |
 | `tools/build-config-table.py` | turn the generated config reference into `inbox/config-keys-table.md` |
 | `tools/triage-adrs.py` | turn `raw/adr/` into `inbox/adr-toc.md` |
+| `tools/triage-discussions.py` | fetch the discussions index into `raw/gh-discussions-index/` and turn it into `inbox/gh-discussions-toc.md` (`--offline` rebuilds without GitHub) |
 | `tools/lab/` | the scratch cluster behind the observed runs — `bash tools/lab/cluster.sh up 3` (see `tools/lab/README.md`) |
 | `site/` | generated web viewer (git-ignored; `python3 tools/build-site.py`) |
 | `local/` | git-ignored overlay: put your own `CLAUDE-MD-EXTENSION.md` there (what you are working on, local conventions) and the agent reads it after `CLAUDE.md` |

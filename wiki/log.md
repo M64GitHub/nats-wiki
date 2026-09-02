@@ -3663,3 +3663,88 @@ steps that closed them; the result line written at the top of
 `consumer-keeps-redelivering`), docs issues **48 → 53** (#49–#53; #4 extended), server issues
 **2 → 3** (SI-3), unlanded ripples 0 → 0, citation drift 0 → 0. Six observed runs on 2.14.6 recorded
 in `raw/nats-server-src/` with their scripts. Phase B's *done when* holds; phase C is next.
+
+## 2026-09-03 — triage: nats-io/nats-server discussions (phase C, step 1)
+
+`inbox/plan-discussions-triage-2026-09-03.md` written from the megaplan's phase C (goal, steps, *done
+when*), then step 1. **New tool `tools/triage-discussions.py`**: pages `repository.discussions` through
+`gh api graphql` (100 a page, five pages, one rate-limit point each), writes the replies verbatim to
+**`raw/gh-discussions-index/discussions-2026-09-03-p1..5.json`** and a rendering
+`discussions-2026-09-03.md` (one `## gh#<n> — <title>` section per thread: meta line, original post;
+no comments), and builds **`inbox/gh-discussions-toc.md`** — 484 rows: number, title, category, opened,
+answered (by whom, when), upvotes, comments, `area` guessed from the title's keywords and said to be,
+`bank` (the question-bank rows whose *asked at* cites the thread), flags, GitHub link, index file,
+summary (preserved on re-run and filled from `wiki/summaries/` whose `source-url` names the thread —
+48 filled today). **The ★ rule, stated in the script and the table head:** *answered and upvoted
+(upvotes ≥ 2, since a discussion opens with its author's own upvote), or design-shaped and answered*;
+`design` is a title regex with the trade-off in it. Counts on 2026-09-03: **40 ★, 28 of them not yet
+in the bank**; 181 answered, 103 upvoted, 22 design-shaped (15 not in the bank), 89 already cited by a
+bank row, 48 in `raw/gh-discussions/`, 1 skip (Show and tell); categories Q&A 351, General 99, Ideas
+33, Show and tell 1; upvotes: 376 threads at 1, 55 at 2, 21 at 3, 32 above. The rule needed no
+tightening (the plan's threshold for that was ~40 new rows). Registered in `wiki.json` → `tocs`
+(nav *Discussions*, filters ★ / answered / upvoted / design / in-bank / in-raw) and `raw_collections`
+(`article_pattern` on the `## gh#<n>` headings, so each row's title opens the original post in the
+index rendering); `raw/sources.md` row; README rows for the tool and the table. Built: the table
+renders with 484 rows and 484 article anchors. `--with-comments` also cached every thread's comments
+and replies (808 comments; replies truncated past 5 on 48 threads, which `fetch-discussion.py` fetches
+whole when needed) under `local/scratch/gh-index/` for step 2's body search — a cache, never cited.
+Lint: 310 pages, wanted none, drift 0, unlanded 0, unverified 12 across 9 pages. Bank unchanged,
+108 / 137.
+
+## 2026-09-03 — scout: the public form of the posed rows 108–137 (phase C, step 2)
+
+`inbox/scout-posed-rows-public-form-2026-09-03.md`. Every one of the 30 posed rows searched for the
+place somebody asked it in public: the discussions index (484 titles and original posts), the comment
+and reply cache from `tools/triage-discussions.py --with-comments` (808 comments, never cited), and the
+Stack Overflow tags through the Stack Exchange API (60 short tag-scoped queries; long queries return
+nothing because the search ANDs every term). Rule: a row is *found* only when a thread asks the row's
+question with its trade-off, or one named half of it. **21 found** (13 whole, 8 partial — the file
+names the half), **9 not found** (112, 116, 123, 127, 128, 131, 132, 133, 134). The bank's *asked at*
+cells for the 21 replaced `own` with the URL, the row text unchanged; the *Thread titles behind the
+rows* list gained entries 108–137 for them; a note at the end of the bank records the pass. Row 129's
+thread is row 57's (gh#6182) — 129 is its design form, so one page will answer both. Row 120 is the
+only Stack Overflow find (*Is anyone using Nats Object Store in production?*, score 6, unanswered).
+Found and worth naming: gh#6100 (stream per subject or one stream — answered "one stream; every
+replicated stream is a Raft group"), gh#6571 (WorkQueue source + Limits mirror, or one stream with two
+consumers — the asker wrote the pros and cons out), gh#3654 (Kafka partition rebalancing onto
+JetStream, 15 upvotes, no chosen answer), gh#6848 (thousands of edge accounts and a JWT the server
+cannot hold), gh#5974 (1,700 stores as leaf nodes with source and mirror), gh#5468 (KV and Object
+Store as a database). The 9 not-found rows and what was searched are in `inbox/scout-backlog.md`
+§5(a) so the search is not repeated; nothing ingested — the threads for phase G's page scouts are
+listed at the end of the scout file. Bank: 108 / 137 answered (unchanged); `own` rows 30 → 9.
+Lint clean: 310 pages, wanted none, drift 0, unlanded 0.
+
+## 2026-09-03 — bank rows 138–158 from the discussions triage (phase C, step 3)
+
+The 24 ★ threads of `inbox/gh-discussions-toc.md` that no bank row cited (after step 2 had taken
+five of the original 29) were read — title, original post, chosen answer. **21 became rows 138–158**,
+each the question as an operator or architect holds it, with the URL; three were left out with a
+reason recorded in the bank's closing note (gh#2933 re-asks rows 108/111 and went to the scout file
+as a second candidate; gh#3164 is a Go test-helper import path; gh#6301 is a third-party Helm chart
+defect fixed in that chart). `answered by` filled for **eight** where a page already states the answer
+with a citation and a version — 141 (a cluster behind one DNS name: `build-a-3-node-cluster`,
+`how-clients-reach-a-cluster`), 142 (the leader does the work: `replicas`, `subject-transforms`), 143
+(no external database — `storage` is `file` or `memory`: `stream`, `nats-streaming`), 145 (lame duck
+then peer-remove: `rebalance-streams`, `evict-a-sick-server`), 147 (the Raft groups, the filestore,
+reads from any replica: `raft-in-nats`, `meta-layer`, `filestore-layout`, `direct-get`), 151 (delete
+by sequence, secure delete, purge: `stream`, `s-docs-altering-stream-state`), 152 (`no_tls` behind a
+proxy: `run-nats-behind-a-proxy`, `websocket`), 158 (MQTT 3.1.1 only: `mqtt`). Thirteen open. Two
+findings on the way: **row 150** — gh#4761's maintainer answer says a request over a service import
+never fails fast with `No responders` because the import itself is a subscription, while
+`cross-account-sharing` states a matched import with nobody answering fails fast; to settle on the
+binary (phase I, or the next security pass), then the page or `inbox/docs-issues.md`. **Row 158** —
+the maintainers stated on 2026-07-06 that MQTT 5 will not be accepted; the `mqtt` page says 3.1.1
+only and should carry the statement when gh#8362 is ingested. Bank: 137 → 158 rows, **108 → 116
+answered**, open 29 → 42 (24 `design`), `own` 9, ★ 43. TOC after the re-run: ★ not in the bank 3
+(the three skipped), in-bank 129. Lint clean.
+
+## 2026-09-03 — plan closed: discussions triage (phase C, step 4)
+
+`inbox/scout-backlog.md` §5(a) struck (the not-found table stays under it; §5(b) open for phase G);
+the result line at the top of `inbox/plan-discussions-triage-2026-09-03.md`. Over the plan, one
+session: a new tool and a new raw collection (`tools/triage-discussions.py`,
+`raw/gh-discussions-index/`), `inbox/gh-discussions-toc.md` with 484 rows in the viewer, the scout of
+the 30 posed rows (21 → URL, 9 recorded as not found), 21 new bank rows. Bank **108 / 137 → 116 /
+158**, `own` 30 → 9, pages 310 (no page written — this phase was bookkeeping by design), wanted 0,
+drift 0, unlanded 0, unverified 12, docs issues 53, server issues 3. Phase C's *done when* holds;
+phase D (the change layer) is next.

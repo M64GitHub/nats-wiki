@@ -215,6 +215,38 @@
       ]
     },
     {
+      "file": "inbox/gh-discussions-toc.md",
+      "id": "gh",
+      "title": "Discussions — nats-io/nats-server",
+      "nav": "Discussions",
+      "label": "discussion",
+      "collection": "gh-discussions-index",
+      "file_column": "file",
+      "num_column": "#",
+      "title_column": "title",
+      "flags_column": "flags",
+      "summary_column": "summary",
+      "star": "★",
+      "meta_columns": [
+        "category",
+        "opened",
+        "area",
+        "bank",
+        "flags"
+      ],
+      "filters": [
+        {
+          "flag": "★",
+          "label": "★ answered and upvoted, or design-shaped and answered"
+        },
+        "answered",
+        "upvoted",
+        "design",
+        "in-bank",
+        "in-raw"
+      ]
+    },
+    {
       "file": "inbox/docs-issues.md",
       "id": "docs",
       "title": "Docs issues — errors and gaps found in public NATS docs",
@@ -332,6 +364,11 @@
     "release-notes": {
       "name_pattern": "v?(\\d+\\.\\d+\\.\\d+)",
       "title": "nats-server {name}"
+    },
+    "gh-discussions-index": {
+      "name_pattern": "discussions-(\\d{4}-\\d{2}-\\d{2})",
+      "title": "nats-server discussions — index of {n}",
+      "article_pattern": "^## gh#(?P<num>\\d+) — (?P<title>.+)$"
     }
   },
   "stub_words": 180
