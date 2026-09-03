@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [subject_transform, republish, wildcard, partition, split, Nats-Stream, Nats-Subject, Nats-Sequence, Nats-Last-Sequence, Nats-Msg-Size, 10052, sharding]
 aliases: [subject transform, transform, republish, subject mapping, partition, wildcard, sharding, "{{wildcard(1)}}", "{{partition(3,1)}}", nats server mappings]
-sources: [s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-mirrors-and-sources, s-docs-stream-config, s-docs-kv-watching]
+sources: [s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-mirrors-and-sources, s-docs-stream-config, s-docs-kv-watching, s-relnotes-2.10, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # Subject transforms and republish
@@ -147,6 +147,25 @@ nothing: **`*` is a token, never a prefix.**
 - **A transform changes what `nats stream subjects` shows, not what the stream listens on.** A
   consumer filter must be written against the **stored** subject, not the published one.
 
+## Version notes
+
+- **Stream subject transforms and republish on mirrors and sources are since 2.10.0** (#3814,
+  #3823, #3827, #4035, #4354, #4400, #4403, #4512; #4010), with wildcard-token removal (#4152) and
+  cluster filtering in account subject mapping (#4175); a republished message carries the original
+  timestamp as a header (#3933) (source: [[s-relnotes-2.10]]).
+- **2.10.16** added "Left and Right subject mapping operations" (#5337).
+- 2.10.12 keeps account mappings whose value changed on a reload (#5132, #5103); 2.10.17 fixed panics
+  on a bad mapping destination and on updating sources with bad transforms (#5570, #5571, #5574);
+  2.10.19 fixed false import-cycle warnings with mappings in use (#5755); 2.10.28 fixed a panic on a
+  transform with missing tokens (#6612).
+
+
+- **2.12.0** added `partition(n)` "for deterministic hash-based partitioning" and `random(n)` "for
+  non-deterministic random partitioning" on the whole subject (#6950); **2.12.8** performs a stream's
+  clustered consistency checks "on transformed subject where applicable instead of the publish
+  subject" (#8022); **2.12.9** validates republish subjects (#8127) (source: [[s-relnotes-2.12]]).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[mirrors-and-sources]] · [[key-value]] · [[worker-pool]] ·
@@ -160,4 +179,4 @@ nothing: **`*` is a token, never a prefix.**
 - [[s-docs-mirrors-and-sources]] — the per-source transform, applied while copying.
 - [[s-docs-stream-config]] — the `subject_transform`, `republish` and per-source
   `subject_transforms` config fields.
-- [[s-docs-kv-watching]] — a KV key filter is a subject filter, so `*` is a whole token there too.
+- [[s-docs-kv-watching]] — a KV key filter is a subject filter, so `*` is a whole token there too. · [[s-relnotes-2.10]] · [[s-relnotes-2.12]]

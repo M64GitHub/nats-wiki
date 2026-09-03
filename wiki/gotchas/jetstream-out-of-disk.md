@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10047, 10028, max_bytes, max_file_store, reserved_storage, out-of-space, OUT_OF_STORAGE]
 aliases: ["JetStream out of disk", "insufficient storage resources available", "insufficient memory resources available", "JetStream out of resources will be DISABLED", "10047", "10028", "out of storage"]
-sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished]
+sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # "insufficient storage resources available (10047)"
@@ -248,6 +248,35 @@ values.
 
 [[jetstream-sizing]] for the numbers, [[s-nats-server-jetstream-resources]] for the code paths.
 
+## Version notes
+
+- **Since 2.10.25 JetStream shuts itself down** "when detecting that the store directory underlying
+  filesystem has become read-only" (#6292, "Disable JetStream on disk errors") (source:
+  [[s-relnotes-2.10]]). Before that a read-only volume produced write errors without the step-down.
+- 2.10.26: "stream disk reservations will no longer be counted multiple times after stream reset
+  errors have occurred" (#6457) — a reason an older server reported less free store than it had.
+- 2.10.19: "Fixed R1 streams exceeding quota limits" (#5771).
+
+
+### The 2.11 line
+
+Three accounting fixes that changed what "out of disk" reported: `reserved_memory` and
+`reserved_storage` "will no longer underflow when no limits are set" (2.11.6, #7024); a potential
+underflow when modifying `max_bytes` reservations (2.11.7, #7131); "extremely large JetStream
+reservations could overflow and violate tier limits" (2.11.15) (source: [[s-relnotes-2.11]]).
+
+
+### The 2.12 line
+
+**2.12.5**: "the `store_max_stream_bytes` and `memory_max_stream_bytes` are no longer incorrectly
+applied when determining whether account resource limits have been exceeded, fixing a long-standing
+bug where it would incorrectly limit total reservations" (#7895); tiered reservations consistent
+(#7880). **2.12.7**: `max_mem_store` and `max_file_store` may be increased by config reload (#8014).
+**2.12.9**: reservations for un-tiered streams consistent between creates and updates (#8170).
+**2.12.12**: usage statistics reflect purged whole blocks (#7685, 2.12.4). **2.12.14**: a publish
+exceeding the maximum store size is rejected before proposal (#8389) (source: [[s-relnotes-2.12]]).
+
+
 ## Related
 
 [[jetstream-sizing]] · [[malformed-or-corrupt-message]] · [[stream-directories-disappear]] ·
@@ -266,4 +295,4 @@ values.
 - [[s-nats-server-filestore-layout]] — why the ceiling bounds a logical figure and the directory is
   bigger.
 - [[s-nats-helm-chart-values-2.14.6]] — the chart rendering `max_file_store` equal to the PVC size. ·
-[[s-gh-5924-filestore-dirs-vanished]]
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

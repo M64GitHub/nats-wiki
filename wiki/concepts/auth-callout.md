@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [auth_callout, issuer, auth_users, xkey, allowed_accounts, ADR-26, "$SYS.REQ.USER.AUTH", oidc, ldap]
 aliases: [auth callout, authorization callout, external auth, "$SYS.REQ.USER.AUTH", auth_callout]
-sources: [s-docs-auth-callout, s-gh-7505-auth-callout-nkey, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-authentication-basics]
+sources: [s-docs-auth-callout, s-gh-7505-auth-callout-nkey, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-authentication-basics, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Auth callout
@@ -155,6 +155,31 @@ The security failure to watch for is not the protocol — the replay and forgery
 the handler trusting `connect_opts`. A service that reads `connect_opts.nkey` as an identity is
 spoofable, and the spoof succeeds silently with the wrong permissions attached.
 
+## Version notes: the 2.10 patches
+
+Auth callout shipped in 2.10.0 (#3719, #3784, #3799, #3864, #3987, #4501, #4544) and was patched
+along the line (source: [[s-relnotes-2.10]]): **2.10.10** binds scoped users correctly (#5013);
+**2.10.17** lets callout users be revoked (#5555, #5561); **2.10.26** authenticates "the username and
+password or authorization token from a leafnode connection" through the callout (#6492). A callout
+in front of leafnode remotes needs 2.10.26 or later.
+
+
+### The 2.11 line
+
+`default_sentinel` (2.11.2, #6577) gives a callout deployment in operator mode a default user: "a
+default sentinel JWT, which is used in operator mode when none is specified". 2.11.7 requires it to
+be a bearer token (#7074); 2.11.9 also accepts one issued by a scoped signing key (#7217) (source:
+[[s-relnotes-2.11]]).
+
+
+### The 2.12 line
+
+**2.12.6**: "client connections are no longer registered after an auth callout timeout" (#7932).
+**2.12.7**: the `jwt` is sent to the callout for MQTT clients again — a 2.12.6 regression (#7997,
+#7999). **2.12.14**: "combining `no_auth_user` with auth callouts will no longer skip authentication
+checks when no `CONNECT` message is sent" (source: [[s-relnotes-2.12]]).
+
+
 ## Related
 
 [[account]] · [[subject-permissions]] · [[operator-mode]] · [[tls-in-nats]] · [[js-api-subjects]] ·
@@ -164,4 +189,4 @@ spoofable, and the spoof succeeds silently with the wrong permissions attached.
 
 [[s-docs-auth-callout]] · [[s-gh-7505-auth-callout-nkey]] · [[s-nats-server-auth-and-tls]] ·
 [[s-docs-security-checklist]] ·
-[[s-docs-authentication-basics]]
+[[s-docs-authentication-basics]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

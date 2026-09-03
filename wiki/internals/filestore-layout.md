@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [filestore, block-size, index.db, tombstone, compaction, disk, sizing, psim, o.dat]
 aliases: [filestore, file store, blocks, blk, msg blocks, index.db, on-disk layout, storage overhead, bytes per message]
-sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects]
+sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -274,7 +274,7 @@ write is skipped, so an unclean stop always means the full read. **Sources**: th
 timer also wraps the source scan a stream with `sources` makes on an R1 server, which can dwarf the
 store's own recovery — the row-13 thread's 6 min 38 s was that, not this ([[mirrors-and-sources]],
 [[jetstream-recovery-is-slow]]; source: [[s-gh-8001-jetstream-startup-slow-50m]]). The in-memory
-tree is an adaptive radix tree since 2.10.9, with a message count and a first and last block per
+tree is an adaptive radix tree since 2.10.10 (the maintainer who described it said 2.10.9; the source tree says 2.10.10 — see *The 2.10 line* below), with a message count and a first and last block per
 subject (source: [[s-gh-5202-max-unique-subjects]]).
 
 Streams are recovered in parallel across streams — one task queue of `min(64, max_concurrent_io)`
@@ -352,6 +352,67 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
   for streams without sources.
 
 
+### The 2.10 line
+
+- **The subject tree is since 2.10.10** — `fileStore.psim` is `map[string]*psi` at v2.10.9 and
+  `*stree.SubjectTree[psi]` at v2.10.10, `server/stree/` absent at v2.10.9; the 2.10.10 body lists it
+  as "NumPending calculations and subject index memory in filestore and memstore" (#4960, #4983).
+  Message-block subject indexing moved onto stree in 2.10.17 (#5559), with `node48` (#5585); `node10`
+  for numeric subject spaces came in 2.10.23 (#6106) (source: [[s-relnotes-2.10]]; evidence in
+  `raw/nats-server-src/stree-arrival-v2.10.10.md`).
+- `index.db`: full-state writes throttled to a separate goroutine (2.10.5, #4731) and their minimum
+  interval raised (2.10.7, #4858); recovery of a bad or missing `index.db` fixed for per-subject
+  tracking (2.10.7, #4851) and corrupt subjects (2.10.8, #4890); the full state written before
+  snapshotting (2.10.4, #4699); recovery "from old or corrupted `index.db`" (2.10.21, #5893, #5901,
+  #5907).
+- Blocks and tombstones: tombstones held for previous blocks on compact (2.10.16, #5426); a "large
+  number of message delete tombstones will no longer result in unusually large message blocks on
+  disk" (2.10.22, #5973); tombstones written on purge and compact so deleted messages do not return
+  after an index rebuild (2.10.28, #6685); a new last block generated before the final one is
+  removed, so sequence numbers survive an interruption (2.10.28, #6778).
+- Sync: `sync_interval` and `sync: always` controllable since 2.10.0 (#4483); metadata `O_SYNC` under
+  `always` since 2.10.19 (#5729); filestore sync timers spread (2.10.23, #6128); JetStream shuts down
+  on a read-only store since 2.10.25 (#6292).
+
+
+### The 2.11 line
+
+- **Encryption**: 2.11.6 fixed a block corrupted "if a write took place before a read after
+  restarting the server" (#7008); 2.11.7 made cipher conversion work with compression (#7099);
+  2.11.12 recovers keys independently of the index, "fixing some cases where the key could be reset
+  unexpectedly if the index is rebuilt" (#7678) (source: [[s-relnotes-2.11]]).
+- **`index.db` and blocks**: truncate and erase consistent after a hard kill (2.11.7, #7100); a stale
+  `index.db` after a block delete marked as lost data and rebuilt (2.11.7, #7123) and cleaned up on
+  truncate (2.11.8, #7162); out-of-order sequences from corruption recovered (2.11.10, #7303,
+  #7304); a use-after-free in the flusher (2.11.10, #7295); tombstones no longer lost with secure
+  erase and the last sequence kept for tombstone-only blocks (2.11.11, #7384); off-by-one hole
+  detection at a block's end (2.11.11, #7508, #7525).
+- **Flush and compaction**: **`AsyncFlush` could lose pending writes after a process pause**
+  (2.11.12, #7594); compactions reclaiming over half the space use an atomic write "to avoid losing
+  messages if killed" (#7627); compaction adjusts a block's high and low sequences and the delete map
+  (#7634); a single truncated block no longer blocks storing (#7704); `sync_always` honoured for the
+  TTL and scheduling state files (2.11.11, #7385).
+
+
+### The 2.12 line
+
+- **2.12.0**: async flush by default on replicated streams (#7018, #7163) and the async persist
+  mode for R1 (#7315, #7323); weak-pointer caches (#7180); write-correctness fixes "particularly when
+  combined with async mode" (#7318, #7331) (source: [[s-relnotes-2.12]]).
+- **2.12.1**: meta files "written using temporary staging, avoiding accidental truncation on
+  crashes" (#7388); pooled write-cache allocations reused (#7346). **2.12.5**: tombstones always used
+  for trailing deletes (#7782); the #7816 batch — checksums after truncation on compressed or
+  encrypted stores, locks not leaked, pending calculations bounded, subject and header corruption
+  avoided. **2.12.7**: purging subjects loads only the blocks in range (#8004); caches no longer
+  evicted too eagerly after a write (#8009). **2.12.9**: encryption-mode conversion clears caches,
+  "avoiding block-level corruption" (#8105, #8166); block-cache aliasing fixed (#8187).
+- **2.12.11**: the stale-subject-state regression of 2.12.7 (#8285). **2.12.12**: **"filestore
+  compaction no longer corrupts compressed or encrypted blocks"** (#8312). **2.12.14**: the disk I/O
+  semaphore is 4096 slots (`max_concurrent_io`, #8336); block-cache buffers recycled when the weak
+  reference is collected (#8395); AVL sequence sets faster (#8406); encryption key files "synced to
+  disk more aggressively" (#8366); a cache-weakening bug that raised memory and GC pressure (#8380).
+
+
 ## To verify
 
 - The **`sdm`/`SDMMeta`** (subject-delete-markers) and **`thw.db`** (TTL hash wheel) and `sched.db`
@@ -378,4 +439,4 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
 - [[s-docs-object-store-chunking]] — the docs' unquantified per-message-overhead claim these
   numbers answer.
 - [[s-docs-object-store-under-the-hood]] — the qualitative disk-reclamation warning the bulk-delete
-  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]]
+  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

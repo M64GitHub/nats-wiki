@@ -29,6 +29,7 @@ nats-server <version>` and `verified-on: <date>`. A stale page is worse than a m
 | `inbox/question-bank.md` | the questions the wiki must answer, asked in public or posed by the maintainer — the map and the scoreboard |
 | `inbox/adr-toc.md` | one row per ADR of `nats-architecture-and-design` |
 | `inbox/gh-discussions-toc.md` | one row per `nats-io/nats-server` GitHub discussion — the place the hard questions are asked, with a ★ rule and the bank rows each thread already feeds |
+| `inbox/relnotes-toc.md` | one row per `nats-server` release from v2.10.0 — the change layer's table of contents, with a ★ rule for the releases an operator must read and the summary that folds each in |
 | `inbox/config-keys-table.md` | every documented config key with type, default and reload behaviour |
 | `inbox/plan-*.md` | the step list a session works through — say `start the plan` |
 | `inbox/` | scout results and plans waiting to be processed |
@@ -37,6 +38,7 @@ nats-server <version>` and `verified-on: <date>`. A stale page is worse than a m
 | `tools/build-config-table.py` | turn the generated config reference into `inbox/config-keys-table.md` |
 | `tools/triage-adrs.py` | turn `raw/adr/` into `inbox/adr-toc.md` |
 | `tools/triage-discussions.py` | fetch the discussions index into `raw/gh-discussions-index/` and turn it into `inbox/gh-discussions-toc.md` (`--offline` rebuilds without GitHub) |
+| `tools/triage-releases.py` | fetch the release archive and write one body per release from v2.10.0 into `raw/release-notes/` (`--fetch`; `--offline` writes from the cache), then turn the folder into `inbox/relnotes-toc.md` |
 | `tools/lab/` | the scratch cluster behind the observed runs — `bash tools/lab/cluster.sh up 3` (see `tools/lab/README.md`) |
 | `site/` | generated web viewer (git-ignored; `python3 tools/build-site.py`) |
 | `local/` | git-ignored overlay: put your own `CLAUDE-MD-EXTENSION.md` there (what you are working on, local conventions) and the agent reads it after `CLAUDE.md` |

@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [recovery, restore, startup, index.db, sources, backward-scan, clean-shutdown, SIGKILL, healthcheck, cardinality, kubernetes, measured, unanswered-upstream]
 aliases: ["Restored messages for stream in minutes", "JetStream restart takes minutes", "stream restore slow", "server slow to start with large stream", "Healthcheck failed during startup", "jetstream startup slow", "recovery slow after restart", "jetstream-recovery-is-slow"]
-sources: [s-gh-8001-jetstream-startup-slow-50m, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects]
+sources: [s-gh-8001-jetstream-startup-slow-50m, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # JetStream startup or recovery is slow
@@ -174,6 +174,46 @@ serially; on newer ones a single huge stream still does (source:
 [[filestore-layout]] — `index.db`, the block files, and what recovery reads.
 [[mirrors-and-sources]] — what a sourcing stream does at every start.
 
+## Version notes: the 2.10 line
+
+- 2.10.0 rewrote filestore meta indexing, "significantly reducing time to recover streams at
+  startup" (#4450, #4481), and 2.10.10 replaced the per-subject map with the subject tree (#4960,
+  #4983 — since 2.10.10, not 2.10.9; see [[filestore-layout]]) (source: [[s-relnotes-2.10]]).
+- `index.db` recovery fixes: 2.10.7 (per-subject tracking corrupted on a bad or missing `index.db`,
+  #4851), 2.10.8 (corrupt subjects detected, #4890; no snapshots before recovery completes, #4927),
+  2.10.21 ("improvements to recovering from old or corrupted `index.db`", #5893, #5901, #5907),
+  2.10.26 (the delete map cleaned on compaction so `index.db` recovers, #6515).
+- 2.10.23: metalayer recovery "will now more reliably group assets for creation/update/deletion …
+  reducing the chance of ghost consumers and misconfigured streams happening after restarts"
+  (#6066, #6069, #6088, #6092); "Sourcing consumers for R1 streams will now be set up inline when the
+  stream is recovered" (#6219).
+- 2.10.28: temporary files from stream compression are ignored on recovery "so that the same blocks
+  do not get loaded more than once" (#6684).
+
+
+### The 2.11 line
+
+- **2.11.11: streams are loaded in parallel** when JetStream is enabled, "often reducing the time it
+  takes to start up the server" (#7482), and recovery parallelism matches the I/O semaphore (#7526)
+  (source: [[s-relnotes-2.11]]).
+- **2.11.12**: "The scan for the last sourced message sequence when setting up a subject-filtered
+  source is now considerably faster" (#7553) — the backward scan measured on this page.
+- **2.11.7**: a stale `index.db` after a block delete and an unclean shutdown is now recognised as
+  lost data and the index rebuilt (#7123). **2.11.10**: blocks with out-of-order sequences from disk
+  corruption recovered (#7303, #7304), with more useful error messages (#7305). **2.11.9 → 2.11.10**:
+  meta snapshot performance with very many assets regressed and was fixed (#7350).
+
+
+### The 2.12 line
+
+**2.12.3**: the meta layer stages and deduplicates recovery operations at startup (#7540).
+**2.12.8**: "scanning for the starting sequence for consumers is now an asynchronous operation
+which no longer pauses the metalayer" (#8051). **2.12.14**: the disk I/O semaphore that bounds the
+parallel recovery task queue rose to 4096 slots (`max_concurrent_io`, #8336). **2.12.5**: tombstones
+always used for trailing deletes (#7782) and a race rebuilding block state (#7783) (source:
+[[s-relnotes-2.12]]).
+
+
 ## Related
 
 [[jetstream-sizing]] · [[kubernetes-storage]] · [[upgrade-a-cluster]] · [[stream]] ·
@@ -183,4 +223,4 @@ serially; on newer ones a single huge stream still does (source:
 
 [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-filestore-recovery]] ·
 [[s-nats-server-stream-scale-observed]] · [[s-gh-8333-high-cardinality-subjects]] ·
-[[s-synadia-how-many-subjects]]
+[[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

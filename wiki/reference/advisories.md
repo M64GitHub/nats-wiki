@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Advisories and system events
@@ -294,6 +294,26 @@ alert built on this subject is silent in exactly the situation where a worker po
 - The `$SYS.ACCOUNT.*` subjects and the `STATSZ` heartbeat come from
   `raw/nats-docs/learn/monitoring/advisories-and-events.md`.
 
+## Version notes
+
+- The AckTerm advisory carries a **`reason`** since 2.10.4 (#4697) (source: [[s-relnotes-2.10]]).
+- 2.10.10 added "higher fidelity client info in JetStream advisory messages" (#5019, #5026);
+  **2.10.25 removed** "unnecessary client info fields" from stream and consumer assignment proposals,
+  API advisories and snapshot/restore advisories (#6326, #6338) — a consumer of those advisories on
+  2.10.10–2.10.24 saw fields that later servers omit.
+- **Since 2.10.25 advisories are only encoded and sent when there is interest** (#6341): a server
+  with no subscriber on `$JS.EVENT.ADVISORY.>` does no work for them.
+
+
+### The 2.11 line
+
+- 2.11.9 fixed a panic sending the leader-elected advisory "when shutting down before completing
+  startup" (#7246); 2.11.15 stopped MQTT passwords appearing "in the JWT field of monitoring endpoints
+  or advisory messages" (source: [[s-relnotes-2.11]]).
+- **Message tracing** (2.11.0, `Nats-Trace-Dest`) is the other event stream a server can emit — per
+  message, to a subject the sender names, not an advisory; see [[js-api]] *The 2.11 line*.
+
+
 ## To verify
 
 - **The per-advisory payload fields are not on this page.** Each of the 25 reference pages carries a
@@ -335,4 +355,4 @@ system account (source: [[s-nats-server-jetstream-cluster]]; [[meta-layer]]):
 [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
 [[s-docs-advanced-publishing]] ·
-[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]]
+[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]]

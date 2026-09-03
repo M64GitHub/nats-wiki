@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore, s-nats-server-jetstream-cluster]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore, s-nats-server-jetstream-cluster, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Replicas
@@ -261,6 +261,36 @@ Reads from the **leader** are read-after-write; reads from a follower can be cor
 "answers from any replica or mirror, which may trail the leader" — **do not use it for
 read-after-write checks**, such as confirming a publish landed (source: [[s-docs-get-direct]]).
 
+## Version notes: the 2.11 line
+
+- **`cluster_traffic: owner`** — since 2.11.0 an account's `jetstream` block can carry its assets'
+  Raft traffic "into the asset account instead of using the system account" (#5466, #5947); the
+  choice is reported as `traffic_account` and `system_account` on stream and consumer info and in
+  `/jsz` from 2.11.9 (#7193). Documented nowhere in the docs tree — `inbox/docs-issues.md` #56
+  (source: [[s-relnotes-2.11]]).
+- **2.11.4**: a stream or consumer update is refused while every peer is offline (#6856).
+  **2.11.9**: a consumer cannot get more replicas than its stream (#7202). **2.11.11**: scaling up
+  from R1 installs a snapshot "allowing recovery after restart if interrupted, avoiding a potential
+  desync" (#7509); binary stream snapshots are preferred by default on new route connections (#7479);
+  catch-ups use delete ranges for streams with many interior deletes (#7512).
+- The ack-through-Raft change of 2.11.0 (#6140) means an R3 `interest` or `workqueue` stream
+  replicates its removals as well as its writes — see [[retention-policies]].
+
+
+### The 2.12 line
+
+- **2.12.0**: a replicated stream can be created "even if some of the replica nodes are offline"
+  (#7075); replicated streams flush asynchronously by default (#7018, #7163) (source:
+  [[s-relnotes-2.12]]).
+- **2.12.5**: replica `lag` and `current` in stream info, consumer info and `/jsz` "are now more
+  consistent, no longer reporting incorrect values on follower nodes" (#7885); tiered reservations
+  no longer over-count replicated assets (#7880). **2.12.10**: scale-down consistency (#8253); a
+  peer-set drift after removing an online node (#8258); quorum calculated correctly when gateway
+  URLs resolve to several IPs (#8238). **2.12.12**: a catch-up is no longer skipped over limits
+  (#8265). **2.12.14**: a stream recreated while a node was down is not treated as an update by the
+  returning node (#8413).
+
+
 ## To verify
 
 - ~~The docs do not state a replica count for the meta group~~ **Settled 2026-09-01**: there is none
@@ -378,4 +408,4 @@ the next line ([[meta-layer]]; source: [[s-nats-server-jetstream-cluster]]).
 [[s-docs-upgrade-to-2.12]] · [[s-docs-worker-pool]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7831-standalone-to-cluster]] · [[s-gh-7982-no-suitable-peers]] ·
-[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]] · [[s-nats-server-jetstream-cluster]]
+[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

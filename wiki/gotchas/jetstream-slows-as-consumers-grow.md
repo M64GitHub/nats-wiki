@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [consumer-count, consumer-info, meta-leader, raft-traffic, subject-filters, republish]
 aliases: ["too many consumers", "100k consumers", "consumer info is slow", "throughput collapses with many consumers"]
-sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed]
+sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed, s-relnotes-2.10, s-relnotes-2.11]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # JetStream slows down as the consumer count grows
@@ -214,6 +214,30 @@ not make the info call cheap.
 [[raft-in-nats]] (the meta group, and why meta-leader load is a cluster-wide symptom) ·
 [[consumer]] · [[ordered-consumer]]
 
+## Version notes
+
+- **2.10.26 changed the cost of many consumers with sparse interest**: "Consumer signaling from
+  streams has been optimized, taking consumer filters into account, significantly reducing CPU usage
+  and overheads when there are a large number of consumers with sparse or non-overlapping interest"
+  (#6499, "Consumer signalling using generic sublist") (source: [[s-relnotes-2.10]]). A cluster
+  older than 2.10.26 pays for every consumer on every publish, whatever its filter.
+- 2.10.23 made creating filtered consumers "considerably faster" with a multi-subject num-pending
+  calculation (#6089, #6112); 2.10.14 optimised the pull-consumer waiting queue "to reduce excessive
+  memory and GC pressure" (#5233); 2.10.25 reduced the clean-up goroutines started by consumers with
+  inactivity thresholds (#6344).
+
+
+### The 2.11 line
+
+- **2.11.0 through 2.11.5 carry a regression that looks like this page's symptom**: "a performance
+  regression introduced in v2.11.0 which could result in abnormally low throughput from filtered
+  consumers and higher GC pressure", fixed in **2.11.6** (#7015, "Fix performance issue in
+  `firstMatchingMulti`") (source: [[s-relnotes-2.11]]). Check the patch before tuning.
+- **2.11.12**: consumer interest checks on interest streams "significantly faster when there are
+  large gaps in interest" (#7656); consumer file stores created without contending on the stream
+  lock, "improving consumer create performance on heavily loaded streams" (#7700).
+
+
 ## Related
 
 [[jetstream-sizing]] · [[consumer]] · [[direct-get]] · [[key-value]] · [[js-api]] ·
@@ -225,4 +249,4 @@ not make the info call cheap.
 [[s-synadia-jetstream-anti-patterns]] · [[s-adr-17-ordered-consumer]] · [[s-relnotes-2.14.0]] ·
 [[s-docs-raft-and-leaders]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6746-watch-many-keys]] ·
 [[s-gh-5044-restrict-durable-consumers]] · [[s-docs-get-direct]] ·
-[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]]

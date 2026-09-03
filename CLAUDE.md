@@ -80,6 +80,7 @@ nats-wiki/
     check-defaults-<tag>.md  every documented config default vs the server, generated
     staleness.md       pages whose version-bearing claims need re-checking, generated
     adr-toc.md         one row per ADR of nats-architecture-and-design
+    relnotes-toc.md    one row per nats-server release from v2.10.0, generated from raw/release-notes/
     config-keys-table.md  every documented config key, generated from raw/nats-docs/
     plan-*.md          the step list a session works through (see Operation: plan)
   tools/             build-site.py (viewer), lint.py, html-to-text.py, extract-forum-posts.py,
@@ -95,7 +96,8 @@ nats-wiki/
                        wiki: `python3 tools/fetch-docs.py https://docs.nats.io
                        --collection nats-docs <prefix…>`),
                      build-config-table.py (config reference -> inbox table),
-                     triage-adrs.py (ADR table)
+                     triage-adrs.py (ADR table), triage-releases.py (the release archive ->
+                       raw/release-notes/, one body per release, and inbox/relnotes-toc.md)
   wiki/
     index.md         catalog of every page, grouped. Read it first on any query.
     log.md           append-only operation log

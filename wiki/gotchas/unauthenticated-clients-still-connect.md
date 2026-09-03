@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: ["$G", "$SYS", no_auth_user, accounts, auth_required, sysAccOnlyNoAuthUser, 2.10.2]
 aliases: [anonymous connections, no credentials required, unauthenticated access, "$G open", auth_required true but anyone connects]
-sources: [s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-accounts-and-multitenancy, s-docs-authentication-basics, s-natscli-account-tls]
+sources: [s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-accounts-and-multitenancy, s-docs-authentication-basics, s-natscli-account-tls, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # Unauthenticated clients still connect
@@ -132,6 +132,18 @@ block and a top-level `authorization` block.
 **The fix.** Upgrade ([[upgrade-a-cluster]]). At v2.14.6 the `!opts.authBlockDefined` condition in
 cause 1 is that fix.
 
+## Version notes
+
+- **2.12.0**: "Leafnode connections without auth no longer unexpectedly connect to the global
+  account" (#7116, "Leaf node without auth doesn't default to global account") — the leafnode form of
+  this page's symptom, closed there (source: [[s-relnotes-2.12]]).
+- **2.12.12**: `NoAuthUser` "now checks connection restrictions". **2.12.14** (and 2.14.4): "combining
+  `no_auth_user` with auth callouts will no longer skip authentication checks when no `CONNECT`
+  message is sent"; "an authentication bypass with TLS `verify_and_map` authenticating users with
+  blank passwords" fixed. **2.11.16 / 2.12.7**: `no_auth_user` applies to client connections only
+  ([[s-relnotes-2.11]]).
+
+
 ## Prevention
 
 - **Never ship an `accounts` block whose only entry is the system account.** Declare the tenant
@@ -170,4 +182,4 @@ before you need it. See [[backup-and-restore-jetstream]].
 ## Sources
 
 [[s-gh-4535-unauthenticated-connections]] · [[s-nats-server-auth-and-tls]] ·
-[[s-docs-accounts-and-multitenancy]] · [[s-docs-authentication-basics]] · [[s-natscli-account-tls]]
+[[s-docs-accounts-and-multitenancy]] · [[s-docs-authentication-basics]] · [[s-natscli-account-tls]] · [[s-relnotes-2.12]]

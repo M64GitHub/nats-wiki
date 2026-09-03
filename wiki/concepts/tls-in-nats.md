@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, mtls, verify, verify_and_map, handshake_first, tls_timeout, encryption-at-rest, prev_key, tls_cert_not_after]
 aliases: [tls, mtls, mutual tls, verify_and_map, handshake_first, encryption at rest, tls block, certificates]
-sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain]
+sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # TLS in NATS
@@ -249,6 +249,51 @@ publicly trusted still performs a handshake and fails at verification:
 
 What fixes that is a `tls {}` block carrying the right `ca_file`, not one added to turn TLS on.
 
+## Version notes: which key arrived when
+
+| key | since | note |
+|---|---|---|
+| leafnode `handshake_first` | 2.10.0 (#4119) | 2.10.1 fixes a remote with no `tls` block (#4565) |
+| `tls { handshake_first }` for client connections | 2.10.4 (#4642) | "opt-in" |
+| `tls { certs [ { cert_file, key_file } … ] }` — several pairs on one listener | 2.10.8 (#4889) | |
+| `tls { min_version }` | 2.10.21 (#5904) | |
+| Windows: `ca_certs_match`, `cert_match_skip_invalid`, `cert_match_by: thumbprint` | 2.10.23 (#5115, #6042, #6047) | the `LocalMachine` store usable by a non-administrator (#6019) |
+
+OCSP fixes along the line: staple resumption for gateways after a certificate reload (2.10.8,
+#4943), POST preferred over GET (2.10.12, #5109), peer validation on the HTTPS monitoring port
+(2.10.21, #5906). 2.10.14 applied "constant-time evaluation of non-bcrypt passwords" (#5247) and
+2.10.28 redacts auth tokens in trace logs (#6808) (source: [[s-relnotes-2.10]]).
+
+
+### The 2.11 line
+
+- **The leafnode listener's `handshake_first` takes a duration (and `auto`) from 2.11.0** (#5783,
+  "LeafNode: Support for TLS handshake_first duration"); the boolean is 2.10.0's. The generated
+  reference types the leafnode listener's key as `boolean` only — `inbox/docs-issues.md` #55
+  (source: [[s-relnotes-2.11]]).
+- **2.11.2**: `tls_timeout` parsed consistently between `authorization` and `timeout` (#6731).
+  **2.11.3**: TLS 1.2 with ECDSA certificates from the Windows store (#6803). **2.11.4**: handshake
+  error log lines "include the subject and SHA-256 hash of the certificate if known" (#6883); a
+  gateway TLS reload applies to implicit remotes (#6886).
+- **2.11.12**: **`tls_cert_not_after`** in `/varz` "for showing when TLS certificates are due to
+  expire" (#7709) — undocumented, #57; see [[rotate-tls-certificates]].
+- **2.11.15**: CVE-2026-33248 ("systems using mutual TLS"); a correctness bug validating relative
+  distinguished names. **2.11.17**: reload of gateway `pinned_certs` corrected.
+
+
+### The 2.12 line
+
+- **2.12.0**: "insecure ciphers are now disabled by default" — `tls { allow_insecure_cipher_suites }`
+  re-enables them (#7144); `X25519MLKEM768` may be named in `curve_preferences` (#7280); OCSP request
+  URL encoding made RFC 4648-compliant (#7184) (source: [[s-relnotes-2.12]]).
+- **2.12.9**: client certificates "without subject DNs but with DNS subject alternate names" are
+  permitted (#8100); TLS handshake timeout and non-TLS record errors demoted to debug (#8096); TLS
+  listeners work with the PROXY protocol (#8130).
+- **2.12.14 — an authentication bypass**: "Fixed an authentication bypass with TLS `verify_and_map`
+  authenticating users with blank passwords" (no CVE id in the body); `allow_non_tls` no longer
+  logs that TLS is required (#8420).
+
+
 ## Related
 
 [[rotate-tls-certificates]] · [[account]] · [[subject-permissions]] · [[operator-mode]] ·
@@ -263,4 +308,4 @@ What fixes that is a `tls {}` block carrying the right `ca_file`, not one added 
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
 [[s-natscli-account-tls]] · [[s-adr-35-filestore-compression]] ·
-[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]]
+[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

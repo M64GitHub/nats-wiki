@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks, s-gh-8333-high-cardinality-subjects, s-gh-5202-max-unique-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-nats-server-filestore-recovery, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-gh-8001-jetstream-startup-slow-50m]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks, s-gh-8333-high-cardinality-subjects, s-gh-5202-max-unique-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-nats-server-filestore-recovery, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-gh-8001-jetstream-startup-slow-50m, s-relnotes-2.10, s-relnotes-2.12]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -510,7 +510,7 @@ its store restarts.
 
 ### Subjects are a RAM term
 
-The per-subject index lives in memory — an adaptive radix tree since 2.10.9 holding, per distinct
+The per-subject index lives in memory — an adaptive radix tree since 2.10.10 (not 2.10.9 — see *Version notes: the 2.10 line*) holding, per distinct
 subject, a message count and the first and last block that contain it, with only the suffix stored
 at the leaf (source: [[s-gh-5202-max-unique-subjects]]). It is rebuilt on every start and does not
 shrink until a subject has no messages left. Three figures for it, all "small subjects":
@@ -625,6 +625,44 @@ Watch the device, not the config: *"Don't trust the config number over what the 
 Deeper per-stream and per-account accounting lives on the `/jsz` endpoint — see
 [[monitoring-endpoints]].
 
+## Version notes: the 2.10 line
+
+- **The 32 MB JetStream publish cap is enforced since 2.10.28** (#6798): above it the filestore's
+  maximum record length overflowed and corrupted the store (source: [[s-relnotes-2.10]]).
+- **The per-subject index is a subject tree since 2.10.10**, not 2.10.9 (#4960, #4983; evidence in
+  `raw/nats-server-src/stree-arrival-v2.10.10.md`); memory with many subjects was reduced in 2.10.5
+  and 2.10.6 (#4742, #4806), and the tree gained `node48` (2.10.17) and `node10` (2.10.23).
+- **Disk I/O**: "the limit of concurrent disk I/O operations that JetStream can perform simultaneously
+  has been raised" in 2.10.26 (#6449); blocking I/O gated more thoroughly in 2.10.10 (#5022, #5027);
+  filestore cleanup and file deletion moved off the hot path in 2.10.5 (#4782, #4783).
+- **Memory**: replicated streams with many interior deletes need far less for snapshots since 2.10.0
+  (#4070, #4071, #4075, #4284, #4520, #4553); the apply queue no longer builds up at startup (2.10.8,
+  #4895); consumers with sparse interest cost less CPU since 2.10.26 (#6499).
+
+
+## Version notes: the 2.12 line
+
+- **Disk I/O concurrency**: from **2.12.14 / 2.14.4** "the disk concurrency semaphore has been
+  increased to 4096 slots, up from the previous CPU-scaled count", configurable with
+  **`jetstream { max_concurrent_io }`** (#8336); at v2.14.6 the server clamps it to 4 – 8192
+  (`dios.go`). Documented nowhere — `inbox/docs-issues.md` #59 (source: [[s-relnotes-2.12]]).
+- **Memory**: filestore caches are held by weak pointers from 2.12.0 and "can respond to garbage
+  collector (GC) pressure" (#7180); 2.12.7 stopped evicting them "too eagerly after a recent write"
+  (#8009) and 2.12.14 recycles cache buffers when the GC collects the weak reference (#8395); the
+  subject-tracking structure uses less memory from 2.12.14 (#8412); `GOMEMLIMIT` governs the
+  balance ([[nats-server-2.12]]).
+- **Subject cardinality**: from **2.12.10 / 2.14.2** the filestore "no longer performs a block skip
+  check on streams with extremely high subject counts, as it could result in runaway CPU usage"
+  (#8227, "Enforce cardinality threshold on `checkSkipFirstBlock`") — a third cost of many subjects
+  beside RAM and recovery.
+- **Limits accounting**: 2.12.5 fixed "a long-standing bug" where `store_max_stream_bytes` and
+  `memory_max_stream_bytes` were applied to account totals, "incorrectly limit[ing] total
+  reservations" (#7895), and made tiered reservations consistent (#7880); 2.12.14 rejects a publish
+  over the maximum store size before proposal (#8389); 2.12.7 lets `max_mem_store` and
+  `max_file_store` be raised by reload (#8014).
+- **`max_conns: 0`** refuses all client connections from 2.12.5 (#7877).
+
+
 ## Pitfalls
 
 **A `max_age` window is not a retention promise.** The three stream limits are independent and all
@@ -713,4 +751,4 @@ wiki could contain.
 [[s-nats-server-object-store-observed]] · [[s-docs-object-store-chunking]] ·
 [[s-docs-monitoring-profiling]] · [[s-gh-7483-varz-cpu-in-containers]] ·
 [[s-nats-server-monitoring-observed]] · [[s-docs-hardening]] ·
-[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-gh-5202-max-unique-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-server-filestore-recovery]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-gh-8001-jetstream-startup-slow-50m]]
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-gh-5202-max-unique-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-server-filestore-recovery]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-relnotes-2.10]] · [[s-relnotes-2.12]]

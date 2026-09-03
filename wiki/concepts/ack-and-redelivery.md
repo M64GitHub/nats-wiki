@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [ack, nak, term, ack_wait, max_deliver, max_ack_pending, backoff, advisories]
 aliases: [acknowledgement, acknowledgment, ack, nak, term, at-least-once, AckWait, MaxDeliver]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-6628-ackwait-vs-dupe-window, s-nats-server-nak-backoff-observed, s-synadia-reliable-delivery-dlq, s-gh-5631-nak-not-immediate, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.2, s-relnotes-2.14.1]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-6628-ackwait-vs-dupe-window, s-nats-server-nak-backoff-observed, s-synadia-reliable-delivery-dlq, s-gh-5631-nak-not-immediate, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.2, s-relnotes-2.14.1, s-relnotes-2.10]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -398,6 +398,18 @@ nats sub '$JS.EVENT.ADVISORY.CONSUMER.MAX_DELIVERIES.ORDERS.shipping'
 nats events --js-advisory --no-srv-advisory
 ```
 
+## Version notes: the 2.10 line
+
+The redelivery accounting fixes of 2.10 are listed release by release on
+[[consumer-keeps-redelivering]] (*The 2.10 patch trail*) and in [[s-relnotes-2.10]]; the ones that
+change what this page describes: **2.10.10** — acking a redelivered message with more pending moves
+the ack floor (#5008); **2.10.23** — replicated consumers do not update delivered state until quorum
+(#6139), and backoff is checked against `max_deliver` (#6154); **2.10.26** — `max_deliver` state is
+preserved on interest streams so a new consumer does not remove the message (#6575); **2.10.28** —
+AckAll removes messages from interest streams (#6587) and acks work for subjects containing `@`
+(#6777).
+
+
 ## To verify
 
 - No source ingested so far gives **metrics** (as opposed to advisories) for acked / naked /
@@ -473,4 +485,4 @@ create-time-only rule a consumer's `ack_wait` follows.
 [[s-docs-consumer-config]] · [[s-docs-policies]] · [[s-nats-server-constants-2.14.6]] ·
 [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-monitoring-advisories-and-events]] ·
-[[s-docs-worker-pool]] · [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-nats-server-nak-backoff-observed]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-5631-nak-not-immediate]] · [[s-docs-acknowledgment]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]]
+[[s-docs-worker-pool]] · [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-nats-server-nak-backoff-observed]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-5631-nak-not-immediate]] · [[s-docs-acknowledgment]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]] · [[s-relnotes-2.10]]

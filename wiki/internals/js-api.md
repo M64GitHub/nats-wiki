@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [js-api, err_code, schemas, paging, acl, errors.json]
 aliases: ["$JS.API", js api, err_code, ApiError, error envelope]
-sources: [s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-docs-stream-config, s-docs-consumer-config, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-jetstream-log-warnings, s-gh-5859-unexpected-nats-timeout]
+sources: [s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-docs-stream-config, s-docs-consumer-config, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-jetstream-log-warnings, s-gh-5859-unexpected-nats-timeout, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # The JetStream API and its errors
@@ -269,6 +269,44 @@ number for this reason — `10005` on [[stream-placement]], `10099` and `10100` 
 **The subject tokens are the permission boundary.** Restricting an application to its own streams is
 done with subject permissions on `$JS.API.*.<stream>`, not with a JetStream-specific ACL system.
 
+## Version notes
+
+- **The request queue limit is since 2.10.21**: "Global JetStream API queue hard limit for
+  protecting the system" (#5900, #5923), with the pending count exposed in `statsz` and `/jsz`
+  (#5923, #5926) (source: [[s-relnotes-2.10]]). The value on this page is read from the 2.14.6
+  source; the 2.10.21 body states none.
+- 2.10.8: JetStream through the system account answers "Account not enabled" (#4910); internal API
+  requests no longer back up in large source and mirror set-ups (#4884). 2.10.23: consumer info for a
+  non-existent consumer is not relayed (#6176). 2.10.25: the in-flight metric no longer drifts after
+  the queue is dropped (#6373). 2.10.28: the extended consumer-create API works with service imports
+  and limited API permissions (#6759).
+
+
+### The 2.11 line
+
+- **`jetstream { strict }` is since 2.11.0** ("strict decoding for JetStream API requests", #5858),
+  off by default there and on by default from 2.12; **pedantic mode** (#5245) and **asset versioning**
+  — the API levels of ADR-44 (#5850, #5855, #5857) — arrived with it (source: [[s-relnotes-2.11]]).
+- **2.11.10**: "JetStream API requests are always handled from the worker pool, improving the
+  semantics of the API request queue and logging when requests take too long" (#7125). **2.11.15**: a
+  panic when paginating "various JetStream API endpoints" fixed.
+- **Message tracing** is a 2.11.0 feature of the core server, not of the API: a message carrying
+  `Nats-Trace-Dest` "will receive events representing what happens to the message as it moves through
+  the system", including stream exports and service imports; `Nats-Trace-Only: true` traces without
+  delivering (#5014, #5057). From 2.11.15 the client needs publish permission on the destination.
+
+
+### The 2.12 line
+
+- **API level 2** (2.12.0, #6969); **strict decoding on by default** (#7049); the
+  **`Nats-Required-Api-Level`** request header (#7157), its error returned after the other checks
+  from 2.12.4 (#7711) (source: [[s-relnotes-2.12]]).
+- **2.12.8**: stream and consumer info no longer return *not found* while assignments are in flight
+  (#8054). **2.12.9**: assignment errors are surfaced (#8208). **2.12.12**: `CONNZ` and `SUBSZ`
+  pagination guard against `Offset` and `Limit` overflow; "several panic, fatal and data race
+  conditions in … clustered request handling" fixed.
+
+
 ## To verify
 
 - The subject list above is ADR-1's own, marked "not an exhaustive list", and predates most of the
@@ -288,4 +326,4 @@ done with subject permissions on `$JS.API.*.<stream>`, not with a JetStream-spec
 [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]] · [[s-docs-stream-config]] ·
 [[s-docs-consumer-config]] · [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] ·
 [[s-relnotes-2.14.0]] ·
-[[s-nats-server-jetstream-log-warnings]] · [[s-gh-5859-unexpected-nats-timeout]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

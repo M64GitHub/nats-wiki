@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [exports, imports, stream-export, service-export, prefix, to, external, api-prefix, 10021, 10022, 10024]
 aliases: [exports, imports, export, import, cross-account, account import, account export, activation token, api prefix, external]
-sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external]
+sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Cross-account sharing
@@ -222,6 +222,40 @@ subjects a leafnode shares", in config mode (source: [[s-gh-5941-restrict-leafno
   imports for a single account? I'm imagining importing thousands of tenants" — and never answered.
   This wiki states no number.
 
+## No responders across an import — since 2.10.26
+
+The two-meanings rule above holds from **2.10.26**. Before it, a request through a service import
+whose exporting account had no interest was **dropped silently** and the requester timed out; the
+release body: "Publishing through a service import to an account with no interest will now generate
+a 'no responders' error instead of silently dropping the message" (#6532, "A request through a
+service import with no interest should return no responders") (source: [[s-relnotes-2.10]]). That is
+the older behaviour the maintainer answer on discussion #4761 describes — a request over an import
+never failed fast, because the import itself was a subscription — and why on 2.10.26 and later it
+does. 2.10.28 added that "it is now possible with service imports to import the same subject from
+multiple different accounts" (#6704).
+
+
+## Version notes: the 2.11 line
+
+- **2.11.2**: the same subject may be imported from several accounts (#6704, the 2.10.28 backport);
+  a deadlock updating account claims with imports and exports fixed (#6726) (source:
+  [[s-relnotes-2.11]]).
+- **2.11.9**: subject interest propagated to leaf nodes "when daisy chaining imports/exports"
+  (#7255). **2.11.12**: a subscription leak in a cluster when an import/export overlaps the `$JS.>`
+  namespace (#7720). **2.11.15**: CVE-2026-33246 ("systems using leafnodes and service imports");
+  messages from leafnodes to non-shared service imports rebuild the request-info header.
+
+
+### The 2.12 line
+
+- **2.12.0**: "No responders errors from the server now include the original subject in the
+  `Nats-Subject` header" (#5250) — a requester behind an import can now see which subject had no
+  responder (source: [[s-relnotes-2.12]]).
+- **2.12.6**: "a bug which could result in the service import cycle detection failing to detect a
+  genuine cycle" fixed (#7961). **2.12.12**: **service-import replies are delivered across cluster
+  routes** (#8317); message tracing works with imports and exports.
+
+
 ## To verify
 
 - The **exact export/import entries for `$JS.API.>`**, and whether the export can be narrowed to one
@@ -246,4 +280,4 @@ subjects a leafnode shares", in config mode (source: [[s-gh-5941-restrict-leafno
 [[s-nats-server-auth-and-tls]] · [[s-docs-mirrors-and-sources]] ·
 [[s-docs-object-store-under-the-hood]] · [[s-docs-authorization]] ·
 [[s-docs-security-checklist]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]]
+[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

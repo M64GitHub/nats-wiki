@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [install, systemd, docker, kubernetes, http_port, store_dir, LimitNOFILE, lame-duck]
 aliases: [install, installation, "install NATS", "set up a server", "first server", nats-server service]
-sources: [s-docs-getting-started, s-nats-server-signals, s-gh-6070-lame-duck-under-systemd, s-docs-single-server, s-docs-hardening, s-nats-server-systemd-units, s-docs-kubernetes, s-docs-config-management, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-rolling-upgrades, s-docs-your-first-cluster, s-gh-3569-connect-to-route-port, s-gh-5924-filestore-dirs-vanished, s-nats-helm-chart-values-2.14.6, s-nats-server-lame-duck, s-nats-server-route-cluster-formation]
+sources: [s-docs-getting-started, s-nats-server-signals, s-gh-6070-lame-duck-under-systemd, s-docs-single-server, s-docs-hardening, s-nats-server-systemd-units, s-docs-kubernetes, s-docs-config-management, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-rolling-upgrades, s-docs-your-first-cluster, s-gh-3569-connect-to-route-port, s-gh-5924-filestore-dirs-vanished, s-nats-helm-chart-values-2.14.6, s-nats-server-lame-duck, s-nats-server-route-cluster-formation, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Install nats-server
@@ -359,6 +359,43 @@ reinstall on the same path picks them up again, and deleting that path is the ir
 Take a backup before touching it (step 3 of the current plan writes
 [[backup-and-restore-jetstream]]).
 
+## A CVE fix as a binary-only release, and the Docker image
+
+CVE-2025-30215 (CRITICAL, "affecting all NATS Server versions from v2.2.0, prior to v2.11.1 or
+v2.10.27") shipped on 2025-03-31 as `v2.10.27-binary` and `v2.11.1-binary`: GitHub releases with
+binaries only, the source and the tags a week later (2025-04-08) — "for workflows that rely on
+building from source, we recommend using the binary in the interim" (source: [[s-relnotes-2.10]]).
+The official `nats` image on Docker Hub is **not built by the NATS team** — "The builds are not done
+by us but docker. We are in the queue already though" — but by Docker's official-images pipeline from
+a pull request the team opens; the `-binary` images appeared within the day, the Alpine variants of
+the tagged releases only after the docker-library PR (#18802) merged on 2025-04-08, "and it will
+still take some time for the images to be built" (source:
+[[s-gh-6748-cve-binary-release-docker-images]]). So: patch a CRITICAL CVE from the GitHub binary, or
+an image you build from it, on day one; the Hub tag and the Helm chart that pins it follow their own
+queue.
+
+
+## Version notes: the 2.11 line
+
+- **A graceful `SIGTERM` exits 0 from 2.11.0** — "will now return exit code 0 instead of exit code
+  1" (#6336); 2.11.10 fixes the code when the signal arrives right after startup (#7367) (source:
+  [[s-relnotes-2.11]]). A unit that treated the old exit 1 as a failure, or a restart policy keyed on
+  it, behaves differently after the upgrade.
+- 2.11.8 added community-contributed builds for Solaris and Illumos (#7122).
+- The CVE cadence of early 2026 — 2.11.14 (2026-03-09), 2.11.15 (2026-03-24), 2.11.16 (2026-04-14)
+  — shipped the same days as 2.12.5, 2.12.6 and 2.12.7; the Docker-image lag described above applies
+  to each.
+
+
+## Version notes: the 2.12 line
+
+**2.12.6**: "when running as a Windows service, switching to lame duck mode should now correctly
+exit the process" (#7958). **2.12.12**: per-connection log lines that were noisy in normal operation
+demoted to debug (#8289); JSONP callback support removed from the monitoring endpoints. **2.12.5**:
+`max_conns: 0` refuses every client connection (#7877) — a way to drain a server without stopping
+it (source: [[s-relnotes-2.12]]).
+
+
 ## Pitfalls
 
 **The monitoring port is off by default.** `http_port` is not set unless you set it, and every probe,
@@ -422,4 +459,4 @@ demo; a config file is what makes `systemctl reload` meaningful ([[config-keys]]
 [[s-docs-encryption-and-tls]] · [[s-docs-forming-a-cluster]] · [[s-docs-rolling-upgrades]] ·
 [[s-docs-your-first-cluster]] · [[s-gh-3569-connect-to-route-port]] ·
 [[s-gh-5924-filestore-dirs-vanished]] · [[s-nats-helm-chart-values-2.14.6]] ·
-[[s-nats-server-lame-duck]] · [[s-nats-server-route-cluster-formation]]
+[[s-nats-server-lame-duck]] · [[s-nats-server-route-cluster-formation]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

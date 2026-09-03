@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [reload, SIGHUP, dry-run, include, reloader, configmap, accounts, max_subscriptions]
 aliases: [reload, SIGHUP, "config reload", "reload config", "add an account", "nats-server --signal reload"]
-sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry, s-docs-cross-account, s-docs-putting-it-together]
+sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry, s-docs-cross-account, s-docs-putting-it-together, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Reload server config
@@ -212,6 +212,44 @@ applies cleanly, or nothing changes". The worst case is that nothing happened.
 To undo a *successful* reload, restore the previous file and reload again. Keep the config in version
 control; that is the rollback.
 
+## Reload over the system account (since 2.10.0)
+
+Besides SIGHUP and `nats-server --signal reload`, a server reloads its config on a request to
+**`$SYS.REQ.SERVER.<server-id>.RELOAD`** in the system account — "Reload server config by sending a
+message in the system account" (2.10.0, #4307) (source: [[s-relnotes-2.10]]); the subject is
+`serverReloadReqSubj` in `server/events.go` at v2.14.6, line 70. It is the one reload path that
+needs no access to the process, and it is **documented nowhere in the docs** (`inbox/docs-issues.md`
+#54). Two 2.10 fixes on the reload path itself: mapping updates for the global account propagate
+to leafnodes again (2.10.8, #4937), and a server started with `--js --store_dir` no longer has
+JetStream disabled by a reload (2.10.28, #6609).
+
+
+## Verify the running config with the digest (since 2.11.0)
+
+`nats-server -t` prints a **configuration state digest** — "A hash of the configuration file can be
+generated using the `-t` option on the command line" — and `/varz` reports the hash of the config
+the server is running as **`config_digest`** (2.11.0, #4325) (source: [[s-relnotes-2.11]]). Compare
+the two after a reload to know the server took the file you think it did. `config_digest` is
+documented nowhere in the docs (`inbox/docs-issues.md` #57). Reload fixes along the line: a panic
+adding a dedicated route on reload with no pinned routes and no system account (2.11.0, #6668); a
+gateway TLS reload applies to implicit remotes (2.11.4, #6886); the parser errors on
+self-referencing environment variables (2.11.12, #7737); gateway `pinned_certs` reload corrected
+(2.11.17).
+
+
+## What became reloadable in 2.12
+
+- **`max_mem_store` and `max_file_store` "can now be increased (but not decreased) via config
+  reload"** (2.12.7, #8014); `/varz` reports the new limits after the reload from 2.12.14 (#8394)
+  (source: [[s-relnotes-2.12]]).
+- **`leafnodes { remotes [ { disabled } ] }`** reloads: false → true disconnects the solicited
+  leafnode and stops it reconnecting, true → false solicits it again (2.12.0, #7054).
+- **`jetstream { meta_compact_sync: true }` by reload** is the mitigation the 2.12.5 body prescribes
+  for its consumer-loss regression.
+- 2.12.6 fixed the configuration digest removing entries from used-variable tracking, "which could
+  cause configuration fields to disappear from the returned config" (#7959).
+
+
 ## Pitfalls
 
 **Never SIGHUP an unvalidated config.** The server would keep the old one anyway, but the failure
@@ -289,4 +327,4 @@ make certificate rotations their own edit. See [[websocket]] and [[run-nats-behi
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] ·
 [[s-gh-7684-certificate-expiry]] ·
-[[s-docs-cross-account]] · [[s-docs-putting-it-together]]
+[[s-docs-cross-account]] · [[s-docs-putting-it-together]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

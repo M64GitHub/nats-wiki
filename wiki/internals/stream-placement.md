@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [placement, server_tags, no-suitable-peers, 10005, meta-leader]
 aliases: [placement, server_tags, tags, "no suitable peers for placement"]
-sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore]
+sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore, s-relnotes-2.10, s-relnotes-2.11]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Stream placement
@@ -177,6 +177,25 @@ only the streams that need the strongest durability placed onto it by tag
 
 - `nats stream cluster step-down --preferred <server>` requires **nats-server 2.11 or newer**.
 
+### The 2.10 line
+
+2.10.11 "improved placement of streams in larger clusters when created in rapid succession" (#5079);
+2.10.22 fixed a panic "when calculating asset placement in a JetStream cluster" (#5996); 2.10.23
+stops duplicate stream-assignment responses "when the stream is being reassigned due to placement
+issues" (#6121); 2.10.29 reports a preferred node that does not become leader, "fixing some issues
+where multiple assets can believe they are the leader after a scale-up operation" (#6851) (source:
+[[s-relnotes-2.10]]).
+
+
+### The 2.11 line
+
+"Ability to specify preferred placement tags or clusters using `preferred` when issuing stepdown
+requests to the metaleader, streams or consumers" is **2.11.0** (#6282, #6284) — the body behind the
+docs' "requires 2.11" (source: [[s-relnotes-2.11]]). 2.11.8: ephemeral consumers "will always select
+an online server when created on a replicated stream" (#7165). 2.11.9: "Updating a stream with an
+empty placement will no longer incorrectly trigger a stream move" (#7222).
+
+
 ## To verify
 
 - The docs reference `reference/config/server_tags.md` and a meta API for assignment; neither has
@@ -195,4 +214,4 @@ only the streams that need the strongest durability placed onto it by tag
 
 [[s-docs-placement]] · [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] ·
 [[s-gh-7982-no-suitable-peers]] · [[s-adr-7-server-error-codes]] · [[s-docs-scaling-and-peers]] ·
-[[s-natscli-backup-restore]]
+[[s-natscli-backup-restore]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]]

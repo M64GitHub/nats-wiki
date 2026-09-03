@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Worker pool
@@ -180,6 +180,16 @@ Two things a worker pool is regularly confused with, and the distinction is the 
 The exception that proves it: on a **`workqueue`** stream the server refuses overlapping consumers
 outright, because there the first ack removes the message for everyone ([[retention-policies]]).
 
+## Version notes
+
+Three 2.10 fixes on WorkQueue streams that a pool depends on (source: [[s-relnotes-2.10]]):
+2.10.14 handled "concurrent creation of workqueue consumers that could result in overlapping
+interest" (#5295); 2.10.19 fixed a "retention issue that could cause messages to be incorrectly
+removed on a WorkQueuePolicy stream when consumers did not cover the entire subject space" (#5697);
+2.10.22 fixed consumers that "get stuck with workqueue streams and max messages per subject limits"
+(#6003). Below 2.10.22, a lost or stuck work item may be the server's fault before the workers'.
+
+
 ## Related
 
 [[consumer]] · [[ack-and-redelivery]] · [[stream]] · [[retention-policies]] · [[priority-groups]] ·
@@ -188,4 +198,4 @@ outright, because there the first ack removes the message for everyone ([[retent
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]]

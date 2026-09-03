@@ -7,9 +7,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ttl, Nats-TTL, subject_delete_marker_ttl, tombstone, markers]
 aliases: [Nats-TTL, per-message TTL, message TTL, subject delete marker, limit marker]
-sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits, s-docs-mirrors-and-sources, s-adr-51-message-scheduler, s-gh-7628-scheduler-vs-nak, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-synadia-delayed-scheduling]
+sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits, s-docs-mirrors-and-sources, s-adr-51-message-scheduler, s-gh-7628-scheduler-vs-nak, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-synadia-delayed-scheduling, s-relnotes-2.11]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Per-message TTL
@@ -162,6 +162,30 @@ disabled`** — a TTL error raised by what looks like a scheduling feature (sour
 [[s-synadia-delayed-scheduling]], confirmed at v2.14.6). Set both, or drop the header.
 
 
+## Version notes: the 2.11 patches
+
+Per-message TTL shipped in **2.11.0** — "`Nats-TTL` header, provided either as a string duration
+(`1m`, `30s`) or an integer in seconds" (#6272, #6354, #6363, #6370, #6376, #6385, #6400) — with
+**subject delete markers on `MaxAge`** (`SubjectDeleteMarkerTTL`, the `Nats-Marker-Reason` header;
+#6378 … #6432) (source: [[s-relnotes-2.11]]). Then, release by release:
+
+- **2.11.2**: markers "are now placed for messages that have aged out due to their TTL and not just
+  because of the `MaxAge` policy" (#6741); a per-message TTL may be **lower than the marker TTL**
+  when `max_msgs_per_subject` is 1 (#6818); TTL state recovered from disk after loss or corruption
+  (#6758); tombstones written for TTL expiry so the deletion survives a rebuild (#6781); a message
+  rejected for an invalid TTL is not put in the deduplication map (#6725); markers have the right
+  headers through direct get (#6826).
+- **2.11.5**: "Updating the `AllowMsgTTL` setting on a stream will now take effect correctly"
+  (#6922).
+- **2.11.7**: **enabling TTLs on a stream scans existing messages** with a `Nats-TTL` header
+  (#7117); TTLs **over an hour** "could take double the expected time" before #7070; a KV purge with
+  markers no longer leaves a redundant extra marker (#7026).
+- **2.11.9**: the `Nats-TTL` header is correct when the marker TTL overwrites it (#7177).
+- **2.11.10**: removed messages leave the TTL state immediately; expiry starts as expected after a
+  restart with markers enabled; no leaked timers (#7344).
+- **2.11.11**: `sync_always` honoured for the TTL and scheduling state files (#7385).
+
+
 ## To verify
 
 - The server-side **default** for `subject_delete_marker_ttl` (as opposed to its 1-second minimum)
@@ -195,4 +219,4 @@ the marker's `MaxAge` reason ([[key-value]]).
 
 [[s-adr-43-per-message-ttl]] · [[s-docs-stream-config]] · [[s-adr-8-key-value-store]] ·
 [[s-adr-48-kv-ttl]] · [[s-docs-kv-ttl-and-limits]] ·
-[[s-docs-mirrors-and-sources]] · [[s-adr-51-message-scheduler]] · [[s-gh-7628-scheduler-vs-nak]] · [[s-nats-server-message-schedules-observed]] · [[s-docs-jetstream-headers]] · [[s-synadia-delayed-scheduling]]
+[[s-docs-mirrors-and-sources]] · [[s-adr-51-message-scheduler]] · [[s-gh-7628-scheduler-vs-nak]] · [[s-nats-server-message-schedules-observed]] · [[s-docs-jetstream-headers]] · [[s-synadia-delayed-scheduling]] · [[s-relnotes-2.11]]

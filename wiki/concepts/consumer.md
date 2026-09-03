@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -491,6 +491,69 @@ that separates them from a crashed pool.
 The symptom page for all three is [[consumer-keeps-redelivering]].
 
 
+### The 2.10 line
+
+- **Since 2.10.0** a consumer may filter on **several subjects** (`filter_subjects`; #3500, #3865,
+  #4008, #4129, #4188) and carry `metadata` (#3797); pull consumers report a batch-completed status
+  (#3822) (source: [[s-relnotes-2.10]]).
+- **2.10.4** sped up a `last_per_subject` start (#4712, #4713) and gave the AckTerm advisory a
+  `reason` (#4697); **2.10.18** stopped filtered consumers acking messages that were not theirs
+  (#5639); **2.10.22** made pull consumers recalculate `max_deliver` when expiring (#5995);
+  **2.10.23** made backoff honour multiple in-flight deliveries and `max_deliver` (#6104, #6154) and
+  had consumers ignore acks past the stream's last sequence (#6109); **2.10.25** started fewer
+  clean-up goroutines for `inactive_threshold` (#6344); **2.10.26** signals consumers by filter
+  (#6499 — [[jetstream-slows-as-consumers-grow]]) and improved the error when a consumer's type is
+  changed (#6408).
+- **Start-sequence clipping**: 2.10.19 stopped clipping `opt_start_seq` into the stream (#5785);
+  2.10.22 restored it (#6014) — see [[mirrors-and-sources]].
+
+
+### The 2.11 line
+
+- **2.11.0** (source: [[s-relnotes-2.11]]): **consumer pause** — "The `PauseUntil` consumer
+  configuration option and `$JS.API.CONSUMER.PAUSE` endpoint suspends message delivery to the consumer
+  until the time specified is reached" (#5066); **the starting sequence is always respected**,
+  "except for consumers used for sources/mirrors" (#6253) — the 2.11 resolution of the 2.10.19
+  clipping story; **pedantic mode** fails a create or update "if the resulting configuration would
+  differ due to defaults" (#5245); replicated consumers no longer skip redeliveries after a leader
+  change (#6566).
+- **2.11.2** (withdrawn; effectively 2.11.3): delivered state waits for quorum — throughput caveat on
+  replicated consumers; priority groups no longer spin (#6749). **2.11.4**: redeliveries no longer
+  misreported with `max_deliver: 1` (#6877). **2.11.5**: `NoWait` pulls answer correctly from
+  replicated consumers (#6960); at `MaxWaiting` a request with a heartbeat gets no reply, "to avoid
+  client tightloops" (#7011).
+- **2.11.6**: the filtered-consumer throughput regression of 2.11.0 fixed (#7015); pending
+  calculation cheaper (#7022). **2.11.7**: a pull consumer with an `inactive_threshold` counts
+  pending acks before it is deleted (#7052) and does not age out while processing acks (#7107);
+  `no_wait` and `expires` fixed on replicated consumers (#7046). **2.11.8**: ephemeral consumers pick
+  an online server (#7165).
+- **2.11.9**: a consumer cannot be created with more replicas than its stream (#7202); an infinite
+  `max_deliver` (`-1`) no longer underflows (#7216). **2.11.11**: `no_wait` on an empty stream answers
+  `404 No Messages` (#7466 — the body prints 400). **2.11.12**: updating filter subjects recalculates
+  pending only when they change (#7753) and no longer loses interest on replicated interest or
+  WorkQueue streams (#7773); a non-replicated file-backed consumer whose state file is corrupt is
+  **deleted automatically** (#7691).
+
+
+### The 2.12 line
+
+- **2.12.4**: consumer info no longer recalculates pending (#7758). **2.12.5**: overlapping filter
+  subjects allowed where neither is a subset (#7810); a message at `max_deliver` preserved on
+  WorkQueue streams (#7845); consumer naming consistent between the current and legacy create
+  endpoints (#7848); scaling a replicated consumer down to R1 uses the right name when there is no
+  durable (#7891) (source: [[s-relnotes-2.12]]).
+- **2.12.7**: `max_ack_pending` no longer sticks "due to deleted messages being left in the consumer
+  pending state" (#7984). **2.12.8**: the start-sequence scan is asynchronous and "no longer pauses
+  the metalayer" (#8051); the pause endpoint no longer panics on a concurrent map write (#8061).
+- **2.12.9**: pending is calculated only on consumer leaders (#8172); the delivery policy on
+  clustered WorkQueue streams enforced (#8126); a consumer with an `inactive_threshold` no longer
+  loses local state when the clean-up proposal fails (#8198); the drifted-redelivered-state fixes of
+  2.14.1 (#8102, #8156, #8168 — [[consumer-keeps-redelivering]]). **2.12.12**: the inactive-delete
+  grace period and pull `max_bytes` budgeting fixed (#8314); ack subscriptions match consumer names
+  containing `%` (#8301). **2.12.14**: changing a consumer's storage type returns an error (#8382); a
+  consumer created immediately after its clustered stream no longer gets `stream not found` (#8410).
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
@@ -512,4 +575,4 @@ The symptom page for all three is [[consumer-keeps-redelivering]].
 [[s-gh-4972-nak-with-delay-blocks]]
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [permissions, allow, deny, default_permissions, allow_responses, queue-group, _INBOX, "$JS.API"]
 aliases: [permissions, authorization, allow list, deny list, publish permissions, subscribe permissions, default_permissions, allow_responses]
-sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler]
+sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Subject permissions
@@ -309,6 +309,27 @@ nats stream info ORDERS --json | jq '.config | {allow_msg_schedules, allow_rollu
 ```
 
 
+## Version notes: the 2.11 line
+
+- **2.11.16 closes two ACL loopholes**: "Overlapping wildcard patterns in ACL `deny` patterns are
+  now enforced correctly" and "Queue subscriptions can no longer incorrectly bypass non-queue ACL
+  `deny` patterns"; the same release restricts `no_auth_user` to client connections and enforces
+  leafnode ACLs on inbound messages "in all cases" (source: [[s-relnotes-2.11]]). A permission
+  design that happened to work on an older server because of either gap fails on 2.11.16 and later.
+- **2.11.15**: CVE-2026-33249 ("systems where client publish permissions should be restricted"); a
+  client needs publish permission on the `Nats-Trace-Dest` subject to trace.
+- **2.11.0**: scoped-user templates "not limited to a subject token" (#5981); the publish-permissions
+  cache pruned more aggressively (#6674).
+
+
+### The 2.12 line
+
+**2.12.14**: "several paths that enforce the permissions of queue subscriptions no longer treat the
+whole permission as a subject literal" (source: [[s-relnotes-2.12]]) — the 2.12 twin of 2.11.16's
+queue-subscription `deny` fix, and the reason a queue-group permission that worked by accident on
+2.12.13 or earlier may not on 2.12.14.
+
+
 ## Related
 
 [[account]] · [[operator-mode]] · [[auth-callout]] · [[tls-in-nats]] · [[cross-account-sharing]] ·
@@ -324,4 +345,4 @@ nats stream info ORDERS --json | jq '.config | {allow_msg_schedules, allow_rollu
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-docs-auth-callout]] · [[s-docs-cross-account]] · [[s-docs-decentralized-auth]] ·
 [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

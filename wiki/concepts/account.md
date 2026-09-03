@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [account, multitenancy, "$G", "$SYS", system_account, no_auth_user, 10039, isolation]
 aliases: [account, accounts, tenant, multitenancy, "$G", "$SYS", system account, global account]
-sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client, s-docs-auth-callout, s-docs-authentication-basics, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-config-management, s-docs-decentralized-auth, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-hardening, s-docs-leaf-nodes, s-docs-putting-it-together, s-docs-security-checklist, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-5941-restrict-leafnode-subjects, s-gh-7017-kv-across-accounts, s-gh-7505-auth-callout-nkey, s-gh-7834-leafnode-same-js-domain, s-gh-7854-jwt-push-timeout, s-issue-4281-insufficient-storage, s-nats-server-leafnode-js-domains]
+sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client, s-docs-auth-callout, s-docs-authentication-basics, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-config-management, s-docs-decentralized-auth, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-hardening, s-docs-leaf-nodes, s-docs-putting-it-together, s-docs-security-checklist, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-5941-restrict-leafnode-subjects, s-gh-7017-kv-across-accounts, s-gh-7505-auth-callout-nkey, s-gh-7834-leafnode-same-js-domain, s-gh-7854-jwt-push-timeout, s-issue-4281-insufficient-storage, s-nats-server-leafnode-js-domains, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Account
@@ -354,6 +354,50 @@ scoped to that listener, which is how a fleet whose firmware cannot send credent
 one account user — though a listener-scoped username or token cannot be combined with a top-level
 `users` list, and `no_auth_user` does not work in [[operator-mode]].
 
+## Version notes: the 2.10 line
+
+- `$SYS.REQ.USER.INFO` is since 2.10.0 (#3671); `no_auth_user` may name an nkey user since 2.10.8
+  (#4938); several `trusted_operators` in one config file since 2.10.21 (#5896) (source:
+  [[s-relnotes-2.10]]).
+- The authorization bypass of 2.10.0 and 2.10.1 — an `accounts` block ignoring top-level
+  `authorization` users — is fixed in **2.10.2** (#4605); see [[nats-server-2.10]].
+- 2.10.17: import/export cycle detection (#5494); imports available to a client after a server
+  restart (#5588, #5589). 2.10.19: connection types in scoped signing keys honoured (#5789). 2.10.28:
+  reducing an account's max connections no longer closes internal clients, "fixing cases where
+  JetStream assets could become unavailable" (#6785); internal JetStream clients survive an expired
+  claim update (#6817).
+
+
+### The 2.11 line
+
+- **2.11.0**: scoped users may have "templates that are not limited to a subject token" (#5981);
+  the publish-permissions cache is pruned more than once so it stays under its size (#6674)
+  (source: [[s-relnotes-2.11]]).
+- **`default_sentinel`** — "a default sentinel JWT, which is used in operator mode when none is
+  specified … making it possible to have default users" (2.11.2, #6577); it must be a bearer token
+  (2.11.7, #7074) or come from a scoped signing key (2.11.9, #7217). See [[operator-mode]].
+- **2.11.9**: an account JWT update with a lower connection limit disconnects the **newest** clients
+  rather than the oldest (#7181, #7185); lowering the limit no longer makes streams lose interest
+  (#7258). **2.11.12**: a JetStream subscription leak when an import/export overlaps `$JS.>` (#7720).
+- **2.11.15**: **a 1 MB size limit on JWTs** (#7960); CVE-2026-33249, "systems where client publish
+  permissions should be restricted". **2.11.16**: **`no_auth_user` applies to client connections
+  only**; overlapping wildcard `deny` patterns enforced; queue subscriptions can no longer bypass a
+  non-queue `deny`. **2.11.17**: JWT validity times that cross midnight validated correctly;
+  repeated `CONNECT` messages clear subscriptions; `/connz` no longer discloses bearer JWTs.
+
+
+### The 2.12 line
+
+- **2.12.0**: a leafnode connection without auth "no longer unexpectedly connect[s] to the global
+  account" (#7116); connection-related log lines carry the account and user (#7079) (source:
+  [[s-relnotes-2.12]]).
+- **2.12.12**: inherited JWT default permissions refreshed when account claims are updated (#8276);
+  external auth configuration cleared on a claims update (#8275); `NoAuthUser` checks connection
+  restrictions. **2.12.14**: "combining `no_auth_user` with auth callouts will no longer skip
+  authentication checks when no `CONNECT` message is sent"; JWT validation no longer crashes on
+  whitespace-only permissions; `healthz` skips expired JWT accounts (#8379).
+
+
 ## To verify
 
 - Per-account **limits**: the JetStream tier fields (`MaxStore`, `MaxMemory`, `max_consumers`) are
@@ -393,4 +437,4 @@ one account user — though a listener-scoped username or token cannot be combin
 [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7017-kv-across-accounts]] ·
 [[s-gh-7505-auth-callout-nkey]] · [[s-gh-7834-leafnode-same-js-domain]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-issue-4281-insufficient-storage]] ·
-[[s-nats-server-leafnode-js-domains]]
+[[s-nats-server-leafnode-js-domains]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

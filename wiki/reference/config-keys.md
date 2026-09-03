@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # Config keys
@@ -390,6 +390,69 @@ The tables above are the reload-relevant subset. The operator-facing keys and th
 | `no_fast_producer_stall` | `false` | reloadable. `true` drops to the slow consumer instead of stalling the producer — [[supercluster-slows-when-a-remote-subscriber-joins]] |
 
 
+## Keys that arrived during 2.10
+
+From the release bodies (source: [[s-relnotes-2.10]]); the full table is `inbox/config-keys-table.md`:
+
+| key | since |
+|---|---|
+| `auth_callout { … }` | 2.10.0 |
+| `cluster { compression }`, `leafnodes { compression }` (default `s2_auto`), leafnode `handshake_first` | 2.10.0 |
+| `logfile_max_num` | 2.10.0 (#4548) |
+| `jetstream { sync_interval }`, `sync: always` | 2.10.0 (#4483; the body misspells it `sync_internal`) |
+| `prof_block_rate` | 2.10.2 (#4587) |
+| `tls { handshake_first }` (clients); `mqtt { reject_qos2_publish, downgrade_qos2_subscribe }` as the config reference names them | 2.10.4 (#4642, #4705) |
+| `tls { certs [ … ] }`; `no_auth_user` as an nkey | 2.10.8 (#4889, #4938) |
+| `cluster { ping_interval }` | 2.10.10 (#5029) |
+| `tls { min_version }`; several `trusted_operators` in a config file | 2.10.21 (#5904, #5896) |
+| Windows `tls { ca_certs_match, cert_match_skip_invalid, cert_match_by: thumbprint }` | 2.10.23 (#5115, #6042, #6047) |
+| `no_fast_producer_stall`; `leafnodes { remotes [ { first_info_timeout } ] }` | 2.10.26 (#6500, #5424) |
+| `max_closed_clients` read from the config file at all | 2.10.26 (#6497 — a parser fix) |
+
+
+## Keys that arrived during 2.11
+
+From the release bodies (source: [[s-relnotes-2.11]]):
+
+| key | since |
+|---|---|
+| `jetstream { max_buffered_msgs, max_buffered_size }` — ingest rate limiting, `429 Too Many Requests` | 2.11.0 (#5796) — the docs' default for `max_buffered_msgs` is wrong, `inbox/docs-issues.md` #22 |
+| `jetstream { strict }` — strict decoding of API requests | 2.11.0 (#5858); default `true` from 2.12 |
+| an account's `jetstream { cluster_traffic: system \| owner }` | 2.11.0 (#5466, #5947) — undocumented, #56 |
+| `js_cluster_migrate` with a delay | 2.11.0 (#5903) |
+| leafnode `handshake_first` as a duration | 2.11.0 (#5783) — the reference types it `boolean`, #55 |
+| `nats-server -t` prints the config digest | 2.11.0 (#4325) |
+| `default_sentinel` | 2.11.2 (#6577) |
+| `trace_headers` | 2.11.2 (#6638) |
+| `mqtt { js_api_timeout }` | 2.11.3 (#6833) |
+| `jetstream { meta_compact, meta_compact_size }` | 2.11.11 (#7484, #7521) |
+| `write_timeout` (`default` / `retry` / `close`) — top level, `cluster`, `gateway`, `leafnodes` | 2.11.11 (the body cites #7513, a cherry-pick PR) |
+| `websocket { ping_interval }` | 2.11.12 (#7614; the body prints `ping_internal`) |
+
+
+## Keys that arrived during 2.12
+
+From the release bodies (source: [[s-relnotes-2.12]]):
+
+| key | since |
+|---|---|
+| `server_metadata { }` | 2.12.0 (#6935) |
+| `tls { allow_insecure_cipher_suites }`; `X25519MLKEM768` in `curve_preferences` | 2.12.0 (#7144, #7280) |
+| `cluster { connect_backoff }`, `gateway { connect_backoff }` (the guide's name for #7042) | 2.12.0 |
+| `leafnodes { isolate_leafnode_interest }`; `leafnodes { remotes [ { disabled } ] }` | 2.12.0 (#7238, #7054) |
+| `proxies { trusted [ … ] }`; `authorization { proxy_required }` | 2.12.0 (#7153) — the block is undocumented, `inbox/docs-issues.md` #60 |
+| stream `persist_mode: async` (opt-in async writes) | 2.12.0 (#7315) |
+| `cluster { write_deadline }`, `leafnodes { write_deadline }`, `gateway { write_deadline }` | 2.12.1 (#7405) |
+| `leafnodes { remotes [ { proxy { url, username, password, timeout } } ] }` | 2.12.1 (#7242) |
+| `proxy_protocol` | 2.12.2 (#7456) |
+| `jetstream { meta_compact, meta_compact_size }`; `write_timeout` | 2.12.2 (as 2.11.11) |
+| `websocket { ping_interval }` | 2.12.3 (#7614) |
+| `jetstream { meta_compact_sync }` | 2.12.5 (#7827, #7846) |
+| `max_conns: 0` | 2.12.5 (#7877) |
+| `max_mem_store` / `max_file_store` increase by reload | 2.12.7 (#8014) |
+| **`jetstream { max_concurrent_io }`** | 2.12.14 / 2.14.4 (#8336) — undocumented, #59 |
+
+
 ## Related
 
 [[defaults-and-limits]] · [[jetstream-sizing]] · [[replicas]] · [[stream-placement]] ·
@@ -407,4 +470,4 @@ The tables above are the reload-relevant subset. The operator-facing keys and th
 [[s-docs-accounts-and-multitenancy]] · [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-hardening]] · [[s-docs-rolling-upgrades]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-nats-server-route-cluster-formation]] · [[s-nats-server-systemd-units]] ·
 [[s-nats-server-mqtt-websocket-observed]] · [[s-docs-websocket-tls-and-proxies]] ·
 [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] ·
-[[s-docs-monitoring-profiling]]
+[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

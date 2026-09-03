@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -401,6 +401,66 @@ states neither the version they were measured against nor the method
 - **Per-block config keys** — the full 621-key table with type and reload behaviour is
   [[config-keys]] and `inbox/config-keys-table.md`.
 
+## Defaults that moved during 2.10
+
+Values this table states as of 2.14.6 that the 2.10 release bodies date (source: [[s-relnotes-2.10]]):
+
+| default or limit | change | since |
+|---|---|---|
+| leafnode compression | none → `s2_auto` | 2.10.0 (#4167, #4230) |
+| `statsz` interval | 30 s → 10 s | 2.10.21 (#5925) |
+| JetStream API request queue | unbounded → a hard limit (`request_queue_limit`, read as 10,000 from the 2.14.6 source on [[js-api]]) | 2.10.21 (#5900, #5923) |
+| `write_deadline` scope | the whole outbound buffer → the current batch of write vectors, at most 64 MB | 2.10.26 (#6471) |
+| maximum publish into JetStream | not enforced → 32 MB, enforced | 2.10.28 (#6798) |
+| a peer-removed server | out until restarted → re-admitted after 5 minutes | 2.10.28 (#6815) |
+| stream snapshot interval | a fixed interval → removed, "relying on the compaction minimum" | 2.10.25 (#6289) |
+| downgrade floor from 2.10 | 2.9.22 | the v2.10.0 body |
+
+
+## Defaults that moved during 2.11
+
+| default or limit | change | since |
+|---|---|---|
+| exit code on a graceful `SIGTERM` | 1 → **0** | 2.11.0 (#6336) |
+| `jetstream.max_buffered_msgs` / `max_buffered_size` | new: **100,000** messages / **128 MB** per stream before `429 Too Many Requests` (the docs print 10,000 — #22) | 2.11.0 (#5796) |
+| `jetstream.strict` | new, `false` here; **`true` from 2.12** | 2.11.0 (#5858) |
+| a consumer's starting sequence | clipped into the stream → respected, "except for consumers used for sources/mirrors" | 2.11.0 (#6253) |
+| a stream or consumer update with every peer offline | accepted → **refused** | 2.11.4 (#6856) |
+| Raft heartbeat and quorum clock | wall clock → **monotonic** | 2.11.5 (#6999) |
+| `mqtt.js_api_timeout` | new, `5s` (config reference) | 2.11.3 (#6833) |
+| `write_timeout` | new, `default` | 2.11.11 |
+| stream snapshots on new route connections | → **binary snapshots preferred** | 2.11.11 (#7479) |
+| `websocket.ping_interval` | new, `2m` (config reference) | 2.11.12 (#7614) |
+| JWT size | unbounded → **1 MB** | 2.11.15 (#7960) |
+| `no_auth_user` | any connection → **client connections only** | 2.11.16 |
+
+(source: [[s-relnotes-2.11]])
+
+
+## Defaults that moved during 2.12
+
+| default or limit | change | since |
+|---|---|---|
+| JetStream API level | 1 → **2** | 2.12.0 (#6969) |
+| `jetstream.strict` | `false` → **`true`** | 2.12.0 (#7049) |
+| replicated stream flush | sync → **async** unless `sync: always` | 2.12.0 (#7018, #7163) |
+| `jetstream.max_buffered_msgs` | 10,000 → **100,000** (the docs still print 10,000 — #22) | 2.12.0 (#6633) |
+| TCP keepalives on WebSocket and MQTT clients | on → **off** | 2.12.0 (#7329) |
+| insecure TLS cipher suites | allowed → **disabled** (`allow_insecure_cipher_suites`) | 2.12.0 (#7144) |
+| route and gateway reconnection | fixed interval → exponential backoff (`connect_backoff`: 1 s to 30 s) | 2.12.0 (#7042) |
+| `cluster` / `leafnodes` / `gateway` `write_deadline` | new, `10s` each (config reference) | 2.12.1 (#7405) |
+| `proxy_protocol` | new, `false` | 2.12.2 (#7456) |
+| metalayer snapshots | synchronous → **asynchronous** (`meta_compact_sync: true` restores) | 2.12.5 (#7827) |
+| `max_consumers` on a stream | fixed → updatable | 2.12.5 (#7724) |
+| `max_conns` | ≥ 1 → `0` allowed (refuse all) | 2.12.5 (#7877) |
+| JWT size | unbounded → **1 MB** | 2.12.6 (#7960) |
+| `max_mem_store`, `max_file_store` | restart → may be raised by reload | 2.12.7 (#8014) |
+| JSONP on monitoring | supported → **removed** | 2.12.12 |
+| concurrent disk I/O | CPU-scaled → **4096** slots (`max_concurrent_io`, 4–8192) | 2.12.14 / 2.14.4 (#8336) |
+
+(source: [[s-relnotes-2.12]])
+
+
 ## Related
 
 [[config-keys]] · [[jetstream-sizing]] · [[stream]] · [[consumer]] · [[ack-and-redelivery]] ·
@@ -420,4 +480,4 @@ states neither the version they were measured against nor the method
 [[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] ·
 [[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]]
+[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

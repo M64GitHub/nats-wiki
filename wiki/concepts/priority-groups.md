@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [priority-groups, overflow, pinned_client, prioritized, unpin, 423]
 aliases: [priority group, pinned client, overflow policy, PriorityPolicy]
-sources: [s-adr-42-priority-groups, s-docs-policies, s-nats-server-constants-2.14.6, s-docs-upgrade-to-2.12, s-docs-worker-pool]
+sources: [s-adr-42-priority-groups, s-docs-policies, s-nats-server-constants-2.14.6, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Priority groups
@@ -150,6 +150,26 @@ deliberate unpin from a client that went quiet. See [[advisories]].
 **A `423` during a pin switch is normal**, not an incident — clients are expected to clear their
 stored ID and keep pulling.
 
+## Version notes
+
+- **2.11.0**: "Pull consumer priority groups with pinning and overflow (#5814, #6078, #6081) …
+  The `PriorityGroups` and `PriorityPolicy` options in the consumer configuration control the
+  policy" (source: [[s-relnotes-2.11]]) — the body, like the ADR, names pinning and overflow only.
+- **2.11.2**: "Consumer priority groups will no longer get stuck in a tight-loop if there are
+  multiple requests from different clients but some are not receiving due to the priority policy"
+  (#6749) — a 2.11.0/2.11.1 hazard.
+- **2.11.7**: a push consumer configured with priority groups now returns an error (#7053).
+
+
+- **2.12.0**: "Prioritised mode for consumer priority groups (#7113) — Allows for low-latency
+  switching between clients based on the priority set" — the `prioritized` policy's release body
+  (source: [[s-relnotes-2.12]]). **2.12.5**: unpin responses include pending messages and bytes
+  (#7815); unpinning is handled on step-down and "allows the next client to pick up the next pin
+  without waiting for new messages" (#7819); an overflowed pull with `min_pending` or
+  `min_ack_pending` above the threshold handled (#7795). **2.12.8**: setting the pinned headers
+  simplified (#8032).
+
+
 ## To verify
 
 - The ADR's status is **Approved**, not *Implemented*, even though it is tagged `2.11` and the
@@ -173,4 +193,4 @@ stored ID and keep pulling.
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
 v2.14.6 with nats CLI 0.4.0, 2026-09-01. Behind `inbox/docs-issues.md` #37. ·
-[[s-docs-worker-pool]]
+[[s-docs-worker-pool]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

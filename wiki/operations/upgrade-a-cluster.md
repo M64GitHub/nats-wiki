@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [rolling-upgrade, lame-duck, SIGUSR2, meta-leader, downgrade, PodDisruptionBudget, ldm]
 aliases: [rolling upgrade, "upgrade NATS", "roll a cluster", lame duck, ldm, "upgrade nats-server"]
-sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster]
+sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Upgrade a cluster
@@ -284,6 +284,75 @@ gone (source: [[s-gh-7463-jetstream-corruption]]). If you are rolling a cluster 
 treat the upgrade itself as the remedy rather than something to schedule after the investigation. See
 [[nats-server-2.12]] and [[disaster-recovery]].
 
+### The 2.10 line
+
+From the 29 release bodies (source: [[s-relnotes-2.10]]):
+
+- **Downgrade floor 2.9.22.** 2.10 changed the on-disk format: "if a downgrade from 2.10.x occurs,
+  the old version will not understand the format on disk with the exception 2.9.22 and any
+  subsequent patch releases for 2.9" (v2.10.0, v2.10.1 and v2.10.2 bodies). 2.10.5 then removed meta
+  files left by the 2.9 → 2.10 conversion (#4733).
+- **2.10.16 can panic at startup** on zero-byte `tav.idx` files left by a crash before a sync;
+  delete them before starting, or run 2.10.17, which "avoid[s] panic on corrupted TAV file" (#5464).
+- **2.10.19 → 2.10.20 → 2.10.22**: 2.10.19 broke KV compare-and-swap on R1 (fixed in 2.10.20) and
+  stopped clipping source-consumer start sequences (reverted in 2.10.22) — skip those three releases
+  if anything sources or mirrors.
+- **2.10.28 is withdrawn** — "contains a regression that has since been fixed in 2.10.29. Please
+  upgrade to that version instead." With 2.11.2 that makes two withdrawn patches in two lines: read
+  the body before picking a patch.
+- **A CVE can ship as binaries first** — `v2.10.27-binary` a week before `v2.10.27`, the Docker
+  image on its own queue (source: [[s-gh-6748-cve-binary-release-docker-images]]); see
+  [[install-nats-server]].
+- **From 2.10.28 a peer-removed server rejoins by itself after five minutes** (#6815).
+
+
+### The 2.11 line
+
+From the 18 release bodies (source: [[s-relnotes-2.11]]):
+
+- **2.11.2 is withdrawn** ("contains a regression that has since been fixed in 2.11.3"); its
+  consumer-consistency change — replicated consumers wait for quorum before delivering — is the one
+  with the throughput caveat, and it stays in every later 2.11.
+- **2.11.0 and 2.11.1 on an upgraded standalone server**: idempotent stream and consumer creates
+  "fail due to metadata changes" until #6716 (2.11.2, so effectively 2.11.3).
+- **2.11.0 – 2.11.5 run filtered consumers slowly** — "a performance regression introduced in v2.11.0
+  which could result in abnormally low throughput from filtered consumers and higher GC pressure",
+  fixed in 2.11.6 (#7015). Do not benchmark a 2.11 cluster below 2.11.6.
+- **2.11.4 refuses stream and consumer updates when all peers are offline** (#6856); earlier 2.11
+  accepted them, "a potential avenue for data loss".
+- **2.11.9 is the floor for any 2.12 rollback** (offline assets, #7158) — see the table above.
+- **Names with spaces are rejected from 2.11.0** for servers, clusters and gateways (#5676); a config
+  that started on 2.10 can fail to start on 2.11.
+- **A graceful `SIGTERM` exits 0 from 2.11.0** (#6336; 2.11.10 fixes it at startup, #7367) — a unit
+  or supervisor that treated the old exit 1 as a failure sees a change.
+- **2.11.14 – 2.11.16 close twelve CVEs**; 2.11.16's `no_auth_user` is client-only and `deny`
+  wildcards are enforced strictly — a config relying on either loophole breaks on upgrade.
+
+
+### The 2.12 line
+
+From the 15 release bodies (source: [[s-relnotes-2.12]]):
+
+- **2.12.5 carries a warning, not a withdrawal**: "a stream update may result in the loss of
+  consumers in clustered deployments in specific cases. Single-server deployments are not affected.
+  To temporarily mitigate, set `meta_compact_sync: true` in the `jetstream` config block and perform
+  a configuration reload." Fixed in 2.12.6 (#7939). A cluster on 2.12.5 must carry the mitigation
+  until it moves.
+- **2.12.7 – 2.12.10 have a stale-subject-state regression** — `Message Not Found` on streams with
+  `max_msgs_per_subject` (every KV bucket) — fixed in 2.12.11 (#8285); "v2.14.x versions are not
+  affected".
+- **2.12.15 fixes a data-loss path** in idempotent stream creates "when an offline node catches up
+  from a metalayer snapshot" (#8449); 2.14.5 is its twin.
+- **The 2.11 → 2.12 hop changes defaults**, not only features: strict API on, async flush on for
+  replicated streams, `max_buffered_msgs` ×10, WebSocket and MQTT keepalives off, insecure cipher
+  suites off (`allow_insecure_cipher_suites` restores them), API level 2 (clients asserting a level
+  with `Nats-Required-Api-Level` now can).
+- **Counters, compression or encryption: 2.12.12 or later** (#8311, #8312); **`verify_and_map` or
+  `no_auth_user` with auth callout: 2.12.14 or later** (the two authentication bypasses).
+- **`max_mem_store` and `max_file_store` may be raised by config reload from 2.12.7** (#8014) — a
+  storage grow no longer needs a restart, but a shrink still does.
+
+
 ## Pitfalls
 
 **Do not size `lame_duck_duration` against JetStream.** The docs advise setting it to cover "how long
@@ -360,4 +429,4 @@ rolling restart is the last node's.
 [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] · [[s-nats-server-systemd-units]] ·
 [[s-docs-scaling-and-peers]] · [[s-gh-4342-memory-stream-backup]] ·
 [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-40-nats-connection]] ·
-[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]]
+[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

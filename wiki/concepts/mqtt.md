@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [mqtt, qos, retained, sessions, client-id, topic-conversion, "$MQTT", stream_replicas, MQTT_WS]
 aliases: [MQTT, mqtt, "mqtt {}", MQTT broker, "$MQTT", MQTT_WS, mosquitto]
-sources: [s-docs-mqtt-your-first-mqtt-client, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-qos-sessions-and-retained, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7533-quorum-loss-mqtt, s-nats-server-kick-ldm-mqtt-session]
+sources: [s-docs-mqtt-your-first-mqtt-client, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-qos-sessions-and-retained, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7533-quorum-loss-mqtt, s-nats-server-kick-ldm-mqtt-session, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # MQTT
@@ -303,6 +303,55 @@ has no leader ([[meta-layer]]). Neither is an MQTT fault; the sequence that foll
 first is not known in public.
 
 
+## Version notes: the 2.10 line
+
+- **QoS 2 is since 2.10.0** (#4349, #4440); retained messages moved to KV semantics "instead of
+  holding retained messages in memory" (#4199, #4228); topics with `.` (#4243); the `RETAIN` flag set
+  on delivery to new subscriptions only (#4443) (source: [[s-relnotes-2.10]]).
+- **2.10.4**: "config options to disable QoS 2 support" (#4705) — the config reference documents
+  `reject_qos2_publish` and `downgrade_qos2_subscribe`; the release body and the PR title name
+  neither — and a standalone server no longer needs `server_name` for MQTT (#4679).
+- **2.10.17, the line's only `### Changed`**: "Do not wait for JS responses when disconnecting the
+  session" (#5575).
+- Fixes worth knowing on an older 2.10: a retained-message memory leak (2.10.4, #4665), retained
+  messages broken when the server name contains `.` (2.10.11, #5048), rapid load-balanced reconnects
+  racing (2.10.5, #4734), the PUBREL header incompatibility and crash (2.10.2, #4616; 2.10.3, #4646).
+
+
+### The 2.11 line
+
+- **2.11.0**: SparkplugB Aware support (#5241). **2.11.3**: **`mqtt { js_api_timeout }`** — "how long
+  to wait for JetStream operations caused by MQTT calls" (#6833; the config reference gives `5s`)
+  (source: [[s-relnotes-2.11]]).
+- **2.11.12, seven fixes**: `max_payload` enforced for MQTT clients (#7555); a reload panic when the
+  user lacked permission on retained messages (#7596); account mapping for JetStream API requests
+  through servers without JetStream (#7598); QoS 0 across imports and exports with subject mappings
+  (#7605); retained messages loading after a restart (#7616) and **"a bug which could corrupt retained
+  messages in clustered deployments"** (#7622); QoS 2 messages retrievable after a restart (#7643);
+  `$MQTT.` subscription permissions handled implicitly except `deny` (#7637); retained messages
+  sourced from another account with a transform (#7636).
+- **2.11.15, three CVEs** (CVE-2026-33216, -33217, -33215) and the protocol tightened (#7933):
+  `SUB`/`UNSUB` with packet identifier 0 rejected (#7805); a panic on invalid fixed32/fixed64 fields
+  (#7941); **a persisted session can only be restored by the matching client ID**; the implicit
+  permissions restricted to the `$MQTT.sub.` and `$MQTT.deliver.pubrel.` prefixes; **MQTT passwords
+  no longer exposed in the JWT field of monitoring endpoints or advisories**; NATS special characters
+  (`.`, `>`, `*`, spaces, tabs) refused in client IDs; session-flapping detection on monotonic time.
+
+
+### The 2.12 line
+
+**2.12.0**: MQTT clients no longer use TCP keepalives (#7329) (source: [[s-relnotes-2.12]]).
+**2.12.7**: "the `jwt` is now correctly sent to auth callout for MQTT clients, fixing a regression
+introduced in 2.12.6" (#7997, #7999). **2.12.9**: invalid characters in subjects rejected, "avoiding
+protocol issues when forwarded to other connection types" (#8104, #8112). **2.12.12**: partial
+`CONNECT` packets can no longer exhaust pre-authentication memory; a `PUBLISH` remaining-length
+underflow no longer panics; subscriptions to `$MQTT.deliver.pubrel` rejected; subscribe `deny` rules
+enforced on retained-message and QoS replay paths; a WebSocket `/mqtt` upgrade no longer panics when
+MQTT is disabled. **2.12.14**: packet identifiers for QoS 1 and 2 issued by a monotonic counter
+(#8358); pending QoS 1/2 deliveries no longer leak when a subscription is downgraded to QoS 0
+(#8359); QoS 2 messages released on a resumed session keep their QoS and packet ID (#8414).
+
+
 ## Related
 
 [[websocket]] · [[stream]] · [[subject-permissions]] · [[account]] · [[operator-mode]] ·
@@ -328,4 +377,4 @@ first is not known in public.
 [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-mqtt-topics-and-subjects]] ·
 [[s-docs-mqtt-qos-sessions-and-retained]] · [[s-docs-mqtt-auth-and-clustering]] ·
 [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-nats-server-monitoring-observed]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-kick-ldm-mqtt-session]]
+[[s-nats-server-monitoring-observed]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-kick-ldm-mqtt-session]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

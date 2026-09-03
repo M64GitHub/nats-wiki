@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [meta-layer, meta-group, meta-leader, raft, quorum, orphan, peer-remove, election, 10008, healthz, jsz, meta_compact, extension_hint, observer, snapshot]
 aliases: [meta group, meta leader, metadata controller, metalayer, meta-layer, "_meta_", JetStream meta layer, metadata leader, meta controller]
-sources: [s-nats-server-jetstream-cluster, s-docs-jetstream-in-a-cluster, s-docs-raft-and-leaders, s-adr-61-meta-quorum-rescue, s-gh-7831-standalone-to-cluster, s-nats-server-leafnode-js-domains, s-docs-scaling-and-peers, s-gh-7438-multi-region-availability, s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-raftz, s-nats-server-meta-layer-rerun-observed]
+sources: [s-nats-server-jetstream-cluster, s-docs-jetstream-in-a-cluster, s-docs-raft-and-leaders, s-adr-61-meta-quorum-rescue, s-gh-7831-standalone-to-cluster, s-nats-server-leafnode-js-domains, s-docs-scaling-and-peers, s-gh-7438-multi-region-availability, s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-09-01
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # The meta layer
@@ -271,6 +271,64 @@ to the system account (source: [[s-nats-server-raftz]]; field table on [[monitor
 - `$JS.API.META.RESCUE` — **2.15** preview only (source: [[s-adr-61-meta-quorum-rescue]]).
 - Everything measured above is **2.14.6**.
 
+### The 2.10 line
+
+- 2.10.0: a "self-healing mechanism to detect and delete orphaned Raft groups" (#4510) (source:
+  [[s-relnotes-2.10]]).
+- 2.10.23: recovery "will now more reliably group assets for creation/update/deletion and handle
+  pending consumers more reliably, reducing the chance of ghost consumers and misconfigured streams
+  happening after restarts" (#6066, #6069, #6088, #6092); snapshots are attempted on every shutdown
+  (#6067), no longer generated on a leader switch (#5700), taken less often (#6165) and stripped of
+  client and subject information (#6185); consumer-info requests for consumers that do not exist are
+  no longer relayed to the meta leader (#6176); the meta leader logs a slow snapshot (#6178).
+- **2.10.25: the health check no longer re-evaluates assignments** — before it, `healthz` could
+  recreate a stream or consumer "shortly after a deletion" (#6362).
+- **2.10.28: a peer-removed server is re-admitted after five minutes** without a restart (#6815);
+  duplicate Raft groups for one asset are prevented on restart (#6732).
+
+
+### The 2.11 line
+
+- **`/healthz?js-meta-only=true`** is since 2.11.0 (#6649) (source: [[s-relnotes-2.11]]).
+- **2.11.9 → 2.11.10**: "Meta snapshot performance for a very large number of assets has been
+  improved after a regression in v2.11.9" (#7350); 2.11.10 also stops snapshotting the meta layer
+  "on every stream removal request, reducing API pauses" (#7373).
+- **2.11.11**: **`jetstream { meta_compact, meta_compact_size }`** — "how many log entries must be
+  present in the metalayer log before snapshotting and compaction takes place" (#7484, #7521);
+  streams are **loaded in parallel** when JetStream starts, "often reducing the time it takes to
+  start up the server" (#7482); monitor goroutines for recreated assets no longer run with the wrong
+  Raft group after recovery (#7510); consumers deleted on recovery no longer fail health checks
+  (#7523).
+- **2.11.12**: the meta layer answers a peer-remove **only after quorum** (#7581); the last remaining
+  peer cannot be removed (#7610); a removed peer's state is written at once (#7602).
+- **2.11.15**: meta snapshot apply errors are surfaced "so that the cluster monitor does not
+  advance the applied index" (#7944).
+
+
+### The 2.12 line
+
+- **2.12.3**: the meta layer "will now stage and deduplicate recovery operations at startup, instead
+  of rapidly applying and then undoing conflicting assignments" (#7540) (source:
+  [[s-relnotes-2.12]]).
+- **2.12.5: metalayer snapshots become asynchronous** "such that JS API operations are not blocked
+  while the snapshot is taking place" (#7827, #7846), disabled with `jetstream { meta_compact_sync:
+  true }` — and **the 2.12.5 warning**: "a stream update may result in the loss of consumers in
+  clustered deployments in specific cases", mitigated by that same key until 2.12.6 (#7939 "Stream
+  update loses consumers in async meta snapshot"). Also 2.12.5: in-flight meta changes tracked for
+  invalid updates, local consumer assignments no longer overwritten before they are applied "which
+  would result in them being omitted from the meta snapshot" (#7798); orphan checks aligned with the
+  snapshot logic (#7826); R1 pending calculations no longer block the metalayer (#7889).
+- **2.12.6**: snapshot apply errors surfaced "so that the cluster monitor does not advance the
+  applied index" (#7944); the orphan check no longer deletes direct consumers (#7957). **2.12.8**:
+  consumer start-sequence scans "no longer pause the metalayer" (#8051); info requests answer while
+  assignments are in flight (#8054). **2.12.9**: meta state preserved on shutdown where it was
+  wrongly removed (#8199); local meta log reset correctly when extending the group to a parent domain
+  (#8142). **2.12.12**: meta proposal in-flight tracking consistent during stream moves (#8261);
+  recovery snapshots "no longer leave phantom streams or consumers behind" (#8324); assignment
+  handling refactored (#8262). **2.12.15**: the idempotent-create data-loss path on catch-up from a
+  meta snapshot (#8449).
+
+
 ## To verify
 
 - The first release in which JetStream clustering — and therefore the meta group — appeared is not
@@ -293,4 +351,4 @@ to the system account (source: [[s-nats-server-raftz]]; field table on [[monitor
 [[s-nats-server-jetstream-cluster]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-docs-raft-and-leaders]] · [[s-adr-61-meta-quorum-rescue]] ·
 [[s-gh-7831-standalone-to-cluster]] · [[s-nats-server-leafnode-js-domains]] ·
-[[s-docs-scaling-and-peers]] · [[s-gh-7438-multi-region-availability]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-raftz]] · [[s-nats-server-meta-layer-rerun-observed]]
+[[s-docs-scaling-and-peers]] · [[s-gh-7438-multi-region-availability]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

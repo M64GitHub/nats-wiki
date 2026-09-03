@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8001-jetstream-startup-slow-50m]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8001-jetstream-startup-slow-50m, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -426,6 +426,63 @@ batch-publish target** — the server refuses the config with
 stream that is a mirror or a source **never gets the default `duplicate_window`** substituted, which
 is why deduplication behaves differently on a copy than on the original ([[stream]]).
 
+## When the upstream restarts empty — the 2.10.19 window, and 2.14
+
+A source consumer is created at "the last remembered offset" plus one. What happens when the
+upstream comes back at sequence 0 — a memory-backed stream after a restart, a stream deleted and
+recreated, a file stream that lost its unflushed last block — depends on the release:
+
+- **Up to 2.10.18** the consumer's start sequence was clipped into the stream, so the source
+  resumed from the upstream's new beginning.
+- **2.10.19, 2.10.20 and 2.10.21** stopped clipping (#5785): the source consumer waited "until the
+  sourced stream LastSeq catches up to the consumer sequence" — a stall, then a gap once the upstream
+  overtook the remembered sequence. Reported for a memory stream on a busy leaf node; a maintainer
+  reverted it two days later (source: [[s-gh-6005-sourcing-memory-stream-restart]]).
+- **2.10.22 and later** restore the clipping — "fixing an issue where sourcing/mirroring consumers
+  could skip messages" (#6014) (source: [[s-relnotes-2.10]]).
+- **2.14**, where an interest or WorkQueue upstream gets the durable `AckFlowControl` consumer (see
+  *When the upstream is a WorkQueue or an Interest stream*), a user reported the stall again on
+  2026-08-07: the replication stream "only receives new messages after we reach the sequence number
+  at which the stop occurred last time". The maintainer's answer names "(2.15) Source stream
+  recreation detection" (#8384), in the 2.15 preview; the user's question "Is there a way to achieve
+  the expected behavior through configuration?" got the PR as its reply, not a setting (source:
+  [[s-gh-6005-sourcing-memory-stream-restart]]).
+
+
+## Version notes: the 2.11 line
+
+- **2.11.0** is where the 2.10.19 → 2.10.22 clipping story ends: "Consumer starting sequence is now
+  always respected, except for consumers used for sources/mirrors" (#6253) — sources keep the
+  clipping, everything else keeps its requested sequence (source: [[s-relnotes-2.11]]).
+- **2.11.5**: mirrors strip `Nats-Expected-` headers "that could interfere with mirroring
+  operations" (#6961); sourcing and mirroring resync faster over leafnodes after a connection failure
+  (#6981). **2.11.6**: a stalled source no longer updates its last-seen timestamp, "making it clearer
+  how long it has been since the last contact" (#7013). **2.11.9**: faster resync after a leaf
+  reconnects "in complex topologies" (#7265).
+- **2.11.12**: the scan for the last sourced sequence of a subject-filtered source is "considerably
+  faster" (#7553) — the mechanism behind [[jetstream-recovery-is-slow]]'s sourcing case.
+- **2.11.15**: ingest strips a NATS status header, "avoiding incorrect classification of sourced or
+  mirrored messages as control traffic"; sourcing into a stream with `discard_new_per_subject`
+  works (#7896).
+
+
+## Version notes: the 2.12 line
+
+- **2.12.0**: a mirror may be **promoted** to a normal stream by removing its `mirror` configuration —
+  "cannot be undone and also requires configuring the stream subjects to continue operation" (#7171)
+  (source: [[s-relnotes-2.12]]).
+- **2.12.5**: timers leaked when a mirror failed to set up, "which resulted in high CPU usage"
+  (#7825); source checks enforced across accounts and domains (#7903). **2.12.6**: mirror goroutines
+  could get stuck, "stalling the mirror indefinitely" (#7929); **the orphan-consumer check no longer
+  deletes direct consumers, "which could affect sourcing and mirroring"** (#7957); idempotent create
+  with sources fixed (#7928).
+- **2.12.8**: a `Nats-Msg-Id` is no longer deduplicated inside a mirror (#8043); **sourcing no longer
+  duplicates messages after a leafnode reconnection or a proposal error** (#8069). **2.12.9**: a
+  source consumer already being set up is not scheduled again, "avoiding potential setup storms"
+  (#8111); a mirror consumer retries immediately on a last-sequence mismatch "avoiding stalling for
+  longer than necessary" (#8152).
+
+
 ## Related
 
 The promotion procedure that turns a mirror into a writable primary is [[disaster-recovery]];
@@ -480,4 +537,4 @@ stream **cannot** have while it mirrors or sources another.
 [[s-adr-57-kv-subject-transforms]] · [[s-docs-disaster-recovery]] · [[s-docs-get-direct]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-5606-cross-account-jetstream]] ·
 [[s-gh-6328-jetstream-behind-gateways]] · [[s-gh-7017-kv-across-accounts]] ·
-[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-8001-jetstream-startup-slow-50m]]
+[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

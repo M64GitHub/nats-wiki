@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [websocket, ws, wss, no_tls, allowed_origins, same_origin, jwt_cookie, compress, LEAFNODE_WS, advertise]
 aliases: [WebSocket, websocket, "websocket {}", ws, wss, browser client, allowed_origins]
-sources: [s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed]
+sources: [s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # WebSocket
@@ -196,6 +196,30 @@ Two WebSocket-only remote settings: `ws_compression` and `ws_no_masking` (aliase
 intermediary caches, "a concern that doesn't apply to a server-to-server link". Both are requests —
 the hub decides, and the link works either way.
 
+## Version notes: the 2.11 line
+
+- **2.11.0**: WebSocket custom response headers (#5230) (source: [[s-relnotes-2.11]]).
+- **2.11.12**: **`websocket { ping_interval }`** — "WebSocket-specific ping interval configuration"
+  (#7614; the body prints `ping_internal`; the config reference gives the default `2m`); the buffer
+  is bounded during decompression (#7625).
+- **2.11.14, CVE-2026-27889** ("systems with WebSockets enabled"): 64-bit payload lengths parsed
+  correctly, compressed frames rejected when compression was not negotiated, **the `Origin` check now
+  validates the scheme as well as host and port**, failed upgrades handled gracefully, `CLOSE` frame
+  lengths and status codes validated, the compressor reset after a max-payload error, empty
+  compressed buffers no longer panic.
+- **2.11.15, CVE-2026-33219**: protocol parsing "no longer relies on potentially unbounded in-memory
+  allocations from compressed or uncompressed frames". **2.11.16**: a connection with no `CONNECT`
+  block uses the WebSocket-specific `no_auth_user` rather than the global one.
+
+
+### The 2.12 line
+
+**2.12.0**: WebSocket (and MQTT) clients "no longer use TCP keepalives" (#7329) — the line's
+`### Changed` (source: [[s-relnotes-2.12]]). **2.12.5**: buffers reused, "reducing memory pressure"
+(#7901). **2.12.10**: "potential protocol-level corruption from buffer misuse in compressed
+WebSocket clients" fixed (#8244). The CVE fixes are those of 2.11.14 and 2.11.15, above.
+
+
 ## Related
 
 [[mqtt]] · [[run-nats-behind-a-proxy]] · [[leafnode]] · [[subject-permissions]] · [[tls-in-nats]] ·
@@ -219,4 +243,4 @@ the hub decides, and the link works either way.
 
 [[s-docs-websocket-your-first-websocket-connection]] · [[s-docs-websocket-browsers-and-origins]] ·
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-nats-server-mqtt-websocket-observed]]
+[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

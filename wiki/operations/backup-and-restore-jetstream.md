@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [backup, restore, snapshot, memory-streams, chunk-size, window-size, 10064, 10130, consumers]
 aliases: [backup, restore, snapshot, "nats stream backup", "nats stream restore", "back up a stream"]
-sources: [s-docs-stream-backup-restore, s-nats-server-snapshot-restore, s-gh-4342-memory-stream-backup, s-natscli-backup-restore, s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-natscli-account-tls, s-gh-7831-standalone-to-cluster]
+sources: [s-docs-stream-backup-restore, s-nats-server-snapshot-restore, s-gh-4342-memory-stream-backup, s-natscli-backup-restore, s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-natscli-account-tls, s-gh-7831-standalone-to-cluster, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Back up and restore JetStream
@@ -224,6 +224,19 @@ damaged stream before restoring over it is irreversible**. Confirm the snapshot 
 restore is the one you want (`backup.json` carries the config and the sequence range) before deleting
 anything.
 
+## Version notes: the 2.12 line
+
+- **2.12.5**: stream backups "are now streamed to clients with improved flow control, which should
+  improve throughput and robustness, particularly over unreliable links, reducing the chance of
+  backups failing due to flow control errors" (#7828), and the snapshot endpoint accepts a
+  `window_size` parameter "to allow improving flow control over slow or unreliable connections"
+  (#7839 — undocumented, noted on `inbox/docs-issues.md` #57) (source: [[s-relnotes-2.12]]).
+- **2.12.6**: "stream restores are now processed directly from the wire without intermediate
+  staging on the filesystem, improving the enforcement of limits and reservations on disk"; a
+  restore "ensure[s] that the stream name in the restore subject matches that of the restored
+  snapshot archive". **2.12.14**: snapshot endpoints check the reply subject more strictly.
+
+
 ## Pitfalls
 
 **Replication is not a backup.** R3 protects against a node dying, not against a `purge`, a bad
@@ -278,4 +291,4 @@ Neither path is a flag, and both have to be planned **before** the restart, not 
 
 [[s-docs-stream-backup-restore]] · [[s-nats-server-snapshot-restore]] · [[s-natscli-backup-restore]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-docs-disaster-recovery]] · [[s-docs-mirrors-as-dr]] ·
-[[s-natscli-account-tls]] · [[s-gh-7831-standalone-to-cluster]]
+[[s-natscli-account-tls]] · [[s-gh-7831-standalone-to-cluster]] · [[s-relnotes-2.12]]

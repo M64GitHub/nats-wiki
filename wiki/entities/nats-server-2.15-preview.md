@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.15, preview, js_ack_fc_v2, acl-migration, sources.db, js_snapshot_sources, recovery]
 aliases: ["2.15", v2.15, "v2.15.0-preview.1"]
-sources: [s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-filestore-recovery, s-gh-8001-jetstream-startup-slow-50m, s-nats-server-stream-scale-observed]
+sources: [s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-filestore-recovery, s-gh-8001-jetstream-startup-slow-50m, s-nats-server-stream-scale-observed, s-gh-6005-sourcing-memory-stream-restart]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -84,6 +84,15 @@ without it (source: [[s-nats-server-stream-scale-observed]]). Also in the previe
 message that carries the `Nats-Stream-Source` header directly is rejected.
 
 
+## Source stream recreation detection (#8384)
+
+"(2.15) [IMPROVED] Source stream recreation detection", merged 2026-08-13 and listed in the preview
+body, is the maintainers' answer to a sourcing stream that stalls after its upstream is deleted and
+recreated — reported on 2.10.19 in 2024, reverted then, and reported again on 2.14 with the
+`AckFlowControl` sourcing consumer on 2026-08-07 (source:
+[[s-gh-6005-sourcing-memory-stream-restart]]). See [[mirrors-and-sources]].
+
+
 ## To verify
 
 - **Beyond the ack-subject default and the source index, nothing about 2.15 is known from an ingested
@@ -99,4 +108,4 @@ message that carries the `Nats-Stream-Source` header directly is rejected.
 
 ## Sources
 
-[[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-stream-scale-observed]]
+[[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-6005-sourcing-memory-stream-restart]]

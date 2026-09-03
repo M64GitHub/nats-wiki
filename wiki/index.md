@@ -533,6 +533,15 @@ exists to answer live in `inbox/question-bank.md`.
   I/O errors, Raft overrun protection.
 - [[s-relnotes-2.14.0]] — the v2.14.0 changelog with PR numbers, including the items the upgrade
   guide omits.
+- [[s-relnotes-2.10]] — the 29 release bodies of the 2.10 line (2023-09-19 → 2025-05-01) read as one changelog:
+  defaults and keys that arrived, behaviours that changed, withdrawn releases, the data-integrity
+  fixes by release, three CVEs; corrects the subject tree to 2.10.10.
+- [[s-relnotes-2.11]] — the 18 release bodies of the 2.11 line (2025-03-19 → 2026-04-27) as one changelog: what
+  2.11.0 added, the withdrawn 2.11.2, the 2.11.9 downgrade floor, twelve 2026 CVEs, the keys and
+  monitoring fields the docs never name (docs issues #55–#57).
+- [[s-relnotes-2.12]] — the 15 release bodies of the 2.12 line (2025-09-22 → 2026-08-12) as one changelog,
+  checked against the docs' upgrade guide: API level 2, strict and async flush by default, the 2.12.5
+  warning, the 2.12.7 → 2.12.11 regression, `max_concurrent_io`, the same-day 2.14 twins; docs issues #58–#60.
 
 **GitHub discussions**
 
@@ -689,6 +698,10 @@ exists to answer live in `inbox/question-bank.md`.
   scale-to-zero trap: with nobody fetching, `ack_wait` never advances the delivery count.
 - [[s-gh-7590-dlq-payload-loss]] — the max-deliveries advisory has no payload, why the maintainers
   resist adding one, and the 2.12.3/2.12.4 R3 defect that made the documented recipe fail.
+- [[s-gh-6005-sourcing-memory-stream-restart]] — a sourcing stream stalls after its memory-backed upstream
+  restarts: 2.10.19 stopped clipping the start sequence, 2.10.22 reverted it, 2.14 saw it again (#8384 in 2.15).
+- [[s-gh-6748-cve-binary-release-docker-images]] — CVE-2025-30215 shipped as binaries a week before the tag;
+  the official Docker image is built by Docker's library from a PR and lags.
 
 **Synadia blog (continued)**
 

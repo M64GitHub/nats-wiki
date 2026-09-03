@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [operator, jwt, nkeys, ed25519, signing-keys, scoped, revocation, bearer, resolver, creds]
 aliases: [decentralized auth, decentralized authentication, jwt auth, operator, trust chain, nkeys, scoped signing key, resolver]
-sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-docs-authentication-basics, s-docs-authorization, s-docs-cross-account, s-gh-5941-restrict-leafnode-subjects, s-gh-7834-leafnode-same-js-domain]
+sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-docs-authentication-basics, s-docs-authorization, s-docs-cross-account, s-gh-5941-restrict-leafnode-subjects, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.11]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Operator mode
@@ -236,6 +236,18 @@ holding the JWT can connect as that user. Treat it like a password, put TLS in f
 its expiry short. And `no_auth_user` is not available in operator mode at all — every connection needs
 a JWT.
 
+## Version notes: the 2.11 line
+
+- **`default_sentinel`** (2.11.2, #6577): "a default sentinel JWT, which is used in operator mode
+  when none is specified, has been added making it possible to have default users" — it must be a
+  bearer token (2.11.7, #7074), or may come from a scoped signing key (2.11.9, #7217) (source:
+  [[s-relnotes-2.11]]).
+- **2.11.9**: an account JWT update with a reduced connection limit disconnects the newest clients
+  (#7181, #7185); `cluster_traffic` restored correctly in operator mode when JetStream is enabled at
+  startup (#7191). **2.11.15**: **JWTs are limited to 1 MB** (#7960). **2.11.17**: claims whose
+  validity crosses midnight are validated correctly.
+
+
 ## Related
 
 [[account]] · [[subject-permissions]] · [[set-up-operator-mode]] · [[auth-callout]] ·
@@ -249,4 +261,4 @@ a JWT.
 [[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] ·
 [[s-docs-mqtt-auth-and-clustering]] · [[s-docs-websocket-browsers-and-origins]] ·
 [[s-docs-authentication-basics]] · [[s-docs-authorization]] · [[s-docs-cross-account]] ·
-[[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7834-leafnode-same-js-domain]]
+[[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.11]]

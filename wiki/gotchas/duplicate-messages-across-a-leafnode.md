@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [leafnode, supercluster, gateway, duplicates, loop, deny_imports, dns, urls]
 aliases: ["duplicate messages leafnode", "messages repeated leafnode", "leafnode loop", "message loop", "duplicates supercluster"]
-sources: [s-gh-4823-leafnode-supercluster-duplicates, s-docs-leaf-nodes, s-docs-super-clusters, s-nats-server-topology]
+sources: [s-gh-4823-leafnode-supercluster-duplicates, s-docs-leaf-nodes, s-docs-super-clusters, s-nats-server-topology, s-relnotes-2.10]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # Duplicate messages across a leafnode
@@ -109,6 +109,22 @@ If the repeats are of a **single** message and the consumer is a JetStream consu
 redelivery — see [[ack-and-redelivery]] and [[consumer-keeps-redelivering]]. The shape is different:
 one message repeated on an `ack_wait` cadence, not a window replayed.
 
+## The fixes in the 2.10 release notes
+
+The line fixed queue-group duplication over leafnodes and gateways five times (source:
+[[s-relnotes-2.10]]):
+
+| release | fix |
+|---|---|
+| 2.10.2 | "Prevent a leafnode cluster from receiving a message multiple times in a queue subscription" (#4578) |
+| 2.10.17 | "Prevent potential message duplication for queue-group subscriptions" over leafnodes (#5519) |
+| 2.10.22 | "Load balancing of queue groups over leafnode connections" (#5982) |
+| 2.10.23 | queue distribution "where a leafnode expressed interest on behalf of a gateway in complex setups" (#6126); leaf subscriptions distinguished from local routed ones (#6161); queue groups from leaf nodes in a cluster balanced (#6043) |
+| 2.10.26 | "Do not incorrectly send duplicate messages when a queue group has members across different leafnodes when connected through a gateway" (#6517) |
+
+A duplicate seen on anything older than **2.10.26** may be one of these before it is a design fault.
+
+
 ## Prevention
 
 - **One leafnode bridge per NATS system.** Write it into the review checklist for any leaf that
@@ -134,12 +150,12 @@ one message repeated on an `ack_wait` cadence, not a window replayed.
 ## Sources
 
 [[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-docs-leaf-nodes]] · [[s-docs-super-clusters]] ·
-[[s-nats-server-topology]]
+[[s-nats-server-topology]] · [[s-relnotes-2.10]]
 
 ## To verify
 
 - The thread ran on **nats-server 2.9.24**. The answer is architectural rather than version-specific,
-  and nothing in the 2.10–2.14 release notes in `raw/release-notes/` describes a change here — but
+  and the 2.10 release notes describe five fixes for queue-group duplication over leafnodes and gateways (*The fixes in the 2.10 release notes* above); the 2.11–2.14 bodies have not yet been read for this — but
   the behaviour has **not** been re-tested on 2.14.
 - "Normal mis-configuration loops are usually caught by the system when the LN's are established" —
   which loops the server catches, and what it logs when it does, has not been read from the source.

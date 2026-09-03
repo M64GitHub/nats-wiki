@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [release, 2.14, feature_flags, js_ack_fc_v2]
 aliases: ["2.14", v2.14, v2.14.0, v2.14.6]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-filestore-recovery, s-relnotes-2.14.1]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-adr-60-reliable-sourcing, s-docs-advanced-publishing, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-filestore-recovery, s-relnotes-2.14.1, s-relnotes-2.12]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -230,6 +230,15 @@ The same release adds the `/varz` client-only counters `in_client_msgs`, `in_cli
 (#8172) (source: [[s-relnotes-2.14.1]]). Symptom page: [[consumer-keeps-redelivering]].
 
 
+## The 2.12 twins of the 2.14 patches
+
+From 2.12.9 (2026-05-20) the 2.12 line ships the 2.14 patches under its own numbers on the same
+days: 2.12.9 = 2.14.1, 2.12.10 = 2.14.2, 2.12.12 = 2.14.3, 2.12.14 = 2.14.4, 2.12.15 = 2.14.5. One
+2.12 hazard has no 2.14 twin — the 2.12.7 → 2.12.11 stale-subject-state regression, whose body says
+"v2.14.x versions are not affected" — and one 2.14 item has no 2.12 twin: 2.14.6 (source:
+[[s-relnotes-2.12]]).
+
+
 ## Related
 
 [[nats-server-2.12]] · [[nats-server-2.15-preview]] · [[raft-in-nats]] · [[retention-policies]] ·
@@ -240,4 +249,4 @@ The same release adds the `/varz` client-only counters `in_client_msgs`, `in_cli
 
 [[s-relnotes-2.14.0]] · [[s-docs-upgrade-to-2.14]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
 [[s-nats-server-jetstream-resources]] ·
-[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-filestore-recovery]] · [[s-relnotes-2.14.1]]
+[[s-adr-60-reliable-sourcing]] · [[s-docs-advanced-publishing]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-filestore-recovery]] · [[s-relnotes-2.14.1]] · [[s-relnotes-2.12]]

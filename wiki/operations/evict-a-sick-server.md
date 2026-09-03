@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [evict, sick-node, hardware-failure, kick, lame-duck, peer-remove, slow-consumer, system-requests, kubernetes]
 aliases: [remove a server from a cluster, kick clients off a server, evict a node, sick node, hardware failure]
-sources: [s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session, s-nats-server-jetstream-cluster, s-nats-server-lame-duck, s-docs-kubernetes, s-adr-61-meta-quorum-rescue, s-docs-scaling-and-peers]
+sources: [s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session, s-nats-server-jetstream-cluster, s-nats-server-lame-duck, s-docs-kubernetes, s-adr-61-meta-quorum-rescue, s-docs-scaling-and-peers, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Evict a sick-but-not-dead server
@@ -155,6 +155,36 @@ to be undone by hand.
 - **Clients leave on their own clock.** Until the socket closes or their own ping times out, clients
   keep using a stalled server; the "10+ minutes of slowness" in gh#6892 is that clock.
 
+## Version notes
+
+- **The five-minute rejoin is a 2.10.28 change**: "Servers that have been `peer-remove`'d can now be
+  re-admitted automatically after 5 minutes without a server restart" (#6815, "Server peer re-add
+  after peer-remove"). Before 2.10.28 a removed server stayed out until restarted (source:
+  [[s-relnotes-2.10]]).
+- **`$SYS.REQ.SERVER.<id>.KICK` and `.LDM` arrived in 2.10.0** (#4298); from 2.10.17 `KICK` also
+  reaches leafnode connections (#5587). Neither is in the docs — `inbox/docs-issues.md` #54.
+- **2.10.28 proposes the new peer set through the Raft layer** on a stream or consumer peer-remove,
+  "potentially avoiding a drift in peers" (#6720, #6727).
+
+
+### The 2.11 line
+
+- **2.11.15**: "The stream peer-remove command now accepts a peer ID as well as a server name"
+  (#7952) (source: [[s-relnotes-2.11]]).
+- **2.11.12** hardened the removal itself: the meta layer answers a peer-remove only after quorum
+  (#7581); the removed peer's state is written immediately so it "cannot unexpectedly reappear after
+  a restart" (#7602); a heartbeat between removal and leadership transfer no longer re-admits it
+  (#7649); removed peers are not counted towards quorum (#7589); **the last remaining peer cannot be
+  removed** (#7610).
+
+
+### The 2.12 line
+
+**2.12.10**: "a drift that could occur in the peer sets after a peer remove of an online node"
+fixed (#8258). **2.12.14**: "Raft elections now correctly ignore votes from removed peers" (#8353).
+**2.12.6**: `peer-remove` by peer ID (#7952) (source: [[s-relnotes-2.12]]).
+
+
 ## To verify
 
 - The client libraries' own ping interval and maximum outstanding pings — what decides how fast a
@@ -171,4 +201,4 @@ to be undone by hand.
 
 [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-kick-ldm-mqtt-session]] ·
 [[s-nats-server-jetstream-cluster]] · [[s-nats-server-lame-duck]] · [[s-docs-kubernetes]] ·
-[[s-adr-61-meta-quorum-rescue]] · [[s-docs-scaling-and-peers]]
+[[s-adr-61-meta-quorum-rescue]] · [[s-docs-scaling-and-peers]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

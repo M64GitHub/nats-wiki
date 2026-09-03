@@ -6,7 +6,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -261,6 +261,43 @@ that acks the message removes it, so a [[dead-letter-queue]] handler is racing w
 attached to the stream.
 
 
+## Version notes
+
+- **The `limits` → `interest` swap is since 2.10.0**: "Allow switching between limits and interest
+  retention policies" (#4361; the PR is "Allow switching from limits-based to interest-based
+  retention in stream update") (source: [[s-relnotes-2.10]]).
+- Fixes that changed what `interest` and `workqueue` actually removed: 2.10.14 — interest and
+  WorkQueue state tracking "to prevent stranded messages during concurrent consumer acks and stream
+  deletes" (#5270); 2.10.16 — messages removed after consumer updates and interest changes on
+  interest streams (#5384, #5385); 2.10.19 — WorkQueue messages "incorrectly removed … when consumers
+  did not cover the entire subject space" (#5697), and the correct sequence returned for a duplicate
+  on an interest stream with no interest (#5818); 2.10.26 — consumers skipping messages on interest
+  or WorkQueue streams (#6526); 2.10.28 — sequence numbers lost on interruption, "particularly
+  noticeable with WQ or interest retention policies" (#6778).
+
+
+### The 2.11 line
+
+- **2.11.0**: on clustered `interest` and `workqueue` streams, message removals by ack "are now
+  proposed through Raft" — "ensures that the removal ordering across all replicas is consistent, but
+  may increase the amount of replication traffic" (#6140) (source: [[s-relnotes-2.11]]).
+- **2.11.5**: "Stream retention policy changes are now correctly propagated to running consumers in
+  all cases" (#6995).
+- **2.11.12** sharpens *Even the allowed swap rewrites history*: "Switching to interest-based
+  retention will now remove no-interest messages from the head of the stream" (#7766) — on 2.11.12
+  and later the removal is immediate, not deferred to the next ack.
+
+
+### The 2.12 line
+
+- **2.12.3**: `discard_new_per_subject` enforced by the leader before proposing (#7607) (source:
+  [[s-relnotes-2.12]]). **2.12.4**: the interest-switch head removal (#7766, as 2.11.12).
+- **2.12.5**: "messages that have reached the max deliver state are preserved with the WorkQueue
+  retention policy" (#7845). **2.12.8**: "message roll-ups are now applied on interest-based streams
+  where there is no interest over the subjects" (#8019). **2.12.12**: a catch-up is no longer
+  skipped when limits are exceeded, "preventing possible stream desync" (#8265).
+
+
 ## To verify
 
 - How `interest` and `workqueue` interact with stream **republish** is referenced by the docs but
@@ -286,4 +323,4 @@ the no-cap statement on [[stream]]).
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
 [[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
 [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
-[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]]
+[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

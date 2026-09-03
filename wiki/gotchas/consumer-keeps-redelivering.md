@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [redelivery, ack, ack_wait, max_deliver, max_ack_pending, backoff, nak, batch, last_per_subject, defect, measured]
 aliases: ["consumer keeps redelivering", "messages processed twice", "messages redelivered after ack", "acked messages redelivered", "redelivery loop", "acks not registered", "tries: 2", "duplicate deliveries", "consumer-keeps-redelivering"]
-sources: [s-issue-6921-last-per-subject-acks, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-5631-nak-not-immediate, s-nats-server-nak-backoff-observed, s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.14.1]
+sources: [s-issue-6921-last-per-subject-acks, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-5631-nak-not-immediate, s-nats-server-nak-backoff-observed, s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.14.1, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-09-03
 updated: 2026-09-03
 ---
@@ -217,6 +217,44 @@ fix has a stated cost: replicated consumers wait for delivered state to reach qu
 more, and the note names R1 consumers, `ack_policy: none` and ordered consumers as the shapes that are
 not slowed (source: [[s-relnotes-2.11.2]]).
 
+## The 2.10 patch trail
+
+Beyond 2.10.16 and 2.10.17 in the table, the line kept fixing redelivery accounting (source:
+[[s-relnotes-2.10]]): 2.10.10 — "acking a redelivered msg with more pending should move the ack
+floor" (#5008); 2.10.14 — "multiple deliveries of the same message that cause the delivery count
+decreasing" (#5305); 2.10.22 — pull consumers "recalculate max delivered when expiring messages,
+such that the redelivered status does not report incorrectly and cause a stall with a max deliver
+limit" (#5995); 2.10.23 — backoff "correctly respected with multiple in-flight deliveries" (#6104)
+and checked against `max_deliver` (#6154), replicated consumers wait for quorum before updating
+delivered state (#6139); 2.10.25 — AckAll retries no longer time out after a restart (#6392),
+replicated consumers no longer stuck after leader changes (#6387); 2.10.26 — `max_deliver` state
+preserved on interest streams so a new consumer does not remove the message (#6575); 2.10.28 —
+AckAll on interest streams removes messages (#6587) and uses the right floor on R1 (#6790). A 2.10
+cluster below **2.10.26** has at least one of these open.
+
+
+## The 2.11 patch trail
+
+Beyond 2.11.2 and 2.11.5 in the table (source: [[s-relnotes-2.11]]): **2.11.0** — replicated
+consumers "should no longer skip redeliveries of unacknowledged messages after a leader change"
+(#6566); **2.11.4** — redeliveries no longer reported for a consumer with `max_deliver: 1` (#6877);
+**2.11.7** — a pull consumer with an inactive threshold counts pending acks before it is deleted
+(#7052), so a slow handler no longer loses its consumer mid-batch; **2.11.9** — an infinite
+`max_deliver` (`-1`) no longer underflows (#7216).
+
+
+## The 2.12 patch trail
+
+The 2.12 line has the 2.14.1 fixes under another number — **2.12.9** (2026-05-20): "a number of
+paths that could leave consumer redelivered in a drifted state have been fixed, e.g. with workqueue
+or interest-based streams with `max_deliver`, on single message removal or after purges/compactions"
+(#8102); "pending state no longer leaks when reaching max deliveries" (#8156); "consumer file stores
+will now correctly flush when deleting a single redelivery, avoiding unexpected further redeliveries"
+(#8168) — and, earlier, **2.12.5**'s "messages that have reached the max deliver state are preserved
+with the WorkQueue retention policy" (#7845) and **2.12.7**'s `max_ack_pending` no longer stuck on
+deleted messages left in the pending state (#7984) (source: [[s-relnotes-2.12]]).
+
+
 ## Prevention
 
 - `ack_wait` longer than the slow case, with **in-progress** from long handlers; the first `backoff`
@@ -248,4 +286,4 @@ nak actually waits, why a nak never reports a failure.
 [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] ·
 [[s-gh-5631-nak-not-immediate]] · [[s-nats-server-nak-backoff-observed]] ·
 [[s-docs-delivery-and-acknowledgment]] · [[s-docs-acknowledgment]] · [[s-relnotes-2.11.5]] ·
-[[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]]
+[[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

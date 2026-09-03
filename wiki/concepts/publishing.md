@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [PubAck, Nats-Msg-Id, duplicate, duplicate_window, async-publish, atomic-batch, fast-ingest, AllowAtomicPublish, AllowBatchPublish, Nats-Batch-Id, Nats-Expected-Last-Subject-Sequence, exactly-once, persist_mode]
 aliases: [publish, PubAck, pub ack, exactly once, exactly-once, deduplication, dedup, Nats-Msg-Id, msg id, async publish, atomic batch, batch publish, fast ingest, publish acknowledgement]
-sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed]
+sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Publishing to a stream
@@ -271,6 +271,26 @@ nats pub -J schedules.x 'body' --schedule-cron='*/5 * * * *' …    # "message s
 schedule and publishes a message as one atomic operation (source: [[s-adr-51-message-scheduler]]).
 
 
+## Version notes: the 2.12 line
+
+- **Atomic batch publish is 2.12.0** (#6966 … #7330, ADR-50). Its patches: **2.12.1** — a batch
+  deduplicates on `Nats-Msg-Id` (#7391), rejects unsupported commits (#7368), checks the batch subject
+  rather than the committing message's (#7342); **2.12.2** — the unsupported-header check looked at
+  the wrong field (#7436); a deadlock between a direct get and a batch write (#7458); **2.12.9** — an
+  *unsupported* advisory on an API-level mismatch (#8082); **2.12.12** — end-of-batch max-size checks
+  and R1 message rewrites (#8305) (source: [[s-relnotes-2.12]]).
+- **`Nats-Required-Api-Level`** (2.12.0, #7157) lets a publish or API request demand a server API
+  level; from 2.12.4 the level error is returned only after the other checks, "preventing unexpected
+  replies from other servers" (#7711).
+- **A no-responders error names the original subject** in a `Nats-Subject` header from 2.12.0
+  (#5250).
+- **A publish exceeding the maximum store size is rejected before proposal** from 2.12.14 (#8389);
+  the **32 MB** cap is 2.10.28 / 2.11.2 ([[s-relnotes-2.10]]); the ingest queue and its `429` are
+  2.11.0 ([[s-relnotes-2.11]]).
+- **Counters** (`Nats-Incr`, 2.12.0, ADR-49): staging corrupted the committed running total until
+  2.12.12 (#8311); configuration constraints since 2.12.10 (#8240).
+
+
 ## To verify
 
 - **The 1,000-message and 50-in-flight batch limits, and the config keys that change them.** Stated
@@ -298,4 +318,4 @@ schedule and publishes a message as one atomic operation (source: [[s-adr-51-mes
 - [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] — the releases the two batch modes shipped
   in.
 - [[s-relnotes-2.14.0]] — the `Nats-Batch-Commit: eob` end-of-batch commit.
-- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]]
+- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]]

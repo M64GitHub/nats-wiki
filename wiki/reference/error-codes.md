@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # JetStream error codes
@@ -277,6 +277,38 @@ the server, and it would go stale silently. The wiki's rule is to summarise and 
 `raw/nats-docs/reference/jetstream/errors.md` locally. The rows above are the ones this wiki has
 reason to explain.
 
+## Version notes
+
+- Since 2.10.8 a JetStream request made through the **system account** is answered with "Account
+  not enabled" rather than served (#4910) (source: [[s-relnotes-2.10]]).
+- 2.10.17 stopped some consumer updates from wrongly returning `maximum consumers limit reached`
+  (#5489); 2.10.26 allowed a stream or consumer update "if up against the max streams or max
+  consumers limit" (#6477) and stopped parallel creates of the same stream from returning a limits
+  error (#6502).
+
+
+### The 2.11 line
+
+- **`429 Too Many Requests`** — the PubAck status a rate-limited publish receives when
+  `max_buffered_msgs` or `max_buffered_size` is exceeded and a reply subject is present (2.11.0,
+  #5796); the server logs `Dropping messages due to excessive stream ingest rate` beside it (source:
+  [[s-relnotes-2.11]]).
+- **`404 No Messages`** on a `no_wait` pull against an empty stream (2.11.11, #7466 "Consumer send
+  404 No Messages on EOS") — the 2.11.11 body prints "400"; the server sends 404.
+
+
+### The 2.12 line
+
+- A **no-responders** error carries the original subject in a `Nats-Subject` header from 2.12.0
+  (#5250) (source: [[s-relnotes-2.12]]).
+- **`last sequence mismatch`** — 2.12.8 stopped the cluster stream sequence advancing on a failed
+  proposal, which produced it (#8057); mirror consumers retry immediately on it from 2.12.9 (#8152).
+- **`Proxy is not trusted`** (`ErrAuthProxyNotTrusted`) — the 2.12.0 trusted-proxies error; the list
+  it refers to is undocumented (`inbox/docs-issues.md` #60).
+- **"Message Not Found"** on a stream with `max_msgs_per_subject` on 2.12.7–2.12.10 is the stale
+  subject-state regression fixed in 2.12.11 (#8285), not a client error.
+
+
 ## Related
 
 [[js-api]] · [[js-api-subjects]] · [[no-suitable-peers-for-placement]] · [[message-ttl]] ·
@@ -300,4 +332,4 @@ summaries that put them there — [[s-adr-43-per-message-ttl]] (`10052`, `10165`
 [[s-docs-stream-backup-restore]] (`10064`) · [[s-gh-7982-no-suitable-peers]] (`10005`) ·
 [[s-issue-4281-insufficient-storage]] (`10028`, `10047`) · [[s-nats-server-snapshot-restore]]
 (`10060`, `10064`, `10130`) · [[s-docs-advanced-publishing]] (the eleven `JSAtomicPublish*` and
-`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]]
+`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Leafnode
@@ -315,6 +315,56 @@ Needs the system account. `Spoke` is a property of **where you ran the command**
 (source: [[s-docs-putting-it-together]]). `/leafz` is the HTTP equivalent — see
 [[monitoring-endpoints]].
 
+## Version notes: the 2.10 line
+
+- **Compression is since 2.10.0**, "where the default now is `s2_auto` to compress relative to the
+  RTT of the hub" (#4167, #4230); the S2 writer concurrency was set to 1 in 2.10.2 (#4570) (source:
+  [[s-relnotes-2.10]]).
+- `handshake_first` on a remote — 2.10.0 (#4119); remotes from the same server may bind the same hub
+  account — 2.10.0 (#4259); reconnect jitter — 2.10.0 (#4398); `first_info_timeout` — **2.10.26**
+  (#5424, "connection may fail on slow link"); leafnode authorization accepts nkeys — 2.10.8 (#4940).
+- Behaviour: 2.10.12 fixes loop detection on daisy-chained leafnodes (#5126); **2.10.19 rejects a
+  leafnode whose cluster name contains spaces** (#5732); 2.10.22 and 2.10.23 load-balance queue groups
+  over leafnode connections (#5982, #6043); 2.10.25 fixes interest propagation when the hub user has
+  subscribe permission on a literal subject (#6291) and queue interest dropped over gateways after a
+  leafnode drop (#6377); 2.10.26 authenticates leafnode credentials through auth callout (#6492).
+  The duplicate-delivery fixes are on [[duplicate-messages-across-a-leafnode]].
+
+
+### The 2.11 line
+
+- **2.11.0**: `handshake_first` on the leafnode listener accepts a duration (#5783) — the fallback
+  form; see [[tls-in-nats]] and `inbox/docs-issues.md` #55 (source: [[s-relnotes-2.11]]).
+- **2.11.5**: leafnodes with restrictive permissions route replies correctly when the request came
+  from a supercluster (#6931); sourcing resyncs faster after a connection failure (#6981).
+  **2.11.9**: subject interest propagated when daisy-chaining imports and exports (#7255) and no
+  longer lost on a spoke (#7259); mirroring and sourcing speed up after a reconnect (#7265).
+- **Security, 2026**: **CVE-2026-29785** — "systems with leafnode compression enabled" (2.11.14: a
+  subscription received before compression was negotiated could panic the server);
+  **CVE-2026-33246** (leafnodes and service imports) and **CVE-2026-33218** (2.11.15: a loop-detection
+  error before `CONNECT`, request-info headers for non-shared imports, and a back-off "on receiving a
+  minimum version required error, no longer requiring blocking the readloop", #7970); **2.11.16**:
+  pre-`CONNECT` guards, ACLs "correctly enforced for inbound leaf messages in all cases", duplicate
+  `INFO` permission updates accepted only on solicited connections, **`max_payload` enforced on
+  leafnode connections**; **2.11.17**: a panic negotiating compression fixed.
+
+
+### The 2.12 line
+
+- **2.12.0**: **`leafnodes { isolate_leafnode_interest }`** — "suppressing east-west traffic and
+  reducing subscription overheads when there are many leafnodes" (#7238, #7243, #7277); `disabled` on
+  a remote, reloadable (#7054); **a leafnode without auth no longer lands in the global account**
+  (#7116) (source: [[s-relnotes-2.12]]).
+- **2.12.1**: `leafnodes { write_deadline }` (#7405); WebSocket leafnodes through an HTTP proxy
+  (`remotes [ { proxy { url, username, password, timeout } } ]`, #7242) — plain leafnodes through
+  HTTP CONNECT from 2.12.6 (#7781). **2.12.2**: a regression parsing token authentication in
+  leafnode URLs fixed (#7452); proxy validation (#7444). **2.12.5**: a crash when a leafnode with
+  bad credentials went through auth callout (#7844). **2.12.7**: a panic on connect when an account
+  fails to resolve (#7991). **2.12.8**: solicited leafnodes send the connect advisory they lacked
+  (#8015). **2.12.9**: no compression negotiation over already-compressed WebSockets (#7969); lock
+  contention between leafnodes and clients (#8139, #8159).
+
+
 ## Related
 
 [[gateway]] · [[choosing-a-topology]] · [[jetstream-domain]] · [[account]] ·
@@ -330,7 +380,7 @@ Needs the system account. `Spoke` is a property of **where you ran the command**
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]] ·
 [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
 
 ## To verify
 

@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [direct-get, allow_direct, mirror_direct, last_by_subj, multi_last, batch, EOB]
 aliases: [direct get, allow_direct, "$JS.API.DIRECT.GET", direct read, mirror_direct]
-sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store, s-synadia-reliable-delivery-dlq]
+sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store, s-synadia-reliable-delivery-dlq, s-relnotes-2.11]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Direct Get
@@ -178,6 +178,17 @@ with `last_by_subj` — is explicitly marked as supported **for legacy buckets o
 cannot happen to a conforming bucket, and the *"a direct read can be stale"* one always applies to
 one.
 
+## Version notes: the 2.11 patches
+
+Multi-get arrived in **2.11.0** ("Multi-get directly from a stream (#5107)", ADR-31) (source:
+[[s-relnotes-2.11]]). Afterwards: **2.11.4** stopped direct gets returning messages incorrectly
+"with `up_to_time` or `start_time` in some configurations" (#6911) and fixed a deadlock on
+`multi_last` (#6899); **2.11.10** made a request whose starting sequence is itself deleted skip
+over it (#7291) and moved `start_time` lookups to a binary search (#7357), which **2.11.12** taught
+to handle deleted messages (#7751); **2.11.2** gave subject delete markers the correct headers on a
+direct get (#6826).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[key-value]] · [[object-store]] · [[mirrors-and-sources]] ·
@@ -187,4 +198,4 @@ one.
 
 [[s-docs-get-direct]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-and-sources]] ·
 [[s-docs-kv-under-the-hood]] · [[s-synadia-jetstream-anti-patterns]] ·
-[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]] · [[s-synadia-reliable-delivery-dlq]]
+[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]] · [[s-synadia-reliable-delivery-dlq]] · [[s-relnotes-2.11]]

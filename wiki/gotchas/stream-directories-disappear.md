@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [filestore, store_dir, tmpfs, ram-disk, tmpreaper, msg-block, kubernetes]
 aliases: ["error opening msg block file", "no such file or directory", "JetStream failed to store a msg", "missing stream directories", "tmpfs store_dir"]
-sources: [s-gh-5924-filestore-dirs-vanished, s-nats-server-jetstream-resources, s-docs-hardening, s-gh-7749-hostpath-jetstream]
+sources: [s-gh-5924-filestore-dirs-vanished, s-nats-server-jetstream-resources, s-docs-hardening, s-gh-7749-hostpath-jetstream, s-relnotes-2.10]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # Stream directories disappear from `store_dir`
@@ -130,6 +130,15 @@ arithmetic) and **not** [[malformed-or-corrupt-message]] (that is a block that e
 parse). The server distinguishes them too: `os.IsNotExist` is filtered out of the critical-write-error
 path and only logs `Resource not found: %v` (`raft.go:5160–5163`).
 
+### Since 2.10.22 the server warns about a temporary store directory
+
+"A warning will now be logged at startup if the JetStream store directory appears to be in a
+temporary folder" (2.10.22, #5935 "Warn if using temp storage for JetStream") (source:
+[[s-relnotes-2.10]]). On 2.10.22 or later that log line is the tmpfs case above announcing itself
+before it bites; the thread this page rests on ran 2.9.14 to 2.10.21, the last release without it.
+2.10.22 also gave the filestore and log files "safer default file permissions".
+
+
 ## Related
 
 [[jetstream-out-of-disk]] · [[malformed-or-corrupt-message]] · [[stream]] ·
@@ -142,4 +151,4 @@ path and only logs `Resource not found: %v` (`raft.go:5160–5163`).
 - [[s-nats-server-jetstream-resources]] — the default `store_dir` and its warning, at v2.14.6.
 - [[s-docs-hardening]] — the deployment shape that assumes a real, persistent store directory.
 - [[s-gh-7749-hostpath-jetstream]] — the same failure asked about in advance, as `hostPath` on
-  Kubernetes.
+  Kubernetes. · [[s-relnotes-2.10]]

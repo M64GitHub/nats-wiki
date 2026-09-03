@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # "Slow Consumer Detected" in the server log
@@ -210,6 +210,37 @@ crashes after 10+ minutes": the route layer had let go, the client connections h
 [[evict-a-sick-server]].
 
 
+## Version notes: what the 2.10 line changed here
+
+- **`no_fast_producer_stall` arrived in 2.10.26** (#6500): "allows disabling the stall gates,
+  instead preferring to drop messages to consumers that would have resulted in a stall". The same
+  release made the stall gate "less penalizing" (#6568, #6579) (source: [[s-relnotes-2.10]]).
+- **`write_deadline` is applied per batch from 2.10.26**: "the configured write deadline is now
+  applied to only the current batch of write vectors (with a maximum of 64MB), making it easier to
+  configure and reason about" (#6471). Before that the deadline covered the whole outbound buffer.
+- 2.10.19 limited the vectors flushed per write "to ensure that very large outbound buffers don't
+  unfairly compete with write deadlines" (#5750), and fixed slow consumers leaving subscription
+  interest behind after the connection closed (#5754).
+- `slow_consumer_stats` in `/varz` is since 2.10.0 (#4330).
+
+
+### The 2.11 line: `write_timeout`
+
+**2.11.11** added `write_timeout` "for clients, routes, gateways and leafnodes which controls the
+behaviour on reaching the `write_deadline`, values can be `default`, `retry` or `close`" (the body
+cites #7513, a cherry-pick PR) (source: [[s-relnotes-2.11]]). The config reference documents it at
+the top level and under `cluster`, `gateway` and `leafnodes`, default `default`: `close` drops the
+connection, `retry` keeps trying. Before 2.11.11 the only behaviour was the one this page describes.
+
+
+### The 2.12 line: `write_deadline` per connection type
+
+**2.12.1** added `write_deadline` to the `cluster`, `leafnodes` and `gateway` blocks, "allow[ing]
+configuring write deadlines on a finger-grained basis" (#7405; the config reference gives `10s` for
+each) (source: [[s-relnotes-2.12]]). Before it the top-level `write_deadline` governed every
+connection type; `write_timeout` (2.11.11 / 2.12.2) chooses what happens when it is missed.
+
+
 ## Related
 
 [[consumer]] · [[monitoring-endpoints]] · [[nats-cli]] · [[jetstream-sizing]] ·
@@ -221,4 +252,4 @@ crashes after 10+ minutes": the route layer had let go, the client connections h
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]]
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

@@ -3748,3 +3748,192 @@ the 30 posed rows (21 → URL, 9 recorded as not found), 21 new bank rows. Bank 
 158**, `own` 30 → 9, pages 310 (no page written — this phase was bookkeeping by design), wanted 0,
 drift 0, unlanded 0, unverified 12, docs issues 53, server issues 3. Phase C's *done when* holds;
 phase D (the change layer) is next.
+
+## 2026-09-03 — every release body into `raw/release-notes/` (phase D, step 1)
+
+Phase D opened with `inbox/plan-change-layer-2026-09-03.md` (nine steps: the archive into `raw/`, a
+release TOC, four per-minor ingests plus the 2.15 preview, a `since:` sweep over the 55 reader pages
+that have none, the default diff per minor with `check-defaults.py --tag`, close). Step 1: a new tool,
+`tools/triage-releases.py --fetch`, paged `repos/nats-io/nats-server/releases?per_page=100` (three
+pages, 291 releases) into `local/scratch/releases/`, and wrote **59 release bodies** — every
+non-prerelease tag from v2.10.0 up that was not yet there (27 of 2.10, 16 of 2.11, 15 of 2.12,
+including the two `-binary` tags of CVE-2025-30215) plus `v2.15.0-preview.1` by name — in the form of
+the 11 files written by hand since 2026-08-31 (provenance line, `# Release <tag> — published <date>`,
+the body with CRLF normalised). Those 11 were left untouched and still match the archive; the live
+fetch matched the 2026-09-02 cache on every tag, body and date. **70 bodies in all.** The 129 RC and
+preview bodies were deliberately not written (each GA body is the consolidated changelog of its RCs;
+`_tags-and-dates.md` has their tags and dates) — said in the tool's docstring and the manifest row.
+`raw/sources.md` extended; README and the `CLAUDE.md` Map name the tool; the scratch index row marks
+the cache promoted. The same run built `inbox/relnotes-toc.md` (70 rows, 28 ★) — step 2 registers and
+tunes it. Lint clean: 310 pages, wanted 0, drift 0, unlanded 0, unverified 12.
+
+## 2026-09-03 — `inbox/relnotes-toc.md` in the viewer (phase D, step 2)
+
+*Operation: triage.* `tools/triage-releases.py` (without `--fetch`) reads the 70 bodies in
+`raw/release-notes/` into a table — tag, minor, published, Go version, changelog items, flags, file,
+summary — registered in `wiki.json` → `tocs` (nav *Releases*, collection `release-notes`, filters ★,
+added, changed, cve, downgrade, warning, default, cited) and rendering with 70 rows, each tag linking
+to its raw body. Flags are the bodies' own sections and admonitions. Two defects fixed on the first
+look: `v2.14.0` had no date because its hand-written header (2026-08-31) predates the `— published`
+form — the tool now falls back to `_tags-and-dates.md`, the raw file is untouched; and `downgrade`
+matched "downgraded to QoS0" in the MQTT fix line of v2.12.14 and v2.14.4 — the noun form only now.
+**★ rule as proposed, 26 of 70** (changed, removed, downgrade, withdrawn, warning, cve, or the first of a
+minor), no tightening needed: 2.10 10 ★ (662 items, 77 KB), 2.11 8 (434, 55 KB), 2.12 5 (509, 61 KB),
+2.14 2 (220, 26 KB), 2.15 preview 1. Other counts: 29 `added`, 6 `changed`, 2 `removed`, 12 `cve` (none
+in the 2.14 line), 5 `downgrade`, 5 `warning`, 2 `withdrawn` (v2.10.28 and v2.11.2, "upgrade to …
+instead"), 2 `binary` (CVE-2025-30215 as binaries a week before v2.10.27 / v2.11.1), 37 `cited` by a
+wiki page, 7 with a summary (the per-patch summaries, matched through their `aliases`). One line to
+carry into step 5 already: the v2.12.5 body warns that a stream update "may result in the loss of
+consumers in clustered deployments", mitigated by `meta_compact_sync: true` — a data-loss note the wiki
+does not have. Reading order for steps 3–6 is the table's: 2.10 first, largest. Lint clean.
+
+## 2026-09-03 — ingest: the 2.10 line, v2.10.0 → v2.10.29 (phase D, step 3)
+
+The 29 release bodies of 2.10 read end to end as one changelog into `s-relnotes-2.10` — per-release
+table, then the change layer by kind: defaults and intervals that moved (leafnode compression
+`s2_auto`, `statsz` 30 s → 10 s in 2.10.21, the API queue limit in 2.10.21, `write_deadline` per
+64 MB batch in 2.10.26, the 32 MB publish cap in 2.10.28, peer-remove re-admission after five minutes
+in 2.10.28), the keys that arrived with their PRs (`auth_callout`, `logfile_max_num`,
+`sync_interval`, `prof_block_rate`, `tls.certs`, `tls.min_version`, `cluster.ping_interval`,
+`no_fast_producer_stall`, `first_info_timeout`, the Windows cert-store keys), the subjects and
+endpoints (`$SYS.REQ.SERVER.<id>.RELOAD`/`KICK`/`LDM`, `PING.IDZ`, `/expvarz`, `/raftz`), the
+"now"/"no longer" lines, the withdrawn and warned releases (2.10.16's zero-byte `tav.idx`, the
+2.10.19 → 2.10.20 KV CAS regression, 2.10.19 → 2.10.22 start-sequence clipping, 2.10.28 withdrawn),
+a data-integrity table by release for rows 64 and 130, and the three CVEs. Two threads fetched and
+summarised on the way: `s-gh-6005-sourcing-memory-stream-restart` (row 154: 2.10.19's #5785 stopped
+clipping source-consumer start sequences, reverted in 2.10.22 by #6014; the same stall reported on
+2.14 with the `AckFlowControl` sourcing consumer on 2026-08-07, answered with #8384 in the 2.15
+preview) and `s-gh-6748-cve-binary-release-docker-images` (row 155: the official image is built by
+Docker's library from a PR the team opens; `-binary` images within the day, Alpine variants after
+2025-04-08). Row 150 settled from the notes: a service import with no interest returns "no
+responders" **since 2.10.26** (#6532), which is why the older maintainer answer on gh#4761 says the
+opposite.
+
+**Corrections.** The wiki said the per-subject index has been a subject tree "since 2.10.9" (a
+maintainer's words in gh#5202, repeated on `nats-server-2.10`, `jetstream-sizing`,
+`filestore-layout`). The source tree says **2.10.10**: `server/stree/` is absent at v2.10.9,
+`fileStore.psim` is `map[string]*psi` there and `*stree.SubjectTree[psi]` at v2.10.10, the oldest
+commit on the package is #4960 (2024-01-20), listed in the 2.10.10 body. Evidence with lines in
+`raw/nats-server-src/stree-arrival-v2.10.10.md`; the three pages corrected, the summary of gh#5202
+given a correction note. Also noted: the 2.10.0 body misspells `sync_interval` as `sync_internal`,
+and the 2.10.22 "safer default file permissions" line cites the release PR (#6013) rather than a
+change.
+
+**Docs issue #54** (`missing`, medium): the four system-account requests the v2.10.0 notes announce —
+`$SYS.REQ.SERVER.<id>.RELOAD`, `.KICK`, `.LDM`, `$SYS.REQ.SERVER.PING.IDZ` — appear nowhere in the
+docs tree; the whole mirror writes out only `PING.VARZ` and `PING.PROFILEZ`, while `server/events.go`
+at v2.14.6 declares all four (lines 62, 63, 68/1268, 70) and fifteen `PING.<Z>` names. The 2.10 upgrade
+guide every body links (`whats_new_210`) now redirects to `/release-notes/` — not filed, since the
+link is in the release bodies, not the docs.
+
+**Ripple: 41 pages.** The release entity rewritten from the bodies (facts, *What v2.10.0 added*,
+*What the patch releases changed*, *Which patch to be on, and why*; its "not a changelog" note gone);
+`mirrors-and-sources` (the restart-empty window), `cross-account-sharing` (no responders since
+2.10.26), `install-nats-server` (a CVE as a binary-only release), `upgrade-a-cluster` (*The 2.10
+line* under version hazards), `evict-a-sick-server`, `reload-server-config` (reload over the system
+account), `stream-has-high-message-lag`, `nats-server-2.15-preview` (#8384), `nats-server-2.11`;
+version notes on `stream`, `consumer`, `ack-and-redelivery`, `retention-policies`, `key-value`,
+`account`, `auth-callout`, `tls-in-nats` (a since-table of keys), `leafnode`, `mqtt`,
+`subject-transforms`, `monitoring-endpoints` (*What arrived in 2.10*), `meta-layer`, `raft-in-nats`,
+`js-api`, `advisories`, `filestore-layout`, `jetstream-sizing`, `defaults-and-limits` (*Defaults
+that moved during 2.10*), `config-keys` (*Keys that arrived during 2.10*), `stream-placement`, the
+gotchas `stream-directories-disappear`, `maximum-messages-exceeded`, `slow-consumer-detected`,
+`jetstream-slows-as-consumers-grow`, `jetstream-out-of-disk`, `duplicate-messages-across-a-leafnode`
+(a five-fix table, and its *To verify* claim that the notes describe no change struck),
+`jetstream-recovery-is-slow`, `consumer-keeps-redelivering` (*The 2.10 patch trail*), `worker-pool`,
+`error-codes`. Manifest rows for the threads and the evidence file; index lines for the three
+summaries. Bank: rows 150, 154, 155 filled — **116 → 119 / 158**. Unlanded ripples 46 (after the
+summaries were written) → 0; lint clean, 313 pages, drift 0.
+
+## 2026-09-03 — ingest: the 2.11 line, v2.11.0 → v2.11.17 (phase D, step 4)
+
+The 18 release bodies of 2.11 read as one changelog into `s-relnotes-2.11`: what 2.11.0 added
+(per-message TTL and delete markers, priority groups, consumer pause, multi-get, message tracing,
+the config digest, ingest rate limiting with its `429`, `cluster_traffic`, `strict`, pedantic mode,
+`preferred` on stepdown; acks on clustered interest and WorkQueue streams proposed through Raft;
+SIGTERM exits 0), then the change layer by kind — the defaults and behaviours that moved (a new
+leader answers only when up to date, updates refused with every peer offline in 2.11.4, monotonic
+Raft time in 2.11.5, the offline-assets floor in 2.11.9, parallel stream loading and `write_timeout`
+and `meta_compact` in 2.11.11, the interest-switch head removal and the Raft membership batch in
+2.11.12, the 1 MB JWT limit in 2.11.15, `no_auth_user` client-only in 2.11.16), the withdrawn 2.11.2,
+the 2.11.0 → 2.11.6 filtered-consumer throughput regression, the 2.11.9 → 2.11.10 meta snapshot
+regression, a data-integrity table by release, and the twelve CVEs of 2.11.14–2.11.16 (2.11.16's CVE
+line reads `TBD`). The release entity rewritten from the bodies (facts, *What v2.11.0 added*, the
+patch table, *Which patch to be on*), its "release body not ingested" item closed.
+
+**Docs issues #55–#57, and #22 extended.** #55 — the generated reference types the leafnode
+listener's `handshake_first` as `boolean`; since 2.11.0 (#5783) it accepts the duration and `auto`
+forms like every other TLS block (`opts.go` 5309–5331 and 2888–2889 at v2.14.6; the remote keeps only
+the boolean, 3157, so its page is right). #56 — the per-account `jetstream { cluster_traffic: owner }`
+option (2.11.0, parsed in `parseJetStreamForAccount`, `opts.go` 2451–2463, values `system` | `owner`)
+and its `traffic_account` / `system_account` reporting fields are documented nowhere. #57 —
+`config_digest` (2.11.0), `tls_cert_not_after` (2.11.12) and `leader_since` (2.11.9) appear on no docs
+page (`monitor.go` 1283, 1296, 4208; `stream.go` 375). #22 gains the description finding: the docs
+call `max_buffered_msgs` a buffer "for a stream whose storage is temporarily unavailable"; the body
+and `stream.queueInbound` (`stream.go` 5768–5783) describe ingest-rate limiting with a `429 Too Many
+Requests` reply. Two typos in the bodies noted, not filed: `ping_internal` (2.11.12) for
+`websocket { ping_interval }`, and "400 No Messages" (2.11.11) for the `404` the server sends
+(`consumer.go` 4678, 5024). PR #4119 is listed by both 2.10.0 and 2.11.0 — the boolean is 2.10.0's,
+the duration 2.11.0's (#5783). The docs' 2.11 upgrade guide, linked from every body, redirects to
+`/release-notes/`.
+
+**Ripple: 39 pages.** `upgrade-a-cluster` (*The 2.11 line* under version hazards), `message-ttl`
+(the patch trail from #6741 to #7385), `priority-groups`, `direct-get`, `consumer` (pause, #6253,
+the 2.11.6 regression, #7691), `stream` (ingest rate limiting, #6856, #7766), `retention-policies`,
+`key-value`, `mirrors-and-sources`, `js-api`, `js-api-subjects` (`$JS.API.CONSUMER.PAUSE` since
+2.11.0), `raft-in-nats`, `meta-layer`, `replicas` (`cluster_traffic`), `evict-a-sick-server`,
+`monitoring-endpoints` (*What arrived in 2.11*), `tls-in-nats`, `leafnode`, `websocket`, `mqtt`,
+`account`, `subject-permissions`, `operator-mode`, `auth-callout`, `cross-account-sharing`,
+`slow-consumer-detected` (`write_timeout`), `jetstream-slows-as-consumers-grow` (the 2.11.0–2.11.5
+regression), `jetstream-recovery-is-slow`, `filestore-layout`, `consumer-keeps-redelivering`,
+`jetstream-out-of-disk`, `install-nats-server` (SIGTERM exit 0), `reload-server-config` (the config
+digest), `config-keys`, `defaults-and-limits`, `error-codes`, `stream-placement`, `advisories`,
+`nats-server-2.12` (the same-day 2.11/2.12 patches; #7158's 2.11.9 half). Index line. Bank unchanged
+at 119 / 158 (row 71 now cites the body through `message-ttl`). Unlanded ripples 0; lint clean, 314
+pages, drift 0.
+
+## 2026-09-03 — ingest: the 2.12 line, v2.12.0 → v2.12.15 (phase D, step 5)
+
+The 15 release bodies of 2.12 read as one changelog into `s-relnotes-2.12`, and — the one line with a
+docs upgrade guide — checked line by line against `s-docs-upgrade-to-2.12`: every feature the guide
+lists is in the v2.12.0 body except "system events for `$G`" (in no body; unverified either way) and
+"`GOMAXPROCS` and `GOMEMLIMIT` in server stats", which the bodies date to 2.10.28 / 2.11.2 (#6791,
+merged 2025-04-11) → **docs issue #58**. The guide omits the API level 2, the `max_buffered_msgs` ×10
+(#6633 — the docs still print the 2.11 default; #22 extended with the history), the TCP-keepalive
+change, trusted proxies, `Nats-Required-Api-Level`, the `Nats-Subject` header, and everything after
+2.12.0. Two more gaps verified in the v2.14.6 source: **#59** `jetstream { max_concurrent_io }`
+(2.12.14 / 2.14.4, #8336; `dios.go` default 4096, bounds 4–8192; `opts.go` 2789–2794) documented
+nowhere, and **#60** the `proxies { trusted [ … ] }` block of ADR-55 (2.12.0, #7153; `parseProxies`
+at `opts.go:5720`) documented nowhere while `proxy_required` and the `Proxy is not trusted` error
+are. #57 extended with the `in_client_*` counters (2.12.9 / 2.14.1) and the snapshot `window_size`
+(2.12.5), both absent from the docs. The change layer: defaults that moved in 2.12.0 (API level 2,
+strict on, async flush on, `max_buffered_msgs` ×10, keepalives off, insecure ciphers off, weak-pointer
+caches, empty-vote protection), the keys and headers that arrived (atomic batch, counters,
+`prioritized`, trusted proxies, mirror promotion, single-message scheduling, `Nats-Required-Api-Level`,
+`server_metadata`, `isolate_leafnode_interest`, `disabled` remotes, `Nats-Subject` on no-responders;
+per-block `write_deadline` and the leafnode HTTP proxy in 2.12.1; the PROXY protocol in 2.12.2;
+`meta_compact_sync` and `max_consumers` updates and `max_conns: 0` in 2.12.5; reloadable
+`max_mem_store`/`max_file_store` in 2.12.7; `in_client_*` in 2.12.9; `max_concurrent_io` in 2.12.14),
+the three hazards (**2.12.5's warning** — a stream update could lose a cluster's consumers, mitigation
+`meta_compact_sync: true`, fixed 2.12.6 #7939; **2.12.7 → 2.12.11** stale subject state and `Message
+Not Found` with `max_msgs_per_subject`, "v2.14.x not affected"; **2.12.15**'s idempotent-create data
+loss fix #8449), the 2.12.12 corruption fixes (counter running total #8311, compaction of compressed
+or encrypted blocks #8312), the 2.12.14 authentication bypasses (`verify_and_map` with blank
+passwords; `no_auth_user` with auth callout), and the same-day twins (2.12.2–2.12.8 with 2.11.11–17,
+2.12.9–2.12.15 with 2.14.1–2.14.5). The release entity rewritten from the bodies (facts, the patch
+table, *Which patch to be on*, *The docs' upgrade guide against the bodies*).
+
+**Ripple: 40 pages.** `upgrade-a-cluster` (*The 2.12 line*), `publishing` (atomic batch patches,
+`Nats-Required-Api-Level`, counters), `message-scheduling`, `priority-groups`, `stream`, `consumer`,
+`retention-policies`, `key-value` (2.12.7–2.12.10 unsafe for buckets), `mirrors-and-sources`,
+`js-api`, `raft-in-nats`, `meta-layer` (async snapshots and the warning), `replicas`,
+`monitoring-endpoints` (*What arrived in 2.12*), `tls-in-nats`, `leafnode`, `websocket`, `mqtt`,
+`account`, `subject-permissions`, `auth-callout`, `cross-account-sharing`, `run-nats-behind-a-proxy`
+(trusted proxies, PROXY protocol, HTTP proxies), `slow-consumer-detected`, `jetstream-sizing`
+(`max_concurrent_io`, the cardinality threshold, the limits accounting fix), `filestore-layout`,
+`jetstream-recovery-is-slow`, `jetstream-out-of-disk`, `consumer-keeps-redelivering`,
+`backup-and-restore-jetstream`, `evict-a-sick-server`, `reload-server-config`, `install-nats-server`,
+`unauthenticated-clients-still-connect`, `config-keys`, `defaults-and-limits`, `error-codes`,
+`subject-transforms`, `nats-server-2.14` (the 2.12 twins); the 2.11 summary's forward link to the
+2.12 summary restored; index line. Bank unchanged at 119 / 158. Unlanded 0; lint clean, 315 pages,
+drift 0. Docs issues 53 → 60 over steps 3–5.

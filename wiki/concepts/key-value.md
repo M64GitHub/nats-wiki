@@ -6,9 +6,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [kv, bucket, tombstone, watch, direct-get]
 aliases: [KV, key value, KV bucket, KV_]
-sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-object-store-watching-and-listing, s-docs-object-store-metadata-and-links, s-adr-20-object-store, s-adr-31-direct-get, s-docs-get-direct, s-docs-mirrors-and-sources, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-relnotes-2.14.4]
+sources: [s-gh-6746-watch-many-keys, s-gh-5243-kv-watchers-at-scale, s-adr-8-key-value-store, s-adr-43-per-message-ttl, s-adr-17-ordered-consumer, s-docs-stream-config, s-gh-7017-kv-across-accounts, s-gh-5606-cross-account-jetstream, s-adr-48-kv-ttl, s-adr-57-kv-subject-transforms, s-adr-54-kv-codecs, s-nats-server-filestore-layout, s-docs-kv-under-the-hood, s-docs-kv-watching, s-docs-kv-history-and-revisions, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-object-store-watching-and-listing, s-docs-object-store-metadata-and-links, s-adr-20-object-store, s-adr-31-direct-get, s-docs-get-direct, s-docs-mirrors-and-sources, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-relnotes-2.14.4, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Key-Value
@@ -537,6 +537,42 @@ See [[jetstream-domain]] and [[streams-not-visible-across-a-leafnode]].
 | **2.10.0** | sourced buckets, read-replica mirror buckets, compression, bucket metadata |
 | **2.11.0** | max-age limit markers, per-key TTL; non-direct gets removed from the spec |
 
+### The 2.10 line
+
+- 2.10.0's largest JetStream item is a KV item: "significant optimisations and reduced memory impact
+  for replicated streams with a large number of interior deletes (common in large KVs)" (#4070,
+  #4071, #4075, #4284, #4520, #4553) (source: [[s-relnotes-2.10]]).
+- **2.10.3** fixed "Stream / KV lookups fail after decreasing history size" (#4656) — lowering
+  `max_msgs_per_subject` on a live bucket was unsafe before it.
+- **2.10.19 broke compare-and-swap on R1 buckets; 2.10.20 fixed it** ("Fix regression in KV CAS
+  operations on R=1 replicas introduced in v2.10.19", #5841).
+- 2.10.5: "resiliency when doing lots of conditional updates to a KV and restarting servers" (#4764);
+  2.10.28: purge performance "particularly for KV `PurgeDeletes` calls" (#6801).
+
+
+### The 2.11 line
+
+- **2.11.0** fixed "issues where KV creates/updates to a key during leader changes could desync the
+  stream" — a new leader now answers only once up to date with its Raft log (#6194, #6485, #6518)
+  (source: [[s-relnotes-2.11]]). Per-key TTL and limit markers ride on the same release's
+  per-message TTL ([[message-ttl]]).
+- **2.11.2**: KV `PurgeDeletes` faster (#6801, #6825 — the 2.10.28 backport); delete markers placed
+  for TTL expiry (#6741). **2.11.7**: a purge with markers configured no longer leaves "a redundant
+  extra delete marker" (#7026).
+
+
+### The 2.12 line
+
+- **2.12.7 – 2.12.10 are unsafe for buckets**: every KV bucket sets `max_msgs_per_subject`, and
+  those releases carry "stale subject state tracking which could manifest in `Message Not Found`
+  errors when a max messages per subject limit is configured" — fixed in 2.12.11 (#8285), never
+  present on 2.14 (source: [[s-relnotes-2.12]]).
+- **2.12.10**: the per-subject state's last block stored correctly with a limit of 1 (#8254);
+  purges consistent between file and memory stores (#8241). **2.12.12**: `MultiLastSeqs` no longer
+  reorders the configured subjects (#8315); the memory store no longer overcounts pending for
+  `last_per_subject` (#8313).
+
+
 ## To verify
 
 - ~~**Why a KV watcher would *miss* updates**~~ — **answered, and the answer is client-side.** The
@@ -593,4 +629,4 @@ See [[filestore-layout]] for the mechanism and [[jetstream-sizing]] for sizing a
 [[s-docs-object-store-watching-and-listing]] · [[s-docs-object-store-metadata-and-links]] ·
 [[s-adr-20-object-store]] · [[s-adr-31-direct-get]] · [[s-docs-get-direct]] ·
 [[s-docs-mirrors-and-sources]] · [[s-gh-6328-jetstream-behind-gateways]] ·
-[[s-nats-server-leafnode-js-domains]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-relnotes-2.14.4]]
+[[s-nats-server-leafnode-js-domains]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-relnotes-2.14.4]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

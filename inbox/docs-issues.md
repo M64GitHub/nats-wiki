@@ -113,6 +113,13 @@ row.
 | 51 | ADR-57 §*Mirror Configuration* says a KV mirror gets `MirrorDirect` and a `KV_` prefix and thereby "Support[s] direct reads via the Direct GET API", but never says which subjects a client reads a mirror bucket at. The reference client reads a **same-domain** mirror at `$KV.<mirror>.>` (which the mirror does not hold — `nats kv ls M` prints `No keys found in bucket`) and a **cross-domain** mirror at `$KV.<origin>.>` (nats.go `jetstream/kv.go:1610–1618`, v1.53.1). Observed on 2.14.6: same-domain `kv get` → `key not found`, cross-domain `kv get` → the value | `raw/adr/ADR-57.md` lines 19–40 (§ *Mirror Configuration*) | ADR repo | missing | low | not filed | wiki: *Reading a mirror* on `key-value`; the asymmetry on `nats-go` |
 | 52 | The sizing chapter's *Memory* paragraph says memory "holds connections, subscriptions, and (for memory-storage streams) message data" and that a file-storage stream's "messages live on disk, not in RAM" — and never mentions the per-subject index, which is in RAM for every file-backed stream (one entry per distinct subject, a few hundred bytes each; ~380 B measured), nor that a restart reads the whole stream after an unclean stop, nor that above 1,000,000 subjects the periodic `index.db` is not written. Nothing in the 861-page tree names `index.db`, the subject index, or the `Restored N messages … in` line | `learn/deployment/sizing-and-resources.md` line 16 (§ *The four resources a node spends*, **Memory**); the whole tree for the absent terms | nats-docs | missing | medium | not filed | wiki: *Subjects are a RAM term* on `jetstream-sizing`; *Recovery at startup* on `filestore-layout`; the gotcha `jetstream-recovery-is-slow` |
 | 53 | `concepts/subjects.md` § *Performance Considerations*: "**Subjects are essentially free**: Creating new subjects has virtually no overhead - NATS efficiently handles millions of unique subjects." True for core NATS routing, which the sentence is about; read from JetStream — the page is the only place the docs discuss subject count at all — it is the opposite of the sizing rule a stream needs, and the docs never say the JetStream side differs | `concepts/subjects.md` line 1108 | nats-docs | enhancement | low | not filed | wiki: *Subjects are a RAM term* on `jetstream-sizing` |
+| 54 | The v2.10.0 release notes announce four system-account requests — `$SYS.REQ.SERVER.<id>.RELOAD` (reload the config by message, #4307), `$SYS.REQ.SERVER.<id>.KICK` and `.LDM` (disconnect or lame-duck one client by id or name, #4298), `$SYS.REQ.SERVER.PING.IDZ` (basic server info, #3663) — and the docs tree never names any of them; across `learn/` and `reference/system/` the only `$SYS.REQ.SERVER` subjects written out are `PING.VARZ` and `PING.PROFILEZ`. The config-management chapter describes SIGHUP and `nats-server --signal reload` only | `learn/deployment/config-management.md`; `reference/system/monitor.md` | nats-docs | missing | medium | not filed | wiki: `reload-server-config` § *system account*, `evict-a-sick-server`, `monitoring-endpoints` |
+| 55 | `reference/config/leafnodes/tls/handshake_first.md` types the leafnode listener's `handshake_first` as `boolean` (`true`, `false`) and describes only the forced form. Since 2.11.0 the leafnode listener accepts what `tls.handshake_first` accepts — `true`/`on`, `false`/`off`, `auto`/`auto_fallback`, or a duration that becomes the fallback delay — because every TLS block is parsed by the same `parseTLS`, and `parseLeafNodes` copies both `HandshakeFirst` and `FallbackDelay` into the listener options. Six sibling pages are typed `boolean`/`string`; the leafnode listener's is the odd one out (the remote's `boolean` is right in effect: the delay is discarded) | `reference/config/leafnodes/tls/handshake_first.md` | nats-docs | wrong-value | low | not filed | wiki: `tls-in-nats` § *which key arrived when*, `leafnode` |
+| 56 | The per-account `jetstream { cluster_traffic: owner }` option — Raft traffic for that account's assets carried in the account instead of the system account, added in v2.11.0 (#5466, #5947) — is documented nowhere: no generated page under `reference/config/accounts/`, no mention in `learn/`, and the `traffic_account` / `system_account` fields that report it (stream and consumer info, `/jsz`, `/raftz`, since 2.11.9) are equally absent | `reference/config/accounts/…/jetstream/` (no page); `reference/system/monitor.md` | nats-docs | missing | medium | not filed | wiki: `replicas` § *Version notes*, `monitoring-endpoints` § *What arrived in 2.11* |
+| 57 | Three monitoring fields the 2.11 line added are named nowhere in the docs tree: `config_digest` in `/varz` (2.11.0, #4325, the hash `nats-server -t` prints), `tls_cert_not_after` in `/varz` and the per-connection-type blocks (2.11.12, #7709), and `leader_since` in stream and consumer info and `/jsz` (2.11.9, #7189). The `/varz` reference page is generated and still omits them | `reference/system/monitor.md` (varz, jsz) | nats-docs | missing | low | not filed | wiki: `monitoring-endpoints` § *What arrived in 2.11*, `tls-in-nats` |
+| 58 | `release-notes/upgrade-to-2.12.md` lists "`GOMAXPROCS` and `GOMEMLIMIT` in server stats" among what is new in 2.12 ("now also contains the effective Go limits"). The change shipped in **v2.10.28 and v2.11.2** (2025-04-25) — both bodies: "`GOMAXPROCS` and `GOMEMLIMIT` are now reported in both `statsz` and `varz` (#6791)", PR merged 2025-04-11 — five months before v2.12.0 | `release-notes/upgrade-to-2.12.md` line 44 | nats-docs | wrong-value | low | not filed | wiki: `nats-server-2.12` § *The docs' upgrade guide against the bodies* (via `s-relnotes-2.12`), `monitoring-endpoints` |
+| 59 | `jetstream { max_concurrent_io }` — the size of the server-wide disk I/O semaphore, added in v2.12.14 / v2.14.4 (#8336) when the default rose from a CPU-scaled count to **4096** — has no page in the generated `reference/config/jetstream/` tree and no mention anywhere else; the server bounds it to 4 – 8192 | `reference/config/jetstream/` (no page) | nats-docs | missing | medium | not filed | wiki: `jetstream-sizing` § *Version notes: the 2.12 line*, `filestore-layout` |
+| 60 | The `proxies { trusted [ … ] }` block — ADR-55 trusted proxies, v2.12.0 (#7153): "enforcing that connections arrive via a NATS protocol-aware proxy" — is documented nowhere; the generated reference has `proxy_protocol` and `authorization { proxy_required }`, and `reference/system/errors.md` names the `Proxy is not trusted` error "from a proxy not in the list of trusted proxies", but no page says how that list is configured | `reference/config/` (no `proxies` page); `reference/system/errors.md` line 11 | nats-docs | missing | medium | not filed | wiki: `run-nats-behind-a-proxy` § *Version notes: the 2.12 line* |
 
 ---
 
@@ -1001,6 +1008,27 @@ report disk size" — correct the three numeric defaults, state that `info_queue
 `request_queue_limit`, note that an explicit `0` disables the storage class, and add the maintainers'
 production guidance to `learn/deployment/sizing-and-resources.md`, which already has the arithmetic
 right.
+
+**Added 2026-09-03 — the description, not only the default.** The generated page says
+`max_buffered_msgs` is "Messages the server buffers for a stream whose storage is temporarily
+unavailable, before it starts discarding" and `max_buffered_size` is "Byte ceiling for that same
+buffer". The v2.11.0 release body, which introduced both, says the opposite of "storage unavailable":
+"Stream ingest rate limiting (#5796) — New `max_buffered_size` and `max_buffered_msgs` options in the
+`jetstream` block of the server config control how many publishes should be queued before
+rate-limiting, making it easier to protect the system against Core NATS publishes into JetStream —
+Where a reply subject is provided, rate-limited messages will receive a 429 "Too Many Requests"
+response and can retry later". The server agrees with the body: the values size the stream's inbound
+queue (`stream.go:900–906`), and `queueInbound` (`stream.go:5768–5783`) drops a message the queue
+refuses, logs `Dropping messages due to excessive stream ingest rate on '<account>' > '<stream>'`, and
+answers a reply subject with `NATS/1.0 429 Too Many Requests` and `JSStreamTooManyRequestsError`.
+Nothing about storage being unavailable. Suggested wording: "Publishes queued per stream before the
+server rate-limits with `429 Too Many Requests` (when a reply subject is present) and drops the
+message; default 100,000 messages / 128 MB."
+
+**Added 2026-09-03 — where the 10,000 comes from.** It was the default when the keys arrived in
+v2.11.0 (#5796); v2.12.0's body, *Changed / JetStream*: "The default value for `max_buffered_msgs`
+has been increased by 10x to 100,000 messages (#6633)" (PR "(2.12) Raise max_buffered_msgs defaults
+by 10x", merged 2025-08-28). The generated page carries the pre-2.12 value into the 2.14 docs tree.
 
 
 
@@ -2444,7 +2472,7 @@ and `statsz` were not resolved by the sweep (their handlers parse differently) a
 ```
 
 **Why it happens** is visible in the pages themselves: the schema is generated from the request
-struct (`RaftzOptions{AccountFilter string \`json:"account"\`}`, `monitor.go:3021–3024`), whose tags
+struct (`RaftzOptions{AccountFilter string `json:"account"`}`, `monitor.go:3021–3024`), whose tags
 name the system-request payload, while `HandleRaftz` reads `r.URL.Query().Get("acc")` (`4241`). Both
 interfaces are real; the pages describe one and are titled for the other.
 
@@ -2609,6 +2637,268 @@ either (#52).
 per distinct subject it stores, see *Sizing & resources*" — and the corresponding paragraph in the
 sizing chapter.
 
+## 54 · Four system-account requests from v2.10.0 — `RELOAD`, `KICK`, `LDM`, `PING.IDZ` — are documented nowhere
+
+**Impact: an operator who reads the docs believes a config reload needs a signal to the process
+(or the Kubernetes reloader sidecar), and that a single client can only be disconnected by finding
+its server and killing the connection. The server has offered both as system-account requests since
+2.10.0, and Helm and systemd are not the only environments — an embedded or Windows deployment has
+no SIGHUP.**
+
+**Docs.** `raw/nats-docs/learn/deployment/config-management.md` line 128: "With the config validated,
+trigger the reload. The mechanism is a **SIGHUP** to the `nats-server` process." The chapter goes on
+to the systemd `reload` and the Kubernetes reloader sidecar; the system-account request is not
+mentioned. Sweep of 2026-09-03 over the whole docs mirror (`grep -rhoE '\$SYS\.REQ\.SERVER\.…'
+raw/nats-docs`): the only `$SYS.REQ.SERVER` subjects written anywhere are `$SYS.REQ.SERVER.PING.VARZ`
+(4 pages) and `$SYS.REQ.SERVER.PING.PROFILEZ` (2 pages). `reference/system/monitor.md` and its
+subpages name none.
+
+**Release notes.** The v2.10.0 body (`raw/release-notes/v2.10.0.md`, *Added*): "Reload server config
+by sending a message in the system account to `$SYS.REQ.SERVER.{server-id}.RELOAD` (#4307)"; "Add
+`$SYS.REQ.SERVER.<id>.KICK` NATS endpoint to disconnect a client by `id` or by `name` from the target
+server (#4298)"; "Add `$SYS.REQ.SERVER.<id>.LDM` NATS endpoint that sends a "lame duck mode" message
+to a client by `id` or `name` on the target server (#4298)"; "Add `$SYS.REQ.SERVER.PING.IDZ` NATS
+endpoint for basic server info (#3663)".
+
+**Server, v2.14.6** — `server/events.go`:
+
+```go
+clientKickReqSubj         = "$SYS.REQ.SERVER.%s.KICK"          // line 62
+clientLDMReqSubj          = "$SYS.REQ.SERVER.%s.LDM"           // line 63
+serverPingReqSubj         = "$SYS.REQ.SERVER.PING.%s"          // line 68
+serverReloadReqSubj       = "$SYS.REQ.SERVER.%s.RELOAD"        // line 70, "with server ID"
+```
+
+and the `PING.<Z>` handler table at lines 1268–1315 registers `IDZ`, `STATSZ`, `VARZ`, `SUBSZ`,
+`CONNZ`, `ROUTEZ`, `GATEWAYZ`, `LEAFZ`, `ACCOUNTZ`, `JSZ`, `HEALTHZ`, `PROFILEZ`, `EXPVARZ`,
+`IPQUEUESZ`, `RAFTZ` — fifteen names, of which the docs write two. (The payload and URL-parameter
+mismatch on the reference pages is #48; this row is about the subjects existing at all.) The wiki
+observed `KICK` and `LDM` on the binary in `raw/nats-server-src/kick-ldm-observed-v2.14.6.md`.
+
+**Suggested fix:** one paragraph in *Config management* — "a reload can also be requested over the
+system account: publish to `$SYS.REQ.SERVER.<server-id>.RELOAD`" — and a table on the system
+reference page listing the `$SYS.REQ.SERVER.<id>.<verb>` requests (`RELOAD`, `KICK`, `LDM`, and each
+`<Z>`) with their request bodies, since the server has carried them for three minors.
+
+
+## 55 · The leafnode listener's `handshake_first` takes a duration and `auto` since 2.11.0; the reference types it boolean
+
+**Impact: an operator who wants the fallback behaviour on the leafnode listener — TLS first for
+remotes that support it, the old order after a delay for those that do not — reads the reference and
+concludes the leafnode listener cannot do it, or copies the boolean and loses the fallback.**
+
+**Docs.** `raw/nats-docs/reference/config/leafnodes/tls/handshake_first.md`: "Force the leafnode
+connection to use a TLS-first handshake prior to the remote sending the `INFO` protocol message …
+| `boolean` | - | `true`, `false` |". Against `raw/nats-docs/reference/config/tls/handshake_first.md`:
+"Send the TLS handshake before the `INFO` protocol message rather than after. A duration string
+instead of `true` waits that long for a client that may not support it before falling back. |
+`boolean` … | `string` |".
+
+**Release notes.** v2.11.0 (`raw/release-notes/v2.11.0.md`, *Added / Leafnodes*): "Support for TLS
+First on leafnode connections with the `handshake_first` option (#4119, #5783)". PR #5783 is "(2.11)
+[ADDED] LeafNode: Support for TLS handshake_first duration" (merged 2024-08-13); #4119 is the 2.10.0
+boolean.
+
+**Server, v2.14.6** — `server/opts.go`. Every TLS block goes through `parseTLS` (`parseLeafNodes` calls
+`parseTLS(tk, true)` at line 2875), whose `handshake_first` case (lines 5309–5331) accepts:
+
+```go
+case "handshake_first", "first", "immediate":
+    switch mv := mv.(type) {
+    case bool:
+        tc.HandshakeFirst = mv
+    case string:
+        switch strings.ToLower(mv) {
+        case "true", "on":   tc.HandshakeFirst = true
+        case "false", "off": tc.HandshakeFirst = false
+        case "auto", "auto_fallback":
+            tc.HandshakeFirst = true
+            tc.FallbackDelay = DEFAULT_TLS_HANDSHAKE_FIRST_FALLBACK_DELAY
+        default:
+            if dur, err := time.ParseDuration(mv); err == nil {
+                tc.HandshakeFirst = true
+                tc.FallbackDelay = dur
+                break
+            }
+            return nil, &configErr{tk, fmt.Sprintf("field %q's value %q is invalid", mk, mv)}
+```
+
+and the leafnode listener keeps both values (lines 2888–2889):
+
+```go
+opts.LeafNode.TLSHandshakeFirst = tc.HandshakeFirst
+opts.LeafNode.TLSHandshakeFirstFallback = tc.FallbackDelay
+```
+
+The remote side keeps only the boolean (line 3157, `remote.TLSHandshakeFirst = tc.HandshakeFirst`;
+`RemoteLeafOpts` has no fallback field, line 265), so
+`reference/config/leafnodes/remotes/tls/handshake_first.md` being `boolean` is right in effect.
+
+**Sweep.** Of the eight `handshake_first` pages in the generated reference (`tls`, `cluster.tls`,
+`gateway.tls`, `gateway.gateways.tls`, `mqtt.tls`, `websocket.tls`, `resolver_tls`, and the two
+leafnode ones), six are typed `boolean`/`string`; only the leafnode listener's and the remote's are
+`boolean`. One wrong.
+
+**Suggested fix:** give `leafnodes/tls/handshake_first.md` the same type table and sentence as
+`tls/handshake_first.md`, and say "since 2.11.0" for the duration form.
+
+## 56 · `cluster_traffic: owner` — a v2.11.0 account option with no page anywhere
+
+**Impact: an operator whose system account is a bottleneck for Raft replication traffic — or who
+wants per-account accounting of that traffic — has an option the server has carried since 2.11.0
+and no way to learn of it from the docs.**
+
+**Docs.** No page. `grep -rl cluster_traffic raw/nats-docs/` returns nothing (mirror of 2026-08-31);
+the generated `reference/config/accounts/` tree has no such key; `learn/clustering/` and
+`learn/security/` never mention it. The reporting fields are absent too: `grep -rl traffic_account
+raw/nats-docs/` and `grep -rl 'system_account' raw/nats-docs/reference/system/` find nothing for the
+stream-info field.
+
+**Release notes.** v2.11.0, *Added / JetStream*: "Ability to move cluster Raft traffic into the asset
+account instead of using the system account using the new `cluster_traffic` configuration option
+(#5466, #5947)". v2.11.9, *Improved*: "The `raftz` endpoint now reports the cluster traffic account
+(#7186)"; "The stream info and consumer info endpoints now return `system_account` and
+`traffic_account` (#7193)"; "The `jsz` monitoring endpoint now returns `system_account` and
+`traffic_account` (#7193)". Fixes: 2.11.2 (#6733, startup parse), 2.11.9 (#7191, operator mode),
+2.11.12 (#7723, config mode).
+
+**Server, v2.14.6** — `server/opts.go`, inside `parseJetStreamForAccount` (function at line 2378),
+lines 2451–2463:
+
+```go
+case "cluster_traffic":
+    vv, ok := mv.(string)
+    if !ok {
+        return &configErr{tk, fmt.Sprintf("Expected either 'system' or 'owner' string value for %q, got %v", mk, mv)}
+    }
+    switch vv {
+    case "system", _EMPTY_:
+        acc.nrgAccount = _EMPTY_
+    case "owner":
+        acc.nrgAccount = acc.Name
+    default:
+        return &configErr{tk, fmt.Sprintf("Expected 'system' or 'owner' string value for %q, got %v", mk, mv)}
+    }
+```
+
+So the key lives in an account's `jetstream { … }` block next to `max_ack_pending`, takes `system`
+(the default) or `owner`, and is reported by `server/stream.go` lines 375–377 (`leader_since`,
+`system_account`, `traffic_account` on the cluster info) and `jetstream_cluster.go:10997`.
+
+**Suggested fix:** a generated page `reference/config/accounts/<name>/jetstream/cluster_traffic.md`
+(type `string`, choices `system` | `owner`, default `system`, restart-only or reloadable as the
+reload code says), a paragraph in the clustering chapter on when to move Raft traffic off the system
+account, and the two fields on the stream-info and `jsz` reference pages.
+
+## 57 · `config_digest`, `tls_cert_not_after`, `leader_since` — 2.11 monitoring fields the reference never lists
+
+**Impact: the two fields an operator would alert on — a certificate about to expire, a config that
+drifted from the file — and the one that answers "how long has this leader been leader" exist in
+`/varz` and stream info and are not discoverable from the docs.**
+
+**Docs.** `grep -rl` over the whole mirror (2026-08-31): `config_digest` 0 pages, `tls_cert_not_after`
+0 pages, `leader_since` 0 pages. The generated `reference/system/monitor.md` and its `varz`, `jsz`
+subpages are the natural home (and are already the subject of #48 for their field names).
+
+**Release notes.** v2.11.0, *Added / General*: "Configuration state digest (#4325) — A hash of the
+configuration file can be generated using the `-t` option on the command line — The hash of the
+currently running configuration file can be seen in the `config_digest` option in `varz`". v2.11.12,
+*Added / Monitoring*: "Added `tls_cert_not_after` to the `varz` monitoring endpoint for showing when
+TLS certificates are due to expire (#7709)". v2.11.9, *Improved*: "The stream info and consumer info
+endpoints now return `leader_since` (#7189)".
+
+**Server, v2.14.6** — `server/monitor.go`: ``ConfigDigest string `json:"config_digest"` `` (line
+1283); ``TLSCertNotAfter time.Time `json:"tls_cert_not_after,omitzero"` `` on `Varz` (line 1296) and on
+the cluster, gateway, leafnode, MQTT and WebSocket option blocks (lines 1320, 1338, 1360, 1391,
+1410); ``LeaderSince *time.Time `json:"leader_since,omitempty"` `` (line 4208), and in
+`server/stream.go` line 375 on the cluster info.
+
+**Suggested fix:** the three fields on the `varz` and stream/consumer-info reference pages, each
+with its "since" (2.11.0, 2.11.12, 2.11.9).
+
+**Added 2026-09-03 — two more.** `in_client_msgs`, `in_client_bytes`, `out_client_msgs` and
+`out_client_bytes` in `/varz` — "for tracking data to/from normal clients only" (v2.12.9 / v2.14.1,
+#7851) — and the `window_size` parameter of the stream snapshot endpoint (v2.12.5, #7839) are
+likewise named on no docs page (`grep -rl` over the mirror: 0 each).
+
+
+## 58 · The 2.12 upgrade guide dates `GOMAXPROCS` / `GOMEMLIMIT` reporting to 2.12; it shipped in 2.10.28 and 2.11.2
+
+**Impact: small — an operator on 2.11 reading "what's new in 2.12" believes the two Go limits are
+not in their `/varz` until they upgrade. They have been there since 2025-04-25.**
+
+**Docs.** `raw/nats-docs/release-notes/upgrade-to-2.12.md`, line 44, under the 2.12 improvements:
+"**`GOMAXPROCS` and `GOMEMLIMIT` in server stats:** The server stats already contained the CPU and
+memory usage of the server but now also contains the effective Go limits."
+
+**Release notes.** `raw/release-notes/v2.10.28.md` and `raw/release-notes/v2.11.2.md`, both
+2025-04-25, *Improved / General*: "`GOMAXPROCS` and `GOMEMLIMIT` are now reported in both `statsz`
+and `varz` (#6791)". PR #6791, "[ADDED] Report `GOMAXPROCS` and `GOMEMLIMIT` in `ServerStats`",
+merged 2025-04-11. The v2.12.0 body (2025-09-22) does not list it.
+
+**Suggested fix:** drop the bullet, or reword it as "since 2.10.28 / 2.11.2".
+
+## 59 · `max_concurrent_io` (2.12.14 / 2.14.4) is documented nowhere
+
+**Impact: the one JetStream knob that governs how many disk operations run at once — the number
+that decides whether a large recovery or a burst of writes saturates a volume — cannot be found in
+the docs, and neither can the fact that its default changed from a CPU-scaled count to 4096.**
+
+**Docs.** `grep -rl max_concurrent_io raw/nats-docs/` returns nothing (mirror of 2026-08-31, the 2.14
+tree); the generated `reference/config/jetstream/` has no page for it.
+
+**Release notes.** `raw/release-notes/v2.12.14.md` and `raw/release-notes/v2.14.4.md` (2026-07-30),
+*Improved / JetStream*: "The disk concurrency semaphore has been increased to 4096 slots, up from the
+previous CPU-scaled count (#8336)"; "The disk concurrency semaphore can now be configured with the
+`max_concurrent_io` option in the `jetstream` config block (#8336)". PR #8336: "Server-scope disk
+I/O semaphore, add `max_concurrent_io`, raise default".
+
+**Server, v2.14.6** — `server/dios.go` lines 21–23 and 35–36:
+
+```go
+const defaultConcurrentIOs = 4096
+const minConcurrentIOs = 4
+const maxConcurrentIOs = 8192
+
+func newDiskIOSemaphore(n int) *diskIOSemaphore {
+	n = max(minConcurrentIOs, min(n, maxConcurrentIOs))
+```
+
+`server/opts.go` lines 2789–2794 parse `max_concurrent_io` in the `jetstream` block into
+`opts.JetStreamConcurrentIOs`, rejecting values outside `minConcurrentIOs`…`maxConcurrentIOs`;
+`server/server.go` line 778 builds the semaphore from it; `jetstream.go` line 752 sizes the parallel
+recovery task queue as `min(64, s.diskIOSemaphore().cap())`.
+
+**Suggested fix:** a generated page `reference/config/jetstream/max_concurrent_io.md` (integer,
+default 4096, range 4–8192, restart-only or reloadable as the reload code says, since 2.12.14 /
+2.14.4), and a sentence in the sizing chapter.
+
+## 60 · The `proxies { trusted [ … ] }` block of ADR-55 has no page
+
+**Impact: v2.12.0 added a way to require that clients arrive through a NATS-aware proxy and to name
+which proxies are trusted; the docs document the client-side switch (`proxy_required`) and the error
+a rejected connection gets, and never the list itself.**
+
+**Docs.** The generated reference has `reference/config/proxy_protocol.md` (the PROXY protocol,
+2.12.2), `reference/config/authorization/proxy_required.md` and its leafnode siblings, and
+`reference/system/errors.md` line 11: "Proxy is not trusted | `ErrAuthProxyNotTrusted` | An error
+condition on failed authentication due to a connection from a proxy not in the list of trusted
+proxies". `grep -rli 'trusted.prox' raw/nats-docs/` finds only that line; no `proxies` page exists.
+
+**Release notes.** `raw/release-notes/v2.12.0.md`, *Added / JetStream*: "Support for trusted proxies
+(#7153) — Allows enforcing that connections arrive via a NATS protocol-aware proxy — ADR:
+…/ADR-55.md". PR #7153: "(2.12) [ADDED] Trusted proxies support".
+
+**Server, v2.14.6** — `server/opts.go`: the top-level key `proxies` (line 1909) is parsed by
+`parseProxies` (line 5720), whose one field is `trusted` (line 5737), a list parsed by
+`parseProxiesTrusted` (line 5759) into `[]*ProxyConfig`; `authorization { proxy_required }` (line
+2987) is the switch the docs do document. The per-entry fields of `ProxyConfig` were not read for
+this row.
+
+**Suggested fix:** a `reference/config/proxies.md` page with the `trusted` list and its entry fields,
+linked from `proxy_required` and from the ADR-55 write-up.
+
+
 ## Internal — where this wiki records each of these
 
 *Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
@@ -2668,3 +2958,10 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 51 | `wiki/concepts/key-value.md` — *Reading a mirror: which name, which storage, which filter*; `wiki/entities/nats-go.md` — *What bites you*; `wiki/summaries/s-nats-go-kv-object-mirror.md` |
 | 52 | `wiki/operations/jetstream-sizing.md` — *Subjects are a RAM term* and *What runs out first* (7); `wiki/internals/filestore-layout.md` — *Recovery at startup*; `wiki/gotchas/jetstream-recovery-is-slow.md`; `wiki/summaries/s-nats-server-filestore-recovery.md`, `s-nats-server-stream-scale-observed.md` |
 | 53 | `wiki/operations/jetstream-sizing.md` — *Subjects are a RAM term*; `wiki/summaries/s-synadia-how-many-subjects.md` |
+| 54 | `wiki/operations/reload-server-config.md` — *### system account request*; `wiki/operations/evict-a-sick-server.md`; `wiki/reference/monitoring-endpoints.md` — *What arrived in 2.10*; `wiki/summaries/s-relnotes-2.10.md` |
+| 55 | `wiki/concepts/tls-in-nats.md` — *Version notes: which key arrived when*; `wiki/concepts/leafnode.md`; `wiki/summaries/s-relnotes-2.11.md` |
+| 56 | `wiki/concepts/replicas.md` — *Version notes*; `wiki/reference/monitoring-endpoints.md` — *What arrived in 2.11*; `wiki/summaries/s-relnotes-2.11.md` |
+| 57 | `wiki/reference/monitoring-endpoints.md` — *What arrived in 2.11*; `wiki/concepts/tls-in-nats.md`; `wiki/summaries/s-relnotes-2.11.md` |
+| 58 | `wiki/entities/nats-server-2.12.md`; `wiki/summaries/s-relnotes-2.12.md` — *The docs' upgrade guide against the bodies* |
+| 59 | `wiki/operations/jetstream-sizing.md` — *Version notes: the 2.12 line*; `wiki/internals/filestore-layout.md`; `wiki/summaries/s-relnotes-2.12.md` |
+| 60 | `wiki/operations/run-nats-behind-a-proxy.md` — *Version notes: the 2.12 line*; `wiki/summaries/s-relnotes-2.12.md` |

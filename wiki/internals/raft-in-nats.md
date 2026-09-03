@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # RAFT in nats-server
@@ -346,6 +346,73 @@ The parameters the docs say live there are **constants at v2.14.6, with no confi
   misaligned snapshot; async stream state snapshots; consistent Raft group rename when moving to or
   off R1 ([[nats-server-2.14]]).
 
+### The 2.10 line
+
+The Raft layer was reworked across 2.10.23's "improvements to Raft append entry handling and log
+consistency (#5661, #5689, #5714, #5957, #6027, #6073)", stepdown (#5666, #5344, #5717), elections
+(#5671, #6056), terms (#5684, #5792, #5975, #5848, #6060), catch-ups (#5987, #6038, #6072) and
+snapshots (#6053, #6055) (source: [[s-relnotes-2.10]]). Individually dated: `/raftz` — 2.10.17
+(#5530); file-backed groups share the filestore's sync interval, including `sync: always` — 2.10.23
+(#6041); entries not certainly applied during a shutdown are no longer reported applied — 2.10.23
+(#6087, #6133); groups no longer snapshot too often — 2.10.25 (#6277), and no longer report current
+while paused with pending commits (#6317); proposals dropped after a peer remove, causing a desync —
+fixed in 2.10.26 (#6456); peer-set changes on a stream or consumer peer-remove go through the Raft
+layer — 2.10.28 (#6720, #6727); a preferred node that fails to become leader is reported to the upper
+layer, "fixing some issues where multiple assets can believe they are the leader after a scale-up" —
+2.10.29 (#6851).
+
+
+### The 2.11 line
+
+- **2.11.0**: a new leader "only starts responding to read/write requests once it's initially
+  up-to-date with its Raft log" (#6194, #6485, #6518); acks on clustered interest and WorkQueue
+  streams are proposed through Raft (#6140) (source: [[s-relnotes-2.11]]).
+- **2.11.5**: **monotonic time** for heartbeats and quorum, "resilient against wall-clock drifts or
+  adjustments from NTP" (#6999); partitioned nodes no longer accept catch-ups from a lower term
+  (#6951). **2.11.7**: recovery and snapshot handling before campaigning, "fixing a situation where a
+  node could continue with an outdated stream" (#7040); no log compaction until a snapshot is written
+  (#7043); truncation back to a snapshot instead of a log reset when applies were behind (#7095).
+- **2.11.8**: step-down on a higher term during catch-up; late entries from cancelled catch-ups
+  ignored (#7151). **2.11.9**: delayed entries from an old leader rejected (#7209, #7239); the leader
+  bounds its cached in-memory entries (#7233). **2.11.10**: non-leaders cannot send append entries
+  (#7297); a stream snapshot timeout no longer resets clustered state (#7293).
+- **2.11.11**: leadership reported only after a no-op entry on recovery (#7460); peer activity
+  reported consistently after leader changes (#7402); no truncation from unexpected catch-up entries
+  once a catch-up is complete (#7424).
+- **2.11.12, the membership batch**: no concurrent membership changes (#7565, #7609); removed peers
+  not counted towards quorum (#7589); the implicit leader ack counted only while a member (#7600);
+  peer state written immediately on peer-remove "to ensure the removed peers cannot unexpectedly
+  reappear after a restart" (#7602); the last remaining peer cannot be removed (#7610); add-peer
+  cannot produce disjoint majorities (#7632); no re-admission on a heartbeat between removal and
+  leadership transfer (#7649); single-node elections reach the leader state (#7642); no repeat vote
+  for a term after a step-down (#7698).
+
+
+### The 2.12 line
+
+- **2.12.0**: "empty log protection" — empty votes for "nodes that have lost their stable storage and
+  attempt to rejoin the cluster regardless" (#7038); no success replies to catch-up messages when
+  not leader (#6944); no append entries in a known non-leader state (#7297); **async flush** on
+  replicated streams, writes still persisted in the Raft log first (#7018, #7163) (source:
+  [[s-relnotes-2.12]]).
+- **2.12.5**: forwarded proposals accepted "only if caught up as the new leader, limiting potentially
+  unbounded log growth" (#7809); concurrent membership changes refused when forwarded (#7809); the
+  cluster size no longer restored to 1 at startup, "which could result in an isolated node
+  incorrectly winning a single-node election" (#7850); the last snapshot-applied sequence no longer
+  reverted when truncating after a catch-up snapshot (#7849); the election timeout set when leaving
+  observer mode (#7793).
+- **2.12.6**: the vote reset on becoming candidate (#7956); **entries from previous terms are no
+  longer committed** (#7955). **2.12.8**: commit-index reset on term mismatch (#8023); a legacy
+  zero-index snapshot no longer panics (#8039). **2.12.9**: temporary snapshots ignored after a
+  crash (#8101); append-entry caches invalidated on truncation and snapshot install (#8149); no
+  proposals to remove unknown peers (#8154); in-flight checkpoints cancelled on reset (#8180, #8202).
+- **2.12.12**: **nodes no longer vote or campaign after write errors** (#8290); checkpoints abort on a
+  closed node (#8296); `ApplyCommit` handles the post-snapshot index (#8321); uncommitted membership
+  changes reverted on truncation or snapshot (#8332); peer-state decoding bounded (#8310).
+  **2.12.14**: elections ignore votes from removed peers (#8353); the transport layer decoupled
+  (#8181, "does not change server behaviour").
+
+
 ## To verify
 
 - ~~The exact heartbeat interval and the 4–9 second election-timer range~~ **Settled 2026-09-01** from
@@ -399,4 +466,4 @@ are on [[stream-leader-keeps-moving]].
 [[s-docs-scaling-and-peers]] · [[s-docs-your-first-cluster]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7463-jetstream-corruption]] ·
 [[s-nats-server-lame-duck]] · [[s-synadia-jetstream-memory-patterns]] ·
-[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]]
+[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

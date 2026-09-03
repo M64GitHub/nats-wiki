@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [websocket, nginx, ingress, proxy, advertise, handshake_timeout, ping_interval, kubernetes, no_tls]
 aliases: [websocket behind nginx, nats behind a proxy, wss ingress, websocket proxy, proxy_read_timeout]
-sources: [s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed]
+sources: [s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.12]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Run NATS WebSocket behind nginx or another proxy
@@ -208,6 +208,22 @@ anything except certificate paths means a **restart**, not a reload ([[reload-se
   present. Permissions do the real work — [[subject-permissions]].
 - **A path rule that does not cover `/leafnode`.** Browsers work, the leaf never connects.
 
+## Version notes: the 2.12 line
+
+- **Trusted proxies (ADR-55) are 2.12.0** (#7153): a `proxies { trusted [ … ] }` block names the
+  NATS-aware proxies, and `authorization { proxy_required }` refuses connections that did not come
+  through one; a rejected connection fails with `Proxy is not trusted`. The `proxies` block is
+  documented nowhere — `inbox/docs-issues.md` #60 (source: [[s-relnotes-2.12]]).
+- **The PROXY protocol (v1 and v2) is 2.12.2** — `proxy_protocol: true` on client connections
+  (#7456); TLS listeners work with it from 2.12.9 (#8130); 2.12.12 fixed detection, TLS sniffing
+  with `allow_non_tls` and the v1 address-family parsing (#8302); 2.12.6 fixed the v1 parser
+  discarding early protocol bytes (#7962); trusted-proxy tracking no longer leaks closed clients
+  (2.12.12, #8307).
+- **Leafnodes through an HTTP proxy**: WebSocket leafnodes from 2.12.1 (`remotes [ { proxy { url,
+  username, password, timeout } } ]`, #7242), plain leafnodes through HTTP CONNECT from 2.12.6
+  (#7781).
+
+
 ## Related
 
 [[websocket]] · [[leafnode]] · [[tls-in-nats]] · [[reload-server-config]] ·
@@ -217,4 +233,4 @@ anything except certificate paths means a **restart**, not a reload ([[reload-se
 
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-your-first-websocket-connection]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-nats-server-mqtt-websocket-observed]]
+[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.12]]

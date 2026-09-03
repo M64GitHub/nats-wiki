@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [message-lag, log-warnings, publish, backpressure, puback, replicas, raft]
 aliases: ["has high message lag", "high message lag", "JetStream warnings in the log", "streamLagWarnThreshold"]
-sources: [s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-replication-and-r3, s-docs-monitoring-jetstream-health, s-gh-5859-unexpected-nats-timeout]
+sources: [s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-replication-and-r3, s-docs-monitoring-jetstream-health, s-gh-5859-unexpected-nats-timeout, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.10]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # "JetStream stream … has high message lag"
@@ -203,6 +203,16 @@ A consumer filtered to `orders.shipped` counts only the shipped messages it has 
 pending on a filtered consumer doesn't mean the stream is empty; it means nothing on *that filter* is
 waiting." Compare it against the stream's per-subject counts, not against `last_seq`.
 
+### An upstream that restarted empty (2.10.19–2.10.21)
+
+A source or mirror whose upstream came back at sequence 0 — a memory stream after a restart, a
+recreated stream — stalls on 2.10.19, 2.10.20 and 2.10.21 until the upstream overtakes the
+remembered sequence, because those releases stopped clipping the source consumer's start sequence
+(#5785, reverted in 2.10.22 by #6014). On 2.14 the same shape was reported with the `AckFlowControl`
+sourcing consumer; the fix is in the 2.15 preview (#8384). Details on [[mirrors-and-sources]]
+(source: [[s-gh-6005-sourcing-memory-stream-restart]], [[s-relnotes-2.10]]).
+
+
 ## Related
 
 [[nats-timeout]] · [[malformed-or-corrupt-message]] · [[jetstream-out-of-disk]] ·
@@ -218,4 +228,4 @@ waiting." Compare it against the stream's per-subject counts, not against `last_
 - [[s-nats-server-jetstream-resources]] — the out-of-resources line's two callers.
 - [[s-docs-replication-and-r3]] — quorum commit and what a `PubAck` promises.
 - [[s-docs-monitoring-jetstream-health]] ·
-[[s-gh-5859-unexpected-nats-timeout]]
+[[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.10]]

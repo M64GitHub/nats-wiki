@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [message-scheduling, allow_msg_schedules, Nats-Schedule, cron, delayed-publish, message-ttl]
 aliases: [message scheduler, scheduled messages, delayed publishing, delayed message, cron schedule, Nats-Schedule, allow_msg_schedules]
-sources: [s-adr-51-message-scheduler, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-gh-7672-cron-schedules, s-gh-7628-scheduler-vs-nak, s-synadia-delayed-scheduling]
+sources: [s-adr-51-message-scheduler, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-gh-7672-cron-schedules, s-gh-7628-scheduler-vs-nak, s-synadia-delayed-scheduling, s-relnotes-2.12]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Message scheduling
@@ -327,6 +327,18 @@ nats stream subjects SCHED
 There is no CLI flag for the time zone or the rollup — use `-H`. **Do not use `--schedule-after`**
 (failure mode 4).
 
+## Version notes: the 2.12 patches
+
+Single-message scheduling shipped in 2.12.0 (#7170, #7245, #7319, "using the `Nats-Schedule-TTL`
+message header") (source: [[s-relnotes-2.12]]). Then: **2.12.1** — a scheduled message is
+deactivated "when followed up with another message on the same subject without a schedule" (#7366)
+and triggers correctly after a recovery (#7347); **2.12.8** — `Nats-Schedule-Next: purge` errors
+when scheduling is not enabled on the stream (#8035); **2.12.9** — schedule subjects corrupted on
+recovery (#8085); **2.12.10** — "configuration constraints applied to prevent incorrect usage
+patterns" for counters and schedules (#8240); **2.12.12** — malformed schedule state rejected on
+decode (#8269). Cron and `@every` are 2.14 ([[nats-server-2.14]]).
+
+
 ## Related
 
 [[stream]] · [[message-ttl]] · [[retention-policies]] · [[mirrors-and-sources]] · [[publishing]] ·
@@ -339,4 +351,4 @@ There is no CLI flag for the time zone or the rollup — use `-H`. **Do not use 
 [[s-docs-jetstream-headers]] · [[s-gh-7672-cron-schedules]] · [[s-gh-7628-scheduler-vs-nak]]
 
 Run directly, not read: `raw/nats-server-src/message-schedules-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01. · [[s-synadia-delayed-scheduling]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01. · [[s-synadia-delayed-scheduling]] · [[s-relnotes-2.12]]

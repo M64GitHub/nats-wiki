@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Monitoring endpoints
@@ -521,6 +521,74 @@ means the `mqtt {}` block set no port; and
 `Creating MQTT streams/consumers with replicas N for account "…"`, which is the only place the server
 states the replica count it derived for MQTT state — see [[mqtt]].
 
+## What arrived in 2.10
+
+Each with its release and PR (source: [[s-relnotes-2.10]]):
+
+| what | since |
+|---|---|
+| `unique_tag` in `/jsz` and `/varz`; `slow_consumer_stats` in `/varz`; subscription count in `/statz`; `/jsz?raft=1` | 2.10.0 (#3617, #4330, #3875, #3914) |
+| `$SYS.REQ.SERVER.PING.IDZ`, `$SYS.REQ.SERVER.<id>.PROFILEZ`, `.KICK`, `.LDM`, `.RELOAD` | 2.10.0 (#3663, #3774, #4298, #4307) — `IDZ`, `KICK`, `LDM` and `RELOAD` are undocumented, `inbox/docs-issues.md` #54 |
+| `ocsp_peer_cache` dropped from `/varz` when not in use | 2.10.6 (#4829) |
+| `/jsz` account filtering with stream details fixed | 2.10.14 (#5229) |
+| **`/expvarz`** | 2.10.16 (#5374) |
+| **`/raftz`**, "experimental … for diagnostic purposes" | 2.10.17 (#5530) |
+| `StreamLeaderOnly` filter on `/jsz`; CPU profiles from `PROFILEZ`; an HTTP read timeout on the monitoring, profiling and OCSP servers | 2.10.19 (#5704, #5743, #5790) |
+| **`statsz` every 10 s instead of 30 s**; pending JetStream API request count in `statsz` and `/jsz` | 2.10.21 (#5925, #5923, #5926) |
+| `/gatewayz` subscription info; `raftz` and `ipqueuesz` over the system account; `/routez` `pending_bytes` | 2.10.26 (#6525, #6439, #6476) |
+| `GOMAXPROCS` and `GOMEMLIMIT` in `statsz` and `/varz`; `/jsz` `offset` pagination fixed | 2.10.28 (#6791, #6794, #6816) |
+| `/connz?state=all` returns open connections | 2.10.29 (#6849) |
+
+`/healthz` changed underneath too: 2.10.17 stops false positives after a failed snapshot restore
+(#5549), 2.10.24 carries "minor fixes to `healthz` and healthchecks" (#6247, #6248, #6232), and
+**2.10.25 stops the health check from re-evaluating assignments**, which had recreated streams and
+consumers "shortly after a deletion" (#6362); 2.10.26 made its error messages say why (#6416).
+
+
+## What arrived in 2.11
+
+Each with its release and PR (source: [[s-relnotes-2.11]]):
+
+| what | since |
+|---|---|
+| `config_digest` in `/varz` (the hash `nats-server -t` prints); `/healthz?js-meta-only=true` | 2.11.0 (#4325, #6649) — `config_digest` undocumented, `inbox/docs-issues.md` #57 |
+| `/connz` includes leafnode connections; `accstatsz` carries leafnode, route and gateway stats | 2.11.5 (#6949, #6967) |
+| `/subsz` returns the correct `total` for pagination | 2.11.6 (#7009) |
+| `/leafz` reports the connection ID; the index page names endpoints on hover | 2.11.7 (#7063, #7066, #7087) |
+| `leader_since`, `system_account`, `traffic_account` on stream and consumer info and in `/jsz`; `/raftz` reports the cluster-traffic account | 2.11.9 (#7189, #7193, #7186) — undocumented, #56 and #57 |
+| `accstatsz` omits empty gateway, route and leaf stats | 2.11.10 (#7300) |
+| meta snapshot statistics and leader counts in `/jsz`; `/jsz?direct-consumers=true` | 2.11.11 (#7524, #7429, #7543) |
+| **`tls_cert_not_after`** in `/varz` and its per-listener blocks | 2.11.12 (#7709) — undocumented, #57 |
+| `/expvarz` redacts command-line secrets; MQTT passwords no longer in the JWT field | 2.11.15 |
+| **`/connz` no longer discloses bearer JWTs**; route and cluster URL secrets redacted | 2.11.17 |
+
+`/healthz` in 2.11: it stops "fixing up cluster node skews, as this could interfere with processing
+assignments" (2.11.5, #7001); no unexpected monitor-goroutine warnings after a snapshot restore
+(2.11.6, #7019); no transient errors for newly created or recently deleted consumers (2.11.8, #7154);
+a stream that is catching up is reported as catching up, not unhealthy (2.11.11, #7535); consumers
+deleted on recovery do not fail it (2.11.11, #7523).
+
+
+## What arrived in 2.12
+
+| what | since |
+|---|---|
+| `exact_match` on the server-name, host and cluster filters of "various monitoring endpoints" | 2.12.0 (#7260) |
+| `server_metadata` reported with the server | 2.12.0 (#6935) |
+| expvar `/debug/vars` on the monitoring port | 2.12.2 (#7469) |
+| meta snapshot statistics, leader counts, `direct-consumers` in `/jsz` | 2.12.1–2.12.2 (#7429, #7524, #7543) |
+| `tls_cert_not_after` in `/varz` | 2.12.4 (#7709) — undocumented, `inbox/docs-issues.md` #57 |
+| replica `lag` and `current` consistent on followers | 2.12.5 (#7885) |
+| `$SYS.REQ.USER.INFO` returns the account and user nametag | 2.12.6 (#7973) |
+| **`in_client_msgs`, `in_client_bytes`, `out_client_msgs`, `out_client_bytes`** in `/varz` — "data to/from normal clients only" | 2.12.9 / 2.14.1 (#7851) — undocumented, noted on #57 |
+| `/accstatz` no longer omits accounts with only leaf connections | 2.12.10 (#8252) |
+| **JSONP callback support removed** | 2.12.12 |
+| `healthz` skips expired JWT accounts; `/varz` reports JetStream limits after a reload | 2.12.14 (#8379, #8394) |
+
+(source: [[s-relnotes-2.12]]). The docs' 2.12 upgrade guide lists `GOMAXPROCS` and `GOMEMLIMIT` in
+server stats as new in 2.12; they are 2.10.28 / 2.11.2 (#6791) — `inbox/docs-issues.md` #58.
+
+
 ## Related
 
 [[slow-consumer-detected]] · [[raft-in-nats]] · [[jetstream-sizing]] · [[js-api]] ·
@@ -535,4 +603,4 @@ states the replica count it derived for MQTT state — see [[mqtt]].
 [[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-nats-server-monitoring-observed]] · [[s-gh-7362-routez-connz-rtt]] ·
 [[s-gh-7483-varz-cpu-in-containers]] · [[s-docs-monitoring-profiling]] ·
-[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

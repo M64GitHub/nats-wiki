@@ -12,7 +12,7 @@ tags: [subjects, cardinality, psim, stree, adaptive-radix-tree, memory, kv, sinc
 aliases: []
 sources: []
 created: 2026-09-02
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # gh#5202 — how many distinct subjects one stream can hold, and where the index lives
@@ -64,6 +64,14 @@ The `since:` fact for the subject index, from the person who wrote it. Pairs wit
 ## Questions it answers
 
 Row **9** (version layer).
+
+## Correction from the source tree (2026-09-03)
+
+The maintainer's ">= 2.10.9" is off by one. `server/stree/` does not exist at tag v2.10.9;
+`fileStore.psim` is `map[string]*psi` there and `*stree.SubjectTree[psi]` at v2.10.10, whose release
+body lists the change as "NumPending calculations and subject index memory in filestore and memstore
+(#4960, #4983)". The claim above stays as the thread made it; the wiki pages say **2.10.10**
+(evidence: `raw/nats-server-src/stree-arrival-v2.10.10.md`; [[s-relnotes-2.10]]).
 
 ## Pages touched
 

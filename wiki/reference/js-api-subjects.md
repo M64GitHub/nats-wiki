@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers, s-nats-server-jetstream-cluster]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers, s-nats-server-jetstream-cluster, s-relnotes-2.11]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # `$JS.API` subjects
@@ -270,6 +270,14 @@ domain back out of as the **second token** (`stream.go:432–437`). See [[jetstr
 [[cross-domain-sourcing]].
 
 
+## Version notes
+
+`$JS.API.CONSUMER.PAUSE.<stream>.<consumer>` is since **2.11.0** — "The `PauseUntil` consumer
+configuration option and `$JS.API.CONSUMER.PAUSE` endpoint suspends message delivery to the consumer
+until the time specified is reached, after which point it will resume automatically" (#5066)
+(source: [[s-relnotes-2.11]]). The consumer reset subject is 2.14.0 ([[s-relnotes-2.14.0]]).
+
+
 ## Related
 
 [[js-api]] · [[error-codes]] · [[stream]] · [[consumer]] · [[account]] · [[advisories]] ·
@@ -281,4 +289,4 @@ domain back out of as the **second token** (`stream.go:432–437`). See [[jetstr
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
 [[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]] ·
 [[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]] ·
-[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]] · [[s-nats-server-jetstream-cluster]]
+[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]]

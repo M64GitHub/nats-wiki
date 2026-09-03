@@ -6,9 +6,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10077, discard, DiscardNew, max_msgs, max_bytes, max_msgs_per_subject, purge, workqueue]
 aliases: ["maximum messages exceeded", "maximum bytes exceeded", "maximum messages per subject exceeded", "10077", "stream is full", "DiscardNew full", "stream full discard new"]
-sources: [s-adr-10-extended-purge, s-docs-policies, s-docs-stream-config, s-docs-retention-policies, s-docs-shaping-the-stream]
+sources: [s-adr-10-extended-purge, s-docs-policies, s-docs-stream-config, s-docs-retention-policies, s-docs-shaping-the-stream, s-relnotes-2.10]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # "maximum messages exceeded (10077)" on publish
@@ -134,6 +134,18 @@ An account tier limit or a server-wide one produces a *different* error —
 `insufficient storage resources available (10047)` or `10028`. If the code is 10047 and not 10077,
 this is not the page: see [[jetstream-out-of-disk]].
 
+## Version notes
+
+- **Before 2.10.19**, `max_msgs_per_subject: 1` with `discard: new` could return "maximum messages
+  per subject exceeded" when it should not — "Fixed `maximum messages per subject exceeded`
+  unexpected error on streams using a max messages per subject limit of 1 and discard new retention
+  policy" (#5761) (source: [[s-relnotes-2.10]]). On an older 2.10 the error is a bug as often as a
+  limit; upgrade before tuning.
+- 2.10.2 fixed lookup misses "when MaxMsgsPerSubject=1 leading to excess messages in stream" (#4631)
+  — the opposite failure, a stream over its per-subject limit; 2.10.5 corrected the `DiscardNew`
+  exceed-bytes calculation (#4772).
+
+
 ## Prevention
 
 **The `learn` chapter confirms all three strings and the `discard_new_per_subject` requirement** from
@@ -174,4 +186,4 @@ either discard policy, so a stream that is "full" is always full on bytes or cou
 - [[s-docs-shaping-the-stream]] — the three rejection strings named together, and `max_age` as the
   one limit that never rejects a publish
 - `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md` — the `PubAck` above, the
-  silent log and the purge behaviour, run on the v2.14.6 binary
+  silent log and the purge behaviour, run on the v2.14.6 binary · [[s-relnotes-2.10]]
