@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, gossip, reject_unknown_cluster, 7222, stalled_clients]
 aliases: [gateways, super-cluster, supercluster, super cluster, cluster of clusters, geo-affinity, geo affinity]
-sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster, s-relnotes-2.14, s-relnotes-2.10]
+sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -75,11 +75,11 @@ to local queue subscribers, the server collects the queue-group **names** it ser
 
 `sendMsgToGateways` then drops those names from the remote's queue list, and skips the gateway
 entirely only if nothing is left **and** there is no plain-subscriber interest
-(`gateway.go:2637–2654`):
+(`gateway.go:2638–2654`):
 
 ```go
-2652:			if !psi && len(queues) == 0 {
-2653:				continue
+2653:			if !psi && len(queues) == 0 {
+2654:				continue
 ```
 
 So:
@@ -91,6 +91,21 @@ So:
 That second case is the one people measure and do not expect —
 [[supercluster-slows-when-a-remote-subscriber-joins]] (source:
 [[s-gh-7494-supercluster-degradation]], [[s-nats-server-topology]]).
+
+## Inside one cluster there is no affinity at all
+
+The exclusion list above is the only locality preference the server has — the docs' "prefers a member in
+the publisher's own cluster before reaching across to another region" (source:
+[[s-docs-core-nats-queue-groups]]) is this list, and nothing narrower. Within a cluster a queue
+group's members are equally likely wherever they sit: a peer's members arrive as one `RS+ … <weight>`
+entry and the sublist expands it to the weight before the random pick (`sublist.go:741–747`), so one
+member on the publisher's server and three on a peer received 90 / 97 / 106 / 107 of 400 publishes on
+the lab (run E2; source: [[s-nats-server-request-reply]], [[s-nats-server-request-reply-observed]]). A
+leafnode is different again — a leaf's members are only a fallback, and their entries skew the hub's
+own split — [[queue-groups]] and [[leafnode]] have the runs. The queue names the local delivery
+served are collected under `pmrCollectQueueNames` (`client.go:4481–4489`) and handed to
+`sendMsgToGateways` (`gateway.go:2638–2654`); the block above is quoted from that range.
+
 
 ## What configures it
 
@@ -194,7 +209,8 @@ rejected (#8527).
 [[s-docs-super-clusters]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-4823-leafnode-supercluster-duplicates]] ·
-[[s-gh-6328-jetstream-behind-gateways]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]]
+[[s-gh-6328-jetstream-behind-gateways]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-request-reply]] · [[s-nats-server-request-reply-observed]]
+- [[s-docs-core-nats-queue-groups]] — the docs' one sentence on geo-affinity for queue groups.
 
 ## To verify
 

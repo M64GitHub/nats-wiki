@@ -4403,3 +4403,79 @@ plan says. **Server issue SI-7** (pedantic mode's error-then-deliver; searched: 
 and the 484 discussions). **Bank**: row 25 → [[core-nats-delivery]]; rows 169 (gh#5097 + gh#2855), 170
 (gh#5172), 171 (`own`, searched) added and answered on arrival — 138 / 171. `since: [2.10]` on both new
 pages with the *present at 2.10* comment. Lint: 366 pages (354 → 366), drift 0, unlanded 0 (9 → 0 after five pointer paragraphs on `defaults-and-limits`, `nats-cli`, `publishing`, `subjects-and-wildcards`, `config-keys`), wanted 0, unverified 12 (11 → 12: the new marker is the cross-server ordering item under `## To verify` on `core-nats-delivery`), staleness 0 behind 2.14.6.
+
+## 2026-09-03 — phase F step 2: core NATS, part 2 — request/reply and queue groups
+
+Operation: plan, `inbox/plan-the-client-side-2026-09-03.md` step 2 (*Operation: ingest*, nine summaries —
+the plan's six plus a source extract for the server, one for natscli, and row 138's thread). **Sources into
+`raw/`**: `raw/release-notes/v2.2.0.md` (the GA body, 2021-03-15 — it names JetStream, WebSocket and MQTT
+and **never names headers or `no_responders`**); `raw/nats-server-src/headers-arrival-v2.2.0.md`
+(`server.go`, `client.go` at v2.1.9 and v2.2.0: nothing matches `headers`/`HMSG`/`503` at 2.1.9, the `INFO`
+field, the two `CONNECT` options, the refusal and the 16-byte `NATS/1.0 503` send are at 2.2.0 — so the
+signal is dated from the source, and `Nats-Subject` from the v2.12.0 body, #5250);
+`raw/nats-server-src/request-reply-v2.14.6.md` (the pmr flags, the tail of `processInboundClientMsg` with
+the 503 and `subForReply`, `processMsgResults`' queue selection and delivery, the sublist's weight
+expansion, `RS+ … <weight>`, the gateway exclusion); `raw/nats-server-src/request-reply-observed-v2.14.6.md`
+with `request-reply-run.sh`, `-run2.sh`, `-run3.sh`, `-run4.sh` and `request-reply-subsz.py` beside it
+(runs A–H in four passes: A–D and G on a standalone server, E on the lab, H on a standalone hub with a
+standalone leaf); `raw/nats-cli/request-reply-0.4.0.md` (`req_command.go`, `reply_command.go` from the
+module at the tag; its go.mod pins nats.go v1.51.0); `raw/gh-discussions/gh-2760.md`. Four manifest rows
+extended. **Read and folded**: `concepts/request-reply.md` (into `s-docs-core-nats-request-reply`, with
+its L589 first-reply-wins and L1040–1046 `reportNoResponders()` lines) and `concepts/queue-groups.md`
+(into `s-docs-core-nats-queue-groups`, with L24, L1528 vs L2131, L2064–2093). Docs coverage after this
+step: `learn/core-nats` **11/11**, `concepts` 8/11 (`request-reply`, `queue-groups` folded here; `jetstream`,
+`security`, `topologies` remain), `reference/config/mappings` 4/4.
+**Summaries** (9): [[s-docs-core-nats-request-reply]], [[s-docs-core-nats-queue-groups]],
+[[s-adr-4-message-headers]], [[s-adr-47-request-many]], [[s-relnotes-2.2.0]], [[s-nats-server-request-reply]],
+[[s-nats-server-request-reply-observed]], [[s-nats-cli-request-reply-source]],
+[[s-gh-2760-one-connection-or-two]]. **Pages created** (2): [[request-reply]] (the mux inbox and
+`--inbox-prefix`; the three outcomes as a table with each client's name and the CLI's exit code; the 503's
+four preconditions and its bytes, `Nats-Subject` since 2.12.0, the signal since 2.2.0; timeouts;
+scatter-gather with ADR-47's four stop conditions and the CLI's flags timed; the 503 across an import for
+row 150; one connection or two for row 138; responders; the config table) and [[queue-groups]] (the random
+pick — not round-robin, **not readiness-aware**, run C; coexistence, one subject, wildcards, the typo; the
+cluster split uniform per member, run E; the leafnode fallback and the hub's skewed split, run H; the
+gateway exclusion; `NATS-RPLY-22`; at-most-once; `/subsz` as one server's view). **Updated** (15 + 2 in
+place): [[nats-timeout]] (*The 503, and what the CLI's exit code tells you*), [[worker-pool]] (*The core
+queue group, measured*), [[gateway]] (*Inside one cluster there is no affinity at all*; **wiki correction**:
+its quoted block was off by one line — `2652:`/`2653:` → `2653:`/`2654:`, the range `2637–2654` →
+`2638–2654`, checked against `topology-v2.14.6.md:361` and the tarball), [[leafnode]] (*Queue groups across a
+leafnode*), [[subject-permissions]] (*The requester's inbox prefix*), [[cross-account-sharing]] (*Run on
+2.14.6 — the 503 crosses the import, and names the importer's subject*), [[nats-java]] (*What bites you*:
+`reportNoResponders()`), [[nats-cli]] (*`nats request` and `nats reply`, as run on 0.4.0*), [[orbit]]
+(*`RequestMany`*), [[nats-js]] (*`requestMany`*), [[nats-net]] (*`RequestManyAsync`, and no responders by
+default*), [[monitoring-endpoints]] (*`/subsz` and queue groups: one server, its own members only*),
+[[slow-consumer-detected]] (*A queue member cut here leaves its group*); in place: [[core-nats-delivery]]
+(the three step-2 pointers now link the pages; row 138's sentence rewritten from gh#2760; the 2.2.0 and
+ADR-4 sentences) and [[nats-server-2.12]] (the `Nats-Subject` line points at the page). **What the runs
+settled beyond the docs**: the 503 is `HMSG <inbox> <sid> 38 38` + `NATS/1.0 503\r\nNats-Subject: nobody`
+and needs the inbox subscription on the requesting connection (B1, B4); `nats request` exits 0 on all
+three outcomes and prints nothing on a timeout (B6–B8); a busy queue member keeps its random share — 8 of
+20 and 12 of 20 while sleeping a second per request (C); `--replies 3` with two responders returns after
+the average reply time plus `--reply-timeout`, `--replies 0` always the full window, and an empty reply
+ends a counted gather with or without `--wait-for-empty` (D; the first pass's sentinel run lost a race to
+the 300 ms gap and was repeated); inside a cluster the pick is uniform per member — one local and three
+remote, 90 / 97 / 106 / 107 (E2) — and `/subsz` shows only the local member; the 503 crosses a service
+import in 37 ms and names the importer's subject (G); across a leafnode the publisher's side wins outright
+(200 / 0, 0 / 200) and **a leaf's members skew the hub's own split 3 : 1** — 148 / 52, 89 / 311, 297 / 103,
+302 / 98; 2 : 1 for two and one; 1 : 1 : 3 for three and two; even without a leaf member (H5–H8). **The
+read's claim corrected by the run**: the plan's digest read `processMsgResults` as "same server first"
+inside a cluster; run E and `sublist.go:741–747` (a routed entry shadowed once per member) say uniform.
+**Docs issues** #85 (`Nats-Subject` on the 503 stated nowhere; sweep: five mentions in the tree, all Direct
+Get's), #86 (`learn/services/scaling.md:150, 272` readiness — wrong-value, with run C; recorded now, the
+row the services tree owns in step 6), #87 (`concepts/queue-groups.md:1528` "exactly once" vs `:2131`),
+#88 (`learn/core-nats/queue-groups.md:218` "a cluster adds a locality preference" — none inside one
+cluster, run E), #89 (natscli: the silent timeout at exit 0 and the empty-reply rule; destination
+`natscli`). **Server issue SI-8** (the leafnode skew; searched: the topology docs, the 484 discussions for
+"queue group" with "leaf", the 2.10.22/2.10.23 release lines — which are about the leaf-side direction).
+**Bank**: row 138 → [[core-nats-delivery]] · [[request-reply]] (gh#2760's chosen answer); row 150 gains
+[[request-reply]] and *measured*; rows 172–174 added (`own`, the cache searched first — the one queue-group
+"round-robin" line is a JetStream thread) and answered on arrival — 142 / 174, `own` 19. `inbox/adr-toc.md`
+rows 4 and 47 linked. No strike from any *Pages touched*. `since: [2.10]` on both new pages with the
+*present at 2.10* comment; the 503's own dates in the sentence. Lint: 377 pages (366 → 377), drift 0,
+unlanded 0 (5 → 0 after three citation sentences on `nats-cli`, `gateway`, `leafnode`), wanted 0,
+unverified 12, staleness 0 behind 2.14.6. For step 3: natscli 0.4.0 carries nats.go **v1.51.0** while the
+entity pin is v1.53.1 — the extract must say which it quotes; the request/inbox ranges of nats.go
+(`NewRespInbox`, `createNewRequestAndSend`, `UseOldRequestStyle`, the 503 check) were read at v1.52.0 from
+the module cache and not quoted — add them to the v1.53.1 extract if [[request-reply]] is to cite the
+client rather than the docs for "no default timeout" and the mux.

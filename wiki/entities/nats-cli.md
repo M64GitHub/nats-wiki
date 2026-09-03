@@ -7,7 +7,7 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports, s-nats-cli-core-commands, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports, s-nats-cli-core-commands, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-cli-request-reply-source, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-adr-47-request-many]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -477,6 +477,33 @@ The chapter's own use of these commands — the `>` wire tap, `nats sub --count 
 [[s-docs-core-nats-publish-subscribe]] and [[s-docs-core-nats-subjects-and-mapping]].
 
 
+## `nats request` and `nats reply`, as run on 0.4.0
+
+- **Three outcomes, one exit code.** A served request prints the reply; no responders prints `No
+  responders are available` in ~37 ms; a timeout prints **nothing** after `Sending request on "…"` —
+  and all three **exit 0** (runs B6–B8; `req_command.go:143–150`, `:205`). A script has to read the
+  output.
+- **A gather ends on any empty reply.** `--replies N` stops at the N-th reply *or* at the first reply
+  with an empty body (`:179–181`); `--wait-for-empty` merely sets `--replies` to 32767 (`:222–224`).
+  With `--replies 0` the wait is the remaining `--timeout` and `--reply-timeout` is not read; with
+  `--replies N` each further wait is the average reply time so far plus `--reply-timeout` — three
+  responders answered `--replies 3` in 41 ms, two responders held it 364 ms, `--replies 0` always the
+  full 2 s (run D).
+- **`nats reply` is one callback.** `--sleep` (random up to the value) and `--command` (run
+  synchronously, `NATS_REQUEST_SUBJECT` and `NATS_REQUEST_BODY` in its environment, combined output
+  as the body) hold every later request on that member; a `--command` with no output answers an
+  empty body, which is how a sentinel responder is made. With no body, no command and no `--echo` the
+  command switches to echo mode and says so.
+- **The default group is `NATS-RPLY-22`.** Independent responders need distinct `--queue` names; a
+  group of one behaves like a plain subscriber (run A).
+
+Source: [[s-nats-cli-request-reply-source]] for the lines, [[s-nats-server-request-reply-observed]] for
+the runs; the flags as the docs describe them — `--replies 0` as deadline mode, `--reply-timeout` as the
+gap, `--wait-for-empty` as the sentinel, `nats sub --queue` — in [[s-docs-core-nats-request-reply]] and
+[[s-docs-core-nats-queue-groups]]; the three stop conditions are ADR-47's ([[s-adr-47-request-many]]);
+the mechanics on [[request-reply]] and [[queue-groups]].
+
+
 ## Related
 
 [[nsc]] · [[nk]] · [[nats-box]] · [[nats-top]] · [[jsm-go]] · [[monitoring-endpoints]] ·
@@ -496,4 +523,6 @@ The chapter's own use of these commands — the `>` wire tap, `nats sub --count 
 [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-kubernetes]] ·
 [[s-docs-single-server]] · [[s-docs-stream-backup-restore]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7684-certificate-expiry]] ·
-[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-natscli-auth-exports-imports]] · [[s-nats-cli-core-commands]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]]
+[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-natscli-auth-exports-imports]] · [[s-nats-cli-core-commands]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-cli-request-reply-source]] · [[s-nats-server-request-reply-observed]]
+- [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] · [[s-adr-47-request-many]] — the
+  gather flags as the docs and ADR-47 describe them, for the `nats request` section.

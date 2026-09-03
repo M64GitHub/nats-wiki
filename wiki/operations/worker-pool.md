@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -181,6 +181,18 @@ Two things a worker pool is regularly confused with, and the distinction is the 
 The exception that proves it: on a **`workqueue`** stream the server refuses overlapping consumers
 outright, because there the first ack removes the message for everyone ([[retention-policies]]).
 
+## The core queue group, measured
+
+The comparison above rests on what a queue group is: a random pick per message over the members
+that are subscribed at that instant — not round-robin, not demand-based, not readiness-aware. Two
+members of one group, one running `sleep 1` before every reply, split 20 concurrent requests 12 / 8
+and then 8 / 12 on 2.14.6; the slow member answered its share one per second while the fast one sat
+idle (run C, source: [[s-nats-server-request-reply-observed]]; the docs' own statement of the rule:
+[[s-docs-core-nats-queue-groups]]). A consumer shared by workers is the opposite shape — each worker
+pulls when it has capacity — which is why a slow worker here only slows itself. The whole of the core
+side, including what a cluster and a leafnode do to the split, is on [[queue-groups]].
+
+
 ## Version notes
 
 Three 2.10 fixes on WorkQueue streams that a pool depends on (source: [[s-relnotes-2.10]]):
@@ -211,4 +223,4 @@ delivery — a level, not a rate, and the max-deliveries drop itself has no seri
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]]

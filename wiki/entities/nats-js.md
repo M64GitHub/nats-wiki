@@ -7,9 +7,9 @@ verified-against: nats.js v3.4.0
 verified-on: 2026-08-31
 tags: [client, tier-1, javascript, typescript, deno, bun, websocket, monorepo]
 aliases: [nats.js, "nats-io/nats.js", javascript client, typescript client, nats.deno, nats.ws, nats.node]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-get-direct]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-get-direct, s-adr-47-request-many, s-docs-core-nats-request-reply]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # nats.js
@@ -59,10 +59,20 @@ npm install @nats-io/transport-node @nats-io/jetstream   # the v3 modular path
 - **Migration between v2 and v3 is documented in-repo** (`migration.md`), which is where a version
   jump on an existing service should start.
 
+## `requestMany`
+
+The JavaScript client ships ADR-47's gather helper as `requestMany` — a total timeout, an optional
+stall gap, a message cap, a sentinel, and a `503` that ends the gather (source:
+[[s-adr-47-request-many]]; named by the docs beside orbit.go's `RequestMany` and .NET's
+`RequestManyAsync`, source: [[s-docs-core-nats-request-reply]]). A plain `request()` still returns the
+first reply and drops the rest; the error for a missing service is `RequestError` with
+`isNoResponders()`, for a slow one `TimeoutError` — [[request-reply]].
+
+
 ## Related
 
 [[orbit]] · [[nats-go]] · [[nats-server]] · [[nats-cli]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-docs-get-direct]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-docs-get-direct]] · [[s-adr-47-request-many]] · [[s-docs-core-nats-request-reply]]

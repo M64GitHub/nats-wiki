@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed, s-docs-core-nats-publish-subscribe]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-queue-groups]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -280,6 +280,15 @@ subscription still alive — is a different symptom with a different page, writt
 [[core-nats-delivery]].
 
 
+## A queue member cut here leaves its group
+
+A member of a queue group "stops receiving messages only when its subscription or connection goes
+away, including when the server disconnects it as a slow consumer; the server then picks among the
+remaining members" (`concepts/queue-groups.md:24`, source: [[s-docs-core-nats-queue-groups]]). Until
+that moment the member keeps its random share of the group's traffic however far behind it is —
+[[queue-groups]] has the run.
+
+
 ## Related
 
 [[consumer]] · [[monitoring-endpoints]] · [[nats-cli]] · [[jetstream-sizing]] ·
@@ -291,4 +300,4 @@ subscription still alive — is a different symptom with a different page, writt
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-docs-core-nats-publish-subscribe]]
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-queue-groups]]

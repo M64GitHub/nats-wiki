@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [timeout, request-reply, no-responders, gomaxprocs, request_queue_limit, routes, kubernetes]
 aliases: ["nats: timeout", "Future cancelled, response not registered in time", "request timeout", "no responders available for request", "publish timeout"]
-sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster]
+sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -226,6 +226,23 @@ often they are the answer — there is no public evidence for that ordering.
   everywhere.
 - Pin `GOMAXPROCS` or use whole-CPU limits on containers.
 
+## The 503, and what the CLI's exit code tells you
+
+The no-responders reply is sent only when four things hold at once — nothing took the message, the
+publish carried a reply subject, the connection asked for `no_responders` in its `CONNECT`, and the
+requesting connection itself holds the inbox subscription — and it carries `Nats-Subject: <subject>`
+since 2.12.0: `HMSG _INBOX.x 1 38 38` + `NATS/1.0 503\r\nNats-Subject: nobody\r\n\r\n`, run on 2.14.6
+(source: [[s-nats-server-request-reply-observed]]). A subscriber that exists and never answers is a
+timeout, not a 503, and so is a request whose inbox lives on another connection. The mechanics, the
+preconditions and each client's name for the two errors — Java reports no responders only with
+`reportNoResponders()` (source: [[s-docs-core-nats-request-reply]]) — are on [[request-reply]].
+
+`nats request` gives all three outcomes **exit 0**: a served request prints the reply, no responders
+prints `No responders are available` in ~37 ms, and a timeout prints **nothing** after `Sending request
+on "…"` (`req_command.go:143–150`, source: [[s-nats-cli-request-reply-source]]; runs B6–B8). A health
+check that scripts `nats request` has to read the output; `$?` cannot tell a timeout from a reply.
+
+
 ## Related
 
 [[stream-has-high-message-lag]] · [[slow-consumer-detected]] · [[build-a-3-node-cluster]] ·
@@ -242,4 +259,4 @@ often they are the answer — there is no public evidence for that ordering.
 - [[s-gh-7190-asymmetric-cluster]] — the same single-DNS-name route defect, independently reported.
 - [[s-docs-monitoring-endpoints]] — `slow_consumers` and `/connz?sort=pending`.
 - [[s-docs-forming-a-cluster]] — what the `Routes` column counts. ·
-[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]]
+[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]]

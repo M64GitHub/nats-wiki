@@ -12,7 +12,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 1 | ADR-1.md | JetStream JSON API Design | Implemented | clients core jetstream | jetstream, client, server | ★ implemented | [[s-adr-1-jetstream-json-api]] |
 | 2 | ADR-2.md | NATS Typed Messages | Implemented | clients core jetstream | jetstream, server, client | ★ implemented |  |
 | 3 | ADR-3.md | NATS Service Latency Distributed Tracing Interoperability | Approved | core monitoring | observability, server | approved |  |
-| 4 | ADR-4.md | NATS Message Headers | Implemented | clients core | server, client | ★ implemented |  |
+| 4 | ADR-4.md | NATS Message Headers | Implemented | clients core | server, client | ★ implemented | [[s-adr-4-message-headers]] |
 | 5 | ADR-5.md | Lame Duck Notification | Partially Implemented | clients core | server, client | ★ partial |  |
 | 6 | ADR-6.md | Naming Rules | Approved | clients core | server, client | approved |  |
 | 7 | ADR-7.md | NATS Server Error Codes | Partially Implemented | clients core jetstream | server, client, jetstream | ★ partial | [[s-adr-7-server-error-codes]] |
@@ -47,7 +47,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 42 | ADR-42.md | Pull Consumer Priority Groups | Approved | core jetstream | jetstream, server, 2.11 | approved 2.11 | [[s-adr-42-priority-groups]] |
 | 43 | ADR-43.md | JetStream Per-Message TTL | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 | [[s-adr-43-per-message-ttl]] |
 | 44 | ADR-44.md | Versioning for JetStream Assets | Implemented | core jetstream | jetstream, server, 2.11, 2.12 | ★ implemented 2.11 2.12 |  |
-| 47 | ADR-47.md | Request Many | Partially Implemented | clients | client, spec, orbit | partial |  |
+| 47 | ADR-47.md | Request Many | Partially Implemented | clients | client, spec, orbit | partial | [[s-adr-47-request-many]] |
 | 48 | ADR-48.md | TTL Support for Key-Value Buckets | Implemented | clients jetstream kv | jetstream, client, kv, refinement, 2.11 | implemented refinement 2.11 | [[s-adr-48-kv-ttl]] |
 | 49 | ADR-49.md | JetStream Distributed Counter CRDT | Approved | jetstream | jetstream, spec, 2.12 | approved 2.12 |  |
 | 50 | ADR-50.md | JetStream Batch Publishing | Approved | clients core jetstream | jetstream, server, client, 2.12, 2.14 | approved 2.12 2.14 |  |

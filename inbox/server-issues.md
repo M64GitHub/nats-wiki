@@ -37,6 +37,7 @@ So the discipline here is different:
 | SI-4 | The `client_connect` event's `timestamp` is UTC (`…Z`) while the `client_disconnect` event's carries the server's local offset (`…+02:00`) — `accountConnectEvent` stamps `time.Now().UTC()`, `accountDisconnectEvent` the `now` its caller passes; the auth-error twin of the same body is UTC again | inconsistent | low | v2.14.6 | not filed |
 | SI-5 | After `--signal ldm` on a server with no clients, `$SYS.SERVER.<id>.LAMEDUCK` arrived and the server exited within a millisecond, but no `$SYS.SERVER.<id>.SHUTDOWN` reached a subscriber on a peer; a plain SIGTERM on the same server did deliver `SHUTDOWN` | unexpected | low | v2.14.6 | not filed |
 | SI-6 | Config mode accepts `share: true` on a **stream** import and ignores it (`nats-server -t`: valid, exit 0; the parser applies `share` to service imports only), while the account-JWT library rejects the same import with `sharing information (for latency tracking) is only valid for services` — the two modes disagree on whether the key is an error | inconsistent | low | v2.14.6 | not filed |
+| SI-8 | With a leafnode holding *n* members of a queue group, a publisher on the hub sees the hub's own members split unevenly: the member that follows the leaf's *n* entries in the match list receives its own share plus the leaf's — two hub members and two leaf members split 148 / 52, 89 / 311, 297 / 103 and 302 / 98 over four runs; two and one 137 / 263; three and two 70 / 75 / 255; the control with no leaf member 196 / 204. The leaf's members receive nothing while the hub has one | unexpected | medium | v2.14.6 | not filed |
 | SI-7 | A `pedantic` client publishing to a subject that fails `IsValidLiteralSubject` — `orders.*.created` — receives `-ERR 'Invalid Publish Subject'` **and the message is delivered anyway**: both `processPub` and `processHeaderPub` send the error and return `nil`, so the publish is routed as a literal subject and wildcard subscribers get it. The error reads as a refusal and is not one | unexpected | low | v2.14.6 | not filed |
 
 ---
@@ -435,3 +436,62 @@ insert, which refuses independently of the flag).
 nevertheless routed, so an application that treats `-ERR` as "not sent" and retries would publish twice.
 Nothing at the default setting. No data-integrity or security effect.
 
+## SI-8 · A leaf's queue members skew the hub's own members' split
+
+**The observation.** On **v2.14.6**, `raw/nats-server-src/request-reply-observed-v2.14.6.md` runs H5–H8
+(`request-reply-run3.sh`, `request-reply-run4.sh`): a standalone hub (`leafnodes { port: 17422 }`) and a
+standalone leaf (`leafnodes { remotes: [ { url: nats-leaf://127.0.0.1:17422 } ] }`), plain `nats sub
+orders.created --queue workers` members on each side, `nats pub --count 400` on the hub:
+
+```
+--- H5.1: two on the hub, two on the leaf; 400 publishes on the hub
+hub-e1-1 89 · hub-e2-1 311 · leaf-e1-1 0 · leaf-e2-1 0
+--- H5.2: two on the hub, two on the leaf; 400 publishes on the hub
+hub-e1-2 297 · hub-e2-2 103 · leaf-e1-2 0 · leaf-e2-2 0
+--- H5.3: two on the hub, two on the leaf; 400 publishes on the hub
+hub-e1-3 302 · hub-e2-3 98 · leaf-e1-3 0 · leaf-e2-3 0
+--- H6: two on the hub, one on the leaf; 400 publishes on the hub
+hub-f1 137 · hub-f2 263 · leaf-f 0
+--- H7: three on the hub, two on the leaf; 400 publishes on the hub
+hub-g1 70 · hub-g2 75 · hub-g3 255 · leaf-g1 0 · leaf-g2 0
+--- H8: two on the hub, no leaf member; 400 publishes on the hub (the control)
+hub-h1 196 · hub-h2 204
+```
+
+(The first pass, `request-reply-run3.sh` H5 with 200 publishes: 148 / 52.) The ratios are 3 : 1 for two
+hub members and two leaf members, 2 : 1 for two and one, 3 : 1 : 1 for three and two, and even without a
+leaf member; which hub member is favoured changed between repeats, each made with a new publisher
+connection.
+
+**The code** (`raw/nats-server-src/request-reply-v2.14.6.md`). The sublist expands a leaf's queue
+subscription to its weight — one entry per member behind it — when building the match result
+(`sublist.go:741–747`, "Shadow these subscriptions"). `processMsgResults` draws a random start index over
+that list (`client.go:5516`) and walks it; for a message from a client, a LEAF entry is not delivered to
+but remembered as the fallback and skipped — "Remember that leaf in case we don't find any other
+candidate … continue" (`:5547–5553`) — so every start index that lands on one of the leaf's *n* adjacent
+entries walks on to the same next local member. With the list `[hub-1, hub-2, leaf, leaf]` the member
+after the leaf entries is reached from three of the four start indexes.
+
+**What would settle it.** Whether the skew is intended. Two readings are possible: the leaf entries are
+meant to be fallbacks only and the walk should re-draw among the local members after skipping them (the
+route-vs-leaf fallback already re-randomises with a coin flip, `:5497–5504`, #6040); or the expansion to
+the weight should not apply to entries that cannot be delivered to on this pass. Either way the docs' "the
+selection is uniform-random across the available members" (`learn/core-nats/queue-groups.md:218`) does not
+hold for a hub with a leaf-side group.
+
+**Searched and not found.** The docs mirror's topology pages (`learn/topologies/leaf-nodes.md` has no
+queue-group statement); the 484 `nats-io/nats-server` discussions' titles, bodies, comments and replies
+for "queue group" with "leaf" (`local/scratch/gh-index/threads-2026-09-03.md`, 2026-09-03); the release
+bodies — 2.10.22 "Load balancing of queue groups over leafnode connections (#5982)" and 2.10.23 "Load
+balancing queue groups from leaf nodes in a cluster (#6043)" are about a message arriving *from* a leaf,
+which was not the shape here.
+
+**What was not tested.** A leaf *cluster* (several leaf servers) and a hub cluster (the hub was one
+server); a publisher on the leaf with several hub members (H2 and H4 had one leaf member taking all,
+which is the fallback rule, not the skew); a gateway; whether the skew changes with route pooling or
+`isolate_leafnode_interest`; a spoke leaf on a cluster.
+
+**Consequence.** Medium: uneven load on hub-side members whenever a leaf also hosts members of the same
+group — one hub member carries the leaf's share on top of its own, and an operator sizing a hub pool on
+"uniform across members" under-provisions it. No message is lost or duplicated; the leaf's members are
+simply never chosen while the hub has one.

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [at-most-once, interest-graph, ordering, fire-and-forget, echo, NoEcho, max_payload, headers, no_header_support, wire-tap, subsz, nats-trace, reconnect, lame-duck, slow-consumer]
 aliases: [core NATS, at-most-once delivery, interest graph, fire and forget, core NATS ordering, message ordering in core NATS, echo, NoEcho, "Maximum Payload Violation", "nats: maximum payload exceeded", debugging delivery, why did my message not arrive]
-sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands]
+sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers]
 created: 2026-09-03
 updated: 2026-09-03
 ---
@@ -47,8 +47,9 @@ docs' "doesn't guarantee that two subscribers see messages in the same order und
 (`publish-subscribe.md:422`), the complement of the rule, not a contradiction. Consequences:
 
 - one connection per producer whose order matters; a connection pool is a set of interleaved streams;
-- a queue group hands each message to one member, so order across members is the members' problem
-  ([[worker-pool]] is the durable form of that trade);
+- a queue group hands each message to one member — a random pick, uniform across a cluster, measured on
+  [[queue-groups]] (source: [[s-docs-core-nats-queue-groups]]) — so order across members is the members'
+  problem ([[worker-pool]] is the durable form of that trade);
 - JetStream orders by stream sequence, not by publisher — [[publishing]] — and *that* order is the one a
   consumer replays.
 
@@ -77,8 +78,11 @@ service import is *not* counted — [[service-import-request-info]].
 against a server without them `nats pub -H` fails client-side with `headers not supported by this
 server`, and a `CONNECT` asking for `no_responders` without header support is refused with `-ERR 'no
 responders requires headers support'` and closed (runs B6, B7, A5). Keys are case-sensitive and never
-folded; `Nats-` is reserved. Status codes ride the version line — `NATS/1.0 503` with an empty body is the
-no-responders signal, which [[nats-timeout]] triages today and step 2's request/reply page will own.
+folded; `Nats-` is reserved. Headers, `no_responders` and the 503 have been in the server since 2.2.0 —
+absent at 2.1.9 (source: [[s-relnotes-2.2.0]]) — framed as ADR-4 specifies: `HDR_LEN` from `NATS/1.0`
+through the blank line, `TOT_LEN` header plus body, which is why the two count together against
+`max_payload` (source: [[s-adr-4-message-headers]]). Status codes ride the version line — `NATS/1.0 503` with an empty body is the
+no-responders signal, since 2.12.0 with a `Nats-Subject` header (`client.go:4506–4516`, run B1; sources: [[s-nats-server-request-reply]], [[s-nats-server-request-reply-observed]], [[s-docs-core-nats-request-reply]]); [[request-reply]] owns it and [[nats-timeout]] triages it.
 
 **A slow subscriber is cut off, alone.** Past the server's pending threshold it "logs `Slow Consumer
 Detected`, and closes its connection. The other subscribers are unaffected" (`publish-subscribe.md:576`).
@@ -150,8 +154,11 @@ Reload behaviour is from [[config-keys]]; the constants from [[defaults-and-limi
 - **Pedantic mode is advisory.** A `pedantic` connection publishing to a wildcard gets `-ERR 'Invalid
   Publish Subject'` and the message is delivered anyway (run C3; `inbox/server-issues.md` SI-7).
 - **A single connection is one FIFO.** A slow subscription and a fast one on the same connection share
-  the socket and the client's read loop; whether that costs enough to justify two connections is bank
-  row 138, open.
+  the socket and the client's read loop. The maintainers' rule (gh#2760): start with one connection;
+  head-of-line blocking is "mostly from the system to your app (subscriptions)", so move a
+  latency-sensitive subscription to a second connection only when a heavy one delays it — publishing
+  needs no connection of its own (source: [[s-gh-2760-one-connection-or-two]]; the requester's side is
+  on [[request-reply]]).
 
 ## To verify
 
@@ -180,3 +187,9 @@ Reload behaviour is from [[config-keys]]; the constants from [[defaults-and-limi
   four surfaces, the restart and the lame duck.
 - [[s-docs-core-nats-subjects-and-mapping]] — wildcard subscribers as ordinary subscribers.
 - [[s-nats-cli-core-commands]] — the CLI flags and defaults quoted above.
+- [[s-nats-server-request-reply]] · [[s-nats-server-request-reply-observed]] — the 503 with `Nats-Subject`, read
+  and run.
+- [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] — the request/reply and queue-group
+  pages of the chapter, for the two pointer sentences above.
+- [[s-gh-2760-one-connection-or-two]] — one connection or two, the maintainers' rule.
+- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing.

@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [release, 2.12, strict-mode, elastic-pointers, offline-assets, GOMEMLIMIT, api-level-2, atomic-batch, counters, async-flush, changelog]
 aliases: ["2.12", v2.12, v2.12.0, v2.12.5, v2.12.15]
-sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing, s-gh-7463-jetstream-corruption, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-filestore-recovery, s-gh-8001-jetstream-startup-slow-50m, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-upgrade-to-2.12, s-docs-advanced-publishing, s-gh-7463-jetstream-corruption, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-filestore-recovery, s-gh-8001-jetstream-startup-slow-50m, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.2.0]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -98,7 +98,7 @@ upgrade guide against them); every release is a row of `inbox/relnotes-toc.md`.
   not need to reach each other, replacing the same-cluster-name workaround.
 - **A leafnode remote can be disabled by config reload** with `disabled: true`; false→true
   disconnects a solicited leafnode and stops it reconnecting.
-- **A no-responders error carries the original subject** in a `Nats-Subject` header (#5250).
+- **A no-responders error carries the original subject** in a `Nats-Subject` header (#5250). The bytes as the 2.14.6 server sends them — and the 2.2.0 form without the header — are on [[request-reply]] (source: [[s-relnotes-2.2.0]]).
 
 **Performance**
 
@@ -278,3 +278,4 @@ implemented (source: [[s-relnotes-2.12]]; the diff in `wiki/log.md` under 2026-0
 ## Sources
 
 [[s-docs-upgrade-to-2.12]] · [[s-docs-advanced-publishing]] · [[s-gh-7463-jetstream-corruption]] · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+- [[s-relnotes-2.2.0]] — where the 503 itself arrived, for the `Nats-Subject` line above.

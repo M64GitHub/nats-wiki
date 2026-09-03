@@ -7,7 +7,7 @@ verified-against: NATS .NET v3.2.0
 verified-on: 2026-08-31
 tags: [client, tier-1, dotnet, csharp, opentelemetry, net10, net6-dropped]
 aliases: [nats.net, "nats-io/nats.net", ".net client", "c# client", NATS.Net]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks, s-docs-core-nats-request-reply, s-adr-47-request-many]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -71,10 +71,18 @@ Two public reports, both from .NET, both looking like the client until they were
 The symptom page is [[consumer-keeps-redelivering]].
 
 
+## `RequestManyAsync`, and no responders by default
+
+`RequestAsync` "throws `NatsNoRespondersException` immediately when nothing is subscribed on the
+subject" — no opt-in, unlike Java — and the client ships ADR-47's gather helper as `RequestManyAsync`
+(source: [[s-docs-core-nats-request-reply]], [[s-adr-47-request-many]]). The stop conditions and what
+each costs are on [[request-reply]].
+
+
 ## Related
 
 [[orbit]] · [[nats-go]] · [[monitoring-endpoints]] · [[nats-server]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-docs-core-nats-request-reply]] · [[s-adr-47-request-many]]

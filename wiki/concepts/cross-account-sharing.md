@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [exports, imports, stream-export, service-export, prefix, to, external, api-prefix, 10021, 10022, 10024]
 aliases: [exports, imports, export, import, cross-account, account import, account export, activation token, api prefix, external]
-sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-service-imports, s-nats-server-share-import-observed, s-jwt-imports-exports-activation, s-nsc-imports-exports-activation, s-natscli-auth-exports-imports, s-docs-config-accounts-exports-imports]
+sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-service-imports, s-nats-server-share-import-observed, s-jwt-imports-exports-activation, s-nsc-imports-exports-activation, s-natscli-auth-exports-imports, s-docs-config-accounts-exports-imports, s-nats-server-request-reply-observed, s-nats-server-request-reply]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -294,6 +294,20 @@ does. 2.10.28 added that "it is now possible with service imports to import the 
 multiple different accounts" (#6704).
 
 
+### Run on 2.14.6 — the 503 crosses the import, and names the importer's subject
+
+Row 150's question, on the binary (run G, source: [[s-nats-server-request-reply-observed]]): account
+`APP` importing service `svc.check` from `SVC` with nobody subscribed in `SVC` got `No responders are
+available` in 37 ms, exit 0 — the fast failure #6532 promised, not a timeout. On the wire the reply
+was `HMSG _INBOX.x 1 41 41` with `Nats-Subject: svc.check`; with the import renamed `to: inv.stock` it
+carried **`Nats-Subject: inv.stock`** — the subject the requester published, not the exporter's (the
+server formats the header from the published subject, `client.go:4510–4511`, source:
+[[s-nats-server-request-reply]]). With a responder in `SVC` both imports answered; a subject `APP`
+never imported was no responders too. So on 2.14.6 the two meanings above are told apart only by what
+*else* is true — an import that does not exist and an export with nobody listening produce the same
+503 — and the request/reply mechanics are on [[request-reply]].
+
+
 ## Version notes: the 2.11 line
 
 **Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
@@ -351,4 +365,4 @@ import of `$JS.ACK.<stream>.>` must be rewritten before the default flips ([[js-
 [[s-nats-server-auth-and-tls]] · [[s-docs-mirrors-and-sources]] ·
 [[s-docs-object-store-under-the-hood]] · [[s-docs-authorization]] ·
 [[s-docs-security-checklist]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-service-imports]] · [[s-nats-server-share-import-observed]] · [[s-jwt-imports-exports-activation]] · [[s-nsc-imports-exports-activation]] · [[s-natscli-auth-exports-imports]] · [[s-docs-config-accounts-exports-imports]]
+[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-service-imports]] · [[s-nats-server-share-import-observed]] · [[s-jwt-imports-exports-activation]] · [[s-nsc-imports-exports-activation]] · [[s-natscli-auth-exports-imports]] · [[s-docs-config-accounts-exports-imports]] · [[s-nats-server-request-reply-observed]] · [[s-nats-server-request-reply]]

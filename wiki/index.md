@@ -91,6 +91,14 @@ exists to answer live in `inbox/question-bank.md`.
   restart-only `max_subscription_tokens` are the real bounds), `$` prefixes nobody checks, a publish to a
   wildcard routed as a literal, pedantic mode that errors and delivers anyway, and a space that silently
   misroutes.
+- [[request-reply]] — a publish with a private reply subject: the `_INBOX.<nuid>.*` mux, the three outcomes
+  with each client's name for them and the CLI's one exit code for all three, the `503` exactly as the
+  2.14.6 server sends it (`Nats-Subject` since 2.12.0, the four preconditions, since 2.2.0), scatter-gather
+  with ADR-47's four stop conditions timed, the 503 across an import, and one connection or two.
+- [[queue-groups]] — one member per message, picked at random: not round-robin and **not readiness-aware**
+  (a busy member kept its share, measured), uniform per member across a cluster, the publisher's own side
+  across a leafnode — with the hub's split skewed 3 : 1 by a leaf's members (SI-8) — and an exclusion list
+  across a gateway; `/subsz` shows one server's members only.
 
 ## Internals
 
@@ -420,6 +428,10 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-docs-core-nats-publish-subscribe]] — the chapter's spine: at-most-once, the interest graph, echo,
   `max_payload` with headers, the reconnect buffer and lame duck as a client sees them, and the three
   debugging tools; the `concepts/` primers folded.
+- [[s-docs-core-nats-request-reply]] — the inbox mux, the three outcomes with each client's name, the CLI's
+  gather flags and the `nats reply` queue-group trap; `concepts/request-reply.md` folded.
+- [[s-docs-core-nats-queue-groups]] — the random pick, coexistence, one subject per group, the typo, and the
+  "a cluster adds a locality preference" sentence the lab contradicts; `concepts/queue-groups.md` folded.
 
 **docs.nats.io — Clustering (learn)**
 
@@ -556,6 +568,12 @@ exists to answer live in `inbox/question-bank.md`.
   `max_subscription_tokens` refusing a reload, `/subsz?test=`, `nats trace` without a system user, weighted
   and partitioned mappings counted over 200 publishes (the loss trick on a wildcard source too), a restart
   and a lame duck as `nats sub --trace` prints them.
+- [[s-nats-server-request-reply]] — the four conditions of the 503 and its bytes, `processMsgResults`' random
+  start index and the leaf fallback, the sublist's weight expansion, `RS+ … <weight>`, the gateway
+  exclusion, at v2.14.6 with lines.
+- [[s-nats-server-request-reply-observed]] — eight runs in four passes: the 503 with `Nats-Subject`, the
+  CLI's silent timeout at exit 0, a busy member keeping 8 of 20, a quarter each across the lab's nodes, the
+  503 across an import, and a leaf's members skewing the hub's split 3 : 1.
 
 **The `nats.go` client source**
 
@@ -617,6 +635,10 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-adr-33-metadata]] — `metadata` on streams and consumers: 128 KB, `_nats` reserved.
 - [[s-adr-34-multiple-filters]] — `filter_subjects`: no overlaps (10136), not both forms (10134), a buffer
   per subject on the server.
+- [[s-adr-4-message-headers]] — the header wire format: `NATS/1.0`, `HDR_LEN` through the blank line, case
+  preserving, one value per line; no version — that comes from the source at v2.2.0.
+- [[s-adr-47-request-many]] — *Partially Implemented*: the four stop conditions of a many-reply request and
+  the terminal 503; the CLI's flags are these.
 
 **Release notes and upgrade guides**
 
@@ -641,6 +663,8 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-relnotes-2.15-preview]] — the v2.15.0-preview.1 body (2026-08-24) read whole: the desired-state metalayer,
   the evacuate and cancel-move subjects verified at the preview tag, backup v2, `sources.db`, the
   `sync_interval: always` change on replicated streams — and the `$JS.ACK` v2 default **not yet flipped**.
+- [[s-relnotes-2.2.0]] — the oldest body kept, out of the archive's range: it never names headers or
+  `no_responders`, so the source at v2.1.9 and v2.2.0 dates them — and the 2.2.0 `503` had no `Nats-Subject`.
 
 **GitHub discussions**
 
@@ -825,6 +849,8 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-gh-5172-mapping-in-config-or-stream]] — the maintainer's placement rule: partition for a stream in the
   stream config, not the server config; and the server's example config using a wildcard source as its own
   destination for loss testing.
+- [[s-gh-2760-one-connection-or-two]] — "start with one connection"; head-of-line blocking is on the
+  subscription side, so split subscriptions, not publishing. Row 138's thread.
 
 **Synadia blog (continued)**
 
@@ -932,6 +958,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-cli-core-commands]] — `request`, `reply`, `trace`, `server mappings`, `subscribe` and `publish`
   help at 0.4.0: `nats reply` joins `NATS-RPLY-22` by default, `--replies` / `--reply-timeout` /
   `--wait-for-empty`, `--headers-only`, `--deliver`.
+- [[s-nats-cli-request-reply-source]] — `req_command.go` and `reply_command.go` at v0.4.0: a timeout `break`s
+  silently to exit 0, any empty reply ends a counted gather, `--wait-for-empty` is `--replies 32767`, and
+  `nats reply` is one callback.
 
 **The Helm chart**
 
@@ -1009,12 +1038,12 @@ names now have pages — see the Entities section above. People: none yet.)*
 
 - `inbox/question-bank.md` — the questions this wiki must answer, with the page that answers each
 - `inbox/adr-toc.md` — one row per ADR of `nats-architecture-and-design`
-- `inbox/docs-issues.md` — **84** errors and gaps found in **public NATS documentation**, each verified
+- `inbox/docs-issues.md` — **89** errors and gaps found in **public NATS documentation**, each verified
   against the server at a release tag with file and line, kept so they can be sent to the maintainers.
   **None has been filed yet** — every row's `upstream` column reads `not filed`. Routed by a
-  `destination` column: 55 to `nats-docs`, 6 (#7, #30, #31, #37, #49, #51) to the ADR repo, 1 (#40) to `natscli`,
+  `destination` column: 59 to `nats-docs`, 6 (#7, #30, #31, #37, #49, #51) to the ADR repo, 2 (#40, #89) to `natscli`,
   1 (#39) to a published blog post.
-- `inbox/server-issues.md` — **7** findings about **`nats-server` itself**, kept separate because a
+- `inbox/server-issues.md` — **8** findings about **`nats-server` itself**, kept separate because a
   server finding cannot be settled the way a docs finding can: there is no higher authority to check it
   against, so entries are observations and questions rather than verdicts. `SI-1` is the
   `$OBJ.>` / `$O.` mismatch that lets object-store data cross a JetStream domain boundary.

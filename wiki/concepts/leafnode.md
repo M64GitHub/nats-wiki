@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed, s-nats-server-service-imports, s-ghsa-2026-08-request-info-spoofing]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed, s-nats-server-service-imports, s-ghsa-2026-08-request-info-spoofing, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -415,6 +415,24 @@ maintainer saw the event on Synadia Cloud and a docker-compose hub never did; th
 [[s-gh-5902-leafnode-connect-events]]; the table is [[system-subjects]]).
 
 
+## Queue groups across a leafnode
+
+A member behind the leaf connection is only a fallback: the server delivers to its own members and
+remembers a leaf entry "in case we don't find any other candidate" (`client.go:5547–5552`; source:
+[[s-nats-server-request-reply]]). Run H on 2.14.6, a standalone hub and a standalone leaf: one member
+each side, 200 publishes on the hub → **200 / 0**, on the leaf → **0 / 200**; members only on the far
+side receive everything (93 / 107 across two). The same rule holds for a spoke, which never forwards
+a queue message to a route (`:5534`), and 2.10.22 / 2.10.23 changed how a leaf's members balance when
+the message comes from the leaf side (#5982, #6043, above). What the run also showed: **a leaf's
+members skew the hub's own split** — two members on the hub and two on the leaf, publishing on the
+hub, split the hub's two 148 / 52, then 89 / 311, 297 / 103 and 302 / 98; two and one gave 137 / 263;
+the control without a leaf member 196 / 204 (runs H5–H8, source:
+[[s-nats-server-request-reply-observed]]; `inbox/server-issues.md` SI-8). Keep a group's members on
+one side of a leafnode, or expect the member after the leaf's entries in the list to carry the leaf's
+share on top of its own. The full rule set is on [[queue-groups]]; the docs' queue-group page covers one server and several
+clusters and says nothing about a leafnode (source: [[s-docs-core-nats-queue-groups]]).
+
+
 ## Related
 
 [[gateway]] · [[choosing-a-topology]] · [[jetstream-domain]] · [[account]] ·
@@ -430,7 +448,8 @@ maintainer saw the event on Synadia Cloud and a docker-compose hub never did; th
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]] ·
 [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-5902-leafnode-connect-events]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-server-service-imports]] · [[s-ghsa-2026-08-request-info-spoofing]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-5902-leafnode-connect-events]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-server-service-imports]] · [[s-ghsa-2026-08-request-info-spoofing]] · [[s-nats-server-request-reply]] · [[s-nats-server-request-reply-observed]]
+- [[s-docs-core-nats-queue-groups]] — silent on leafnodes; cited for that.
 
 ## To verify
 

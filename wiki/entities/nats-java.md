@@ -7,9 +7,9 @@ verified-against: nats.java 2.26.2
 verified-on: 2026-08-31
 tags: [client, tier-1, java, jvm, kotlin, scala, jnats]
 aliases: [nats.java, "nats-io/nats.java", java client, jnats, "io.nats:jnats"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-core-nats-request-reply]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # nats.java
@@ -55,10 +55,20 @@ example, not as the version to use (source: [[s-docs-getting-started]]).
 - **It has an Orbit counterpart** (`synadia-io/orbit.java`), and the README documents the Client/Orbit
   split directly — see [[orbit]].
 
+## What bites you
+
+- **A missing service is a timeout, not a no-responders error, unless you ask.** The Java client
+  needs the `reportNoResponders()` connect option to surface the server's `503` (as a
+  `JetStreamStatusException` with status 503); without it a request to a subject nobody is subscribed
+  to waits out its full timeout — the docs' word (`learn/core-nats/request-reply.md:380`,
+  `concepts/request-reply.md:1040–1046`; source: [[s-docs-core-nats-request-reply]]). Every other
+  client the docs cover reports no responders by default — [[request-reply]].
+
+
 ## Related
 
 [[orbit]] · [[nats-go]] · [[nats-server]] · [[consumer]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-docs-core-nats-request-reply]]

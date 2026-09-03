@@ -19,7 +19,7 @@ those are suggestions — the point of the report is the finding, not the patch.
 |---|---|
 | `★` | a **confirmed factual error with real impact** — following the documentation produces a broken result, **silently**. If you triage on one thing, triage on this |
 | `where` | the doc path. For docs.nats.io prefix `https://docs.nats.io/` |
-| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Four rows (#7, #30, #31, #37) are ADR errors rather than docs errors, one (#40) is a **CLI defect**, and one (#39) is a **published blog post** rather than a repository at all |
+| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Four rows (#7, #30, #31, #37) are ADR errors rather than docs errors, two (#40, #89) are **CLI** findings, and one (#39) is a **published blog post** rather than a repository at all |
 | `kind` | `wrong-value` and `missing` are defects; `enhancement` is correct-but-unhelpful |
 | `severity` | our estimate of consequence, not of effort |
 | **`upstream`** | where this was filed and what became of it. `not filed` means we have not sent it yet |
@@ -143,6 +143,11 @@ row.
 | 81 | `concepts/subjects.md:1101` — "**Keep it reasonable**: Limit to ~16 tokens and under 256 characters total" — states a limit no server enforces. At v2.14.6 `isValidSubject` checks empty tokens, whitespace and a non-final `>` and nothing else; the only bounds are `max_control_line` (4096 bytes for the whole line) and the optional `max_subscription_tokens`. The learn page (`learn/core-nats/subjects-and-wildcards.md`) states no such limit, and a reader who asked what the 16 meant was told it is "probably not strictly enforced" (gh#5097). The 256 is most likely `JSMaxNameLen = 255`, which bounds stream and consumer names | `concepts/subjects.md` (line 1101) | nats-docs | enhancement | low | not filed | wiki states the three enforced rules and the real bounds on `concepts/subjects-and-wildcards` |
 | 82 | `reference/config/max_subscription_tokens.md` is an empty page: alias `max_sub_tokens`, "Requires Restart", type `integer`, and nothing else — no description, default, range or behaviour. The server: `uint8`, `1`–`255` (`0` refused as "value can not be negative", `256` as "value is too big"), unset = unlimited, applied to **subscriptions only**, violation `-ERR 'Permissions Violation for Subscription to "<subj>", too many tokens'` and log `Subscription Violation Too Many Tokens`. Sweep: the seven sibling `max_*` config pages' reload labels all agree with `reload.go`; this is the only empty one | `reference/config/max_subscription_tokens.md` | nats-docs | missing | medium | not filed | wiki tables the key on `reference/config-keys` and states the rule on `concepts/subjects-and-wildcards` |
 | 83 | `concepts/subjects.md:1080–1087` lists `_INBOX` under "Subjects starting with `$` are reserved for system use: `$SYS`, `$JS`, `$KV`, `$O`, `$SRV`, `_INBOX`"; `_INBOX` does not start with `$`, and the learn page (`learn/core-nats/subjects-and-wildcards.md:418–422`) correctly separates the two families. The primer also omits that the server enforces none of the prefixes for a plain client | `concepts/subjects.md` (lines 1080–1087) | nats-docs | enhancement | low | not filed | wiki tables the prefixes and who enforces them on `concepts/subjects-and-wildcards` |
+| 85 | The no-responders `503` has carried a `Nats-Subject: <subject>` header since 2.12.0 (#5250), and no page says so: `learn/core-nats/request-reply.md:563` and `headers.md:314–316, 378` describe the reply as `NATS/1.0 503` with an empty body and stop there; the five `Nats-Subject` mentions in the 861-page tree are all Direct Get's header. Run on 2.14.6: `HMSG _INBOX.x 1 38 38` + `NATS/1.0 503\r\nNats-Subject: nobody\r\n\r\n`; across a renamed service import the header names the subject the requester published (`inv.stock`) | `learn/core-nats/request-reply.md` (line 563), `learn/core-nats/headers.md` (lines 314–316, 378) | nats-docs | missing | low | not filed | wiki states the bytes and the version on `concepts/request-reply` |
+| 86 | `learn/services/scaling.md:150` "the server delivers each message to whichever queue-group member is ready" and `:272` "The queue group masks this for a while by sending requests to the busy instance's peers instead" — the server picks a random start index over the group's members (`client.go:5516–5519`) and knows nothing of a handler's state. Run on 2.14.6: two members, one sleeping 1 s per request, split 20 concurrent requests 12 / 8 and then 8 / 12; the busy member kept receiving while busy and answered its share one per second | `learn/services/scaling.md` (lines 150, 272) | nats-docs | wrong-value | medium | not filed | wiki states the random pick and the run on `concepts/queue-groups` |
+| 87 | `concepts/queue-groups.md:1528` "Use queue groups for operational work that needs to happen **exactly once**" against the same page's `:2131` "Core queue groups never redeliver — a message sent to a worker that crashes mid-processing is lost … Duplicates come only from publisher retries": a queue group is at-most-once, as the deep dive says (`learn/core-nats/queue-groups.md:230`) | `concepts/queue-groups.md` (lines 1528, 2131) | nats-docs | enhancement | low | not filed | wiki states at-most-once on `concepts/queue-groups` |
+| 88 | `learn/core-nats/queue-groups.md:218` "On a single server the selection is uniform-random across the available members; a cluster adds a locality preference, covered below" — the section below (`:259–263`) is about several clusters; inside one cluster there is no preference: a peer's members are expanded to their weight in the match list (`sublist.go:741–747`) and picked like local ones. Run on the three-node lab, 2.14.6: one member on the publisher's server and three on a peer received 90 / 97 / 106 / 107 of 400 publishes. The preferences the server does have are across a leafnode (a leaf member is only a fallback, `client.go:5547–5552`) and across a gateway (an exclusion list) | `learn/core-nats/queue-groups.md` (line 218) | nats-docs | enhancement | low | not filed | wiki states the cluster, leafnode and gateway rules with the runs on `concepts/queue-groups` |
+| 89 | `nats request` (natscli v0.4.0) exits 0 and prints nothing after `Sending request on "…"` when the request times out, exits 0 with `No responders are available` on a 503, and exits 0 on a reply — a script cannot tell a timeout from a served request by `$?` (`cli/req_command.go:143–150, 205`; run on 2.14.6). Second, `--replies N` ends on any reply with an empty body, `--wait-for-empty` or not (`:179–181`), and `--wait-for-empty` only sets `--replies` to 32767 (`:222–224`); the `--help` text describes neither. The docs' `learn/core-nats/request-reply.md:561` ("The CLI prints the line and exits cleanly") is right for no responders and silent on the timeout | `nats request` in natscli v0.4.0 (`cli/req_command.go`); `learn/core-nats/request-reply.md` (line 561), `scatter-gather.md` (line 621) | natscli | enhancement | low | not filed | wiki states the exit codes and the empty-reply rule on `concepts/request-reply` and `entities/nats-cli` |
 | 84 | `learn/core-nats/subject-mapping.md:646` "list the source subject itself as a destination, which tells the server your weights are final and stops it topping them up. This works because the source here is a literal subject" and `:772` "This only works for a literal source like `orders.created`" — the restriction is not in the server. `AddWeightedMappings` skips the auto-added remainder whenever the source string is among the destinations, wildcard or not (`accounts.go:844–862`); run on 2.14.6, `"orders.loss.>": [ { destination: "orders.loss.>", weight: 50 } ]` passed `nats-server -t` and dropped 102 of 200 publishes. The server's own example config uses exactly that shape as "A chaos testing trick that introduces 50% artificial message loss" (quoted in gh#5172). `reference/config/mappings/weight.md` mentions "artifical message loss" without saying how it is configured | `learn/core-nats/subject-mapping.md` (lines 646, 772); `reference/config/mappings/weight.md` | nats-docs | wrong-value | low | not filed | wiki states the rule with the literal and the wildcard run on `concepts/subject-transforms` |
 
 ---
@@ -3508,6 +3513,11 @@ which case it is dropped. The `weight` reference page could carry the one-line e
 | 81 | `wiki/concepts/subjects-and-wildcards.md` — *No length limit, one line limit, one optional token limit*; `wiki/summaries/s-gh-5097-subject-token-limit.md` |
 | 82 | `wiki/reference/config-keys.md` — *Three top-level keys the core-NATS pages need*; `wiki/concepts/subjects-and-wildcards.md`; `wiki/reference/defaults-and-limits.md` — *What the core-server rows do when crossed* |
 | 83 | `wiki/concepts/subjects-and-wildcards.md` — *Reserved prefixes* |
+| 85 | `wiki/concepts/request-reply.md` — *The 503, exactly*; `wiki/gotchas/nats-timeout.md`; `wiki/summaries/s-nats-server-request-reply-observed.md` (B1, G2, G3) |
+| 86 | `wiki/concepts/queue-groups.md` — *The pick: random, not round-robin, not readiness-aware*; `wiki/operations/worker-pool.md` — *The core queue group, measured* |
+| 87 | `wiki/concepts/queue-groups.md` — *At-most-once*; `wiki/summaries/s-docs-core-nats-queue-groups.md` |
+| 88 | `wiki/concepts/queue-groups.md` — *In a cluster*, *Across a leafnode*, *Across a gateway*; `wiki/concepts/gateway.md` — *Inside one cluster there is no affinity at all* |
+| 89 | `wiki/concepts/request-reply.md` — *The three outcomes*, the gather table; `wiki/entities/nats-cli.md` — *`nats request` and `nats reply`, as run on 0.4.0*; `wiki/summaries/s-nats-cli-request-reply-source.md` |
 | 84 | `wiki/concepts/subject-transforms.md` — *Account-level `mappings`*; `wiki/summaries/s-nats-server-core-delivery-observed.md` (F5, F8); `wiki/summaries/s-gh-5172-mapping-in-config-or-stream.md` |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
@@ -3586,3 +3596,151 @@ that two of them (`accounts`, and any revocation) rewrite the exporter's JWT per
 export flag, the token's fields (`sub` = importing account, `nats.subject`, `nats.kind`, `exp`,
 `issuer_account` when a signing key signs), the `nsc` commands, `revocations`, and the comparison with
 `accounts` and `account_token_position`. Until `nats auth` gains the command, the page has to name `nsc`.
+
+## 85 · The 503 carries `Nats-Subject`, and no page says so
+
+`learn/core-nats/request-reply.md:563`: "The signal rides the message header mechanism: the server
+delivers a reply with the header line `NATS/1.0 503`. A client needs header support to receive it, which
+every current client enables." `learn/core-nats/headers.md:314–316`: "the line reads `NATS/1.0 503`, and
+the message carries no payload … a reply with the header line `NATS/1.0 503` and an empty body"; `:378`
+repeats it. `grep -rn Nats-Subject raw/nats-docs/` finds five lines, all Direct Get's header
+(`learn/jetstream/get-direct.md:625, 817`, `learn/jetstream/subject-mapping.md:618, 631`,
+`reference/jetstream/api/headers.md:90`).
+
+**The server**: `client.go:4508–4511` at v2.14.6 (`raw/nats-server-src/request-reply-v2.14.6.md`):
+
+```go
+hdrLen := 32 /* header without the subject */ + len(c.pa.subject)
+proto := fmt.Sprintf("HMSG %s %s %d %d\r\nNATS/1.0 503\r\nNats-Subject: %s\r\n\r\n\r\n", c.pa.reply, sub.sid, hdrLen, hdrLen, c.pa.subject)
+```
+
+At v2.2.0 the same send was `HMSG %s %s 16 16\r\nNATS/1.0 503\r\n\r\n\r\n` (`client.go:3498`,
+`raw/nats-server-src/headers-arrival-v2.2.0.md`); the header arrived with v2.12.0 — "No responders errors
+from the server now include the original subject in the `Nats-Subject` header (#5250)"
+(`raw/release-notes/v2.12.0.md:19`).
+
+**Run** (2026-09-03, `raw/nats-server-src/request-reply-observed-v2.14.6.md` B1, G2, G3): `HMSG _INBOX.x 1
+38 38` with the header block `NATS/1.0 503\r\nNats-Subject: nobody\r\n\r\n`; over a service import renamed
+with `to: inv.stock` the header read `Nats-Subject: inv.stock` — the subject as the requester published
+it.
+
+**Why it matters**: a client that handles many in-flight requests on one inbox, or a gather helper, can
+tell *which* request found no responders only from this header; and a 2.2.0–2.11 server does not send it,
+which a client reading it must tolerate.
+
+**Suggested fix**: on `request-reply.md:563` and `headers.md:316`, state the header and its version:
+"since 2.12.0 the reply also carries `Nats-Subject: <the subject you published to>`, so a client can match
+the signal to the request".
+
+## 86 · The queue group is not readiness-aware
+
+`learn/services/scaling.md:150`: "The split isn't a round-robin you control: the server delivers each
+message to whichever queue-group member is ready." `:272`: "While one handler blocks … that instance
+answers no other request. The queue group masks this for a while by sending requests to the busy
+instance's peers instead, but if every instance blocks, the whole service stalls."
+
+**The server** (`client.go:5514–5520` at v2.14.6, `raw/nats-server-src/request-reply-v2.14.6.md`):
+
+```go
+sindex := 0
+lqs := len(qsubs)
+if lqs > 1 {
+	sindex = int(fastrand.Uint32() % uint32(lqs))
+}
+// Find a subscription that is able to deliver this message starting at a random index.
+```
+
+Nothing in the selection reads a member's pending buffer or knows whether a handler is running; a member
+leaves the list only when its subscription or connection goes.
+
+**Run** (2026-09-03, `request-reply-observed-v2.14.6.md` C1, C1', C3, nats CLI 0.4.0): two `nats reply`
+members of group `inv`, one answering at once and one running `sleep 1` before every reply, under 20
+concurrent requests: the slow member received **8 of 20**, then **12 of 20** on the repeat (`/subsz`:
+`msgs 8`, `msgs 12`), and answered them one per second, so the batch took 8.6 s and 12.3 s; 20 sequential
+requests split 8 / 12. The busy member kept receiving while busy.
+
+**Why it matters**: an architect reading L272 sizes a service on the assumption that a stalled instance
+sheds its load to its peers; it does not — its random share queues behind the stall until the requesters'
+timeouts fire. The learn page's own queue-group chapter says it right ("Selection is random per
+message", `learn/core-nats/queue-groups.md:218`; the primer adds "does not account for how busy a member
+is", `concepts/queue-groups.md:24`).
+
+**Suggested fix**: L150 → "the server picks a member at random per request"; L272 → "a blocked instance
+keeps receiving its share of requests, which wait behind the block until the caller's timeout — keep
+handlers fast, and size the requester's timeout for it".
+
+## 87 · "Exactly once" on a page that says at-most-once
+
+`concepts/queue-groups.md:1528`: "Use queue groups for operational work that needs to happen **exactly
+once**, and regular subscribers for observational tasks." `:2131` on the same page: "**At-most-once
+delivery**: Core queue groups never redeliver — a message sent to a worker that crashes mid-processing is
+lost … Duplicates come only from publisher retries, so make processing idempotent if the publisher may
+resend." The deep dive, `learn/core-nats/queue-groups.md:230`: "if the server picks a packer and it dies
+*after* delivery, that message is gone — the server won't retry it with another member."
+
+**Suggested fix**: L1528 → "work that should be handled by one member, not by every subscriber".
+
+## 88 · "A cluster adds a locality preference" — it does not, inside one cluster
+
+`learn/core-nats/queue-groups.md:218`: "On a single server the selection is uniform-random across the
+available members; a cluster adds a locality preference, covered below." The section below (`:259–263`,
+*A note on placement across regions*) is about "members in several clusters"; nothing on the page says
+what happens between the servers of one cluster.
+
+**The server**: a peer's members reach a server as one `RS+ <account> <subject> <queue> <weight>` entry
+(`route.go:1498, 1573`) and the sublist expands it to its weight before the pick — "Shadow these
+subscriptions … for n := 0; n < int(ns); n++" (`sublist.go:741–747`) — so a routed member is as likely as
+a local one; the loop takes a route entry outright ("Pick this one and be done", `client.go:5570–5571`).
+
+**Run** (2026-09-03, `request-reply-observed-v2.14.6.md` E1–E5 on `tools/lab/cluster.sh`): one member on
+the publisher's node and one on a peer, 200 publishes: 92 / 108, then 116 / 84; one on the publisher's node
+and **three** on a peer, 400 publishes: **90 / 97 / 106 / 107**, then 105 / 98 / 102 / 95; two local and one
+remote: 100 / 104 / 96. Uniform per member, no preference for the local server. The preferences the server
+does have: across a **leafnode** a leaf member is only a fallback (`client.go:5547–5552`; run H: 200 / 0 and
+0 / 200) and across a **gateway** the served queue names are excluded (`gateway.go:2638–2654`).
+
+**Suggested fix**: L218 → "… uniform-random across the available members, on one server and across a
+cluster alike; across a leafnode the publisher's own side is preferred, and across a super-cluster the
+publisher's cluster — covered below".
+
+## 89 · `nats request`: a silent timeout with exit 0, and a gather that any empty reply ends
+
+`nats request` at natscli v0.4.0 (`raw/nats-cli/request-reply-0.4.0.md`, `cli/req_command.go`):
+
+```go
+143:				if err == nats.ErrTimeout {
+144:					// continue to publish additional messages.
+145:					break
+146:				}
+147:				if err == nats.ErrNoResponders {
+148:					log.Printf("No responders are available")
+149:					return nil
+150:				}
+…
+179:			if c.replyCount > 0 && len(m.Data) == 0 {
+180:				break
+181:			}
+…
+222:	if c.terminateOnEmpty {
+223:		c.replyCount = math.MaxInt16
+224:	}
+```
+
+**Run** (2026-09-03, `raw/nats-server-src/request-reply-observed-v2.14.6.md` B6–B8, D8'–D11, nats CLI
+0.4.0 on nats-server 2.14.6): a timed-out request printed only `Sending request on "nobody"` and exited
+**0** after 1.058 s; no responders printed `No responders are available` and exited **0**; a served
+request exited **0**. With two quoting responders and one answering an empty body after 200 ms,
+`--replies 5` ended at the empty reply exactly as `--wait-for-empty` did (`nil body`, 0.25 s), while
+`--replies 2` took the first two and never saw it.
+
+**The docs**: `learn/core-nats/request-reply.md:561` — "The CLI prints the line and exits cleanly" (no
+responders); `scatter-gather.md:621` — "With `--wait-for-empty`, the command keeps collecting until a reply
+arrives with an empty payload"; neither the `--help` text nor the pages say that a timeout is silent, that
+its exit status is 0, or that a counted gather ends on an empty reply without the flag.
+
+**Why it matters**: `nats request` in a health check or a deploy script cannot distinguish a timeout from
+success by exit status, and a responder whose legitimate answer is empty cuts every `--replies N` short.
+
+**Suggested fix** (natscli): print `Request timed out` on the timeout path and exit non-zero for a timeout
+and for no responders (as `nats sub --wait` and `nats server check` do); document the empty-reply rule in
+`--replies`' help text.

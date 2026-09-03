@@ -7,9 +7,9 @@ verified-against: synadia-io/orbit.* as of 2026-08-31
 verified-on: 2026-08-31
 tags: [orbit, extensions, incubator, partitioned-consumer-groups, kv-codecs, counters]
 aliases: [orbit, orbit.go, orbit.js, orbit.py, orbit.java, orbit.rs, orbit.net, orbit.c, "synadia-io/orbit"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-advanced-publishing, s-docs-get-direct]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-advanced-publishing, s-docs-get-direct, s-adr-47-request-many, s-docs-core-nats-request-reply]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Orbit (synadia-io/orbit.*)
@@ -95,6 +95,15 @@ optional extra** — worth knowing before designing around either mode ([[publis
 - **`natssysclient` and `natscontext` are the two most operations-relevant modules**: they let a Go
   service read the same monitoring surface an operator reads by hand, using the same context files.
 
+## `RequestMany`
+
+ADR-47's request-many helper for Go lives in orbit.go, not in nats.go: a total timeout, an optional
+stall gap, an optional message cap, a sentinel — and a `503` in place of a reply is terminal (source:
+[[s-adr-47-request-many]]; the docs name orbit.go's `RequestMany` beside nats.js's `requestMany` and
+.NET's `RequestManyAsync`, source: [[s-docs-core-nats-request-reply]]). What each stop condition does,
+measured through the CLI's flags, is on [[request-reply]].
+
+
 ## Related
 
 [[nats-go]] · [[nats-rs]] · [[nats-java]] · [[nats-cli]] · [[key-value]] · [[monitoring-endpoints]] ·
@@ -103,4 +112,4 @@ optional extra** — worth knowing before designing around either mode ([[publis
 ## Sources
 
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-advanced-publishing]] ·
-[[s-docs-get-direct]]
+[[s-docs-get-direct]] · [[s-adr-47-request-many]] · [[s-docs-core-nats-request-reply]]
