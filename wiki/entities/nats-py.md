@@ -7,9 +7,9 @@ verified-against: nats.py v2.15.0 · PyPI nats-py 2.15.0 / nats-core 0.2.0
 verified-on: 2026-08-31
 tags: [client, tier-1, python, asyncio, nats-py, nats-core]
 aliases: [nats.py, "nats-io/nats.py", python client, nats-py, nats-core]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-gh-4535-unauthenticated-connections, s-docs-getting-started]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-gh-4535-unauthenticated-connections, s-docs-getting-started, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # nats.py
@@ -66,6 +66,17 @@ pip install nats-core[websocket]    # the new core package, WebSocket transport 
 - **Treat `nats-core` as early.** Version 0.2.0, no mention in the repo README, one mention in the
   docs. `nats-py` is what the docs' examples and this wiki's other pages assume.
 
+## What the core-NATS chapter says about this client
+
+- **`publish` skips the subject check**, so a subject with a space goes out as written and the server
+  misroutes it — `orders.us created` arrives as subject `orders.us` with reply subject `created`
+  (`learn/core-nats/subjects-and-wildcards.md:454`; source: [[s-docs-core-nats-subjects-and-mapping]]). The
+  server's side of that is reproduced on 2.14.6 with a raw writer (source:
+  [[s-nats-server-core-delivery-observed]], run A2); the client's side is the docs' word until step 8 of
+  `inbox/plan-the-client-side-2026-09-03.md` reads the client's releases. The rule is on
+  [[subjects-and-wildcards]].
+
+
 ## To verify
 
 - Whether `nats-core` is intended to replace `nats-py` or to sit beside it, and on what timeline. No
@@ -79,4 +90,4 @@ pip install nats-core[websocket]    # the new core package, WebSocket transport 
 ## Sources
 
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-gh-4535-unauthenticated-connections]] ·
-[[s-docs-getting-started]]
+[[s-docs-getting-started]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]]

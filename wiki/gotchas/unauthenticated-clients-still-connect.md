@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: ["$G", "$SYS", no_auth_user, accounts, auth_required, sysAccOnlyNoAuthUser, 2.10.2]
 aliases: [anonymous connections, no credentials required, unauthenticated access, "$G open", auth_required true but anyone connects]
-sources: [s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-accounts-and-multitenancy, s-docs-authentication-basics, s-natscli-account-tls, s-relnotes-2.12]
+sources: [s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-accounts-and-multitenancy, s-docs-authentication-basics, s-natscli-account-tls, s-relnotes-2.12, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -46,6 +46,17 @@ curl -s http://127.0.0.1:8222/varz | jq '{auth_required, system_account}'
 If `nats account info` reports **`$G`** for a connection you gave no credentials to, you have this
 problem. Then look at the config and answer one question: **is there any declared account other than
 the system account?**
+
+### What a bare server answers, for calibration
+
+A `nats-server` with no configuration at all already has both accounts and no user in either: on
+2.14.6 `/subsz?subs=1` counts 62 subscriptions across `$G` and `$SYS`, `nats server request connections`
+answers from `$G` (the caller's own connection, `"name_tag":"$G"`), and `nats server request
+subscriptions` refuses with `server request failed, ensure the account used has system privileges and
+appropriate permissions` (source: [[s-nats-server-core-delivery-observed]], runs D3–D5; the docs state
+the same split, [[s-docs-core-nats-publish-subscribe]]). That is the baseline the symptom above departs
+from: a `$G` you did not declare, answering, is the fabricated user at work.
+
 
 ## Causes
 
@@ -183,4 +194,4 @@ before you need it. See [[backup-and-restore-jetstream]].
 ## Sources
 
 [[s-gh-4535-unauthenticated-connections]] · [[s-nats-server-auth-and-tls]] ·
-[[s-docs-accounts-and-multitenancy]] · [[s-docs-authentication-basics]] · [[s-natscli-account-tls]] · [[s-relnotes-2.12]]
+[[s-docs-accounts-and-multitenancy]] · [[s-docs-authentication-basics]] · [[s-natscli-account-tls]] · [[s-relnotes-2.12]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]]

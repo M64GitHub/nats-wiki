@@ -164,7 +164,7 @@ wanted 0; `check-staleness.py` 0 behind 2.14.6.
 
 ---
 
-## Step 1 — core NATS, part 1: delivery, subjects and mapping · status: open
+## Step 1 — core NATS, part 1: delivery, subjects and mapping · status: done 2026-09-03 — s-docs-core-nats-subjects-and-mapping, s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-nats-cli-core-commands, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-gh-5172-mapping-in-config-or-stream, s-nats-go-relnotes-1.48.0; pages `core-nats-delivery` (row 25) and `subjects-and-wildcards`; 12 ripples; docs issues #81–#84, SI-7; rows 25, 169–171 filled (169/170 got URLs from the cache: gh#5097 + gh#2855, gh#5172); runs A–G + F8 in `core-delivery-observed-v2.14.6.md`; the 503's `Nats-Subject` row deferred to step 2 as planned; lint 366 pages, 0 · 0, wanted 0, unverified 12 (one new, under `## To verify`), staleness 0 behind
 
 *Operation: ingest*, six summaries. **Cache first**: fetch gh#7577 whole with
 `python3 tools/fetch-discussion.py 7577 --out raw/gh-discussions` (manifest row); capture `nats

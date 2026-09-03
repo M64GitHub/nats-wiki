@@ -4346,3 +4346,60 @@ appended, three added. **Bank**: 166 → [[service-import-request-info]] · [[cr
 (`share` on a stream import: config-mode no-op, JWT-mode error; searched, nothing upstream). Nothing about
 the customer or the person who measured the API entered the repo. Lint: 354 pages (345 → 354), drift 0,
 unlanded 0, wanted 0, unverified 11 (unchanged), staleness 0 behind 2.14.6.
+
+## 2026-09-03 — phase F step 1: core NATS, part 1 — delivery, subjects and mapping
+
+Operation: plan, `inbox/plan-the-client-side-2026-09-03.md` step 1 (*Operation: ingest*, ten summaries —
+the plan's six plus three small threads the bank rows can cite and one release body). **Sources into
+`raw/`**: gh#7577 whole (`raw/gh-discussions/gh-7577.md`, row 25's thread), gh#5097, gh#2855 and gh#5172
+(the public forms found for the posed rows); `raw/nats-cli/help-core-0.4.0.md` (six `--help` blocks,
+verbatim); `raw/nats-server-src/core-delivery-v2.14.6.md` (16 verbatim ranges: `isValidSubject`, the two
+`PUB` parsers, the pedantic check, echo, the `no_responders`-needs-headers check, the 503 `HMSG` with
+`Nats-Subject`, `max_subscription_tokens`, `no_header_support`, top-level `mappings` as `$G`,
+`AddWeightedMappings` / `selectMappedSubject`, `/subsz`, the reload rule, the `$NRG.` refusal) and
+`core-delivery-observed-v2.14.6.md` with `core-delivery-run.sh` and `core-delivery-raw.py` beside it
+(runs A–G plus F8 on the binary, D6 on the lab); `raw/github-repos/nats-io__nats.go.release-v1.48.0.md`.
+Four manifest rows extended. **Read and folded** (named here as the plan requires): `concepts/subjects.md`
+into `s-docs-core-nats-subjects-and-mapping` (three surplus lines carried as pointers: L10 "any UTF-8",
+L1101 the 16-token limit, L1080–1087 `_INBOX` under `$`); `concepts/pub-sub-basics.md`, `what-is-nats.md`
+and `intro.md` into `s-docs-core-nats-publish-subscribe` (nothing the learn pages lack; the "~15MB" footprint
+not recorded); `reference/config/mappings.md` + `destination.md`, `weight.md`, `cluster.md` into the first.
+Docs coverage after this step: `learn/core-nats` 8/11 (`request-reply.md`, `queue-groups.md`,
+`scatter-gather.md` are step 2), `concepts` 6/11 (`subjects`, `pub-sub-basics`, `what-is-nats`, `intro`
+folded here; `ecosystem`, `getting-started` prior), `reference/config/mappings` 4/4.
+**Summaries** (10): [[s-docs-core-nats-subjects-and-mapping]], [[s-docs-core-nats-publish-subscribe]],
+[[s-gh-7577-core-nats-ordering]], [[s-nats-server-core-delivery]], [[s-nats-server-core-delivery-observed]],
+[[s-nats-cli-core-commands]], [[s-gh-5097-subject-token-limit]], [[s-gh-2855-publish-with-wildcards]],
+[[s-gh-5172-mapping-in-config-or-stream]], [[s-nats-go-relnotes-1.48.0]]. **Pages created** (2):
+[[core-nats-delivery]] (row 25 — at-most-once, order per publisher connection across subjects from gh#7577,
+echo, `max_payload` over header plus body, the header negotiation, the connection's part through a restart
+and a lame duck, the four debugging surfaces as a table, the config table) and [[subjects-and-wildcards]]
+(the rule table by `SUB` / default `PUB` / pedantic `PUB`, the two wildcards, the six reserved prefixes and
+who enforces them, no length limit / `max_control_line` / `max_subscription_tokens`, cardinality pointers).
+**Updated** (12): [[subject-transforms]] (*Account-level `mappings`* — weights, the remainder rule measured
+on a literal and a wildcard source, partition, `cluster`, reload through `accounts`, the maintainer's
+placement rule; the "different topic" sentence now points there), [[defaults-and-limits]] (the rows'
+behaviour when crossed, `max_subscription_tokens`, `no_header_support`; `verified-on` re-pinned),
+[[config-keys]] (three top-level keys with reload checked; re-pinned), [[monitoring-endpoints]] (the `/subsz`
+row corrected to the HTTP names `acc`, `subs` — docs issue #48's `/subsz` half had not landed on the table —
+and a `/subsz?test=` section; re-pinned), [[slow-consumer-detected]] (the client-side sibling),
+[[publishing]] (core order for comparison), [[nats-cli]] (the core commands from `--help`),
+[[nats-server-2.11]] (`nats trace` is this line's feature), [[nats-py]] and [[nats-c]] (the chapter's
+claim that their publish skips the whitespace check — the docs' word until step 8), [[nats-go]] (subject
+validation since v1.48.0, dated from the release body), [[unauthenticated-clients-still-connect]] (what a
+bare server answers). **What the runs settled beyond the docs**: the header block counts against
+`max_payload` and a violation closes the connection; pedantic mode sends `-ERR 'Invalid Publish Subject'`
+and delivers anyway; `max_subscription_tokens` refuses a reload (`config reload not supported for
+MaxSubTokens`); `mappings` reloads as `Reloaded: accounts`; the weighted remainder is dropped only when the
+source is listed — for a wildcard source too (98 of 200), against the docs' "literal only"; `nats trace`
+needs no system user; under `--signal ldm` a single-server client sees only an EOF disconnect and the server
+exits after the grace period once its clients are closed (`lame_duck_duration` has a 30 s floor: `3s` is
+refused at start). **Docs issues** #81 (`concepts/subjects.md:1101`, the unsourced 16-token / 256-character
+limit — gh#5097 shows it confusing a reader), #82 (`reference/config/max_subscription_tokens.md` empty;
+sweep: 7 sibling `max_*` pages' reload labels all agree with `reload.go`), #83 (`_INBOX` under `$`),
+#84 (`subject-mapping.md:646,772` "literal source only" — wrong; the server's example config uses a wildcard
+source for loss). The 503's `Nats-Subject` header (documented nowhere) waits for step 2's run B, as the
+plan says. **Server issue SI-7** (pedantic mode's error-then-deliver; searched: 0 hits in the docs mirror
+and the 484 discussions). **Bank**: row 25 → [[core-nats-delivery]]; rows 169 (gh#5097 + gh#2855), 170
+(gh#5172), 171 (`own`, searched) added and answered on arrival — 138 / 171. `since: [2.10]` on both new
+pages with the *present at 2.10* comment. Lint: 366 pages (354 → 366), drift 0, unlanded 0 (9 → 0 after five pointer paragraphs on `defaults-and-limits`, `nats-cli`, `publishing`, `subjects-and-wildcards`, `config-keys`), wanted 0, unverified 12 (11 → 12: the new marker is the cross-server ordering item under `## To verify` on `core-nats-delivery`), staleness 0 behind 2.14.6.

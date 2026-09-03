@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed, s-docs-core-nats-publish-subscribe]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -268,6 +268,18 @@ diffing the default reports at v2.10.29 and v2.11.17 (source: [[s-relnotes-2.11]
 [[s-relnotes-2.12]]). An operator on 2.11.11 or later may set them.
 
 
+## The client-side sibling
+
+The core-NATS chapter states the server's half in one sentence — past its pending threshold the server
+"logs `Slow Consumer Detected`, and closes its connection. The other subscribers are unaffected. The fix
+lives in the client: process messages fast enough, or hand them to a worker"
+(`learn/core-nats/publish-subscribe.md:576`; source: [[s-docs-core-nats-publish-subscribe]]). The other
+half — a client's own pending limits, which drop messages *before* the server ever notices, with the
+subscription still alive — is a different symptom with a different page, written in step 4 of
+`inbox/plan-the-client-side-2026-09-03.md`; what a core publish promises in the first place is on
+[[core-nats-delivery]].
+
+
 ## Related
 
 [[consumer]] · [[monitoring-endpoints]] · [[nats-cli]] · [[jetstream-sizing]] ·
@@ -279,4 +291,4 @@ diffing the default reports at v2.10.29 and v2.11.17 (source: [[s-relnotes-2.11]
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]]
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-docs-core-nats-publish-subscribe]]

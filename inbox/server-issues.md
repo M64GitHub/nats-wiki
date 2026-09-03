@@ -37,6 +37,7 @@ So the discipline here is different:
 | SI-4 | The `client_connect` event's `timestamp` is UTC (`…Z`) while the `client_disconnect` event's carries the server's local offset (`…+02:00`) — `accountConnectEvent` stamps `time.Now().UTC()`, `accountDisconnectEvent` the `now` its caller passes; the auth-error twin of the same body is UTC again | inconsistent | low | v2.14.6 | not filed |
 | SI-5 | After `--signal ldm` on a server with no clients, `$SYS.SERVER.<id>.LAMEDUCK` arrived and the server exited within a millisecond, but no `$SYS.SERVER.<id>.SHUTDOWN` reached a subscriber on a peer; a plain SIGTERM on the same server did deliver `SHUTDOWN` | unexpected | low | v2.14.6 | not filed |
 | SI-6 | Config mode accepts `share: true` on a **stream** import and ignores it (`nats-server -t`: valid, exit 0; the parser applies `share` to service imports only), while the account-JWT library rejects the same import with `sharing information (for latency tracking) is only valid for services` — the two modes disagree on whether the key is an error | inconsistent | low | v2.14.6 | not filed |
+| SI-7 | A `pedantic` client publishing to a subject that fails `IsValidLiteralSubject` — `orders.*.created` — receives `-ERR 'Invalid Publish Subject'` **and the message is delivered anyway**: both `processPub` and `processHeaderPub` send the error and return `nil`, so the publish is routed as a literal subject and wildcard subscribers get it. The error reads as a refusal and is not one | unexpected | low | v2.14.6 | not filed |
 
 ---
 
@@ -389,3 +390,48 @@ were run); other keys that are valid on one import type only.
 
 **Consequence.** Low: an operator who puts `share` on a stream import gets no latency data and no
 error. No data-integrity or security effect. Related: docs issue #79 (the key is documented nowhere).
+
+## SI-7 · Pedantic mode sends `-ERR 'Invalid Publish Subject'` and delivers the message anyway
+
+**The observation.** On **v2.14.6**, `raw/nats-server-src/core-delivery-observed-v2.14.6.md` run C3
+(`core-delivery-run.sh`, `core-delivery-raw.py`), a bare server with a `nats sub 'orders.>'` tap:
+
+```
+>> CONNECT {"name": "raw", "lang": "python", "version": "0", "protocol": 1, "verbose": false, "pedantic": true, "headers": true}
+>> PUB orders.*.created 0
+>> (empty line)
+>> PING
+<< -ERR 'Invalid Publish Subject'
+<< PONG
+-- socket still open after 1.0s
+orders.> tap:
+[#1] Received on "orders.*.created"
+```
+
+The same publish from a non-pedantic connection (run C2) is delivered with no error, to `orders.>` and to a
+subscriber on `orders.*.created`, whose `*` matches the literal `*` token. **The code**: `processPub`
+(`client.go:2984–2986`) and `processHeaderPub` (`:2931–2933`) run
+`if c.opts.Pedantic && !IsValidLiteralSubject(...) { c.sendErr("Invalid Publish Subject") }` and then
+`return nil`, so the parser goes on to route the message (`raw/nats-server-src/core-delivery-v2.14.6.md`).
+`defaultOpts` sets `Pedantic: true` (`:706`), but the value is overwritten by the client's `CONNECT`; nats.go
+sends `false` unless its `Pedantic` option is set, so the case is reached only by a client that opts in.
+
+**What would settle it.** Whether `Invalid Publish Subject` in pedantic mode is meant as a warning (the
+protocol reference describes `pedantic` as "Turns on additional strict format checking, e.g. for properly
+formed subjects" and lists no such error) or as a refusal — in which case the publish should not be
+routed. Every other `-ERR` the server sends on a `PUB` (`Maximum Payload Violation`, the permission
+violations) accompanies a message that is **not** delivered.
+
+**Searched and not found.** `Invalid Publish Subject` occurs in none of the 861 pages of the docs mirror
+(`grep -rn` on 2026-09-03), in none of the 484 `nats-io/nats-server` discussions' titles, bodies, comments
+or replies (`local/scratch/gh-index/threads-2026-09-03.md`), and `reference/protocols/client.md`'s `-ERR`
+table does not list it.
+
+**What was not tested.** Whether any official client sets `pedantic: true` by default (the CLI does not);
+a pedantic `HPUB`; whether a pedantic `SUB` differs from a non-pedantic one (both go through the sublist
+insert, which refuses independently of the flag).
+
+**Consequence.** Low: a client that asked for strict checking sees an error line for a publish that was
+nevertheless routed, so an application that treats `-ERR` as "not sent" and retries would publish twice.
+Nothing at the default setting. No data-integrity or security effect.
+

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -503,6 +503,28 @@ Values this table states as of 2.14.6 that the 2.10 release bodies date (source:
 (source: [[s-relnotes-2.14]], [[s-relnotes-2.15-preview]])
 
 
+## What the core-server rows do when crossed, and one optional limit they omit
+
+Run on 2.14.6 with a raw protocol writer (source: [[s-nats-server-core-delivery-observed]]; the code
+in [[s-nats-server-core-delivery]]):
+
+| setting | when a client crosses it | what the server does |
+|---|---|---|
+| `max_payload` | a `PUB` body over the limit, **or an `HPUB` whose header block plus body is over it** (600,000 + 500,000 bytes was refused with `maximum payload exceeded: 1100000 vs 1048576`) | `-ERR 'Maximum Payload Violation'` and **closes the connection**, on the control line, before the body is read; official clients refuse first with `nats: maximum payload exceeded` and keep the connection |
+| `max_subscription_tokens` / `max_sub_tokens` — **not in the table above because it has no default**: unset means unlimited; `1`–`255`; **restart-only** (`config reload not supported for MaxSubTokens`) | a `SUB` with more tokens; a `PUB` with more is delivered | `-ERR 'Permissions Violation for Subscription to "<subj>", too many tokens'` and the log line `Subscription Violation Too Many Tokens - Subject "<subj>", SID <n>`; the connection stays open |
+| `no_header_support: true` | a client sends a header | never reaches the server: `INFO` says `"headers":false` and the client fails with `headers not supported by this server`; a `CONNECT` asking for `no_responders` is refused with `-ERR 'no responders requires headers support'` and closed |
+
+The subject rules themselves — no length limit, `max_control_line` as the only bound on the line — are
+on [[subjects-and-wildcards]]; the `-ERR` strings behind `max_control_line` and the rest are step 5's
+wire-protocol page.
+
+
+The docs' side of the same rows: the core-NATS chapter states the 1 MB ceiling, the client-side
+`nats: maximum payload exceeded` and the server's closing `-ERR` (source: [[s-docs-core-nats-publish-subscribe]]),
+and no subject length or token limit at all — the primer's "~16 tokens and under 256 characters" is docs
+issue #81 (source: [[s-docs-core-nats-subjects-and-mapping]]).
+
+
 ## Related
 
 [[config-keys]] · [[jetstream-sizing]] · [[stream]] · [[consumer]] · [[ack-and-redelivery]] ·
@@ -522,4 +544,4 @@ Values this table states as of 2.14.6 that the 2.10 release bodies date (source:
 [[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] ·
 [[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]
+[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]]

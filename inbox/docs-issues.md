@@ -140,6 +140,10 @@ row.
 | 78 | The docs' sample `nats_consumer_num_pending{account,stream_name,consumer_name} 20` never says the value is computed on the consumer's leader only and reads **0 on every replica** — the 3 / 0 / 3 readings operators have reported since 2023 (exporter issue #218, unanswered) — nor that the series carries seventeen labels, `is_consumer_leader` among them | `learn/monitoring/prometheus-and-dashboards.md` (lines 32–43) | nats-docs | enhancement | medium | not filed | wiki states the leader rule with the server lines and the run |
 | 79 | `reference/config/accounts/imports.md` lists four keys (`stream`, `service`, `prefix`, `to`) and `exports.md` four (`stream`, `service`, `accounts`, `response_type`); the server's parsers at v2.14.6 also accept `share` and `allow_trace` on an import and `latency`, `response_threshold` (three aliases), `account_token_position` and `allow_trace` on an export — six keys documented on no page of the tree. `imports/service.md` is also described as "Stream import source configuration" | `reference/config/accounts/imports.md`, `imports/service.md`, `exports.md` | nats-docs | missing | medium | not filed | wiki tables all keys in `reference/config-keys` and states `share` on `concepts/service-import-request-info` |
 | 80 | Activation tokens — a private export (`token_req: true`, `nsc add export --private`), the `token` an import carries, `nsc generate activation`, expiry and revocation — are described on no page of the 861-page tree; the two mentions (`learn/security/operator-mode.md:14`, `learn/security/cross-account.md:260`) say only that `nats auth` v0.4.0 lacks them and that `nsc` has them. The mirror holds no `nsc` page at all | `learn/security/cross-account.md`, `learn/security/operator-mode.md` | nats-docs | missing | medium | not filed | wiki states the token, its checks and the two `nsc` commands on `concepts/cross-account-sharing` |
+| 81 | `concepts/subjects.md:1101` — "**Keep it reasonable**: Limit to ~16 tokens and under 256 characters total" — states a limit no server enforces. At v2.14.6 `isValidSubject` checks empty tokens, whitespace and a non-final `>` and nothing else; the only bounds are `max_control_line` (4096 bytes for the whole line) and the optional `max_subscription_tokens`. The learn page (`learn/core-nats/subjects-and-wildcards.md`) states no such limit, and a reader who asked what the 16 meant was told it is "probably not strictly enforced" (gh#5097). The 256 is most likely `JSMaxNameLen = 255`, which bounds stream and consumer names | `concepts/subjects.md` (line 1101) | nats-docs | enhancement | low | not filed | wiki states the three enforced rules and the real bounds on `concepts/subjects-and-wildcards` |
+| 82 | `reference/config/max_subscription_tokens.md` is an empty page: alias `max_sub_tokens`, "Requires Restart", type `integer`, and nothing else — no description, default, range or behaviour. The server: `uint8`, `1`–`255` (`0` refused as "value can not be negative", `256` as "value is too big"), unset = unlimited, applied to **subscriptions only**, violation `-ERR 'Permissions Violation for Subscription to "<subj>", too many tokens'` and log `Subscription Violation Too Many Tokens`. Sweep: the seven sibling `max_*` config pages' reload labels all agree with `reload.go`; this is the only empty one | `reference/config/max_subscription_tokens.md` | nats-docs | missing | medium | not filed | wiki tables the key on `reference/config-keys` and states the rule on `concepts/subjects-and-wildcards` |
+| 83 | `concepts/subjects.md:1080–1087` lists `_INBOX` under "Subjects starting with `$` are reserved for system use: `$SYS`, `$JS`, `$KV`, `$O`, `$SRV`, `_INBOX`"; `_INBOX` does not start with `$`, and the learn page (`learn/core-nats/subjects-and-wildcards.md:418–422`) correctly separates the two families. The primer also omits that the server enforces none of the prefixes for a plain client | `concepts/subjects.md` (lines 1080–1087) | nats-docs | enhancement | low | not filed | wiki tables the prefixes and who enforces them on `concepts/subjects-and-wildcards` |
+| 84 | `learn/core-nats/subject-mapping.md:646` "list the source subject itself as a destination, which tells the server your weights are final and stops it topping them up. This works because the source here is a literal subject" and `:772` "This only works for a literal source like `orders.created`" — the restriction is not in the server. `AddWeightedMappings` skips the auto-added remainder whenever the source string is among the destinations, wildcard or not (`accounts.go:844–862`); run on 2.14.6, `"orders.loss.>": [ { destination: "orders.loss.>", weight: 50 } ]` passed `nats-server -t` and dropped 102 of 200 publishes. The server's own example config uses exactly that shape as "A chaos testing trick that introduces 50% artificial message loss" (quoted in gh#5172). `reference/config/mappings/weight.md` mentions "artifical message loss" without saying how it is configured | `learn/core-nats/subject-mapping.md` (lines 646, 772); `reference/config/mappings/weight.md` | nats-docs | wrong-value | low | not filed | wiki states the rule with the literal and the wildcard run on `concepts/subject-transforms` |
 
 ---
 
@@ -3329,6 +3333,97 @@ pods, resolved by the reporter with `is_consumer_leader="true"`.
 is 0 on the replicas; alert on `nats_consumer_num_pending{is_consumer_leader="true"}` (exporter) or run
 surveyor with `--jsz-leaders-only` — and a sample that shows the label.
 
+## 81 · The subject length and token limit the docs state does not exist in the server
+
+`concepts/subjects.md:1101`: "**Keep it reasonable**: Limit to ~16 tokens and under 256 characters total."
+No source is given, and the learn page on the same subject (`learn/core-nats/subjects-and-wildcards.md:8–36`)
+states no limit at all.
+
+**The server** at v2.14.6: `isValidSubject` (`sublist.go:1209–1246`, `raw/nats-server-src/core-delivery-v2.14.6.md`)
+rejects an empty subject, an empty token, a token containing ` \t\n\f\r`, and a `>` that is not the last token
+— and nothing about length or token count. The bounds that exist: `MAX_CONTROL_LINE_SIZE = 4096`
+(`const.go:90`) on the whole `PUB`/`SUB` line, and the **optional** `max_subscription_tokens`
+(`opts.go:1370–1381`, `client.go:3090–3096`), unset by default and applied to subscriptions only. The
+"256" is most likely `JSMaxNameLen = 255` (`jetstream_api.go`), which bounds **stream and consumer names**,
+not subjects. **Run**: a four-token subscription and publish on a bare server pass; with
+`max_subscription_tokens: 3` the subscription is refused and the publish still delivered
+(`raw/nats-server-src/core-delivery-observed-v2.14.6.md`, run C5).
+
+**Why it matters**: the number has already confused a reader — gh#5097 (2024-02-16) asks whether "16"
+means characters or tokens and is told it is "probably not strictly enforced" — and it hides the real
+bound, `max_control_line`, which *is* enforced and *is* configurable.
+
+**Suggested fix**: replace the sentence with the enforced rules (no empty token, no whitespace, `>` last),
+name `max_control_line` as the bound on the line and `max_subscription_tokens` as the optional token
+ceiling on subscriptions, and keep "few tokens" as performance guidance without a number.
+
+## 82 · The `max_subscription_tokens` reference page is empty
+
+`reference/config/max_subscription_tokens.md` in full: the alias `max_sub_tokens`, "Requires Restart",
+and a *Types* table with `integer`, description "-". No description, no default, no range, no behaviour.
+
+**The server** (`opts.go:1370–1381`): the value is a `uint8`; `n > 255` → "`max_subscription_tokens value
+is too big`"; `n <= 0` → "`max_subscription_tokens value can not be negative`" (so `0` cannot mean
+unlimited — leaving the key unset does); the check runs on `SUB` only (`client.go:3090–3096`) and sends
+`-ERR 'Permissions Violation for Subscription to "<subj>", too many tokens'` with the log line
+`Subscription Violation Too Many Tokens - Subject "<subj>", SID <n>` (`:5814–5819`). "Requires Restart"
+is correct: `reload.go` has no case for the field and a changed value fails the reload with
+`config reload not supported for MaxSubTokens: old=3, new=4`. **Run**: `raw/nats-server-src/core-delivery-observed-v2.14.6.md`
+runs C5–C7 (the error, the log line, the publish that is still delivered, the refused reload, the two refused values).
+
+**Sweep**: the sibling pages `max_control_line`, `max_payload`, `max_pending`, `max_connections`,
+`max_subscriptions`, `max_traced_msg_len` were checked for their reload label against `reload.go` at
+v2.14.6 (`maxcontrolline`, `maxpayload`, `maxconn`, `maxtracedmsglen` reloadable; `max_pending` and
+`max_subscriptions` "Requires Restart" with no reload case) — **7 pages checked, all consistent; this is
+the only one with no content**.
+
+**Suggested fix**: a description ("the maximum number of tokens a subscription's subject may have; unset
+means unlimited"), the range `1`–`255`, that it applies to subscriptions only, and the error the client
+sees.
+
+## 83 · `_INBOX` is not a `$` prefix
+
+`concepts/subjects.md:1080–1087`: "Subjects starting with `$` are reserved for system use", followed by a
+list that ends with `_INBOX`. The learn page (`learn/core-nats/subjects-and-wildcards.md:418–422`) gives
+the same six names in two sentences: the five `$` prefixes "belong to the server and its subsystems",
+and "The `_INBOX` prefix is reserved for reply subjects that clients generate automatically."
+
+Neither page says who enforces the reservation. **The server** enforces none of them for a plain client
+(`$SRV` does not occur in `server/*.go`; a client may publish under `$SYS`, `$JS`, `$KV` or `$O` inside its
+account and reaches whatever is subscribed there); the one `$` prefix it does refuse is `$NRG.` from a
+client outside the system account (`client.go:4373–4378`, `raw/nats-server-src/core-delivery-v2.14.6.md`).
+
+**Suggested fix**: split the list as the learn page does, and add one sentence that the prefixes are
+conventions the server does not check — permissions do.
+
+## 84 · The mapping loss trick works for a wildcard source too
+
+`learn/core-nats/subject-mapping.md:646`: "If you want the leftover share dropped rather than kept — to
+test how a subscriber copes with loss — list the source subject itself as a destination, which tells the
+server your weights are final and stops it topping them up. **This works because the source here is a
+literal subject.**" And `:772`: "This only works for a literal source like `orders.created`."
+
+**The server** (`accounts.go:839–862`, `raw/nats-server-src/core-delivery-v2.14.6.md`): the auto-added
+remainder is skipped when `seen[src]` holds — the source string was listed among the destinations —
+"Iff the src was not already added in explicitly, meaning they want loss". `seen` is keyed by the
+destination string, so a wildcard source that names itself is found exactly like a literal one, and the
+transform `src → src` is built with `transformTokenize` for the wildcard case (`:849–852`).
+
+**Run** (`raw/nats-server-src/core-delivery-observed-v2.14.6.md`, F5 and F8, v2.14.6): the literal
+`orders.created` listed at weight 90 delivered 188 of 200 publishes; the **wildcard**
+`"orders.loss.>": [ { destination: "orders.loss.>", weight: 50 } ]` passed `nats-server -t` and delivered
+98 of 200 to `orders.loss.a`. The server's own example configuration carries this very shape —
+"A chaos testing trick that introduces 50% artificial message loss of messages published to foo.loss:
+`foo.loss.>: [ { destination: foo.loss.>, weight: 50% } ]`" — as quoted in a user's config in gh#5172
+(`raw/gh-discussions/gh-5172.md`).
+
+`reference/config/mappings/weight.md` says weights must sum to 100 per cluster "unless artifical message
+loss is desired for testing" and never says how the loss is configured.
+
+**Suggested fix**: drop the two "literal only" sentences, and state the rule as the code has it: the
+remainder stays on the source unless the source — literal or wildcard — is listed as a destination, in
+which case it is dropped. The `weight` reference page could carry the one-line example.
+
 ### Where the wiki records each of these
 
 | # | wiki page |
@@ -3410,6 +3505,10 @@ surveyor with `--jsz-leaders-only` — and a sample that shows the label.
 | 78 | `wiki/reference/metrics.md` — *Which node's exporter to read*; `wiki/concepts/consumer.md` — *The consumer's numbers as time series*; `wiki/entities/prometheus-nats-exporter.md` — *What bites you* |
 | 79 | `wiki/reference/config-keys.md` — *`accounts { <name> { exports, imports } }`* (the six keys marked *unlisted*); `wiki/concepts/cross-account-sharing.md` — *Who may import*; `wiki/summaries/s-docs-config-accounts-exports-imports.md` |
 | 80 | `wiki/concepts/cross-account-sharing.md` — *Who may import: the three export guards*; `wiki/concepts/operator-mode.md` — *Private exports and activation tokens*; `wiki/entities/nsc.md` — cheat sheet |
+| 81 | `wiki/concepts/subjects-and-wildcards.md` — *No length limit, one line limit, one optional token limit*; `wiki/summaries/s-gh-5097-subject-token-limit.md` |
+| 82 | `wiki/reference/config-keys.md` — *Three top-level keys the core-NATS pages need*; `wiki/concepts/subjects-and-wildcards.md`; `wiki/reference/defaults-and-limits.md` — *What the core-server rows do when crossed* |
+| 83 | `wiki/concepts/subjects-and-wildcards.md` — *Reserved prefixes* |
+| 84 | `wiki/concepts/subject-transforms.md` — *Account-level `mappings`*; `wiki/summaries/s-nats-server-core-delivery-observed.md` (F5, F8); `wiki/summaries/s-gh-5172-mapping-in-config-or-stream.md` |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
 

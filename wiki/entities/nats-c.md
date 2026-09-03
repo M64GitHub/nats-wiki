@@ -7,9 +7,9 @@ verified-against: nats.c v3.13.0
 verified-on: 2026-08-31
 tags: [client, tier-1, c, ffi, embedded, libsodium, streaming]
 aliases: [nats.c, "nats-io/nats.c", c client]
-sources: [s-docs-ecosystem, s-github-repo-facts]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-core-nats-subjects-and-mapping]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # nats.c
@@ -47,10 +47,20 @@ options — TLS backend, static linking, libsodium — an integration concern ra
 - **Two builds worth knowing about**: `EXPERIMENTAL API` (opt-in, unstable surface) and libsodium
   (faster Ed25519 for nkey-authenticated connections; see [[nk]]).
 
+## What the core-NATS chapter says about this client
+
+- **`natsConnection_PublishString` with a space in the subject "does NOT fail"** — the C client's publish
+  skips the subject check, so the space "goes straight into the `PUB` line and the server silently
+  misroutes" it (`learn/core-nats/subjects-and-wildcards.md:493–503`; source:
+  [[s-docs-core-nats-subjects-and-mapping]]). The docs' word, to be confirmed against the client's
+  source in step 8 of `inbox/plan-the-client-side-2026-09-03.md`; the server's half is reproduced and
+  the rule is on [[subjects-and-wildcards]].
+
+
 ## Related
 
 [[nats-go]] · [[nats-streaming]] · [[nk]] · [[orbit]] · [[nats-server]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-core-nats-subjects-and-mapping]]

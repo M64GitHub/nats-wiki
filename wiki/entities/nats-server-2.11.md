@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [release, 2.11, api-level-1, ttl, priority-groups, tracing, cve, withdrawn, changelog]
 aliases: ["2.11", v2.11, v2.11.0, v2.11.2, v2.11.9, v2.11.17, v2.11.1-binary]
-sources: [s-docs-upgrade-to-2.12, s-adr-43-per-message-ttl, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-raft-and-leaders, s-docs-placement, s-docs-auth-callout, s-relnotes-2.11.2, s-relnotes-2.11.5, s-issue-6921-last-per-subject-acks, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-upgrade-to-2.12, s-adr-43-per-message-ttl, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-raft-and-leaders, s-docs-placement, s-docs-auth-callout, s-relnotes-2.11.2, s-relnotes-2.11.5, s-issue-6921-last-per-subject-acks, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11, s-relnotes-2.12, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -200,6 +200,17 @@ unset, so off (2.11.0; the docs' `true` is 2.12's), `mqtt { js_api_timeout }` = 
 ships them — `inbox/docs-issues.md` **#64** (source: [[s-relnotes-2.11]], [[s-relnotes-2.12]]).
 
 
+## `nats trace` is this line's feature
+
+The docs' debugging page says `nats trace` "needs NATS Server 2.11 or newer" — it is the client of the
+distributed message tracing listed under *Operations* above (source:
+[[s-docs-core-nats-publish-subscribe]]). On 2.14.6 it answers on a plain server with no system-account
+user: `--X No active interest` with nobody subscribed, one `--C Client "<name>" cid:<n> subject:"orders.>"`
+line per matching subscriber otherwise, and with `--deliver` the subscriber receives the probe carrying
+`Nats-Trace-Dest` and `Accept-Encoding: snappy` (source: [[s-nats-server-core-delivery-observed]]). The
+four delivery-debugging surfaces are tabled on [[core-nats-delivery]].
+
+
 ## Related
 
 [[nats-server-2.12]] · [[nats-server-2.10]] · [[message-ttl]] · [[priority-groups]] ·
@@ -209,4 +220,4 @@ ships them — `inbox/docs-issues.md` **#64** (source: [[s-relnotes-2.11]], [[s-
 
 [[s-docs-upgrade-to-2.12]] · [[s-adr-43-per-message-ttl]] · [[s-adr-42-priority-groups]] ·
 [[s-adr-8-key-value-store]] · [[s-docs-raft-and-leaders]] · [[s-docs-placement]] ·
-[[s-docs-auth-callout]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.11.5]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-auth-callout]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.11.5]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery-observed]]

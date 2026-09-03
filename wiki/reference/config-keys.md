@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-09-03
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets, s-docs-config-accounts-exports-imports, s-nats-server-service-imports]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets, s-docs-config-accounts-exports-imports, s-nats-server-service-imports, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-docs-core-nats-publish-subscribe]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -520,6 +520,27 @@ the series to trend it is `gnatsd_varz_jetstream_stats_ha_assets` ([[metrics]], 
 source: [[s-nats-server-traffic-counters-and-ha-assets]], [[s-gh-5128-ha-assets]]).
 
 
+## Three top-level keys the core-NATS pages need
+
+Not in the *Top level* table above; each checked against `reload.go` at v2.14.6 and run (sources:
+[[s-nats-server-core-delivery]], [[s-nats-server-core-delivery-observed]]):
+
+| key | type | default | reload | what |
+|---|---|---|---|---|
+| `mappings { }` (alias `maps`) | { subject: dest \| [ { destination, weight, cluster } ] } | — | **reloadable** — the block is the `$G` account's mappings, so it rides the `accounts` reload path and logs `Reloaded: accounts` | rewrites a core subject before routing; weights ≤ 100 each and per source; [[subject-transforms]] |
+| `max_subscription_tokens` (alias `max_sub_tokens`) | integer, `1`–`255` | unset = unlimited | **restart** — a reload with the value changed fails whole: `config reload not supported for MaxSubTokens: old=3, new=4` | a token ceiling on *subscriptions* only; `0` is refused as "value can not be negative", `256` as "value is too big"; [[subjects-and-wildcards]] |
+| `no_header_support` | boolean | `false` | **restart** — no `reload.go` case | `headers: false` in `INFO`; disables the no-responders 503 with it; [[core-nats-delivery]] |
+
+The generated reference page for `max_subscription_tokens` says "Requires Restart" and nothing else — no
+description, range or behaviour (docs issue #82; the docs summary is
+[[s-docs-core-nats-subjects-and-mapping]] for `mappings`).
+
+
+The docs' one mention of `no_header_support` is the headers page's failure mode — against such a server
+a publish with a header fails client-side with `headers not supported by this server` (source:
+[[s-docs-core-nats-publish-subscribe]]).
+
+
 ## Related
 
 [[defaults-and-limits]] · [[jetstream-sizing]] · [[replicas]] · [[stream-placement]] ·
@@ -537,4 +558,4 @@ source: [[s-nats-server-traffic-counters-and-ha-assets]], [[s-gh-5128-ha-assets]
 [[s-docs-accounts-and-multitenancy]] · [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-hardening]] · [[s-docs-rolling-upgrades]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-nats-server-route-cluster-formation]] · [[s-nats-server-systemd-units]] ·
 [[s-nats-server-mqtt-websocket-observed]] · [[s-docs-websocket-tls-and-proxies]] ·
 [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] ·
-[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-docs-config-accounts-exports-imports]] · [[s-nats-server-service-imports]]
+[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-docs-config-accounts-exports-imports]] · [[s-nats-server-service-imports]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-docs-core-nats-publish-subscribe]]

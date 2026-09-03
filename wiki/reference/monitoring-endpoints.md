@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-prometheus-nats-exporter-collector, s-prometheus-nats-exporter-metrics-observed, s-nats-surveyor-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-2818-counters-exact-or-sampled, s-gh-6182-what-to-alert-on]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-prometheus-nats-exporter-collector, s-prometheus-nats-exporter-metrics-observed, s-nats-surveyor-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-2818-counters-exact-or-sampled, s-gh-6182-what-to-alert-on, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-nats-server-core-delivery-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -59,7 +59,7 @@ Fifteen paths, from `server.go:3030–3044` and the `HandleFunc` calls at `:3134
 | `/accstatz` | per-account statistics | `accounts`, `include_unused` |
 | `/gatewayz` | gateway connections | `account_name`, `accounts`, `name`, `subscriptions`, `subscriptions_detail` |
 | `/leafz` | leafnode connections | `account`, `subscriptions` |
-| `/subsz` (alias `/subscriptionsz`) | the subscription list | `account`, `limit`, `offset`, `subscriptions`, `test` |
+| `/subsz` (alias `/subscriptionsz`) | the subscription list | `acc`, `limit`, `offset`, `subs`, `test` — **the docs print `account` and `subscriptions`, which the endpoint ignores** (docs issue #48); `test=<literal subject>` returns only the subscriptions a publish to it would match |
 | `/ipqueuesz` | internal queue depths | `all`, `filter` |
 | `/stacksz` | a goroutine dump — **documented nowhere** | — |
 | `/debug/vars` | the Go `expvar` page (`memstats`, `cmdline`) — **documented nowhere**; its request form is `EXPVARZ` | — |
@@ -643,6 +643,31 @@ are queued separately and deprioritised** relative to create/update/delete (#789
 poller that scrapes `STREAM.INFO` on a busy server waits behind the writes.
 
 
+### `/subsz?test=` — who would receive a publish
+
+The one monitoring query that answers a delivery question directly, and it needs no credentials
+(sources: [[s-docs-core-nats-publish-subscribe]], [[s-nats-server-core-delivery]],
+[[s-nats-server-core-delivery-observed]]):
+
+```
+curl -s 'http://127.0.0.1:8222/subsz?subs=1&acc=$G&test=orders.us.created'
+```
+
+`HandleSubsz` reads `subs`, `offset`, `limit`, `acc` and `test` (`monitor.go:1104–1131`). `test` takes a
+**literal** subject and returns only the subscriptions a message on it would match, wildcards included:
+on 2.14.6 with an `orders.>` subscriber the reply was `"total": 1` and one entry — `{"account":"$G",
+"account_tag":"$G","subject":"orders.>","sid":"1","msgs":0,"cid":5}` — while `num_subscriptions: 6`
+still counted everything in `$G`; with nobody subscribed, `"total": 0` and **no `subscriptions_list` at
+all**. A queue member's entry carries `"qgroup": "packers"`. `acc=$G` scopes the counts to the global
+account; without it the count spans every account (62 on a bare server, `$SYS` included), and even scoped
+the four `$SYS.REQ.*` service-import subscriptions the server keeps in every account
+(`$SYS.REQ.SERVER.PING.CONNZ`, `$SYS.REQ.USER.INFO`, `$SYS.REQ.ACCOUNT.PING.CONNZ`,
+`$SYS.REQ.ACCOUNT.PING.STATZ`) appear beside yours. The same list over NATS is `nats server request
+subscriptions`, which needs a system-account user; `nats server request connections` answers for the
+caller's own account without one. The four surfaces together — a wire tap, `/subsz?test=`,
+`/connz?subs=true`, `nats trace` — are tabled on [[core-nats-delivery]].
+
+
 ## Related
 
 [[slow-consumer-detected]] · [[raft-in-nats]] · [[jetstream-sizing]] · [[js-api]] ·
@@ -657,4 +682,4 @@ poller that scrapes `STREAM.INFO` on a busy server waits behind the writes.
 [[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-nats-server-monitoring-observed]] · [[s-gh-7362-routez-connz-rtt]] ·
 [[s-gh-7483-varz-cpu-in-containers]] · [[s-docs-monitoring-profiling]] ·
-[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-monitor-reference]] · [[s-prometheus-nats-exporter-collector]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-surveyor-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-2818-counters-exact-or-sampled]] · [[s-gh-6182-what-to-alert-on]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-monitor-reference]] · [[s-prometheus-nats-exporter-collector]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-surveyor-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-2818-counters-exact-or-sampled]] · [[s-gh-6182-what-to-alert-on]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]]

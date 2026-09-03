@@ -7,7 +7,7 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports, s-nats-cli-core-commands, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -446,6 +446,37 @@ nats bench js consume --stream S --consumer C …          # binds an existing d
   without a terminal.
 
 
+## The core-NATS commands, from `--help` on 0.4.0
+
+Defaults and flags read from the binary (source: [[s-nats-cli-core-commands]]); the outputs from the
+runs on 2.14.6 (source: [[s-nats-server-core-delivery-observed]]):
+
+```
+nats reply orders.inventory.check '{"in_stock":true}'           # joins queue group NATS-RPLY-22 by default (-q/--queue)
+nats reply orders.inventory.check --echo                        # reflects the request, headers copied, NATS-Reply-Counter added
+nats reply 'weather.>' --command "curl -s wttr.in/{{1}}?format=3"   # {{1}} = first token after the literal prefix; NATS_REQUEST_BODY in the env
+nats request orders.inventory.check '{}' --replies 0 --timeout 2s --reply-timeout 300ms   # scatter-gather: every reply until the timeout
+nats sub '>' --headers-only                                     # wire tap, metadata only; --subjects-only still prints one line per message
+nats sub orders.created --count 3 --wait 10s                    # take exactly three, or give up after 10 s idle
+nats pub orders.created '{…}' -H 'Content-Type:application/json' -H 'Acme-Request-Id:req_7f3c9a'
+nats trace orders.us.created                                    # who would receive it, nothing delivered; needs nats-server 2.11+, no system user
+nats trace orders.us.created --deliver                          # …and deliver it, with Nats-Trace-Dest and Accept-Encoding: snappy headers
+nats server mappings "orders.created.*" "orders.created.{{partition(3, 1)}}.{{wildcard(1)}}" orders.created.ord_8w2k   # no server needed
+nats sub orders.created --trace --connection-name warehouse     # >>> Connected / Disconnected due to: EOF / Setting reconnect delay / Reconnected lines
+```
+
+Two checks the CLI makes for you: a subject with whitespace fails at once with `nats: error: nats: invalid
+subject` (the server would misroute it — [[subjects-and-wildcards]]), and a payload over the server's
+`max_payload` fails with `nats: error: nats: maximum payload exceeded` (the server would close the
+connection — [[core-nats-delivery]]). `nats server request subscriptions` needs a system-account user;
+`nats server request connections` answers without one, for your own account only.
+
+
+The chapter's own use of these commands — the `>` wire tap, `nats sub --count 3`, `nats pub -H`, `nats rtt
+--connection-name`, the `nats server mappings` dry runs and the partition demo — is in
+[[s-docs-core-nats-publish-subscribe]] and [[s-docs-core-nats-subjects-and-mapping]].
+
+
 ## Related
 
 [[nsc]] · [[nk]] · [[nats-box]] · [[nats-top]] · [[jsm-go]] · [[monitoring-endpoints]] ·
@@ -465,4 +496,4 @@ nats bench js consume --stream S --consumer C …          # binds an existing d
 [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-kubernetes]] ·
 [[s-docs-single-server]] · [[s-docs-stream-backup-restore]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7684-certificate-expiry]] ·
-[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-natscli-auth-exports-imports]]
+[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-natscli-auth-exports-imports]] · [[s-nats-cli-core-commands]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]]

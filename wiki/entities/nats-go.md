@@ -7,9 +7,9 @@ verified-against: nats.go v1.53.1
 verified-on: 2026-08-31
 tags: [client, tier-1, go, reference-implementation]
 aliases: [nats.go, "nats-io/nats.go", go client, golang client]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # nats.go
@@ -75,6 +75,17 @@ through the server's symptoms (sources: [[s-nats-go-kv-object-mirror]],
   mirror rules; which one an application uses changes nothing here.
 
 
+## Publish subject validation since v1.48.0
+
+Before **v1.48.0** (2025-12-17) the Go client wrote any subject it was given into the `PUB` line; the
+release added "publish subject validation and a connection option to skip it (#1974, #1979)" (source:
+[[s-nats-go-relnotes-1.48.0]]). The docs' whitespace pitfall names "nats.go before v1.48.0" as a client
+that lets `orders.us created` through (source: [[s-docs-core-nats-subjects-and-mapping]]), and the
+server then reads the space as the reply boundary — subject `orders.us`, reply `created` — silently
+(source: [[s-nats-server-core-delivery-observed]], run A2). The CLI, built on a current client, refuses
+the subject with `nats: invalid subject`. Rules on [[subjects-and-wildcards]].
+
+
 ## Related
 
 [[orbit]] · [[jsm-go]] · [[nats-cli]] · [[ordered-consumer]] · [[nats-js]] · [[nats-rs]] ·
@@ -82,4 +93,4 @@ through the server's symptoms (sources: [[s-nats-go-kv-object-mirror]],
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]]

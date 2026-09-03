@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [subject_transform, republish, wildcard, partition, split, Nats-Stream, Nats-Subject, Nats-Sequence, Nats-Last-Sequence, Nats-Msg-Size, 10052, sharding]
 aliases: [subject transform, transform, republish, subject mapping, partition, wildcard, sharding, "{{wildcard(1)}}", "{{partition(3,1)}}", nats server mappings]
-sources: [s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-mirrors-and-sources, s-docs-stream-config, s-docs-kv-watching, s-relnotes-2.10, s-relnotes-2.12, s-nats-server-stream-consumer-config]
+sources: [s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-mirrors-and-sources, s-docs-stream-config, s-docs-kv-watching, s-relnotes-2.10, s-relnotes-2.12, s-nats-server-stream-consumer-config, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5172-mapping-in-config-or-stream]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -34,7 +34,7 @@ subject; anything else is stored under its original subject. The listen set and 
 are separate things.
 
 **This is not account subject mapping.** That is configured on the server, reroutes *core* subjects
-before anything reaches a stream, and is a different topic.
+before anything reaches a stream — see *Account-level `mappings`* below.
 
 ## The transform language
 
@@ -180,6 +180,56 @@ transform from `src` to `dest` that is invalid, is refused at creation and updat
 [[stream-and-consumer-config]] (source: [[s-nats-server-stream-consumer-config]]).
 
 
+## Account-level `mappings`: the same language, applied before routing
+
+The server-side sibling of the stream transform. A `mappings { }` block (alias `maps`) rewrites a
+**core** subject the moment a message arrives — `parser.go:519–527` applies it to CLIENT and LEAF
+publishes before the interest graph is consulted, before any stream sees the message, and the publisher
+gets no signal. The block is per account; a top-level block is the `$G` account's (`opts.go:1188–1195`),
+and mappings never cross an account boundary (sources: [[s-docs-core-nats-subjects-and-mapping]],
+[[s-nats-server-core-delivery]]).
+
+```
+mappings {
+  orders.placed: orders.created                                     # rename
+  orders.created: [ { destination: orders.created.canary, weight: 10 } ]   # 10 % to a canary, 90 % stays
+  "orders.created.*": "orders.created.{{partition(3, 1)}}.{{wildcard(1)}}"   # shard by the id token
+}
+```
+
+Test any line without a server — `nats server mappings "<source>" "<dest>" <subject>` runs the same
+transform code — and then the rules, each run on 2.14.6 (source: [[s-nats-server-core-delivery-observed]]):
+
+- **Weights**: each destination `0`–`100` (a trailing `%` is accepted), **each ≤ 100 and the total per
+  source ≤ 100** or the config is refused — `Error adding mapping for "orders.created" : total weight
+  needs to be <= 100` for 60 + 50, from `nats-server -t` and from a start alike. A total under 100
+  leaves the remainder **on the source subject** (weight 10: 17 of 200 publishes remapped, 183 stayed).
+- **The remainder is dropped only when the source is listed as its own destination**
+  (`AddWeightedMappings` skips the auto-added source "iff the src was … added in explicitly, meaning they
+  want loss", `accounts.go:844–862`): `orders.created` at weight 90 delivered 188 of 200; and, against the
+  docs' "This only works for a literal source", `"orders.loss.>"` at weight 50 delivered 98 of 200 — the
+  server's own example config uses a wildcard source this way as "a chaos testing trick" (source:
+  [[s-gh-5172-mapping-in-config-or-stream]]; docs issue #84).
+- **`partition(n, k…)`** is deterministic: the docs' three ids landed in buckets 0, 1, 2 and the
+  repeated id in 0 again; a subscriber on the pre-map subject received nothing. The count `n` is part of
+  the subject contract — the same rule as the stream transform above.
+- **`cluster`**: a destination with a `cluster` name applies only to messages published through a server
+  in that cluster, with the unscoped list as fallback; the ≤ 100 total is checked per cluster.
+- **Reloadable** — `nats-server --signal reload` after editing the block logs `Reloaded: accounts`
+  (the block is account data, so it rides the `accounts` reload path) and the next publishes use the
+  new weights (weight 10 → 50: 93 of 200 remapped); with `-DV` each rewrite is traced as
+  `MAPPING <from> -> <to>`.
+
+**Which one to use.** A maintainer's placement rule: core mapping "is part of the account data (i.e. in
+the server's config, or in the account's JWT)" and is applied as a core message is published; a stream's
+transform is applied as messages are ingested; "You do not want to put the mappings you want to do
+inside streams (e.g. inserting a partition number) in the server config, only in the stream config"
+(source: [[s-gh-5172-mapping-in-config-or-stream]]). Map at the account level to rename a legacy subject
+for every subscriber, to canary a share of core traffic, or to shard a subject that core subscribers
+consume; map in the stream when only the stream's consumers need the shard. The subject rules the source
+and destination must obey are on [[subjects-and-wildcards]].
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[mirrors-and-sources]] · [[key-value]] · [[worker-pool]] ·
@@ -193,4 +243,4 @@ transform from `src` to `dest` that is invalid, is refused at creation and updat
 - [[s-docs-mirrors-and-sources]] — the per-source transform, applied while copying.
 - [[s-docs-stream-config]] — the `subject_transform`, `republish` and per-source
   `subject_transforms` config fields.
-- [[s-docs-kv-watching]] — a KV key filter is a subject filter, so `*` is a whole token there too. · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-nats-server-stream-consumer-config]]
+- [[s-docs-kv-watching]] — a KV key filter is a subject filter, so `*` is a whole token there too. · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-nats-server-stream-consumer-config]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-gh-5172-mapping-in-config-or-stream]]
