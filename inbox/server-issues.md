@@ -34,6 +34,8 @@ So the discipline here is different:
 | SI-1 | The leafnode JetStream deny list names `$OBJ.>`, but the object store's subjects are `$O.<bucket>.C.>` and `$O.<bucket>.M.>` — so object-store data crosses a JetStream domain boundary that KV data does not, and two same-named buckets on either side of a leafnode silently converge | inconsistent | ★ high | v2.14.6 | not filed |
 | SI-2 | A nak that carries a delay is redelivered after `delay + (BackOff[dc] − BackOff[0])`, not after `delay`: `processNak` backdates the pending timestamp by `o.cfg.AckWait` while `checkPending` measures it against the attempt's backoff entry. A client asking for 2s gets 12s; a client asking for **0s** gets 10s. A **bare** `-NAK` is unaffected, and `-NAK {}` is not bare | unexpected | high | v2.14.6 | not filed |
 | SI-3 | A `*` inside a subject token — `orders.1*` — is a wildcard to the subject tree and a literal to the sublist: a consumer filtered on it reports `num_pending` for every subject beginning `orders.1`, and `STREAM.INFO`'s `subjects_filter` lists those subjects, while delivery and a direct get match the literal token and find nothing. The consumer shows a backlog it can never deliver | inconsistent | low | v2.14.6 | not filed |
+| SI-4 | The `client_connect` event's `timestamp` is UTC (`…Z`) while the `client_disconnect` event's carries the server's local offset (`…+02:00`) — `accountConnectEvent` stamps `time.Now().UTC()`, `accountDisconnectEvent` the `now` its caller passes; the auth-error twin of the same body is UTC again | inconsistent | low | v2.14.6 | not filed |
+| SI-5 | After `--signal ldm` on a server with no clients, `$SYS.SERVER.<id>.LAMEDUCK` arrived and the server exited within a millisecond, but no `$SYS.SERVER.<id>.SHUTDOWN` reached a subscriber on a peer; a plain SIGTERM on the same server did deliver `SHUTDOWN` | unexpected | low | v2.14.6 | not filed |
 
 ---
 
@@ -285,3 +287,67 @@ the memory store; a `*` inside the *first* token; whether the same tree matcher 
 the way*; the run in `raw/nats-server-src/stream-scale-observed-v2.14.6.md`. No reader page yet:
 the trigger is a filter that is not a NATS wildcard, so it belongs in a page on subject filters when
 one exists.
+
+## SI-4 · Connect events are stamped in UTC, disconnect events in local time
+
+**The observation.** On **v2.14.6** (nats CLI 0.4.0, a standalone server, system-account subscriber on
+`$SYS.>`; `raw/nats-server-src/system-subjects-observed-v2.14.6.md` §3–4):
+
+```
+$SYS.ACCOUNT.APP.CONNECT     "timestamp":"2026-09-03T01:47:27.113195Z"
+$SYS.ACCOUNT.APP.DISCONNECT  "timestamp":"2026-09-03T03:47:29.141611+02:00"
+$SYS.SERVER.<id>.CLIENT.AUTH.ERR   "timestamp":"2026-09-03T01:47:30.189954Z"      (a client_disconnect body)
+$SYS.ACCOUNT.$G.DISCONNECT   "timestamp":"2026-09-03T03:47:30.189966+02:00"      (the same event)
+```
+
+The `client.start` field inside the same bodies is local time in both. The `server.time` field is
+UTC in both.
+
+**Why.** `accountConnectEvent` builds its `TypedEvent` with `time.Now().UTC()`;
+`accountDisconnectEvent(c *client, now time.Time, reason string)` uses the `now` it is handed, which
+its callers take from `time.Now()` without `.UTC()`; `sendAuthErrorEvent` uses `time.Now().UTC()`
+(`server/events.go:2551–2720` at v2.14.6, quoted in `raw/nats-server-src/system-subjects-v2.14.6.md`).
+Both are RFC 3339 and parse to the same instant, so nothing is wrong; a consumer that compares or
+sorts the strings, or that assumes the `Z` form, is surprised.
+
+**What would settle it.** Whether the difference is intended, and whether the `TypedEvent.Time`
+of every `$SYS` event should be normalised to UTC as the JetStream advisories' are.
+
+**Searched and not found.** GitHub issues in `nats-io/nats-server` for "disconnect event timestamp
+timezone" (no result) and "client_disconnect timestamp UTC" (no result) — none about the zone.
+
+**What was not tested.** Whether a server started with `TZ=UTC` shows the difference (it would not,
+which is presumably why it goes unnoticed in containers); the leafnode and route disconnect paths.
+
+## SI-5 · No `SHUTDOWN` event after a lame-duck exit with no clients
+
+**The observation.** On **v2.14.6**, lab cluster n1–n3, `nats sub '$SYS.>'` as the system user on n1
+(`raw/nats-server-src/system-subjects-observed-v2.14.6.md` §7). `nats-server --signal ldm=<n2 pid>`
+at 03:50:54.077:
+
+```
+[#127] Received on "$SYS.SERVER.<n2 id>.LAMEDUCK"   {"name":"n2",…,"time":"2026-09-03T01:50:54.084721Z"}
+n2.log: 03:50:54.084705 [INF] Entering lame duck mode, stop accepting new clients
+        03:50:54.085188 [INF] Server Exiting..
+```
+
+No `$SYS.SERVER.<n2 id>.SHUTDOWN` reached the subscriber (none in the whole log). The restarted n2,
+sent a plain SIGTERM at 03:52:27, produced `[#187] Received on "$SYS.SERVER.<n2 id>.SHUTDOWN"`.
+
+**Why, as far as the source says.** `sendShutdownEvent` (`events.go:689–707`) pushes the event as
+the last message of the system send queue and sets `s.sys.sendq = nil`; with no clients the
+lame-duck drain finishes in under a millisecond and the routes close on `Server Exiting`. Whether the
+queued message was flushed to the route before it closed is what this run cannot see. The lame-duck
+event itself (`sendLDMShutdownEventLocked`, `:679`) arrived.
+
+**What would settle it.** Whether `SHUTDOWN` is expected to be delivered after a lame-duck exit
+(with and without clients), or whether `LAMEDUCK` is the only event an operator should rely on for
+a drained server.
+
+**Searched and not found.** GitHub issues in `nats-io/nats-server` for "SHUTDOWN event lame duck"
+(no result) and "system event SHUTDOWN not received" (no result) — nothing about a missing shutdown event.
+
+**What was not tested.** A lame-duck exit with connected clients (a drain of `lame_duck_duration`);
+whether `SHUTDOWN` arrives on the server's own local system subscriber rather than a peer's; a
+standalone server.
+

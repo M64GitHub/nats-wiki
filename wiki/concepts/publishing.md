@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [PubAck, Nats-Msg-Id, duplicate, duplicate_window, async-publish, atomic-batch, fast-ingest, AllowAtomicPublish, AllowBatchPublish, Nats-Batch-Id, Nats-Expected-Last-Subject-Sequence, exactly-once, persist_mode]
 aliases: [publish, PubAck, pub ack, exactly once, exactly-once, deduplication, dedup, Nats-Msg-Id, msg id, async publish, atomic batch, batch publish, fast ingest, publish acknowledgement]
-sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10]
+sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-stream-consumer-config]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -318,6 +318,20 @@ older than the archive (source: [[s-relnotes-2.10]]).
   same fix as 2.12.14.
 
 
+## The batch limits, from the source
+
+The three numbers the docs give for atomic batches — 1,000 messages per batch, 50 batches in flight
+per stream, a ten-second stall before a batch is abandoned — are the compiled-in defaults
+`streamDefaultMaxAtomicBatchSize`, `…InflightPerStream` and `streamDefaultMaxBatchTimeout`
+(`stream.go:446–455` at v2.14.6), with a fourth the docs omit, 1,000 in flight in total; fast
+batches allow 1,000 per stream and 50,000 in total. All are overridable in
+`jetstream { limits { max_batch_size, max_batch_inflight_per_stream, max_batch_inflight_total,
+max_batch_timeout } }` ([[config-keys]]). `allow_atomic` (2.12.0), `allow_batched` (2.14.0) and
+`persist_mode` (2.12.0, fixed after creation, `async` incompatible with atomic batches) are on
+[[stream-and-consumer-config]] with their update rules (source:
+[[s-nats-server-stream-consumer-config]]).
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[consumer]] · [[subject-transforms]] · [[error-codes]] ·
@@ -335,4 +349,4 @@ older than the archive (source: [[s-relnotes-2.10]]).
 - [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] — the releases the two batch modes shipped
   in.
 - [[s-relnotes-2.14.0]] — the `Nats-Batch-Commit: eob` end-of-batch commit.
-- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]]
+- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-stream-consumer-config]]

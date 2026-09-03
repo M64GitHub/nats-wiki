@@ -7,9 +7,9 @@ verified-against: nats-surveyor v0.9.11
 verified-on: 2026-08-31
 tags: [tool, surveyor, monitoring, system-account, statz, raftz, prometheus]
 aliases: [nats-surveyor, surveyor, "nats-io/nats-surveyor"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-prometheus-and-dashboards]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-prometheus-and-dashboards, s-nats-server-system-subjects]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # nats-surveyor
@@ -72,6 +72,16 @@ nats-surveyor … --log-level debug
 Every flag has an environment variable: `NATS_SURVEYOR_SERVERS`, `NATS_SURVEYOR_CREDS`,
 `NATS_SURVEYOR_JSZ`, and so on — which is how it is configured in Kubernetes.
 
+## The surface it reads
+
+Surveyor's system-account credentials buy it the request family on [[system-subjects]] —
+`$SYS.REQ.SERVER.PING.<Z>`, one reply per server, including the three names an HTTP scraper can never
+reach (`STATSZ`, `IDZ`, `PROFILEZ`) and the account-scoped `$SYS.REQ.ACCOUNT.<acc>.<Z>` forms — which
+is the structural reason it can survey a whole topology from one connection while
+[[prometheus-nats-exporter]] needs one process per server's HTTP port (source:
+[[s-nats-server-system-subjects]]).
+
+
 ## Related
 
 [[prometheus-nats-exporter]] · [[monitoring-endpoints]] · [[raft-in-nats]] · [[nats-helm-charts]] ·
@@ -79,4 +89,4 @@ Every flag has an environment variable: `NATS_SURVEYOR_SERVERS`, `NATS_SURVEYOR_
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-prometheus-and-dashboards]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-prometheus-and-dashboards]] · [[s-nats-server-system-subjects]]

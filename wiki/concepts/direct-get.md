@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [direct-get, allow_direct, mirror_direct, last_by_subj, multi_last, batch, EOB]
 aliases: [direct get, allow_direct, "$JS.API.DIRECT.GET", direct read, mirror_direct]
-sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store, s-synadia-reliable-delivery-dlq, s-relnotes-2.11, s-relnotes-2.14]
+sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store, s-synadia-reliable-delivery-dlq, s-relnotes-2.11, s-relnotes-2.14, s-nats-server-stream-consumer-config]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -199,6 +199,14 @@ counts (#8227), which changes how a `last_by_subj` read walks a million-subject 
 ([[filestore-layout]]).
 
 
+## `allow_direct` and `mirror_direct`, after creation
+
+Both are free to turn on or off by update; `mirror_direct` needs a `mirror` at creation (`stream has
+no mirror but does have mirror direct`). The batch and multi-subject request fields of
+`$JS.API.STREAM.MSG.GET` are listed on [[js-api-subjects]]; the stream fields on
+[[stream-and-consumer-config]] (source: [[s-nats-server-stream-consumer-config]]).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[key-value]] · [[object-store]] · [[mirrors-and-sources]] ·
@@ -208,4 +216,4 @@ counts (#8227), which changes how a `last_by_subj` read walks a million-subject 
 
 [[s-docs-get-direct]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-and-sources]] ·
 [[s-docs-kv-under-the-hood]] · [[s-synadia-jetstream-anti-patterns]] ·
-[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]] · [[s-synadia-reliable-delivery-dlq]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]]
+[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]] · [[s-synadia-reliable-delivery-dlq]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]]

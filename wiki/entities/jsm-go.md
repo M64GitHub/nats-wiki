@@ -7,9 +7,9 @@ verified-against: jsm.go v0.4.1
 verified-on: 2026-08-31
 tags: [repo, jsm, schemas, schema-registry, management-library, generator]
 aliases: [jsm.go, jsm, "nats-io/jsm.go"]
-sources: [s-docs-ecosystem, s-github-repo-facts]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-jsm-go-config-schemas]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # jsm.go
@@ -48,6 +48,17 @@ README is blunt about the audience: "For typical end users we suggest the nats.g
   userfriendly features and requires deep technical knowledge of the JetStream internals." Use it
   when you are building tooling, not applications.
 
+## The two schemas this wiki reads directly
+
+`schemas/jetstream/api/v1/stream_configuration.json` and `consumer_configuration.json` at **v0.4.1**
+are in `raw/jsm-go/`: 38 stream properties matching the server's `StreamConfig` field for field, and
+34 consumer properties (the server's `sourcing` is internal). Because the docs collapse the consumer
+schema (docs issue #4), the consumer descriptions and schema defaults — `ack_policy: none`,
+`max_waiting: 512`, `ack_wait: "30000000000"` — are readable only here; one description is wrong
+(`opt_start_time` names `DeliverByStartSequence`, docs issue #74). The field tables built from them
+are [[stream-and-consumer-config]] (source: [[s-jsm-go-config-schemas]]).
+
+
 ## Related
 
 [[nats-cli]] · [[nack]] · [[js-api]] · [[js-api-subjects]] · [[advisories]] · [[nats-go]] ·
@@ -55,4 +66,4 @@ README is blunt about the audience: "For typical end users we suggest the nats.g
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-jsm-go-config-schemas]]

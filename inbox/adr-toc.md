@@ -17,7 +17,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 6 | ADR-6.md | Naming Rules | Approved | clients core | server, client | approved |  |
 | 7 | ADR-7.md | NATS Server Error Codes | Partially Implemented | clients core jetstream | server, client, jetstream | ★ partial | [[s-adr-7-server-error-codes]] |
 | 8 | ADR-8.md | JetStream based Key-Value Stores | Implemented | clients jetstream kv | jetstream, client, kv, spec | implemented | [[s-adr-8-key-value-store]] |
-| 9 | ADR-9.md | JetStream Consumer Idle Heartbeats | Approved | clients core jetstream | server, client, jetstream | approved |  |
+| 9 | ADR-9.md | JetStream Consumer Idle Heartbeats | Approved | clients core jetstream | server, client, jetstream | approved | [[s-adr-9-idle-heartbeats]] |
 | 10 | ADR-10.md | JetStream Extended Purge | Implemented | clients core jetstream | server, client, jetstream | ★ implemented | [[s-adr-10-extended-purge]] |
 | 11 | ADR-11.md | Hostname resolution | Approved | clients | client | approved |  |
 | 12 | ADR-12.md | JetStream Encryption At Rest | Implemented | jetstream | jetstream | implemented |  |
@@ -35,8 +35,8 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 30 | ADR-30.md | Subject Transform | Implemented | core | server | ★ implemented |  |
 | 31 | ADR-31.md | JetStream Direct Get | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 | [[s-adr-31-direct-get]] |
 | 32 | ADR-32.md | Service API | Implemented | clients | client, spec | implemented |  |
-| 33 | ADR-33.md | Metadata for Stream and Consumer | Approved | clients core jetstream | jetstream, client, server | approved |  |
-| 34 | ADR-34.md | JetStream Consumers Multiple Filters | Approved | clients core jetstream | jetstream, client, server | approved |  |
+| 33 | ADR-33.md | Metadata for Stream and Consumer | Approved | clients core jetstream | jetstream, client, server | approved | [[s-adr-33-metadata]] |
+| 34 | ADR-34.md | JetStream Consumers Multiple Filters | Approved | clients core jetstream | jetstream, client, server | approved | [[s-adr-34-multiple-filters]] |
 | 35 | ADR-35.md | JetStream Filestore Compression | Implemented | clients core jetstream | jetstream, client, server | ★ implemented | [[s-adr-35-filestore-compression]] |
 | 36 | ADR-36.md | Subject Mapping Transforms in Streams | Implemented | clients core jetstream | jetstream, client, server | ★ implemented |  |
 | 37 | ADR-37.md | JetStream Simplification | Approved | clients jetstream | jetstream, client, spec | approved |  |

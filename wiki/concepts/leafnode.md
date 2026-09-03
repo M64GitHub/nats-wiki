@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -389,6 +389,19 @@ older than the archive (source: [[s-relnotes-2.10]]).
   node's JetStream from the hub (#8429) (source: [[s-relnotes-2.15-preview]]).
 
 
+## Leafnode connect events: what you get, and the one you do not
+
+A leaf connecting to a hub is a **client connect event** on the account it binds to —
+`$SYS.ACCOUNT.<acc>.CONNECT` with `"kind":"Leafnode"` and the remote's `server_name` as `name` — and
+the account's `$SYS.ACCOUNT.<acc>.SERVER.CONNS` counts it under `leafnodes` (observed on 2.14.6,
+[[s-nats-server-system-subjects-observed]] §3). **`$SYS.ACCOUNT.<acc>.LEAFNODE.CONNECT` is
+published only when gateways are enabled** (`sendLeafNodeConnect`, `events.go:2416–2421`, "for
+internal use only"), and **there is no `LEAFNODE.DISCONNECT`** at all. gh#5902 asked why the
+maintainer saw the event on Synadia Cloud and a docker-compose hub never did; the thread closed with
+"a single server vs a cluster" as the open guess — the difference is gateways (source:
+[[s-gh-5902-leafnode-connect-events]]; the table is [[system-subjects]]).
+
+
 ## Related
 
 [[gateway]] · [[choosing-a-topology]] · [[jetstream-domain]] · [[account]] ·
@@ -404,7 +417,7 @@ older than the archive (source: [[s-relnotes-2.10]]).
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]] ·
 [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-5902-leafnode-connect-events]] · [[s-nats-server-system-subjects-observed]]
 
 ## To verify
 

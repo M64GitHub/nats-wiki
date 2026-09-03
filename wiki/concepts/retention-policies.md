@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -331,6 +331,16 @@ the no-cap statement on [[stream]]).
   (#8431, #8528) — before it, a filtered source could consume messages it never copied.
 
 
+## Changing `retention` on a live stream
+
+`limits` ↔ `interest` is allowed and was accepted on 2.14.6; **to or from `workqueue` is refused**
+with `stream configuration update can not change retention policy to/from workqueue`
+(`configUpdateCheck`, `stream.go:2318–2322`), and a counter stream may only be `limits`. A pull
+consumer on a workqueue stream must use `ack_policy: explicit` (10084). The field table is
+[[stream-and-consumer-config]] (source: [[s-nats-server-stream-consumer-config]],
+[[s-nats-server-config-mutability-observed]]).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[ack-and-redelivery]] · [[worker-pool]] · [[jetstream-out-of-disk]] ·
@@ -341,4 +351,4 @@ the no-cap statement on [[stream]]).
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
 [[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
 [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
-[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [account, multitenancy, "$G", "$SYS", system_account, no_auth_user, 10039, isolation]
 aliases: [account, accounts, tenant, multitenancy, "$G", "$SYS", system account, global account]
-sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client, s-docs-auth-callout, s-docs-authentication-basics, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-config-management, s-docs-decentralized-auth, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-hardening, s-docs-leaf-nodes, s-docs-putting-it-together, s-docs-security-checklist, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-5941-restrict-leafnode-subjects, s-gh-7017-kv-across-accounts, s-gh-7505-auth-callout-nkey, s-gh-7834-leafnode-same-js-domain, s-gh-7854-jwt-push-timeout, s-issue-4281-insufficient-storage, s-nats-server-leafnode-js-domains, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client, s-docs-auth-callout, s-docs-authentication-basics, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-config-management, s-docs-decentralized-auth, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-hardening, s-docs-leaf-nodes, s-docs-putting-it-together, s-docs-security-checklist, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-5941-restrict-leafnode-subjects, s-gh-7017-kv-across-accounts, s-gh-7505-auth-callout-nkey, s-gh-7834-leafnode-same-js-domain, s-gh-7854-jwt-push-timeout, s-issue-4281-insufficient-storage, s-nats-server-leafnode-js-domains, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -227,7 +227,7 @@ storage; it does not give a tenant its own certificate or its own key.
   state does not follow users across the boundary, `no_auth_user` needs a restart, and existing
   clients must all be re-pointed at named users.
 - **It is the multi-tenancy unit**, so per-tenant limits, per-tenant JetStream quotas and per-tenant
-  monitoring all hang off it. `$SYS.SERVER.ACCOUNT.<ACCOUNT>.CONNS` advisories report connections
+  monitoring all hang off it. `$SYS.ACCOUNT.<ACCOUNT>.SERVER.CONNS` advisories (and the older `$SYS.SERVER.ACCOUNT.<ACCOUNT>.CONNS`, both every 30 s while the account has a connection; [[system-subjects]]) report connections
   per account.
 - **Verify the boundary, don't assume it.** The docs' own check is two clients on the same subject
   string in different accounts; the message does not arrive.
@@ -429,6 +429,19 @@ missing no longer panics at startup (2.14.3, #8329). **2.14.6**: consumer tiers 
 enforcing account limits (#8484).
 
 
+## What the system account answers, and what an ordinary account may ask
+
+Every `$SYS` subject — the fifteen `$SYS.REQ.SERVER.PING.<Z>` requests (three of them, `STATSZ`,
+`IDZ` and `PROFILEZ`, with no HTTP form), the per-account `$SYS.REQ.ACCOUNT.<acc>.<Z>` requests, the
+claims and auth-callout subjects, and the events with their heartbeats — is tabled on
+[[system-subjects]], read from `events.go` at v2.14.6. The boundary for an **ordinary** account is
+two built-in imports: `$SYS.REQ.ACCOUNT.PING.CONNZ` and `.STATZ`, which the system account exports and
+map onto the asking account's own `$SYS.REQ.ACCOUNT.<acc>.<Z>` (`events.go:2385–2387`), plus
+`$SYS.REQ.USER.INFO`; anything else — `$SYS.REQ.SERVER.PING.VARZ`, another account's `CONNZ` — gets
+`No responders are available`, whatever the user's permissions say (observed on 2.14.6; source:
+[[s-nats-server-system-subjects]], [[s-nats-server-system-subjects-observed]]).
+
+
 ## Related
 
 [[nats-server]] · [[stream]] · [[error-codes]] · [[config-keys]] · [[monitoring-endpoints]] ·
@@ -453,4 +466,4 @@ enforcing account limits (#8484).
 [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7017-kv-across-accounts]] ·
 [[s-gh-7505-auth-callout-nkey]] · [[s-gh-7834-leafnode-same-js-domain]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-issue-4281-insufficient-storage]] ·
-[[s-nats-server-leafnode-js-domains]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-nats-server-leafnode-js-domains]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]]

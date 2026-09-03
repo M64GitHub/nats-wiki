@@ -228,6 +228,14 @@ exists to answer live in `inbox/question-bank.md`.
   worth naming in `/varz`, `/connz`, `/routez`, `/jsz` and `/healthz`.
 - [[advisories]] — every `$JS.EVENT.ADVISORY` subject **read from the server source**, the `$SYS`
   connect/disconnect events, and the four worth alerting on.
+- [[system-subjects]] — every `$SYS` subject the server answers on or publishes to, read from `events.go`
+  at v2.14.6 and run: the fifteen `$SYS.REQ.SERVER.PING.<Z>` requests and which three have no HTTP twin,
+  the account requests an ordinary user may make, the events with their bodies and heartbeats (`STATSZ`
+  10 s, `CONNS` 30 s), and the two subjects the docs name that do not exist.
+- [[stream-and-consumer-config]] — every field of `StreamConfig` and `ConsumerConfig` at v2.14.6: type,
+  the default the server applies, the minor it arrived in, whether it can change after creation (with
+  the refusal string), the CLI flag, and the rule that bites; the limits that clamp a consumer; which
+  clock stamps a message; the pull `batch` that has no ceiling.
 
 ## Entities
 
@@ -404,6 +412,17 @@ exists to answer live in `inbox/question-bank.md`.
   `/connz?sort=pending`, and why an unscoped `/jsz` times out.
 - [[s-docs-monitor-raftz]] — the 173-byte reference page three learn chapters call "the full field
   set": two request options, no response fields.
+- [[s-docs-system-monitor-reference]] — the system monitor tree read whole: 15 generated endpoint pages,
+  three of which (`statsz`, `idz`, `profilez`) are not HTTP endpoints at all, and `max_connections`
+  annotated as a duration.
+- [[s-docs-system-advisories-and-metrics]] — the three system events and the latency metric as the docs
+  give them: a `CONNECTIONS` subject that does not exist, a "limits reached" trigger that is a 30 s
+  heartbeat, and a latency subject the server never uses.
+- [[s-docs-jetstream-api-index]] — the four `$JS.API` index tables and 25 operation pages: `subjects_filter`,
+  `missing` and `offline`, the purge and snapshot options, `min_pending` / `min_ack_pending`, and
+  `stream/names` documenting its array as `consumers`.
+- [[s-docs-jetstream-advisories-reference]] — the 24 advisory and metric pages swept field by field against
+  `jetstream_events.go`: four wrong bodies, one missing enum value, twelve pages without `domain`.
 
 **nats-server source**
 
@@ -477,6 +496,18 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-meta-layer-rerun-observed]] — the meta-layer run repeated through `tools/lab/`: the same
   bootstrap, restart and stepdown numbers by a different route, the same peer ids on a purged store, and the
   correction that `Healthcheck failed` is one log line per `/healthz` request, not one a second.
+- [[s-nats-server-system-subjects]] — every `$SYS` subject from `events.go` at v2.14.6: the fifteen `PING.<Z>`
+  names and their double subscription, the per-account table, the two built-in imports, the event
+  bodies, the HTTP mux, service latency on the export's own subject, and `jetstream_events.go` whole.
+- [[s-nats-server-system-subjects-observed]] — the runs: `/statsz` `/idz` `/profilez` 404 while the requests
+  answer; `CONNS` on both subjects every 30 s; a leaf as a `CONNECT` with `kind: Leafnode` and no
+  `LEAFNODE.CONNECT` without gateways; the auth-error pair; reload by message; lame duck and shutdown.
+- [[s-nats-server-stream-consumer-config]] — `StreamConfig` and `ConsumerConfig` from the source: the defaults
+  `checkStreamCfg` and `setConsumerConfigDefaults` fill in, the validation, `configUpdateCheck` and
+  `checkNewConsumerConfig`, the batch constants, and the leader's clock on every message.
+- [[s-nats-server-config-mutability-observed]] — three passes of raw API updates on 2.14.6: every refusal
+  string, what sealing forces, an ephemeral's defaults, `subjects_filter`, and a pull of `batch: 300`
+  served in full.
 
 **The `nats.go` client source**
 
@@ -524,6 +555,11 @@ exists to answer live in `inbox/question-bank.md`.
   consumers, `AckFlowControl`, the consumer reset API, and the API level 4 requirement.
 - [[s-adr-61-meta-quorum-rescue]] — 2.15's `$JS.API.META.RESCUE`: quorum is computed from the
   configured peer set, and what to do when that wedges the meta layer.
+- [[s-adr-9-idle-heartbeats]] — `idle_heartbeat`: status `100 Idle Heartbeat` with `Nats-Last-Consumer` and
+  `Nats-Last-Stream`; push-only and fixed after creation on 2.14.6.
+- [[s-adr-33-metadata]] — `metadata` on streams and consumers: 128 KB, `_nats` reserved.
+- [[s-adr-34-multiple-filters]] — `filter_subjects`: no overlaps (10136), not both forms (10134), a buffer
+  per subject on the server.
 
 **Release notes and upgrade guides**
 
@@ -708,6 +744,14 @@ exists to answer live in `inbox/question-bank.md`.
   restarts: 2.10.19 stopped clipping the start sequence, 2.10.22 reverted it, 2.14 saw it again (#8384 in 2.15).
 - [[s-gh-6748-cve-binary-release-docker-images]] — CVE-2025-30215 shipped as binaries a week before the tag;
   the official Docker image is built by Docker's library from a PR and lags.
+- [[s-gh-5768-track-connected-clients]] — reconciling who is connected after a missed `CONNECT`:
+  `$SYS.REQ.SERVER.<id>.CONNZ` paged with `offset`/`limit`, one server per id, and the 30 s `CONNS`
+  heartbeat the thread never mentions.
+- [[s-gh-5902-leafnode-connect-events]] — `LEAFNODE.CONNECT` seen on Synadia Cloud, never on a
+  docker-compose hub, unresolved upstream; settled from the source — the sender is a no-op without
+  gateways, and there is no `LEAFNODE.DISCONNECT`.
+- [[s-gh-3944-subjects-in-a-stream]] — which subjects a stream holds: `subjects_filter` on `STREAM.INFO`,
+  and "everything except X" as a `filter_subjects` list.
 
 **Synadia blog (continued)**
 
@@ -808,6 +852,8 @@ exists to answer live in `inbox/question-bank.md`.
   verified chain, `--expire-warn 1w`, and a non-zero exit. Plus `nats account backup` / `restore`.
 - [[s-natscli-stream-external]] — the CLI has walked people through cross-domain sourcing for years:
   two branches, `$JS.<domain>.API` composed for you, and what the account branch assumes.
+- [[s-nats-cli-help-0.4.0]] — `stream add` / `edit` and `consumer add` / `edit` help at 0.4.0, verbatim: the
+  flag for every field, the CLI's own defaults, and the fields `consumer edit` has no flag for.
 
 **The Helm chart**
 
@@ -829,6 +875,8 @@ exists to answer live in `inbox/question-bank.md`.
   feature coverage the docs delegate to them.
 - [[s-nats-server-readme]] — CNCF, Apache-2.0, and the Trail of Bits / OSTIF security audit.
 - [[s-cncf-nats-project]] — accepted 2018-03-15 at the Incubating maturity level.
+- [[s-jsm-go-config-schemas]] — the two configuration JSON schemas at jsm.go v0.4.1: 38 stream and 34
+  consumer properties, the consumer descriptions the docs never render, and one wrong deliver policy.
 
 ## Wanted pages (topics with no source yet)
 

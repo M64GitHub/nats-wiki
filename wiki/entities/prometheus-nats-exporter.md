@@ -7,9 +7,9 @@ verified-against: prometheus-nats-exporter v0.20.2
 verified-on: 2026-08-31
 tags: [tool, prometheus, exporter, metrics, jsz, varz, healthz]
 aliases: [prometheus-nats-exporter, nats exporter, "nats-io/prometheus-nats-exporter"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-prometheus-and-dashboards]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-prometheus-and-dashboards, s-nats-server-system-subjects]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # prometheus-nats-exporter
@@ -87,6 +87,15 @@ nats_stream_total_messages{account="ORDERS",stream_name="ORDERS"} 1000
 
 The names follow the wire fields of `/jsz` — `num_pending` becomes `nats_consumer_num_pending`.
 
+## The surface it reads
+
+The exporter scrapes the HTTP monitoring port only — the fifteen paths `server.go` registers, tabled
+on [[monitoring-endpoints]]. It therefore never sees the request-only names (`STATSZ`, `IDZ`,
+`PROFILEZ`) nor any `$SYS` event (`CONNS`, `STATSZ` heartbeats, `CLIENT.AUTH.ERR`), which need a
+system-account connection; that side is [[system-subjects]] and, as a tool, [[nats-surveyor]]
+(source: [[s-nats-server-system-subjects]]).
+
+
 ## Related
 
 [[nats-surveyor]] · [[monitoring-endpoints]] · [[nats-cli]] · [[nats-helm-charts]] ·
@@ -94,4 +103,4 @@ The names follow the wire fields of `/jsz` — `num_pending` becomes `nats_consu
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-prometheus-and-dashboards]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-prometheus-and-dashboards]] · [[s-nats-server-system-subjects]]

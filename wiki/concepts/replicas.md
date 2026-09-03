@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore, s-nats-server-jetstream-cluster, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-relnotes-2.10]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore, s-nats-server-jetstream-cluster, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-relnotes-2.10, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -407,6 +407,16 @@ the next line ([[meta-layer]]; source: [[s-nats-server-jetstream-cluster]]).
   R3 becomes: the Raft log is synced, the message blocks are not.
 
 
+## `num_replicas`, after creation
+
+Free on a cluster — 1 → 3 → 1 was accepted on the three-node lab — and refused on a standalone
+server for any value above 1 (`replicas > 1 not supported in non-clustered mode`, 10074); the cap is
+5 (`StreamMaxReplicas`) and a stream capturing `>` must be R1. A consumer's `num_replicas` may not
+exceed its stream's and must equal it on memory and workqueue streams. Tabled on
+[[stream-and-consumer-config]] (source: [[s-nats-server-stream-consumer-config]],
+[[s-nats-server-config-mutability-observed]]).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[raft-in-nats]] · [[stream-placement]] · [[retention-policies]] ·
@@ -428,4 +438,4 @@ the next line ([[meta-layer]]; source: [[s-nats-server-jetstream-cluster]]).
 [[s-docs-upgrade-to-2.12]] · [[s-docs-worker-pool]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7831-standalone-to-cluster]] · [[s-gh-7982-no-suitable-peers]] ·
-[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-relnotes-2.10]]
+[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-relnotes-2.10]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]

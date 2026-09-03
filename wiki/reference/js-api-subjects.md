@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers, s-nats-server-jetstream-cluster, s-relnotes-2.11, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers, s-nats-server-jetstream-cluster, s-relnotes-2.11, s-relnotes-2.14, s-relnotes-2.15-preview, s-docs-jetstream-api-index, s-nats-server-system-subjects, s-nats-server-config-mutability-observed, s-gh-3944-subjects-in-a-stream]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -123,34 +123,23 @@ queue group for both forms, which is how a read can be answered from another clu
 
 ## `$SYS` subjects an operator must know
 
-Not part of `$JS.API`, but read from the server source at **v2.14.6** and cited across this wiki's
-security pages. They are what an account push and an auth callout actually travel on.
-
-| subject | what it is | source |
-|---|---|---|
-| **`$SYS.REQ.CLAIMS.UPDATE`** | an **account push**. When nothing is subscribed here, the push fails with a bare `nats: timeout` and the server logs nothing | `events.go:46` |
-| `$SYS.REQ.CLAIMS.LIST` | list the accounts the resolver holds | `events.go:45` |
-| `$SYS.REQ.CLAIMS.DELETE` | delete an account JWT; needs `allow_delete: true` on the resolver | `events.go:47` |
-| `$SYS.REQ.CLAIMS.PACK` | resolver-to-resolver reconciliation | `events.go:44` |
-| `$SYS.REQ.ACCOUNT.<id>.CLAIMS.LOOKUP` | the server fetching one account JWT | `events.go:43` |
-| **`$SYS.REQ.USER.AUTH`** | the [[auth-callout]] hand-off; carries the client's credentials **in the clear** unless `xkey` is set | `auth_callout.go:30` |
-| `$SYS.REQ.USER.INFO` | what `nats account info` asks; a narrow publish allow-list silently blanks the answer ([[account]]) | cited by [[s-docs-accounts-and-multitenancy]] |
-
-Two permission facts follow from this table:
+Not part of `$JS.API`. The full table — the claims and auth requests (`$SYS.REQ.CLAIMS.*`,
+`$SYS.REQ.ACCOUNT.<id>.CLAIMS.LOOKUP`, `$SYS.REQ.USER.AUTH`, `$SYS.REQ.USER.INFO`), the fifteen
+`$SYS.REQ.SERVER.PING.<Z>` monitoring requests, the account requests and every event — moved to
+[[system-subjects]] on 2026-09-03, read from `events.go` at v2.14.6 and run on the binary (source:
+[[s-nats-server-system-subjects]]). Two permission facts stay here because ACLs built from this page
+need them:
 
 - The temporary user a push uses is scoped to exactly `$SYS.REQ.CLAIMS.LIST`,
   `$SYS.REQ.CLAIMS.UPDATE` and `$SYS.REQ.CLAIMS.DELETE`, plus `_INBOX.>` on the subscribe side
   (source: [[s-gh-7854-jwt-push-timeout]]) — so narrowing the system account's permissions can break
   pushes and nothing else.
 - On the account where auth callout runs, **the server denies publishing to `$SYS.REQ.USER.AUTH` for
-  every user**, the auth service included. That stops forgery; it does not stop a subscriber reading
-  every credential presented to the server.
+  every user**, the auth service included (source: [[s-nats-server-auth-and-tls]]). That stops
+  forgery; it does not stop a subscriber reading every credential presented to the server.
 
-The `$SYS.REQ.SERVER.PING.*` family is not listed here: it carries the monitoring endpoints over NATS
-rather than HTTP — a mirror or source error, for instance, is readable over
-`$SYS.REQ.SERVER.PING.JSZ` as well as at `/jsz` (source: [[s-adr-59-sourcing-and-mirroring]]). The
-endpoints, their fields and that equivalence are on [[monitoring-endpoints]].
-
+A mirror or source error is readable over `$SYS.REQ.SERVER.PING.JSZ` as well as at `/jsz` (source:
+[[s-adr-59-sourcing-and-mirroring]]); the endpoints and their fields are on [[monitoring-endpoints]].
 
 ## Why the tokens matter
 
@@ -220,6 +209,33 @@ subject that does not exist:
 
 **Headers are case-sensitive**, and some are set by the server rather than the client — the docs say
 so without listing which. On this wiki the server-set ones are named on each feature's page.
+
+
+## What the operation pages add
+
+The docs' 25 operation pages under `reference/jetstream/api/` were read together on 2026-09-03
+(source: [[s-docs-jetstream-api-index]]). Beyond the subjects above they give the request fields
+worth knowing: `STREAM.INFO` takes **`subjects_filter`** (a wildcard; the reply lists every matching
+subject with its message count, paged with `offset`) and `deleted_details`; `STREAM.LIST` returns
+**`missing[]`** ("in clustered environments gathering Stream info might time out") and **`offline`**
+(streams that are offline, with the reason); `STREAM.MSG.GET` takes `seq` *or* `last_by_subj`,
+`next_by_subj`, `batch`, `max_bytes`, `start_time`, `multi_last[]`, `up_to_seq`, `up_to_time`
+([[direct-get]]); `STREAM.PURGE` takes `filter`, `seq` (up to but not including) or `keep`, never both
+of the last two; `STREAM.SNAPSHOT` takes `chunk_size` (≥ 1024), `window_size` (1024–33554432) and
+`jsck`; `CONSUMER.MSG.NEXT` takes `expires`, `batch`, `max_bytes`, `no_wait`, `idle_heartbeat`,
+`group`, `min_pending`, `min_ack_pending`, `id` and `priority` ([[consumer]], [[priority-groups]]);
+`META.SERVER.REMOVE` takes `peer` (a name) or `peer_id`; a `PubAck` carries `val` on a counter stream.
+The *System Account* column is `Yes` for the two `META` operations only — which agrees with the
+server's meta-leader subscriptions (source: [[s-nats-server-system-subjects]]).
+
+The `get-next` page's "Maximum: 256" on `batch` is not a server limit either: a pull of 300 was served in
+full on 2.14.6 and only the consumer's `max_batch` (`409 Exceeded MaxRequestBatch of N`) or the server's
+`max_request_batch` refuses one (docs issue #73; source: [[s-nats-server-config-mutability-observed]]).
+The `subjects_filter` reply lands in `state.subjects`, paged 100000 at a time — the answer to gh#3944's "which subjects does my stream actually hold" ([[stream-and-consumer-config]]; source: [[s-gh-3944-subjects-in-a-stream]]).
+
+One page is wrong: `stream/names.md` documents its array as `consumers`; the server writes
+`streams` (`JSApiStreamNamesResponse`, `jetstream_api.go:464–468`, and on the wire
+`"streams":null` from an empty account) — docs issue #69.
 
 
 ## Conventions
@@ -310,4 +326,4 @@ None of the four exists at v2.14.6.
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
 [[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]] ·
 [[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]] ·
-[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-docs-jetstream-api-index]] · [[s-nats-server-system-subjects]] · [[s-nats-server-config-mutability-observed]] · [[s-gh-3944-subjects-in-a-stream]]

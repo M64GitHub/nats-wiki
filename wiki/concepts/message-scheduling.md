@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [message-scheduling, allow_msg_schedules, Nats-Schedule, cron, delayed-publish, message-ttl]
 aliases: [message scheduler, scheduled messages, delayed publishing, delayed message, cron schedule, Nats-Schedule, allow_msg_schedules]
-sources: [s-adr-51-message-scheduler, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-gh-7672-cron-schedules, s-gh-7628-scheduler-vs-nak, s-synadia-delayed-scheduling, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-adr-51-message-scheduler, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-gh-7672-cron-schedules, s-gh-7628-scheduler-vs-nak, s-synadia-delayed-scheduling, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
 created: 2026-09-01
 updated: 2026-09-03
 ---
@@ -349,6 +349,16 @@ constraints on counter streams and schedules "to prevent incorrect usage pattern
 The 2.12 twins carry the same fixes ([[nats-server-2.12]]).
 
 
+## `allow_msg_schedules` after creation
+
+**One-way**: an update turning it off is refused with `message schedules can not be disabled`, and
+turning it on sets `allow_rollup_hdrs` for you (the reply to the update already carried it) — which
+in turn needs the purge permission, so a stream with `deny_purge` cannot take schedules. `discard:
+new` is refused with it (`message scheduling cannot use discard new`). Field by field on
+[[stream-and-consumer-config]] (source: [[s-nats-server-stream-consumer-config]],
+[[s-nats-server-config-mutability-observed]]).
+
+
 ## Related
 
 [[stream]] · [[message-ttl]] · [[retention-policies]] · [[mirrors-and-sources]] · [[publishing]] ·
@@ -361,4 +371,4 @@ The 2.12 twins carry the same fixes ([[nats-server-2.12]]).
 [[s-docs-jetstream-headers]] · [[s-gh-7672-cron-schedules]] · [[s-gh-7628-scheduler-vs-nak]]
 
 Run directly, not read: `raw/nats-server-src/message-schedules-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01. · [[s-synadia-delayed-scheduling]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01. · [[s-synadia-delayed-scheduling]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]

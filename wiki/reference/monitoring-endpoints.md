@@ -4,10 +4,10 @@ type: reference
 area: [monitoring, deploy]
 since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-09-01
+verified-on: 2026-09-03
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -15,8 +15,10 @@ updated: 2026-09-03
 # Monitoring endpoints
 
 The read-only HTTP endpoints a `nats-server` serves on its monitoring port. This page lists the
-**15 documented endpoints and their query parameters**; it does not list response fields — those are
-per-endpoint schema dumps in the docs, and the ones worth explaining live on the concept pages.
+**endpoints the server's HTTP mux registers at v2.14.6 and their query parameters**; it does not
+list response fields — those are per-endpoint schema dumps in the docs, and the ones worth
+explaining live on the concept pages. The same data over the system account — `$SYS.REQ.SERVER.PING.<Z>`,
+including the three names that have **no** HTTP form — is on [[system-subjects]].
 
 ## The port
 
@@ -38,9 +40,12 @@ that instant and the connection closes.
 > and see your users, subjects and traffic. Do not expose it to the internet
 > (source: [[s-docs-monitoring-endpoints]]).
 
-## The 15 endpoints
+## The endpoints the port serves
 
-Query parameters are the request-schema fields from the 2.14 reference tree.
+Fifteen paths, from `server.go:3030–3044` and the `HandleFunc` calls at `:3134–3162` (source:
+[[s-nats-server-system-subjects]]; every code below observed on 2.14.6,
+[[s-nats-server-system-subjects-observed]]). Query parameters are the request-schema fields from the
+2.14 reference tree, corrected where the handler reads a different name (docs issue #48).
 
 | endpoint | what it reports | query parameters |
 |---|---|---|
@@ -54,11 +59,20 @@ Query parameters are the request-schema fields from the 2.14 reference tree.
 | `/accstatz` | per-account statistics | `accounts`, `include_unused` |
 | `/gatewayz` | gateway connections | `account_name`, `accounts`, `name`, `subscriptions`, `subscriptions_detail` |
 | `/leafz` | leafnode connections | `account`, `subscriptions` |
-| `/subsz` | the subscription list | `account`, `limit`, `offset`, `subscriptions`, `test` |
-| `/statsz` | server statistics | `cluster`, `domain`, `exact_match`, `host`, `server_name`, `tags` |
+| `/subsz` (alias `/subscriptionsz`) | the subscription list | `account`, `limit`, `offset`, `subscriptions`, `test` |
 | `/ipqueuesz` | internal queue depths | `all`, `filter` |
-| `/profilez` | Go profiles (`pprof`) | `debug`, `duration`, `name` |
-| `/idz` | the server's identity | — |
+| `/stacksz` | a goroutine dump — **documented nowhere** | — |
+| `/debug/vars` | the Go `expvar` page (`memstats`, `cmdline`) — **documented nowhere**; its request form is `EXPVARZ` | — |
+| `/` | the landing page | — |
+
+**Three names the docs list here are not HTTP endpoints.** `reference/system/monitor.md` presents
+`Statsz`, `Idz` and `Profilez` among fifteen endpoints "accessible at `http://localhost:8222/<z>`";
+on 2.14.6 **`/statsz`, `/idz` and `/profilez` return 404**. They exist only as system-account
+requests — `$SYS.REQ.SERVER.PING.STATSZ` (the 10-second heartbeat body, `{"server", "statsz"}`),
+`PING.IDZ` (a bare `{"name", "host", "id"}`) and `PING.PROFILEZ` (`{"name": "goroutine" | "heap" | …}`,
+a gzip profile) — whose request options are what those three docs pages print (docs issue #65;
+[[system-subjects]]). `/expvarz` is 404 too: the 2.10.16 release body's "`/expvarz` monitoring
+endpoint" was the `EXPVARZ` request, and the HTTP path arrived as `/debug/vars` in 2.11.11 / 2.12.2.
 
 The four used most are **`/varz`, `/connz`, `/routez` and `/jsz`**
 (source: [[s-docs-monitoring-endpoints]]).
@@ -390,10 +404,13 @@ The Leafnode Report's two columns worth reading carefully:
 
 ## How this was derived
 
-- The endpoint list and every query parameter come from `raw/nats-docs/reference/system/monitor/`
-  in the 2.14 docs tree — 15 pages, each a generated schema with a `## Request Schema` section. To
-  regenerate: parse the request-schema field names out of each file (note the docs escape
-  underscores as `\_`).
+- The endpoint list comes from `server/server.go` at v2.14.6 (`raw/nats-server-src/system-subjects-v2.14.6.md`),
+  each path confirmed with a `curl` status code on 2026-09-03 — **not** from the docs' monitor tree,
+  which lists three request-only names as endpoints (#65). The query parameters come from the
+  `## Request Schema` sections of `raw/nats-docs/reference/system/monitor/` (source:
+  [[s-docs-system-monitor-reference]]), corrected against the handlers where the two differ (#48).
+  To regenerate: re-read `server.go`'s path constants and `HandleFunc` calls at the new tag, then
+  parse the request-schema field names out of each docs file (the docs escape underscores as `\_`).
 - The prose — the port, the counter meanings, the pooled-routes count, the `/jsz` scaling warning
   and the unauthenticated-by-default caveat — comes from
   `raw/nats-docs/learn/monitoring/monitoring-endpoints.md`. The reference pages carry **no prose at
@@ -444,6 +461,17 @@ handlers read different names (`acc`, `consumers`, `subs`, …) and ignore the d
 2.14.6 `/accountz?account=NOPE` returns the normal page while `/accountz?acc=NOPE` answers
 `400 Account NOPE does not exist`. `connz` and `healthz` print the right names. Use the underscore
 names in `nats server request …` and its flags, never in a URL (source: [[s-nats-server-raftz]]).
+
+## The same numbers pushed: `STATSZ` and `CONNS`
+
+Two of the objects on this page also arrive without being asked for, on the system account: every
+server publishes its `STATSZ` body — the `statsz` object of `$SYS.REQ.SERVER.PING.STATSZ` — on
+`$SYS.SERVER.<id>.STATSZ` **every 10 s** (`statsHBInterval`), and every account with a connection
+gets `$SYS.ACCOUNT.<acc>.SERVER.CONNS` **every 30 s** with `conns`, `leafnodes`, `total_conns`,
+`num_subscriptions` and `slow_consumers` per server. Both are heartbeats an alert can key on the
+absence of; the subjects, bodies and the observed cadence are on [[system-subjects]] (source:
+[[s-nats-server-system-subjects]], [[s-nats-server-system-subjects-observed]]).
+
 
 ## What is deliberately not here
 
@@ -532,7 +560,7 @@ Each with its release and PR (source: [[s-relnotes-2.10]]):
 | `$SYS.REQ.SERVER.PING.IDZ`, `$SYS.REQ.SERVER.<id>.PROFILEZ`, `.KICK`, `.LDM`, `.RELOAD` | 2.10.0 (#3663, #3774, #4298, #4307) — `IDZ`, `KICK`, `LDM` and `RELOAD` are undocumented, `inbox/docs-issues.md` #54 |
 | `ocsp_peer_cache` dropped from `/varz` when not in use | 2.10.6 (#4829) |
 | `/jsz` account filtering with stream details fixed | 2.10.14 (#5229) |
-| **`/expvarz`** | 2.10.16 (#5374) |
+| the **`EXPVARZ`** system request — the body says "a `/expvarz` monitoring endpoint", but no HTTP path existed at that tag (`/expvarz` is 404 on 2.14.6); the HTTP form is `/debug/vars`, since 2.11.11 / 2.12.2 (#7469; source: [[s-nats-server-system-subjects-observed]]) | 2.10.16 (#5374) |
 | **`/raftz`**, "experimental … for diagnostic purposes" | 2.10.17 (#5530) |
 | `StreamLeaderOnly` filter on `/jsz`; CPU profiles from `PROFILEZ`; an HTTP read timeout on the monitoring, profiling and OCSP servers | 2.10.19 (#5704, #5743, #5790) |
 | **`statsz` every 10 s instead of 30 s**; pending JetStream API request count in `statsz` and `/jsz` | 2.10.21 (#5925, #5923, #5926) |
@@ -622,4 +650,4 @@ poller that scrapes `STREAM.INFO` on a busy server waits behind the writes.
 [[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-nats-server-monitoring-observed]] · [[s-gh-7362-routez-connz-rtt]] ·
 [[s-gh-7483-varz-cpu-in-containers]] · [[s-docs-monitoring-profiling]] ·
-[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-monitor-reference]]

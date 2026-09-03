@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [priority-groups, overflow, pinned_client, prioritized, unpin, 423]
 aliases: [priority group, pinned client, overflow policy, PriorityPolicy]
-sources: [s-adr-42-priority-groups, s-docs-policies, s-nats-server-constants-2.14.6, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-adr-42-priority-groups, s-docs-policies, s-nats-server-constants-2.14.6, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -181,6 +181,18 @@ stored ID and keep pulling.
   So the ADR's example value is the real default (source: [[s-nats-server-constants-2.14.6]]).
 - "Delivery stats per group" and multiple groups per consumer are named as **future** iterations.
 
+## The three fields, in the server's own rules
+
+`priority_groups`, `priority_policy` and `priority_timeout` (default 2 m for `pinned_client`) are
+pull-only (10178), need each other (a policy without groups and groups without a policy are both
+refused), and take names of 1–16 characters from `A-Z a-z 0-9 -_/=` (10162). `checkNewConsumerConfig`
+at v2.14.6 does **not** list them among the fields an update may not change, and an update adding
+`priority_groups: [a]` with `overflow` to a plain pull consumer was accepted on 2.14.6 — the ADR-42
+rule that they cannot change is not enforced (docs issue #37). Field by field on
+[[stream-and-consumer-config]] (source: [[s-nats-server-stream-consumer-config]],
+[[s-nats-server-config-mutability-observed]]).
+
+
 ## Related
 
 [[consumer]] · [[ack-and-redelivery]] · [[worker-pool]] · [[advisories]] · [[stream]] ·
@@ -193,4 +205,4 @@ stored ID and keep pulling.
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
 v2.14.6 with nats CLI 0.4.0, 2026-09-01. Behind `inbox/docs-issues.md` #37. ·
-[[s-docs-worker-pool]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-worker-pool]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]

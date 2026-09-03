@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -172,6 +172,15 @@ Each of these is a hypothesis. None is sourced.
   ([[config-keys]]), so this is cheap to test on a running server.
 - Confirmation of the cumulative-vs-instantaneous reading above.
 
+## The counters the system account pushes
+
+Two heartbeats carry the slow-consumer counters without a scrape: `$SYS.SERVER.<id>.STATSZ` every
+10 s (`slow_consumers`, `slow_consumer_stats`, `stale_connections`, `stalled_clients` per server) and
+`$SYS.ACCOUNT.<acc>.SERVER.CONNS` every 30 s (`slow_consumers` **per account**, which `/varz` cannot
+give you). Subjects, bodies and cadence on [[system-subjects]] (source:
+[[s-nats-server-system-subjects]]).
+
+
 ## Prevention
 
 - **Name your connections**, and connect as a distinct user per service. `/connz?auth=true` reports
@@ -264,4 +273,4 @@ diffing the default reports at v2.10.29 and v2.11.17 (source: [[s-relnotes-2.11]
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]]

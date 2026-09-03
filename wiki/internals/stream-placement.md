@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [placement, server_tags, no-suitable-peers, 10005, meta-leader]
 aliases: [placement, server_tags, tags, "no suitable peers for placement"]
-sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -222,6 +222,14 @@ desired-state metalayer makes changing placement or replicas mid-move, and cance
 without having to peer-remove first" (source: [[s-relnotes-2.15-preview]]).
 
 
+## The `placement` field
+
+`{cluster, tags, preferred}` (`jetstream_cluster.go:114–118` at v2.14.6); `preferred` is accepted only
+on a leader-stepdown request — in a stream configuration it is refused with `preferred server not
+permitted in placement` (`stream.go:2276`). Free to change by update (not exercised by the run). On
+[[stream-and-consumer-config]] with the other fields (source: [[s-nats-server-stream-consumer-config]]).
+
+
 ## Related
 
 [[replicas]] · [[raft-in-nats]] · [[stream]] · [[error-codes]] · [[js-api-subjects]] ·
@@ -232,4 +240,4 @@ without having to peer-remove first" (source: [[s-relnotes-2.15-preview]]).
 
 [[s-docs-placement]] · [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] ·
 [[s-gh-7982-no-suitable-peers]] · [[s-adr-7-server-error-codes]] · [[s-docs-scaling-and-peers]] ·
-[[s-natscli-backup-restore]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-natscli-backup-restore]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]]

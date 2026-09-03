@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [reload, SIGHUP, dry-run, include, reloader, configmap, accounts, max_subscriptions]
 aliases: [reload, SIGHUP, "config reload", "reload config", "add an account", "nats-server --signal reload"]
-sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry, s-docs-cross-account, s-docs-putting-it-together, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry, s-docs-cross-account, s-docs-putting-it-together, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects-observed, s-nats-server-system-subjects]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -224,6 +224,17 @@ to leafnodes again (2.10.8, #4937), and a server started with `--js --store_dir`
 JetStream disabled by a reload (2.10.28, #6609).
 
 
+### Observed on 2.14.6: the request, the reply, the log line
+
+`nats --server nats://sys:sys@… req '$SYS.REQ.SERVER.<server-id>.RELOAD' ''` answered
+`{"server":{"name":"n1",…,"seq":184,"time":"2026-09-03T01:50:53.062618Z"}}` — the bare server
+envelope, no `data` — and the server logged `[INF] Reloaded: accounts` and `[INF] Reloaded server
+configuration (sha256:23f0c0…)`, the same lines a `SIGHUP` produces. The server id is what
+`$SYS.REQ.SERVER.PING.IDZ` or `/varz` `server_id` returns; the handler is `reloadConfig`,
+`events.go:3201` (source: [[s-nats-server-system-subjects-observed]] §7,
+[[s-nats-server-system-subjects]]). The whole request family is on [[system-subjects]].
+
+
 ## Verify the running config with the digest (since 2.11.0)
 
 `nats-server -t` prints a **configuration state digest** — "A hash of the configuration file can be
@@ -336,4 +347,4 @@ not shown. **2.14.5**: `dial_timeout` arrives; whether it reloads was not tested
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] ·
 [[s-gh-7684-certificate-expiry]] ·
-[[s-docs-cross-account]] · [[s-docs-putting-it-together]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-docs-cross-account]] · [[s-docs-putting-it-together]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-server-system-subjects]]

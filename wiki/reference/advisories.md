@@ -4,10 +4,10 @@ type: reference
 area: [monitoring, jetstream, core]
 since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-09-01
+verified-on: 2026-09-03
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-advisories-and-metrics, s-docs-jetstream-advisories-reference]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -82,24 +82,30 @@ The whole space is under **`JSAdvisoryPrefix = "$JS.EVENT.ADVISORY"`** (line 232
 
 ## System events
 
-From `raw/nats-docs/reference/system/advisory/` — three documented events, on the **system account**:
+Three events the docs' system tree names, on the **system account** (source:
+[[s-docs-system-advisories-and-metrics]]) — every other `$SYS` subject, the request family, and the
+full bodies are on [[system-subjects]]:
 
-| event | schema type |
-|---|---|
-| client connect | `io.nats.server.advisory.v1.client_connect` |
-| client disconnect | `io.nats.server.advisory.v1.client_disconnect` |
-| account connections | `io.nats.server.advisory.v1.account_connections` |
+| event | schema type | subject on 2.14.6 |
+|---|---|---|
+| client connect | `io.nats.server.advisory.v1.client_connect` | `$SYS.ACCOUNT.<account>.CONNECT` — a leaf node too, with `"kind":"Leafnode"` |
+| client disconnect | `io.nats.server.advisory.v1.client_disconnect` | `$SYS.ACCOUNT.<account>.DISCONNECT`; also the body of `$SYS.SERVER.<id>.CLIENT.AUTH.ERR`, with `reason: "Authentication Failure"` |
+| account connections | `io.nats.server.advisory.v1.account_connections` | **`$SYS.ACCOUNT.<account>.SERVER.CONNS`**, and `$SYS.SERVER.ACCOUNT.<account>.CONNS` for compatibility — on every connect and disconnect **and every 30 s** while the account has a connection; never for `$G` |
 
-Connect and disconnect are published per account on `$SYS.ACCOUNT.<account>.CONNECT` and
-`$SYS.ACCOUNT.<account>.DISCONNECT`. Since **2.12** the global account `$G` produces these too
-(source: [[nats-server-2.12]]).
+**The docs give the third one as `$SYS.ACCOUNT.{account}.CONNECTIONS`, fired "when account
+connection limits are reached". Neither is true**: the server has no such subject
+(`events.go:58–59` at v2.14.6), and the event is a heartbeat — observed on 2.14.6 at 30-second
+intervals with one idle client and no limit configured (docs issue #66; source:
+[[s-nats-server-system-subjects]], [[s-nats-server-system-subjects-observed]]). Since **2.12** the
+global account `$G` produces connect and disconnect events too (source: [[nats-server-2.12]]).
 
-Separately, each server publishes a **`STATSZ` heartbeat on `$SYS.SERVER.<id>.STATSZ`** on a fixed
-interval, carrying the same kind of summary numbers as `/varz` — **pushed instead of polled**, so a
-listener has a steady pulse from every node (source: [[s-docs-monitoring-endpoints]]).
-
-A server also publishes per-account connection counts on
-**`$SYS.SERVER.ACCOUNT.<ACCOUNT>.CONNS`**, visible to a system-account user.
+Separately, each server publishes a **`STATSZ` heartbeat on `$SYS.SERVER.<id>.STATSZ`** every
+**10 s** (`statsHBInterval`), carrying the same kind of summary numbers as `/varz` — **pushed instead
+of polled**, so a listener has a steady pulse from every node (source: [[s-docs-monitoring-endpoints]];
+cadence observed, [[s-nats-server-system-subjects-observed]]). A server entering lame duck publishes
+`$SYS.SERVER.<id>.LAMEDUCK`; a shutdown publishes `$SYS.SERVER.<id>.SHUTDOWN` — seen on a plain
+SIGTERM, **not** after a lame-duck drain with no clients, so alert on the missing heartbeat rather
+than on `SHUTDOWN`.
 
 **None of this is reachable without a system-account user, and that is easy to lose.** The moment a
 config declares its own `accounts` block without naming a `SYS` account, the system account has no
@@ -108,7 +114,7 @@ info` included. Declare a `SYS` account, set `system_account`, and give it a use
 (source: [[s-docs-accounts-and-multitenancy]]); see [[account]] and [[config-keys]]. To watch them:
 
 ```
-nats subscribe '$SYS.SERVER.>' --user sys-admin --password syspass
+nats subscribe '$SYS.>' --user sys-admin --password syspass
 ```
 
 ### Coming in 2.15: the meta-rescue advisory
@@ -163,6 +169,20 @@ beyond the fields the chapter's example shows.
 **The chapter does not settle the pinned/unpinned subjects.** It names `nak`, `consumer_action` and
 `terminated` as *types* and never writes their subjects, and does not mention pinned or unpinned at
 all — so docs issues #2 and #3 still rest on the server alone.
+
+### The bodies on the reference pages, swept against the server
+
+The 24 generated advisory and metric pages were checked field by field against
+`server/jetstream_events.go` at v2.14.6 on 2026-09-03 (source:
+[[s-docs-jetstream-advisories-reference]]). **Four bodies are wrong**: `nak` and `terminated` type
+`consumer_seq` as a string (the server sends a `uint64`); `snapshot_create` documents `blocks` and
+`block_size`, which do not exist (the server sends `state`); `stream_action` documents a `template`
+field that no longer exists; `stream_batch_abandoned` omits the `reason` value `unsupported` (docs
+issue #70). Twelve pages omit `domain` and four of those `account`, though every advisory carries
+`domain` when one is configured — the field to route on in a multi-domain deployment (#71). And
+`reference/jetstream/metric.md`'s "enabled or disabled at the stream or consumer level" describes a
+switch that does not exist: the ack metric follows the consumer's `sample_freq`, and nothing on a
+stream enables a metric (#72).
 
 ### An advisory subscription is noisier than the examples suggest
 
@@ -293,7 +313,11 @@ alert built on this subject is silent in exactly the situation where a worker po
 - **The schema type names** come from the 22 files in
   `raw/nats-docs/reference/jetstream/advisory/` and the 3 in `raw/nats-docs/reference/system/advisory/`.
 - The `$SYS.ACCOUNT.*` subjects and the `STATSZ` heartbeat come from
-  `raw/nats-docs/learn/monitoring/advisories-and-events.md`.
+  `raw/nats-docs/learn/monitoring/advisories-and-events.md`, corrected and timed against
+  `server/events.go` at v2.14.6 and the wire (`raw/nats-server-src/system-subjects-v2.14.6.md`,
+  `system-subjects-observed-v2.14.6.md`).
+- **The advisory bodies** were swept against `server/jetstream_events.go` at v2.14.6 (quoted whole in
+  `raw/nats-server-src/system-subjects-v2.14.6.md`); the findings are under *A docs error worth knowing*.
 
 ## Version notes
 
@@ -317,14 +341,20 @@ alert built on this subject is silent in exactly the situation where a worker po
 
 ## To verify
 
-- **The per-advisory payload fields are not on this page.** Each of the 25 reference pages carries a
-  response schema; none has been ingested field-by-field.
+- ~~The per-advisory payload fields are not on this page~~ — **done 2026-09-03**: the 24 JetStream
+  pages were read and swept against `jetstream_events.go` ([[s-docs-jetstream-advisories-reference]],
+  *The bodies on the reference pages*), the three system pages against `events.go`
+  ([[s-docs-system-advisories-and-metrics]]); the bodies live on those summaries and on
+  [[system-subjects]], not here.
 - ~~`learn/monitoring/advisories-and-events.md` not ingested~~ — **done 2026-09-01**
   ([[s-docs-monitoring-advisories-and-events]]). It confirmed the max-deliveries subject and produced
   docs issue #36, and it does **not** state the nak, pinned or unpinned subjects, so it could not
   cross-check #1–#3 by itself.
-- **The `$SYS` connect/disconnect and `STATSZ` events have not been captured on the wire.** They need
-  a system-account connection; the advisory captures above were made in the application account.
+- ~~The `$SYS` connect/disconnect and `STATSZ` events have not been captured on the wire~~ — **done
+  2026-09-03** on 2.14.6 with a system-account subscriber: connect, disconnect, `CONNS` (both
+  subjects, 30 s), `STATSZ` (10 s), `CLIENT.AUTH.ERR`, `LAMEDUCK`, `SHUTDOWN` and the service-latency
+  metric, bodies in `raw/nats-server-src/system-subjects-observed-v2.14.6.md`
+  ([[s-nats-server-system-subjects-observed]]).
 
 ## Observed: the server-removed advisory
 
@@ -342,6 +372,15 @@ system account (source: [[s-nats-server-jetstream-cluster]]; [[meta-layer]]):
 `JetStream being DISABLED, our server was removed from the cluster` and shuts its JetStream down.
 
 
+## Where the rest of `$SYS` lives
+
+This page keeps the three documented system events; the request family (`$SYS.REQ.SERVER.PING.<Z>`
+and the three names with no HTTP twin), the account requests an ordinary user may make, the
+`LAMEDUCK` / `SHUTDOWN` / `CLIENT.AUTH.ERR` / `LEAFNODE.CONNECT` events with their conditions, the
+service-latency metric's real subject and every body are on [[system-subjects]] (source:
+[[s-nats-server-system-subjects]], [[s-nats-server-system-subjects-observed]]).
+
+
 ## Related
 
 [[ack-and-redelivery]] · [[monitoring-endpoints]] · [[raft-in-nats]] · [[priority-groups]] ·
@@ -356,4 +395,4 @@ system account (source: [[s-nats-server-jetstream-cluster]]; [[meta-layer]]):
 [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
 [[s-docs-advanced-publishing]] ·
-[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]]
+[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-advisories-and-metrics]] · [[s-docs-jetstream-advisories-reference]]

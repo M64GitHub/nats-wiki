@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [evict, sick-node, hardware-failure, kick, lame-duck, peer-remove, slow-consumer, system-requests, kubernetes]
 aliases: [remove a server from a cluster, kick clients off a server, evict a node, sick node, hardware failure]
-sources: [s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session, s-nats-server-jetstream-cluster, s-nats-server-lame-duck, s-docs-kubernetes, s-adr-61-meta-quorum-rescue, s-docs-scaling-and-peers, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session, s-nats-server-jetstream-cluster, s-nats-server-lame-duck, s-docs-kubernetes, s-adr-61-meta-quorum-rescue, s-docs-scaling-and-peers, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-system-subjects, s-nats-server-system-subjects-observed]
 created: 2026-09-01
 updated: 2026-09-03
 ---
@@ -203,6 +203,16 @@ runbook this page wants and 2.14 does not have; verified at the preview tag (sou
 [[s-relnotes-2.15-preview]]).
 
 
+## The request forms, in one place
+
+`KICK`, `LDM`, `RELOAD`, the fifteen `$SYS.REQ.SERVER.PING.<Z>` / `<id>.<Z>` monitoring requests
+(`CONNZ` per server with `offset` / `limit` in the body is how the cid is found without HTTP), their
+bodies and envelopes, and the events a server publishes on the way out — `$SYS.SERVER.<id>.LAMEDUCK`
+when it enters lame duck, `SHUTDOWN` when it stops (observed on a SIGTERM; **not** delivered after a
+lame-duck drain with no clients on 2.14.6) — are tabled on [[system-subjects]] (source:
+[[s-nats-server-system-subjects]], [[s-nats-server-system-subjects-observed]] §7).
+
+
 ## Related
 
 [[meta-layer]] · [[raft-in-nats]] · [[stream-leader-keeps-moving]] · [[slow-consumer-detected]] ·
@@ -213,4 +223,4 @@ runbook this page wants and 2.14 does not have; verified at the preview tag (sou
 
 [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-kick-ldm-mqtt-session]] ·
 [[s-nats-server-jetstream-cluster]] · [[s-nats-server-lame-duck]] · [[s-docs-kubernetes]] ·
-[[s-adr-61-meta-quorum-rescue]] · [[s-docs-scaling-and-peers]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-adr-61-meta-quorum-rescue]] · [[s-docs-scaling-and-peers]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]]

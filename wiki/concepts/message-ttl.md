@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [ttl, Nats-TTL, subject_delete_marker_ttl, tombstone, markers]
 aliases: [Nats-TTL, per-message TTL, message TTL, subject delete marker, limit marker]
-sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits, s-docs-mirrors-and-sources, s-adr-51-message-scheduler, s-gh-7628-scheduler-vs-nak, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-synadia-delayed-scheduling, s-relnotes-2.11]
+sources: [s-adr-43-per-message-ttl, s-docs-stream-config, s-adr-8-key-value-store, s-adr-48-kv-ttl, s-docs-kv-ttl-and-limits, s-docs-mirrors-and-sources, s-adr-51-message-scheduler, s-gh-7628-scheduler-vs-nak, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-synadia-delayed-scheduling, s-relnotes-2.11, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -210,6 +210,15 @@ markers on the bucket is rejected, and the timed create fails with it."
 A KV watcher sees an expiry as a **`PURGE` operation**, indistinguishable from a hand purge except by
 the marker's `MaxAge` reason ([[key-value]]).
 
+## The two fields, after creation
+
+`allow_msg_ttl` is **one-way** — an update that turns it off is refused with `message TTL status can
+not be disabled` — and `subject_delete_marker_ttl` is free but must be ≥ 1 s, needs `allow_msg_ttl`
+and roll-ups, and is refused on a mirror (`subject delete markers forbidden on mirrors`); a counter
+stream cannot have TTLs at all. The full table is [[stream-and-consumer-config]] (source:
+[[s-nats-server-stream-consumer-config]], observed on 2.14.6 [[s-nats-server-config-mutability-observed]]).
+
+
 ## Related
 
 [[stream]] · [[key-value]] · [[retention-policies]] · [[error-codes]] · [[js-api]] ·
@@ -219,4 +228,4 @@ the marker's `MaxAge` reason ([[key-value]]).
 
 [[s-adr-43-per-message-ttl]] · [[s-docs-stream-config]] · [[s-adr-8-key-value-store]] ·
 [[s-adr-48-kv-ttl]] · [[s-docs-kv-ttl-and-limits]] ·
-[[s-docs-mirrors-and-sources]] · [[s-adr-51-message-scheduler]] · [[s-gh-7628-scheduler-vs-nak]] · [[s-nats-server-message-schedules-observed]] · [[s-docs-jetstream-headers]] · [[s-synadia-delayed-scheduling]] · [[s-relnotes-2.11]]
+[[s-docs-mirrors-and-sources]] · [[s-adr-51-message-scheduler]] · [[s-gh-7628-scheduler-vs-nak]] · [[s-nats-server-message-schedules-observed]] · [[s-docs-jetstream-headers]] · [[s-synadia-delayed-scheduling]] · [[s-relnotes-2.11]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]

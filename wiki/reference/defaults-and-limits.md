@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -169,14 +169,18 @@ Defaults from the generated `StreamConfig` schema unless a line reference is giv
 | `description` | — | max 4096 characters |
 | `name` | — | pattern `^[^.*>]*$` |
 
-**Batch-publish limits are stated by the docs and not confirmed here.** `learn/jetstream/advanced-publishing.md`
-gives **1,000 messages per atomic batch**, **at most 50 batches in flight per stream**, and a
-**ten-second** stall before a batch is abandoned, describing all three as "operator-configurable
-server limits, not fixed protocol caps" (source: [[s-docs-advanced-publishing]]). No config key for
-any of them appears in `inbox/config-keys-table.md`, and none has been checked against
-`nats-server` — so this table records them as the docs' claim, not as verified defaults. The two
-`429` error codes they surface are `10210` and `10211` ([[error-codes]]); the mechanism is
-[[publishing]]. **(unverified)**
+**Batch-publish limits, from the source.** `stream.go:446–455` at v2.14.6: `streamDefaultMaxBatchTimeout
+= 10 * time.Second`; atomic batches `streamDefaultMaxAtomicBatchInflightPerStream = 50`,
+`…InflightTotal = 1000`, `…BatchSize = 1000`; fast batches `streamDefaultMaxFastBatchInflightPerStream
+= 1000`, `…InflightTotal = 50_000` — the server-wide keys that override them are
+`jetstream { limits { max_batch_timeout, max_batch_inflight_per_stream, max_batch_inflight_total,
+max_batch_size } }` (`JSLimitOpts`, `opts.go:375–384`). So `learn/jetstream/advanced-publishing.md`'s
+**1,000 messages per atomic batch, 50 batches in flight per stream and a ten-second stall** are the
+compiled-in defaults, confirmed (source: [[s-nats-server-stream-consumer-config]]; the docs' claim,
+[[s-docs-advanced-publishing]]). The two `429` error codes they surface are `10210` and `10211`
+([[error-codes]]); the mechanism is [[publishing]]. The stream and consumer fields themselves — every
+one, with its server default and whether it can change after creation — are on
+[[stream-and-consumer-config]].
 
 ### When the 2-minute duplicate window applies
 
@@ -208,6 +212,19 @@ at v2.14.6 (source: [[s-nats-server-constants-2.14.6]]) and are corroborated by 
 | pull `expires` | | **client-side ~30s**; `0` on the wire never times out | [[s-docs-pull-consumers]] |
 
 In **pedantic mode**, a `max_deliver` below `-1` is an error rather than being corrected to `-1`.
+Two corrections from the source and the binary (2026-09-03): the API's `ack_policy` default is **`none`**
+(`AckNone … = iota`, `consumer.go:335`) — `explicit` is the `nats` CLI's default, not the server's —
+and `ack_wait` and `max_ack_pending` are filled in **only** for `explicit` and `all` consumers
+(`consumer.go:651`, `:674`); `max_waiting` defaults to **512** (`JSWaitQueueDefaultMax`,
+`jetstream_api.go:705`). The full field tables are [[stream-and-consumer-config]] (source:
+[[s-nats-server-stream-consumer-config]], [[s-nats-server-config-mutability-observed]]).
+
+### The stream table's one documented default the server rewrites
+
+`duplicate_window: 0` means "2 minutes" only for a stream that is neither a mirror nor sourcing; and
+sealing a stream rewrites four other fields (`deny_delete`, `deny_purge`, `discard: new`, `max_age: 0`)
+— observed in `STREAM.INFO` on 2.14.6 (source: [[s-nats-server-config-mutability-observed]]).
+
 
 ## Cluster and RAFT
 
@@ -505,4 +522,4 @@ Values this table states as of 2.14.6 that the 2.10 release bodies date (source:
 [[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] ·
 [[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]

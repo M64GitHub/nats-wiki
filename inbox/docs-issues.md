@@ -124,6 +124,17 @@ row.
 | 62 | `reference/config/feature_flags.md` documents the block as "Toggles for features that are not yet on by default. Names are server-internal and change between releases" and names **no flag** — while `release-notes/upgrade-to-2.14.md` tells operators to set `js_ack_fc_v2`, and the server at v2.14.6 defines exactly two flags, the second of which (`js_raft_delete_range`) carries a source warning that enabling it makes older peers **panic**; neither name, nor the warning, is documented | `reference/config/feature_flags.md` (whole page) | nats-docs | missing | medium | not filed | wiki: `config-keys` § *Keys that arrived during 2.14*, `mirrors-and-sources` § *Version notes: the 2.14 line*, `nats-server-2.14` (via `s-relnotes-2.14`) |
 | 63 | `$JS.API.CONSUMER.RESET.<stream>.<consumer>` — the consumer reset API of v2.14.0 (#7489, ADR-60) — is absent from `reference/jetstream/api/consumer.md`, which lists nine consumer endpoints, and has no page under `reference/jetstream/api/consumer/`; the 2.14 upgrade guide describes the API without its subject | `reference/jetstream/api/consumer.md` lines 4–14; `reference/jetstream/api/consumer/` (no page) | nats-docs | missing | medium | not filed | wiki: `js-api-subjects` § *Documented elsewhere, absent from the API index* and § *The 2.14 line*, `consumer` (via `s-relnotes-2.14`) |
 | 64 | Five generated config pages say "Available since NATS Server `2.12`" for keys the **2.11 line ships**: `write_timeout` (v2.11.11, #7513), `websocket { ping_interval }` (v2.11.12, #7614), and the block-level `cluster` / `gateway` / `leafnodes` `write_deadline` (parsed at v2.11.17, announced only by v2.12.1's #7405). An operator on 2.11.17 reads that the keys are not available to them | `reference/config/write_timeout.md`, `reference/config/websocket/ping_interval.md`, `reference/config/cluster/write_deadline.md`, `reference/config/gateway/write_deadline.md`, `reference/config/leafnodes/write_deadline.md` | nats-docs | wrong-value | low | not filed | wiki: `slow-consumer-detected` § *The 2.11 line* / *The 2.12 line*, `nats-server-2.11` § *The default diff* (via `s-relnotes-2.11`, `s-relnotes-2.12`) |
+| 65 | `reference/system/monitor.md` presents fifteen "HTTP monitoring endpoints" reachable at `http://localhost:8222/<z>`; **`statsz`, `idz` and `profilez` are not HTTP endpoints** (404 on 2.14.6 — they exist only as `$SYS.REQ.SERVER.PING.<Z>` requests), and two paths the mux serves are documented nowhere: `/stacksz` and `/debug/vars` | `reference/system/monitor.md`, `monitor/statsz.md`, `monitor/idz.md`, `monitor/profilez.md` | nats-docs | wrong-value | ★ high | not filed | wiki lists the mux's paths |
+| 66 | The account-connections event is documented on **`$SYS.ACCOUNT.{account}.CONNECTIONS`** and as fired "when account connection limits are reached"; the server publishes it on `$SYS.ACCOUNT.<acc>.SERVER.CONNS` (and the compatibility `$SYS.SERVER.ACCOUNT.<acc>.CONNS`) on every connect/disconnect **and every 30 s** as a heartbeat — the page's own schema line says so | `reference/system/advisory.md`, `advisory/account-connections.md` | nats-docs | wrong-value | ★ high | not filed | wiki uses the server subjects |
+| 67 | Service latency is documented on a fixed subject, `$SYS.SERVER.METRIC.SERVICE.LATENCY`, under `$SYS.SERVER.METRIC.>`; the server publishes it on the subject the export's `latency { subject }` names, in the exporting account, and no `$SYS.SERVER.METRIC` subject exists; the field documented as `error` is `description` | `reference/system/metric.md`, `metric/service-latency.md` | nats-docs | wrong-value | high | not filed | wiki states the export subject |
+| 68 | `varz.md` annotates `max_connections` — an integer count — with "nanoseconds depicting a duration in time" | `reference/system/monitor/varz.md` | nats-docs | wrong-value | low | not filed | — |
+| 69 | `stream/names.md` documents the response array as `consumers string[]`; the server writes **`streams`** | `reference/jetstream/api/stream/names.md` | nats-docs | wrong-value | medium | not filed | wiki uses `streams` |
+| 70 | Four advisory bodies contradict the server: `nak.md` and `terminated.md` type `consumer_seq` as a string (server: `uint64`); `snapshot-create.md` documents `blocks` and `block_size`, which do not exist (the server sends `state`); `stream-action.md` documents `template`, which does not exist; `stream-batch-abandoned.md` omits the `reason` value `unsupported` | `reference/jetstream/advisory/{nak,terminated,snapshot-create,stream-action,stream-batch-abandoned}.md` | nats-docs | wrong-value | ★ high | not filed | wiki carries the server bodies |
+| 71 | Across the 24 advisory and metric pages: `domain` is missing from 12 and `account` from 4 more; `consumer-pause.md` and `consumer-group-pinned.md` carry descriptions copied from other pages; two string fields carry a numeric "Minimum: 1" | `reference/jetstream/advisory/`, `metric/consumer-ack.md` | nats-docs | enhancement | low | not filed | — |
+| 72 | `reference/jetstream/metric.md` says metrics "can be enabled or disabled at the stream or consumer level"; the only switch is the consumer's `sample_freq`, and nothing in `StreamConfig` enables a metric | `reference/jetstream/metric.md` | nats-docs | wrong-value | low | not filed | — |
+| 73 | `consumer/get-next.md` gives the pull request's `batch` a "Maximum: 256"; the server has no such ceiling — a pull of 300 and of 100000 was served on 2.14.6; the only limits are the consumer's `max_batch` (`409 Exceeded MaxRequestBatch of N`) and the server's `max_request_batch` | `reference/jetstream/api/consumer/get-next.md` | nats-docs | wrong-value | medium | not filed | wiki states the real ceiling |
+| 74 | The consumer schema describes `opt_start_time` as "Start time used with the DeliverByStartSequence deliver policy"; it is used with `DeliverByStartTime` | `schemas/jetstream/api/v1/consumer_configuration.json` (jsm.go v0.4.1; the docs never render it, #4) | jsm.go | wrong-value | low | not filed | — |
+| 75 | `stream/restore.md` labels its request section "A response from the JetStream $JS.API.STREAM.RESTORE API" | `reference/jetstream/api/stream/restore.md` | nats-docs | enhancement | low | not filed | — |
 
 ---
 
@@ -3032,6 +3043,213 @@ generally, if the generator takes *since* from the main-line minor, say so on th
 from the oldest tag whose parser accepts the key.
 
 
+## 65 · Three of the fifteen "HTTP monitoring endpoints" are not HTTP endpoints, and two that are go unmentioned ★
+
+**Impact: an operator who reads the monitor reference builds a probe or a scrape against
+`/statsz`, `/idz` or `/profilez` and gets a 404; the three names exist only as system-account
+requests, which the page never says. `/stacksz` and `/debug/vars`, which the port does serve, are
+documented nowhere.**
+
+**Docs.** `raw/nats-docs/reference/system/monitor.md` (fetched 2026-08-31): "NATS Server exposes HTTP
+monitoring endpoints … *Available Endpoints* … Statsz … IPQueuesz … Idz … Profilez … Raftz";
+"Endpoints are then accessible at `http://localhost:8222/varz`". `monitor/statsz.md`, `idz.md`,
+`profilez.md` each open "Request options for `<z>` monitoring endpoint".
+
+**Server, v2.14.6** — `server/server.go` lines 3030–3044 declare the paths (`/`, `/varz`, `/connz`,
+`/routez`, `/gatewayz`, `/leafz`, `/subsz`, `/stacksz`, `/accountz`, `/accstatz`, `/jsz`, `/healthz`,
+`/ipqueuesz`, `/raftz`, `/debug/vars`) and lines 3134–3162 register exactly those plus the alias
+`/subscriptionsz`; `server/events.go` lines 1268–1315 register `IDZ`, `STATSZ` and `PROFILEZ` (with
+twelve others) as `$SYS.REQ.SERVER.PING.<Z>` / `$SYS.REQ.SERVER.<id>.<Z>` requests. Quoted in
+`raw/nats-server-src/system-subjects-v2.14.6.md`.
+
+**Observed, 2.14.6** (`raw/nats-server-src/system-subjects-observed-v2.14.6.md` §1–2):
+
+```
+/varz 200   /statsz 404   /idz 404   /profilez 404   /stacksz 200   /debug/vars 200   /subscriptionsz 200
+$SYS.REQ.SERVER.PING.IDZ      → {"name":"n1","host":"127.0.0.1","id":"<n1 id>"}   (three replies)
+$SYS.REQ.SERVER.PING.STATSZ   → {"server":{…},"statsz":{…}}
+$SYS.REQ.SERVER.PING.PROFILEZ → {"server":{…},"data":{"profile":"H4sI…"}}
+```
+
+**Sweep.** All fifteen names checked against the mux: twelve are both, three are request-only, and
+the tree omits the two HTTP-only paths.
+
+**Suggested fix:** on `monitor.md`, split the list into "HTTP endpoints" (the twelve plus `/stacksz`
+and `/debug/vars`) and "system-account requests" (`$SYS.REQ.SERVER.PING.<Z>` for all fifteen), and
+say on the three pages that they answer over the system account only.
+
+## 66 · The account-connections event's subject and trigger ★
+
+**Impact: a subscription written from the reference — `$SYS.ACCOUNT.*.CONNECTIONS` — receives
+nothing, silently; and an operator who reads "when account connection limits are reached" alerts on
+an event that is in fact a 30-second heartbeat.**
+
+**Docs.** `raw/nats-docs/reference/system/advisory.md`: "Account Connections — Published when account
+connection limits are reached · Subject: `$SYS.ACCOUNT.{account}.CONNECTIONS` · Alerts when approaching
+or exceeding limits". `advisory/account-connections.md`: "`$SYS.ACCOUNT.{account}.CONNECTIONS`" and,
+in the schema description, "Regular advisory published with account states".
+
+**Server, v2.14.6** — `server/events.go`:
+
+```go
+accConnsEventSubjNew      = "$SYS.ACCOUNT.%s.SERVER.CONNS"          // line 58
+accConnsEventSubjOld      = "$SYS.SERVER.ACCOUNT.%s.CONNS" // kept for backward compatibility  // line 59
+var eventsHBInterval = 30 * time.Second                              // line 100
+```
+
+`AccountNumConns` is documented in the source as sent "when the number of connections changes. It
+will also HB updates in the absence of any changes" (lines 207–209); the timer is armed at line
+2466; both subjects are sent at line 2545; the `$G` account is skipped at line 2543.
+
+**Observed, 2.14.6** (§3 of the observed file): with one `APP` client connected and nothing
+happening, `$SYS.ACCOUNT.APP.SERVER.CONNS` and `$SYS.SERVER.ACCOUNT.APP.CONNS` arrived at
+01:47:31, 01:48:01, 01:48:31, 01:49:01; `CONNECTIONS` never appeared in two minutes of `$SYS.>`.
+No limit was configured, let alone reached.
+
+**Suggested fix:** the subject `$SYS.ACCOUNT.{account}.SERVER.CONNS` (with the compatibility form
+noted); the trigger "on every connection change and every 30 seconds while the account has
+connections"; drop "when limits are reached". Add `name` and `num_subscriptions`, which the body
+carries.
+
+## 67 · Service latency is not published on `$SYS.SERVER.METRIC.SERVICE.LATENCY`
+
+**Impact: a system-account subscriber waiting on `$SYS.SERVER.METRIC.>` never sees a latency
+sample; the samples go to the subject the exporting account configured, in that account.**
+
+**Docs.** `raw/nats-docs/reference/system/metric.md`: "Metrics are published to specific subjects that
+follow the pattern: `$SYS.SERVER.METRIC.>` — All server metrics; `$SYS.SERVER.METRIC.SERVICE.LATENCY`
+— Service latency metrics". `metric/service-latency.md`: "Subscription Subject
+`$SYS.SERVER.METRIC.SERVICE.LATENCY`"; field `error` — "A description of the status code when not
+200".
+
+**Server, v2.14.6** — `server/accounts.go` lines 1491–1500:
+
+```go
+func (a *Account) sendLatencyResult(si *serviceImport, sl *ServiceLatency) {
+	…
+	lsubj := si.latency.subject
+	…
+	a.srv.sendInternalAccountMsg(a, lsubj, sl)
+}
+```
+
+and line 1432: `Error string \`json:"description,omitempty"\``. `grep -n 'SERVER.METRIC'
+server/events.go server/accounts.go` at the tag: no match.
+
+**Observed, 2.14.6** (§5): an export `latency { sampling: 100%, subject: "svc.latency" }` in account
+`SVC`; the sample arrived on `svc.latency` in `SVC` (`"status":200,"service":15000,"system":1792,
+"total":666084`); the `$SYS.>` subscriber saw nothing.
+
+**Suggested fix:** "published on the subject named by the export's `latency.subject`, in the
+exporting account" — and `description` for the error field. The `learn/` chapter on service
+latency, if one exists, should be the page the reference links to.
+
+## 68 · `max_connections` described as a duration in nanoseconds
+
+**Docs.** `raw/nats-docs/reference/system/monitor/varz.md`: "max_connections integer — The maximum
+amount of connections the server can accept — nanoseconds depicting a duration in time, signed 64
+bit integer". **Server**: `server/monitor.go:1235`, `MaxConn int \`json:"max_connections"\``, "MaxConn is
+the maximum amount of connections the server can accept". A generator misplacement (the annotation
+belongs to `write_deadline`, which carries it too). **Suggested fix:** drop the annotation.
+
+## 69 · `STREAM.NAMES` documents its array as `consumers`
+
+**Docs.** `raw/nats-docs/reference/jetstream/api/stream/names.md`, response: "consumers string[]".
+**Server**: `server/jetstream_api.go:464–468`:
+
+```go
+type JSApiStreamNamesResponse struct {
+	ApiResponse
+	ApiPaged
+	Streams []string `json:"streams"`
+}
+```
+
+**Observed, 2.14.6**: `nats req '$JS.API.STREAM.NAMES' '{}'` →
+`{"type":"io.nats.jetstream.api.v1.stream_names_response","total":0,"offset":0,"limit":1024,"streams":null}`.
+**Suggested fix:** `streams string[]`. (`consumer/names.md`'s `consumers` is right.)
+
+## 70 · Four advisory bodies that contradict the server ★
+
+**Impact: a consumer of `nak` / `terminated` advisories that types `consumer_seq` as a string fails to
+parse the wire; a consumer of `snapshot_create` waiting for `blocks` never sees it; a filter on
+`stream_action.template` matches nothing; a batch abandoned for an unsupported requirement carries a
+`reason` the docs say cannot occur.**
+
+**Docs versus `server/jetstream_events.go` at v2.14.6** (quoted whole in
+`raw/nats-server-src/system-subjects-v2.14.6.md`):
+
+| page | docs | server |
+|---|---|---|
+| `advisory/nak.md` | `consumer_seq` string | `JSConsumerDeliveryNakAdvisory.ConsumerSeq uint64 \`json:"consumer_seq"\`` |
+| `advisory/terminated.md` | `consumer_seq` string | `JSConsumerDeliveryTerminatedAdvisory.ConsumerSeq uint64` |
+| `advisory/snapshot-create.md` | `blocks` ("Approximate number of blocks in the snapshot"), `block_size` | `JSSnapshotCreateAdvisory{Stream, State StreamState \`json:"state"\`, Client, Domain}` — no `blocks`, no `block_size` |
+| `advisory/stream-action.md` | `template` ("The Stream Template that manages the Stream") | `JSStreamActionAdvisory{Stream, Action, Domain}` — no `template` |
+| `advisory/stream-batch-abandoned.md` | `reason` ∈ `timeout`, `large`, `incomplete` | `BatchAbandonReason` also `"unsupported"` (`BatchRequirementsNotMet`) |
+
+**Sweep.** All 24 pages of `reference/jetstream/advisory/` and `metric/` were checked against the
+file: these four (plus #71's omissions); the subjects were not re-checked (#1–#3).
+
+**Suggested fix:** regenerate the four schemas from the server structs; the `template` field belongs
+to stream templates, which no longer exist.
+
+## 71 · The advisory pages omit `domain` and `account`, and carry copied descriptions
+
+**Docs versus `server/jetstream_events.go` at v2.14.6.** Every advisory struct carries
+`Domain string \`json:"domain,omitempty"\``; twelve pages omit it (`api-audit`, `consumer-action`,
+`max-deliver`, `consumer-leader-elected`, `consumer-quorum-lost`, `stream-leader-elected`,
+`stream-quorum-lost`, `restore-create`, `restore-complete`, `snapshot-complete`,
+`server-out-of-space`, `metric/consumer-ack`), and the four leader/quorum pages also omit
+`Account string \`json:"account,omitempty"\``. `consumer-pause.md` describes `consumer` as "The name of
+the Consumer that elected a new leader"; `consumer-group-pinned.md` describes `group` as "The group
+that unpinned a client"; `api-limit-reached.md` and `nak.md` give the string `domain` "Minimum: 1".
+Not wrong values — a reader is not misled into a broken subscription — so `enhancement`.
+
+**Suggested fix:** regenerate from the structs (which fixes #70 as well); fix the two descriptions.
+
+## 72 · No stream-level metric switch exists
+
+**Docs.** `raw/nats-docs/reference/jetstream/metric.md`: "Metrics can be enabled or disabled at the
+stream or consumer level. Some metrics may impact performance when enabled". **Server**: the one
+JetStream metric, `$JS.EVENT.METRIC.CONSUMER.ACK`, is emitted according to the consumer's
+`SampleFrequency` (`server/consumer.go:103`, `json:"sample_freq"`); `StreamConfig` (`stream.go`) has no
+metric field. **Suggested fix:** "enabled per consumer with `sample_freq`".
+
+
+## 73 · The pull request's `batch` has no "Maximum: 256"
+
+**Docs.** `raw/nats-docs/reference/jetstream/api/consumer/get-next.md`: "batch integer — How many
+messages the server should deliver to the requestor — Minimum: `0` Maximum: `256`".
+
+**Server, v2.14.6** — `JSApiConsumerGetNextRequest` (`jetstream_api.go:764–770`) carries `Batch int`
+with no bound; the only checks on a pull are the consumer's own `max_batch`
+(`consumer.go:834–835`: `NewJSConsumerMaxRequestBatchExceededError(srvLim.MaxRequestBatch)` at
+creation against the server limit, and `Exceeded MaxRequestBatch` at pull time).
+
+**Observed, 2.14.6** (`raw/nats-server-src/config-mutability-observed-v2.14.6.md` §6): a consumer with
+no `max_batch` on a stream holding three messages, `{"batch":300,"no_wait":true}` → `m1`, `m2`, `m3`,
+then `404 No Messages`; `{"batch":100000,"no_wait":true}` → `404 No Messages`. With `max_batch: 5`:
+`Status 409, Description: Exceeded MaxRequestBatch of 5`.
+
+**Suggested fix:** drop the maximum, or say "bounded by the consumer's `max_batch` and the server's
+`jetstream.limits.max_request_batch`". The 256 may be a client library's default, not the server's.
+
+## 74 · `opt_start_time` described with the wrong deliver policy
+
+**Schema.** `raw/jsm-go/consumer_configuration-v0.4.1.json`, `opt_start_time`: "Start time used with
+the DeliverByStartSequence deliver policy". **Server**: `DeliverByStartTime` (`consumer.go:306`) and
+the validation `badStart("by start time", "start sequence")` / `notSet("by start time", "start time")`
+(`consumer.go:942–945`). `destination` is jsm.go because the docs collapse the consumer schema (#4)
+and never show the line.
+
+**Suggested fix:** "Start time used with the DeliverByStartTime deliver policy".
+
+## 75 · `restore.md`'s request is labelled a response
+
+**Docs.** `raw/nats-docs/reference/jetstream/api/stream/restore.md`, under `## Request`: "A response
+from the JetStream $JS.API.STREAM.RESTORE API". Cosmetic; the fields (`config`, `state`) are right.
+
+
 ## Internal — where this wiki records each of these
 
 *Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
@@ -3102,3 +3320,14 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 62 | `wiki/reference/config-keys.md` — *Keys that arrived during 2.14*; `wiki/concepts/mirrors-and-sources.md` — *Version notes: the 2.14 line, and the preview*; `wiki/entities/nats-server-2.14.md` — *The docs' upgrade guide against the bodies*; `wiki/summaries/s-relnotes-2.14.md` |
 | 63 | `wiki/reference/js-api-subjects.md` — *Documented elsewhere, absent from the API index* and *The 2.14 line, and the preview's subjects*; `wiki/concepts/consumer.md` — *The 2.14 line*; `wiki/summaries/s-relnotes-2.14.md` |
 | 64 | `wiki/gotchas/slow-consumer-detected.md` — *The 2.11 line* and *The 2.12 line*; `wiki/entities/nats-server-2.11.md` — *The default diff*; `wiki/log.md` 2026-09-03 (phase D, step 8) |
+| 65 | `wiki/reference/system-subjects.md` — *Server requests*; `wiki/reference/monitoring-endpoints.md` — *The endpoints the port serves*; `wiki/summaries/s-docs-system-monitor-reference.md`; `wiki/summaries/s-nats-server-system-subjects-observed.md` |
+| 66 | `wiki/reference/system-subjects.md` — *Events the server publishes*; `wiki/reference/advisories.md` — *System events*; `wiki/summaries/s-docs-system-advisories-and-metrics.md` |
+| 67 | `wiki/reference/system-subjects.md` — *Events the server publishes*; `wiki/summaries/s-docs-system-advisories-and-metrics.md` |
+| 68 | `wiki/summaries/s-docs-system-monitor-reference.md` |
+| 69 | `wiki/reference/js-api-subjects.md` — *What the operation pages add*; `wiki/summaries/s-docs-jetstream-api-index.md` |
+| 70 | `wiki/reference/advisories.md` — *A docs error worth knowing*; `wiki/summaries/s-docs-jetstream-advisories-reference.md` |
+| 71 | `wiki/summaries/s-docs-jetstream-advisories-reference.md` |
+| 72 | `wiki/reference/advisories.md` — *A docs error worth knowing*; `wiki/summaries/s-docs-jetstream-advisories-reference.md` |
+| 73 | `wiki/reference/stream-and-consumer-config.md` — *Consumer fields* (`max_batch`) and *What the docs do not render*; `wiki/summaries/s-nats-server-config-mutability-observed.md` |
+| 74 | `wiki/reference/stream-and-consumer-config.md` — *Consumer fields* (`opt_start_time`); `wiki/summaries/s-jsm-go-config-schemas.md` |
+| 75 | `wiki/summaries/s-docs-jetstream-api-index.md` |

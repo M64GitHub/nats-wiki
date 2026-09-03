@@ -7,9 +7,9 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # natscli (the nats CLI)
@@ -385,6 +385,32 @@ ran the command* (source: [[s-docs-putting-it-together]]). See [[leafnode]] and 
 for both prefixes and requires both, because those are **your local import subjects** — none of this
 is in the docs (source: [[s-natscli-stream-external]]). See [[cross-domain-sourcing]].
 
+## The `$SYS` requests the CLI does not wrap
+
+`nats server request` has subcommands for `variables`, `connections`, `subscriptions`, `routes`,
+`gateways`, `leafnodes`, `accounts`, `jetstream`, `jetstream-health`, `ipqueue`, `raft`, `profile`
+and `kick` (0.4.0) — and none for `STATSZ` or `IDZ`, which have no HTTP form either. The raw
+request works with the system user, one reply per server (source:
+[[s-nats-server-system-subjects-observed]] §2; the full table is [[system-subjects]]):
+
+```
+nats --server nats://sys:sys@host:4222 req '$SYS.REQ.SERVER.PING.IDZ'    '{}' --replies 3   # {"name","host","id"} per server
+nats --server nats://sys:sys@host:4222 req '$SYS.REQ.SERVER.PING.STATSZ' '{}' --replies 3   # {"server", "statsz"} per server
+nats --server nats://sys:sys@host:4222 req '$SYS.REQ.SERVER.<id>.RELOAD' ''                  # reload by message
+```
+
+
+## The flag for every stream and consumer field
+
+`nats stream add` (47 stream flags) and `nats consumer add` (38) at 0.4.0 are captured verbatim in
+`raw/nats-cli/help-0.4.0.md`; the flag beside each API field is on [[stream-and-consumer-config]].
+Two CLI defaults differ from the server's: `--ack` defaults to `explicit` where the API's
+`ack_policy` default is `none`, and `--max-pending=-1` / `--wait=-1s` mean "let the server decide"
+(1000 and 30 s for an explicit consumer). `consumer edit` has flags for exactly the fields the server
+lets an update change; `--config file.json` on either command sends a raw configuration for anything
+the flags do not cover (source: [[s-nats-cli-help-0.4.0]]).
+
+
 ## Mirrors of buckets — what the CLI builds, and what it cannot read
 
 Checked on CLI 0.4.0 against nats-server 2.14.6 (sources: [[s-nats-server-mirrors-observed]],
@@ -428,4 +454,4 @@ nats bench js consume --stream S --consumer C …          # binds an existing d
 [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-kubernetes]] ·
 [[s-docs-single-server]] · [[s-docs-stream-backup-restore]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7684-certificate-expiry]] ·
-[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]]
+[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]]

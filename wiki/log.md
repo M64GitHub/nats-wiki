@@ -4065,3 +4065,78 @@ per-minor summaries, five entities rewritten, ~170 version-note sections, `since
 page with `verified-against` (47 + 8 reasons, residue 0), three default reports and the diff, docs
 issues #54–#64, the subject-tree correction; 310 → 317 pages, bank 116 / 137 → 121 / 160, docs issues
 53 → 64, unverified 12 (unchanged), lint clean at drift 0 · unlanded 0 · staleness 0 behind 2.14.6.
+
+## 2026-09-03 — phase E, step 1: `reference/system-subjects`, and the endpoint correction
+
+Plan `inbox/plan-the-reference-layer-2026-09-03.md` written first, after reading
+`raw/nats-docs/reference/system/` (23 pages) and `reference/jetstream/` (59 pages) end to end; the
+seven findings of that read are in the plan head. Step 1 then: `server/jetstream_events.go` and
+`accounts.go` at v2.14.6 fetched into the cache; `raw/nats-server-src/system-subjects-v2.14.6.md`
+(25 verbatim ranges of `events.go`, `server.go`, `accounts.go`, and `jetstream_events.go` whole) and
+`system-subjects-observed-v2.14.6.md` with `system-subjects-run.sh` (eight runs on the lab cluster and
+a standalone two-account server with a latency export and a leaf); gh#5768 and gh#5902 fetched
+(`raw/gh-discussions/`). **Eight summaries**: `s-nats-server-system-subjects`,
+`s-nats-server-system-subjects-observed`, `s-docs-system-monitor-reference`,
+`s-docs-system-advisories-and-metrics`, `s-docs-jetstream-api-index`,
+`s-docs-jetstream-advisories-reference` (24 pages swept field by field against
+`jetstream_events.go`), `s-gh-5768-track-connected-clients`, `s-gh-5902-leafnode-connect-events`.
+**Page** `wiki/reference/system-subjects.md`: the fifteen `$SYS.REQ.SERVER.PING.<Z>` requests with
+their envelopes and HTTP twins (three have none), the account requests and the two built-in imports
+an ordinary user may use, the claims and auth subjects (moved from `js-api-subjects`), every event
+with its body and cadence (`STATSZ` 10 s, `CONNS` 30 s on both subjects, never for `$G`), the
+subjects the docs name that do not exist, permissions, a cheat sheet, version notes.
+**A wiki bug fixed**: `monitoring-endpoints` had inherited the docs' list and printed `/statsz`,
+`/profilez` and `/idz` as endpoints — all three are 404 on 2.14.6; the table is now the mux's
+(`/stacksz`, `/debug/vars`, `/subscriptionsz` added), and its 2.10 note that `/expvarz` arrived in
+2.10.16 corrected (the request did; the HTTP path is `/debug/vars`, 2.11.11 / 2.12.2, #7469 — read
+off `server.go` at twelve tags). **Ripple** (11 pages): `monitoring-endpoints`, `advisories`
+(*System events* corrected — `SERVER.CONNS`, the heartbeat, `SHUTDOWN` after lame duck — the bodies
+sweep under *A docs error*, two *To verify* items struck), `js-api-subjects` (the `$SYS` table → a
+pointer; *What the operation pages add*), `account`, `reload-server-config` (the observed `RELOAD`),
+`evict-a-sick-server`, `nats-cli`, `nats-surveyor`, `prometheus-nats-exporter`,
+`slow-consumer-detected`, `leafnode` (gh#5902 settled: the leafnode-connect event needs gateways and
+has no disconnect twin). **Docs issues #65–#72** (64 → 72): the three non-endpoints and two
+undocumented paths; `CONNECTIONS` and "limits reached" versus a 30 s heartbeat; the service-latency
+subject and `error`/`description`; `max_connections` as a duration; `stream/names` `consumers`;
+four wrong advisory bodies (`consumer_seq` string, `snapshot_create` `blocks`/`block_size`,
+`stream_action` `template`, the `unsupported` reason); the missing `domain`/`account` and copied
+descriptions (`enhancement`); `metric.md`'s stream-level toggle. **Server issues SI-4, SI-5** (3 → 5):
+connect events stamped UTC and disconnect events local; no `SHUTDOWN` after a client-less lame-duck
+exit. **Bank**: rows 161 (own), 162 (gh#5902), 163 (gh#5768) added and answered on arrival; rows 54
+and 82 gain the page — 121 / 160 → **124 / 163**, `own` 12. Docs coverage: `reference/system` 23/23,
+`reference/jetstream` 59/59 read (each page in a summary). Manifest rows extended, cache INDEX
+updated. Lint: **326 pages**, wanted 0, drift 0, unlanded 0, staleness 0 behind 2.14.6.
+
+## 2026-09-03 — phase E, step 2: `reference/stream-and-consumer-config`
+
+`raw/nats-server-src/stream-consumer-config-v2.14.6.md` (27 ranges: `StreamConfig`, `ConsumerConfig`
+and their nested structs, `checkStreamCfg`, `configUpdateCheck`, `setConsumerConfigDefaults`,
+`checkConsumerCfg`, `checkNewConsumerConfig`, `updateConfig`, the batch constants, the limit structs,
+the policy enumerations, the two timestamp sites) and `config-mutability-observed-v2.14.6.md` with
+three run scripts (raw `$JS.API` updates against every fixed, one-way and free field of a stream and a
+pull consumer; what sealing forces; an ephemeral's defaults; `subjects_filter`; a pull of `batch: 300`
+served in full). Two new raw collections: `raw/jsm-go/` (the stream and consumer JSON schemas at
+jsm.go v0.4.1 — 38 and 34 properties, the consumer descriptions the docs never render) and
+`raw/nats-cli/` (`stream add/edit`, `consumer add/edit` help at 0.4.0). gh#3944 fetched. **Eight
+summaries**: `s-nats-server-stream-consumer-config`, `s-nats-server-config-mutability-observed`,
+`s-jsm-go-config-schemas`, `s-nats-cli-help-0.4.0`, `s-gh-3944-subjects-in-a-stream`,
+`s-adr-33-metadata`, `s-adr-34-multiple-filters`, `s-adr-9-idle-heartbeats` (ADR rows 9, 33, 34
+linked). **Page** `wiki/reference/stream-and-consumer-config.md`: 38 stream and 35 consumer fields —
+type, the server's default, the minor of arrival, *after creation* (free / fixed / one-way /
+conditional, with the refusal string as the binary produced it), the CLI flag, the rule that bites;
+the three limit layers; *Which subjects a stream holds*; *Which clock stamps a message* (the leader's,
+`stream.go:6929–6931` — row 140). **Corrections the source forced**: the API's `ack_policy` default is
+`none` (the CLI's is `explicit`), `ack_wait` / `max_ack_pending` are filled in only for `explicit` and
+`all`, `max_waiting` defaults to 512; the batch-publish limits (1000 / 50 / 1000 / 10 s) are the
+compiled-in defaults — the `(unverified)` on `defaults-and-limits` cleared (12 → 11). **Ripple** (18
+pages): `stream` (*What you cannot change later* rebuilt with every refusal string; *Which clock
+stamps a message*), `consumer`, `defaults-and-limits`, `config-keys` (`jetstream { limits }`),
+`publishing`, `nats-cli`, `jsm-go`, `js-api-subjects`, and pointer sections on `message-ttl`,
+`message-scheduling`, `mirrors-and-sources`, `direct-get`, `priority-groups`, `retention-policies`,
+`replicas`, `stream-placement`, `key-value`, `subject-transforms`. **Docs issues #73–#75** (72 → 75):
+the pull `batch` "Maximum: 256" the server does not enforce; the consumer schema's `opt_start_time`
+naming the wrong policy (destination jsm.go); `restore.md`'s label. **Bank**: rows 140 and 146
+filled, row 164 (own — the mutability question, searched and not found) added and answered, ten
+answered rows gain the page — 124 / 163 → **127 / 164**. A harness lesson recorded in the observed
+file: pass 1 copied `allow_rollup_hdrs: true` forward and six cases had to be re-run. Lint: **335
+pages**, wanted 0, drift 0, unlanded 0, unverified 11, staleness 0 behind 2.14.6.

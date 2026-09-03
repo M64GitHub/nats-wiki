@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -111,24 +111,41 @@ batch publishing** (source: [[s-docs-policies]]).
 ## What you cannot change later
 
 The server refuses these updates outright; the only way to change your mind is to recreate the
-stream and move the data (source: [[s-docs-policies]]).
+stream and move the data. The complete field-by-field table, with every refusal string as the
+v2.14.6 binary produced it, is [[stream-and-consumer-config]] (source:
+[[s-nats-server-stream-consumer-config]], [[s-nats-server-config-mutability-observed]]; the docs'
+statements, [[s-docs-policies]], [[s-docs-stream-config]]).
 
-| policy | on a live stream |
+| field | on a live stream |
 |---|---|
+| `name` | **fixed** — `stream name in subject does not match request` (10056) |
 | `storage` | **fixed** — `stream configuration update can not change storage type` |
-| `persist_mode` | **fixed** |
+| `persist_mode` | **fixed** — `stream configuration update can not change persist mode` |
+| `allow_msg_counter` | **fixed** — `stream configuration update can not change message counter setting` |
 | `retention` | `limits` ↔ `interest` allowed, and the switch re-applies to messages already stored; to or from `workqueue` refused with `stream configuration update can not change retention policy to/from workqueue` |
-| `discard` | can change |
-| `compression` | can change, but only takes effect after a server or leader restart |
-| `mirror` | **fixed at creation** — "You can't point a mirror at a different upstream or change what it copies in place"; `sources`, by contrast, can be added, dropped or re-filtered by updating the stream (sources: [[s-docs-mirrors-and-sources]], [[s-docs-mirrors-as-dr]]) |
-| `allow_msg_ttl` | can be **enabled** on an existing stream and **never disabled**; setting it (or `subject_delete_marker_ttl`) requires stream API level `1`, and `subject_delete_marker_ttl` may not be set on a mirror at all (source: [[s-adr-43-per-message-ttl]], 2.11) |
-
-`deny_delete` and `deny_purge` cannot be changed once set to `true`, and a `sealed` stream cannot
-be unsealed (source: [[s-docs-stream-config]]).
+| `mirror` | **fixed** — `stream mirror configuration can not be updated` (10055); "You can't point a mirror at a different upstream or change what it copies in place" — but since **2.12.0 removing it is allowed** (promotion, #7171); `sources`, by contrast, can be added, dropped or re-filtered (sources: [[s-docs-mirrors-and-sources]], [[s-relnotes-2.12]]) |
+| `sealed`, `deny_delete`, `deny_purge` | **one-way** — each can be set and never cleared (`can not unseal a sealed stream`, `can not cancel deny message deletes`, `can not cancel deny purge`); sealing also forces `deny_delete`, `deny_purge`, `discard: new` and `max_age: 0`, so a later edit built from the old config is refused for a field you did not touch |
+| `allow_msg_ttl` | **one-way** — `message TTL status can not be disabled`; setting it (or `subject_delete_marker_ttl`) requires stream API level `1`, and `subject_delete_marker_ttl` may not be set on a mirror at all (source: [[s-adr-43-per-message-ttl]]) |
+| `allow_msg_schedules` | **one-way** — `message schedules can not be disabled`; turning it on turns `allow_rollup_hdrs` on for you |
+| `max_consumers` | free **since 2.12.5** (#7724); fixed before |
+| `discard`, `num_replicas`, `subjects`, `compression`, the limits, `metadata`, `consumer_limits` | can change — `compression` only takes effect after the store is re-created ([[stream-compression]]); a `consumer_limits` change re-validates every consumer |
 
 Recreating a stream means moving the data. A [[mirrors-and-sources|mirror]] can copy the messages
 across, but a mirror is read-only and turning it into a publishable replacement takes further steps
 (source: [[s-docs-policies]]).
+
+## Which clock stamps a message
+
+The **leader's**. `processJetStreamMsg` sets the timestamp with `time.Now().UnixNano()` on the leader
+before the message is proposed to the group, and the value travels in the Raft proposal, so every
+replica stores the same instant and a follower's clock never enters a message (`stream.go:6929–6931`
+at v2.14.6; atomic batches `:7486`; source: [[s-nats-server-stream-consumer-config]]). A cluster
+therefore does not need synchronised clocks for *ordering* — sequence numbers do that — but it does
+for **anything measured in time across a leader change**: `max_age`, per-message TTLs,
+`subject_delete_marker_ttl` and `opt_start_time` are evaluated by whichever server leads at the
+moment, against the stored timestamp, so a new leader whose clock is ahead ages every message by the
+skew. Run NTP on JetStream nodes; the question is gh#3095 (row 140).
+
 
 ## Limits and failure modes
 
@@ -522,4 +539,4 @@ From the seven release bodies (source: [[s-relnotes-2.14]]):
 [[s-issue-4281-insufficient-storage]] · [[s-synadia-jetstream-anti-patterns]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]

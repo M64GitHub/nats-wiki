@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [subject_transform, republish, wildcard, partition, split, Nats-Stream, Nats-Subject, Nats-Sequence, Nats-Last-Sequence, Nats-Msg-Size, 10052, sharding]
 aliases: [subject transform, transform, republish, subject mapping, partition, wildcard, sharding, "{{wildcard(1)}}", "{{partition(3,1)}}", nats server mappings]
-sources: [s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-mirrors-and-sources, s-docs-stream-config, s-docs-kv-watching, s-relnotes-2.10, s-relnotes-2.12]
+sources: [s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-mirrors-and-sources, s-docs-stream-config, s-docs-kv-watching, s-relnotes-2.10, s-relnotes-2.12, s-nats-server-stream-consumer-config]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -171,6 +171,15 @@ mapping is older than the archive, so the frontmatter says `[2.10]` (source: [[s
   subject" (#8022); **2.12.9** validates republish subjects (#8127) (source: [[s-relnotes-2.12]]).
 
 
+## The two fields, after creation
+
+`subject_transform {src, dest}` and `republish {src, dest, headers_only}` are not among the fields
+`configUpdateCheck` refuses, so an update may change them (the CLI's `stream edit` has
+`--no-transform` and `--no-republish` for removal); a republish destination that forms a cycle, or a
+transform from `src` to `dest` that is invalid, is refused at creation and update alike. Tabled on
+[[stream-and-consumer-config]] (source: [[s-nats-server-stream-consumer-config]]).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[mirrors-and-sources]] · [[key-value]] · [[worker-pool]] ·
@@ -184,4 +193,4 @@ mapping is older than the archive, so the frontmatter says `[2.10]` (source: [[s
 - [[s-docs-mirrors-and-sources]] — the per-source transform, applied while copying.
 - [[s-docs-stream-config]] — the `subject_transform`, `republish` and per-source
   `subject_transforms` config fields.
-- [[s-docs-kv-watching]] — a KV key filter is a subject filter, so `*` is a whole token there too. · [[s-relnotes-2.10]] · [[s-relnotes-2.12]]
+- [[s-docs-kv-watching]] — a KV key filter is a subject filter, so `*` is a whole token there too. · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-nats-server-stream-consumer-config]]
