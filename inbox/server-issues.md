@@ -36,6 +36,7 @@ So the discipline here is different:
 | SI-3 | A `*` inside a subject token — `orders.1*` — is a wildcard to the subject tree and a literal to the sublist: a consumer filtered on it reports `num_pending` for every subject beginning `orders.1`, and `STREAM.INFO`'s `subjects_filter` lists those subjects, while delivery and a direct get match the literal token and find nothing. The consumer shows a backlog it can never deliver | inconsistent | low | v2.14.6 | not filed |
 | SI-4 | The `client_connect` event's `timestamp` is UTC (`…Z`) while the `client_disconnect` event's carries the server's local offset (`…+02:00`) — `accountConnectEvent` stamps `time.Now().UTC()`, `accountDisconnectEvent` the `now` its caller passes; the auth-error twin of the same body is UTC again | inconsistent | low | v2.14.6 | not filed |
 | SI-5 | After `--signal ldm` on a server with no clients, `$SYS.SERVER.<id>.LAMEDUCK` arrived and the server exited within a millisecond, but no `$SYS.SERVER.<id>.SHUTDOWN` reached a subscriber on a peer; a plain SIGTERM on the same server did deliver `SHUTDOWN` | unexpected | low | v2.14.6 | not filed |
+| SI-6 | Config mode accepts `share: true` on a **stream** import and ignores it (`nats-server -t`: valid, exit 0; the parser applies `share` to service imports only), while the account-JWT library rejects the same import with `sharing information (for latency tracking) is only valid for services` — the two modes disagree on whether the key is an error | inconsistent | low | v2.14.6 | not filed |
 
 ---
 
@@ -351,3 +352,40 @@ a drained server.
 whether `SHUTDOWN` arrives on the server's own local system subscriber rather than a peer's; a
 standalone server.
 
+## SI-6 · `share` on a stream import: a config-mode no-op, a JWT-mode error
+
+**The observation.** On **v2.14.6**, `raw/nats-server-src/share-import-observed-v2.14.6.md` scene D
+(`share-import-run.sh`):
+
+```
+accounts {
+  SVC: { exports: [ { stream: "ev.>" } ] }
+  APP: { imports: [ { stream: { account: SVC, subject: "ev.>" }, share: true } ] }
+}
+```
+
+```
+$ nats-server -t -c d.conf
+nats-server: configuration file d.conf is valid (sha256:58b2e1d8…)
+exit: 0
+```
+
+The key is silently dropped: `parseImportStreamOrService` assigns `share` to `curService` only
+(`opts.go:4505–4509`, `raw/nats-server-src/service-imports-v2.14.6.md`). The same import written into
+an account JWT fails validation — `Import.Validate`: "sharing information (for latency tracking) is
+only valid for services" (jwt v2.8.2 `imports.go:88–90`, `raw/jwt-src/imports-exports-activation-v2.8.2.md`)
+— and `nsc add import --share` on a stream refuses with "only services can set the share property".
+
+**What would settle it.** Whether config mode should reject `share` on a stream import the way the JWT
+library does (a parse error, like `allow_trace` on a service import already is: "Detected allow_trace
+directive on a non-stream"), or whether ignoring unknown-for-this-type keys is the intended
+config-mode behaviour.
+
+**Searched and not found.** GitHub issues in `nats-io/nats-server` for "share stream import" and
+"share latency import config" (`gh search issues`, 2026-09-03) — no result either way.
+
+**What was not tested.** Whether a *reload* with the key behaves the same (only `-t` and a fresh start
+were run); other keys that are valid on one import type only.
+
+**Consequence.** Low: an operator who puts `share` on a stream import gets no latency data and no
+error. No data-integrity or security effect. Related: docs issue #79 (the key is documented nowhere).

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-09-03
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets, s-docs-config-accounts-exports-imports, s-nats-server-service-imports]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -239,6 +239,32 @@ deadline. See [[defaults-and-limits]].
 
 The `auth_callout { … }` sub-block is exactly five keys — `issuer`, `account`, `auth_users`, `xkey`,
 `allowed_accounts` (`opts.go:394–407`); none is reloadable in a way this wiki has checked.
+
+## `accounts { <name> { exports, imports } }`
+
+Both lists are reloadable, with a difference the reference states: a reload rebuilds the export set in
+place, but tears down and re-creates **all** of the account's service-import subscriptions, so requests
+arriving in that window are dropped (source: [[s-docs-config-accounts-exports-imports]]). The
+parsers accept more than the reference lists (docs issue #79) — the six unlisted keys are marked:
+
+| key | on | what it takes |
+|---|---|---|
+| `stream` / `service` | export | the subject; `service` is request/reply |
+| `accounts` | export | the importers allowed; absent = public |
+| `response_type` | export | `single` (default) or `stream` |
+| `response_threshold` (aliases `threshold`, `response_max_time`, `response_time`) — *unlisted* | export | a duration |
+| `latency { subject, sampling }` — *unlisted* | export | service-latency events to `subject` |
+| `account_token_position` — *unlisted* | export | the wildcard token that must equal the importer's account name |
+| `allow_trace` — *unlisted* | export (service) | message tracing may cross |
+| `stream { account, subject }` / `service { account, subject }` | import | the exporter and its subject |
+| `prefix` | import (stream) | local prefix |
+| `to` | import (service) | local subject |
+| `share` — *unlisted* | import (service) | put the requester's user into `Nats-Request-Info` ([[service-import-request-info]]) |
+| `allow_trace` — *unlisted* | import (stream) | message tracing may cross |
+
+Source for the parser: `opts.go:4228–4283` and `4480–4514` at v2.14.6
+([[s-nats-server-service-imports]]); see [[cross-account-sharing]].
+
 
 ## Operator mode keys
 
@@ -511,4 +537,4 @@ source: [[s-nats-server-traffic-counters-and-ha-assets]], [[s-gh-5128-ha-assets]
 [[s-docs-accounts-and-multitenancy]] · [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-hardening]] · [[s-docs-rolling-upgrades]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-nats-server-route-cluster-formation]] · [[s-nats-server-systemd-units]] ·
 [[s-nats-server-mqtt-websocket-observed]] · [[s-docs-websocket-tls-and-proxies]] ·
 [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] ·
-[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]]
+[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-docs-config-accounts-exports-imports]] · [[s-nats-server-service-imports]]

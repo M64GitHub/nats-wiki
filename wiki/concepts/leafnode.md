@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed, s-nats-server-service-imports, s-ghsa-2026-08-request-info-spoofing]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -257,6 +257,19 @@ Two WebSocket-only remote settings exist: `ws_compression` and `ws_no_masking` (
 intermediary caches, which does not apply to a server-to-server link; both are requests the hub may
 decline, and the link works either way. See [[websocket]].
 
+## The request-info header across a leaf
+
+A request that crosses a service import carries `Nats-Request-Info`, the server's description of the
+requester ([[service-import-request-info]]). Over a leafnode two things happen to it: a header the leaf
+forwards is **replaced** with "the identity of the authenticated leaf connection instead of trusting
+forwarded values" (`client.go:4950–4954`), and its `acc` is rewritten to the hub-side account name
+when the leaf's account is mapped to a different one (`client.go:5756–5783`). So a service on the hub
+sees the *leaf's* user, never the end client behind it (source: [[s-nats-server-service-imports]]).
+Before **2.11.15 / 2.12.6** the forwarded header was trusted as-is — CVE-2026-33246, medium,
+"Workarounds: None" — because "a leafnode connecting to a nats-server is not fully trusted unless the
+system account is bridged too" (source: [[s-ghsa-2026-08-request-info-spoofing]]).
+
+
 ## Limits and failure modes
 
 - **A `urls` list spanning two clusters of one supercluster loops.** One bridge per NATS system;
@@ -417,7 +430,7 @@ maintainer saw the event on Synadia Cloud and a docker-compose hub never did; th
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]] ·
 [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-5902-leafnode-connect-events]] · [[s-nats-server-system-subjects-observed]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-5902-leafnode-connect-events]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-server-service-imports]] · [[s-ghsa-2026-08-request-info-spoofing]]
 
 ## To verify
 

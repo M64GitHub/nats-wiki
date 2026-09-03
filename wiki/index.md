@@ -68,6 +68,9 @@ exists to answer live in `inbox/question-bank.md`.
   as an identity, TLS-first, and the at-rest key.
 - [[cross-account-sharing]] — exports and imports, the two halves that fail differently, and the two
   undocumented routes to a stream or KV bucket in another account.
+- [[service-import-request-info]] — the header the server stamps on every request that crosses a service
+  import: account only by default, the user too with `share: true` on the tenant's import; the first hop
+  decides on a chain, a leafnode rewrites it, a stream strips it, and it can push a request over `max_payload`.
 - [[leafnode]] — the server that dials *out* and bridges interest over one connection; the only layer
   that can draw a boundary, and only with an account behind it.
 - [[gateway]] — cluster to cluster. Interest-based forwarding, the gossip that hides your typo, and
@@ -413,6 +416,8 @@ exists to answer live in `inbox/question-bank.md`.
   `ConsumerInfo` fields.
 - [[s-docs-connection-limits-config]] — `max_payload`, `max_pending`, `max_connections`,
   `max_subscriptions`: the 8MB/64MB rule and their reload behaviour.
+- [[s-docs-config-accounts-exports-imports]] — the `exports` / `imports` reference tables: four keys each, the
+  reload notes, and the six keys the server accepts that they omit (docs issue #79).
 - [[s-docs-monitoring-endpoints]] — the only prose source for the monitoring port; `slow_consumers`,
   `/connz?sort=pending`, and why an unscoped `/jsz` times out.
 - [[s-docs-monitor-raftz]] — the 173-byte reference page three learn chapters call "the full field
@@ -433,6 +438,12 @@ exists to answer live in `inbox/question-bank.md`.
 
 - [[s-nats-server-constants-2.14.6]] — the defaults the docs do not state, read from the tagged
   source with file and line.
+- [[s-nats-server-service-imports]] — `Nats-Request-Info`, the import's `share`, `getClientInfo(detailed)`, the
+  first-hop rule, the leaf rewrite, the three export guards and `checkActivation`, and the config parsers'
+  import/export keys, with lines at v2.14.6 and v2.10.0.
+- [[s-nats-server-share-import-observed]] — four scenes on 2.14.6: the header's two shapes, a two-hop chain
+  (the first hop decides), `max_payload: 256` delivering `HMSG … 257 507`, and `share` on a stream import
+  accepted silently.
 - [[s-nats-server-systemd-units]] — the two units in `util/`: `ExecStop` is a **SIGUSR2 lame-duck
   drain**, `TimeoutStopSec=150` is `lame_duck_duration` plus buffer, `LimitNOFILE=800000`.
 - [[s-nats-server-route-cluster-formation]] — the cluster-name check on both sides of a route, and
@@ -523,6 +534,13 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-jetstream-log-warnings|(see above)]] for the server side; the client error strings
   `nats: timeout` and `nats: no responders available for request` are quoted from
   `raw/nats-go-src/errors-v1.53.1.md` on [[nats-timeout]].
+
+**The `jwt` library and `nsc`**
+
+- [[s-jwt-imports-exports-activation]] — jwt v2.8.2: `Import.Share` / `Token`, `Export.TokenReq` /
+  `Revocations` / `AccountTokenPosition` (and no account list), the validators, the activation claim.
+- [[s-nsc-imports-exports-activation]] — nsc v2.15.0: `add import --share` / `--token`, `add export --private` /
+  `--account-token-position`, `generate activation --target-account`.
 
 **Synadia blog**
 
@@ -865,6 +883,8 @@ exists to answer live in `inbox/question-bank.md`.
 
 - [[s-natscli-backup-restore]] — every flag `nats stream backup` / `restore` takes at v0.4.0,
   including the three (`--config`, `--cluster`, `--replicas`) that make a cross-site restore possible.
+- [[s-natscli-auth-exports-imports]] — `nats auth account exports add` / `imports add --help` on 0.4.0: `--share`,
+  `--token-position`, and no `--private`.
 - [[s-natscli-account-tls]] — `nats account tls`, the certificate check nobody names: the whole
   verified chain, `--expire-warn 1w`, and a non-zero exit. Plus `nats account backup` / `restore`.
 - [[s-natscli-stream-external]] — the CLI has walked people through cross-domain sourcing for years:
@@ -897,6 +917,10 @@ exists to answer live in `inbox/question-bank.md`.
   reservation; **open since 2023-06-29** with an unanswered counter-example.
 - [[s-issue-8322-dynamic-maxstore-shrinks]] — the auto-sized `max_file_store` ratcheting downwards at
   every restart, reported twice two years apart, fixed by PR #8503 in **2.14.6**.
+- [[s-issue-8271-request-info-max-payload]] — the server-added `Nats-Request-Info` header pushing a request
+  over `max_payload`; **open**, its fix PR unmerged and the maintainers inclined to leave it; reproduced on 2.14.6.
+- [[s-ghsa-2026-08-request-info-spoofing]] — CVE-2026-33246: a leafnode could forward a spoofed
+  `Nats-Request-Info`; fixed 2.11.15 / 2.12.6, no workaround; the maintainers' statement of what the header is for.
 - [[s-exporter-issue-218-num-pending-differs-per-node]] — `nats-io/prometheus-nats-exporter` #218, open and
   unanswered since 2023: `nats_consumer_num_pending` 3 / 0 / 3 across the pods, the reporter settling on
   `is_consumer_leader="true"`; reproduced on 2.14.6 and explained from the server source.

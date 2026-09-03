@@ -4267,3 +4267,82 @@ answer (row 25) read from the comment cache. Plan: nine steps (core NATS ×2, re
 wire protocol, services, `core-or-jetstream`, the client entities, close), ~28 summaries, 12 pages, the
 runs named per step. `local/megaplan.md` phase F: `plan file:` set, `next:` = start step 1, sessions
 revised ~3 → ~9. No page, bank cell or docs-issue row changed; lint unchanged at 0 · 0.
+
+## 2026-09-03 — query: `share: true` on a service import, `Nats-Request-Info`, activation tokens
+
+Operation: query. The question, in its open-source shape: a service in its own account authorises
+callers from the `Nats-Request-Info` header the server stamps on a service import; the header carries
+the user only when the tenant's import has `share: true` — is that a supported setting, what else is in
+the header, what is known to bite, and can an export every tenant imports be guarded with an activation
+token per tenant instead of an `accounts` list. Read: [[cross-account-sharing]], [[synadia-products]],
+`server/{accounts,client,jetstream,jetstream_api,stream,events,opts}.go` at v2.14.6 from the scratch
+cache, `nats-io/jwt` v2.8.2 `v2/{imports,exports,activation_claims}.go` (the tag `go.mod` pins at
+v2.14.6; fetched to `local/scratch/src/jwt-v2.8.2/`), `nats-io/nsc` `cmd/{addimport,addexport,generateactivation}.go`
+at `main` (fetched to `local/scratch/src/nsc-main-2026-09-03/`), `nats auth account imports add --help`
+and `exports add --help` on natscli 0.4.0, nats-server issue #8271 and PR #8278 via `gh`, and advisory
+GHSA-55h8-8g96-x4hj (CVE-2026-33246). **Run** (`local/scratch/runs/share-import/`, nats-server v2.14.6,
+config mode, two accounts): without `share` the responder saw `Nats-Request-Info:
+{"acc":"APP","rtt":268000}`; with `share: true` on the import, after `--signal reload`, it saw
+`{"start":…,"host":"127.0.0.1","id":10,"acc":"APP","user":"app","name":"tenant-agent-1","lang":"go","ver":"1.51.0","rtt":196958,"server":"sharelab","kind":"Client","client_type":"nats"}`.
+What the wiki knows: `share` is `jwt.Import.Share` (`imports.go:42`, valid on service imports only,
+`imports.go:88–90`), read by the server at `accounts.go:2199–2203`, a config key at `opts.go:4505`, a flag
+on both `nsc add import --share` and `nats auth account imports add --share`; `getClientInfo(detailed)`
+(`client.go:6590–6622`) adds `user`, `name`, `host`, `id`, `start`, `lang`, `ver`, `jwt`, `issuer_key`,
+`name_tag`, `tags`, `kind`, `client_type` and the server/cluster only when `detailed` is the import's
+`share`; on a chain of imports the **first** import's `share` decides (`client.go:4932–4935`); the
+system account's own `$JS.API.>` import is forced to `share = true` (`jetstream.go:795`) and the
+JetStream API refuses requests without the header (`jetstream_api.go:810–815`) — the mechanism is
+load-bearing for JetStream itself; a stream strips the header before storing (`stream.go:6357`).
+Known to bite: #8271 (open, `defect` + `stale`, fix PR #8278 unmerged 2026-09-03: the header is added
+after the `max_payload` check, so a request within a header's size of the limit is delivered oversized);
+CVE-2026-33246 (a leafnode could forward a spoofed header; fixed 2.11.15 / 2.12.6, "no workarounds");
+the header's `acc` is rewritten to the hub-side account name across a leafnode
+(`client.go:5757–5783`). Export guards: `checkAuth` (`accounts.go:2863–2882`) tries
+`account_token_position`, then `token_req` → `checkActivation` (`3046–3087`: issuer = the exporting
+account or its signing key, subject = the importer, import subject contained, unexpired, not in
+`revocations`), then the `accounts` list; only `token_req` leaves the exporter's JWT untouched when an
+importer joins — revocation rewrites it. NGS's pre-auth `INFO` (read without credentials, not recorded
+in `raw/`) reports `version 2.14.6`, `max_payload 8388608`. Not in the wiki, and out of its scope: the
+Control Plane REST API, its UI and its token model — commercial, no public source read. **Bank**: rows
+166–168 added (166, 167 posed; 168 asked, #8271), none answered. **Docs issues**: #79 (six
+import/export keys the parsers accept and the config reference omits, both sibling pages swept) and
+#80 (activation tokens on no page; zero `nsc` pages in the mirror). No page changed; a
+`service-import-request-info` page or a *Cross-account sharing* section was offered.
+
+## 2026-09-03 — ingest: `share: true`, `Nats-Request-Info` and the export guards (from the query above)
+
+Operation: ingest, on the user's "yes please we should add that to the wiki". Eight sources entered
+`raw/`, each with a summary: `raw/nats-server-src/service-imports-v2.14.6.md`
+([[s-nats-server-service-imports]] — the server ranges at v2.14.6 plus v2.10.0 for the arrival, including
+`getRawAuthUser`, which makes `user` a public key for a JWT login and `[REDACTED]` for a token);
+`raw/nats-server-src/share-import-observed-v2.14.6.md` with `share-import-run.sh` and
+`share-import-rawsub.py` ([[s-nats-server-share-import-observed]] — four scenes: the two shapes, the
+two-hop chain where the first hop decides, `max_payload: 256` delivering `HMSG … 257 507`, and `share`
+on a stream import accepted silently); `raw/jwt-src/imports-exports-activation-v2.8.2.md`
+([[s-jwt-imports-exports-activation]], the tag nats-server v2.14.6 pins; new collection `jwt-src`);
+`raw/nsc-src/import-export-activation-v2.15.0.md` ([[s-nsc-imports-exports-activation]]; new collection
+`nsc-src`); `raw/gh-issues/issue-8271.md` with the whole PR #8278 thread
+([[s-issue-8271-request-info-max-payload]] — **the PR's maintainers lean towards not enforcing**:
+"it is generally about what the client sends not what the server needs to add to it", which corrects the
+query's "fix pending" reading); `raw/gh-advisories/GHSA-55h8-8g96-x4hj.md` + `secnote-2026-08.txt`
+([[s-ghsa-2026-08-request-info-spoofing]]; new collection `gh-advisories`);
+`raw/nats-cli/help-auth-account-exports-imports-0.4.0.md` ([[s-natscli-auth-exports-imports]]); and the
+docs' `reference/config/accounts/{exports,imports}` pages already in the mirror
+([[s-docs-config-accounts-exports-imports]]). **Created**: [[service-import-request-info]] (concept:
+the header's two shapes, what `user` holds, the first-hop rule, the leaf rewrite, the stream strip, the
+JetStream dependence, `share` in JWT / nsc / nats auth / config, #8271, the CVE, and the design notes for
+a multi-tenant service). **Updated**: [[cross-account-sharing]] — a pointer in *How it behaves* and the
+new *Who may import: the three export guards* (with the correction that **a JWT export has no account
+list**: operator mode has `token_req` and `account_token_position` only), the *To verify* item on the
+generated reference closed, `since` comment and `verified-on` re-pinned; [[leafnode]] (*The request-info
+header across a leaf*); [[js-api]] (*The header every API request carries*); [[publishing]] (the
+`max_payload` overshoot); [[operator-mode]] (*Private exports and activation tokens*); [[nsc]] and
+[[nats-cli]] (cheat-sheet lines); [[config-keys]] (a new `accounts { exports, imports }` table with the
+six unlisted keys marked); [[s-relnotes-2.11]] (the 2.11.15 row now names the CVE's fix line). Index:
+the concept, eight summaries, a new group *The `jwt` library and `nsc`*. `raw/sources.md`: three rows
+appended, three added. **Bank**: 166 → [[service-import-request-info]] · [[cross-account-sharing]];
+167 → [[cross-account-sharing]] · [[operator-mode]] · [[nsc]]; 168 → [[service-import-request-info]] ·
+[[publishing]]. **Docs issues** #79 and #80 now point at the pages. **Server issue SI-6** added
+(`share` on a stream import: config-mode no-op, JWT-mode error; searched, nothing upstream). Nothing about
+the customer or the person who measured the API entered the repo. Lint: 354 pages (345 → 354), drift 0,
+unlanded 0, wanted 0, unverified 11 (unchanged), staleness 0 behind 2.14.6.

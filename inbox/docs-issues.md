@@ -138,6 +138,8 @@ row.
 | 76 | `learn/monitoring/prometheus-and-dashboards.md` says "The full set of metric names, check flags, and surveyor options is documented in Reference" — no page of the reference tree lists a series name; and the exporter's default prefix for every core series, `gnatsd_`, is stated nowhere in the docs (only the JetStream `jetstream_` default is), so a reader who omits `-prefix nats` gets names no dashboard expects | `learn/monitoring/prometheus-and-dashboards.md` (lines 23–32, 149) | nats-docs | missing | medium | not filed | wiki tables every series under both prefixes (`reference/metrics`) |
 | 77 | `nats-surveyor`'s `--prefix` is documented — the README's flag block and `--help` — as "Replace the default prefix for all the metrics"; at v0.9.11 the flag is parsed into a field declared `Prefix string // TODO` that nothing reads, and every name is built with the literal `nats` namespace: `--prefix x` renames nothing | `nats-io/nats-surveyor` README.md (the usage block) and `cmd/root.go:238` (the help text) | nats-surveyor | wrong-value | low | not filed | wiki says the flag is a no-op |
 | 78 | The docs' sample `nats_consumer_num_pending{account,stream_name,consumer_name} 20` never says the value is computed on the consumer's leader only and reads **0 on every replica** — the 3 / 0 / 3 readings operators have reported since 2023 (exporter issue #218, unanswered) — nor that the series carries seventeen labels, `is_consumer_leader` among them | `learn/monitoring/prometheus-and-dashboards.md` (lines 32–43) | nats-docs | enhancement | medium | not filed | wiki states the leader rule with the server lines and the run |
+| 79 | `reference/config/accounts/imports.md` lists four keys (`stream`, `service`, `prefix`, `to`) and `exports.md` four (`stream`, `service`, `accounts`, `response_type`); the server's parsers at v2.14.6 also accept `share` and `allow_trace` on an import and `latency`, `response_threshold` (three aliases), `account_token_position` and `allow_trace` on an export — six keys documented on no page of the tree. `imports/service.md` is also described as "Stream import source configuration" | `reference/config/accounts/imports.md`, `imports/service.md`, `exports.md` | nats-docs | missing | medium | not filed | wiki tables all keys in `reference/config-keys` and states `share` on `concepts/service-import-request-info` |
+| 80 | Activation tokens — a private export (`token_req: true`, `nsc add export --private`), the `token` an import carries, `nsc generate activation`, expiry and revocation — are described on no page of the 861-page tree; the two mentions (`learn/security/operator-mode.md:14`, `learn/security/cross-account.md:260`) say only that `nats auth` v0.4.0 lacks them and that `nsc` has them. The mirror holds no `nsc` page at all | `learn/security/cross-account.md`, `learn/security/operator-mode.md` | nats-docs | missing | medium | not filed | wiki states the token, its checks and the two `nsc` commands on `concepts/cross-account-sharing` |
 
 ---
 
@@ -3406,3 +3408,82 @@ surveyor with `--jsz-leaders-only` — and a sample that shows the label.
 | 76 | `wiki/reference/metrics.md` — *The naming rule, and the prefix nobody documents*, *What the docs say, and what they do not*; `wiki/entities/prometheus-nats-exporter.md` — *What an operator needs to know* |
 | 77 | `wiki/reference/metrics.md` — *The naming rule…*; `wiki/entities/nats-surveyor.md` — *What bites you*; `wiki/summaries/s-nats-surveyor-metrics-observed.md` |
 | 78 | `wiki/reference/metrics.md` — *Which node's exporter to read*; `wiki/concepts/consumer.md` — *The consumer's numbers as time series*; `wiki/entities/prometheus-nats-exporter.md` — *What bites you* |
+| 79 | `wiki/reference/config-keys.md` — *`accounts { <name> { exports, imports } }`* (the six keys marked *unlisted*); `wiki/concepts/cross-account-sharing.md` — *Who may import*; `wiki/summaries/s-docs-config-accounts-exports-imports.md` |
+| 80 | `wiki/concepts/cross-account-sharing.md` — *Who may import: the three export guards*; `wiki/concepts/operator-mode.md` — *Private exports and activation tokens*; `wiki/entities/nsc.md` — cheat sheet |
+
+## 79 · Six import/export keys the server accepts and the config reference never lists
+
+**`reference/config/accounts/imports.md`** (fetched 2026-08-31) tables `stream`, `service`, `prefix` and
+`to`, and nothing else; `imports/service.md` tables `account` and `subject` under the description
+"Stream import source configuration. Exclusive of `stream`." — the stream entry's text with the type
+swapped. **`reference/config/accounts/exports.md`** tables `stream`, `service`, `accounts` and
+`response_type`.
+
+**The server**, `server/opts.go` at v2.14.6 — `parseImportStreamOrService`:
+
+```go
+		case "share":                       // opts.go:4505
+			share = mv.(bool)
+			if curService != nil {
+				curService.share = share
+			}
+		case "allow_trace":                 // opts.go:4510
+```
+
+and `parseExportStreamOrService`:
+
+```go
+		case "threshold", "response_threshold", "response_max_time", "response_time":   // opts.go:4228
+		…
+		case "accounts":                    // opts.go:4255
+		case "latency":                     // opts.go:4265
+		case "account_token_position":      // opts.go:4281
+		case "allow_trace":                 // opts.go:4283
+```
+
+**Run** (2026-09-03, nats-server v2.14.6, `local/scratch/runs/share-import/server.conf`): with
+`imports: [ { service: { account: SVC, subject: "svc.remote" }, to: "svc.local", share: true } ]` the
+config loads, reloads with `--signal reload`, and the responder in `SVC` sees the requester's user in
+`Nats-Request-Info` (`"acc":"APP","user":"app","name":"tenant-agent-1",…`); without `share` it sees
+`{"acc":"APP","rtt":268000}` only. So `share` is not a dead key: it is the switch that decides whether a
+service in one account can identify the *user* in another, which is what a multi-tenant design turns on.
+
+**Sweep**: both sibling pages of the same generated kind were checked against the two parsers — 2 of 2
+incomplete, 6 keys missing in total (2 on imports, 4 on exports). The keys the pages do list are
+correct.
+
+**Suggested fix**: add the six rows; `share` as "service imports only: put the requester's user, name,
+client host, JWT and issuer key into the `Nats-Request-Info` header and the service-latency event
+(default `false`: account and RTT only)"; `latency` with its `subject` / `sampling` sub-keys;
+`response_threshold` with its aliases; `account_token_position`; `allow_trace` on both sides with the
+rule from the jwt library — trace on a *stream* import and a *service* export only. Fix the
+`imports/service.md` description.
+
+## 80 · Activation tokens are documented nowhere in the tree
+
+A private export is the one cross-account mechanism that lets the exporting account keep its JWT
+unchanged as importers come and go: the export carries `token_req: true` (jwt v2.8.2 `exports.go:115`,
+`nsc add export --private`), and each importer's import carries an activation JWT in `token`
+(`imports.go:27`) that the exporting account — or one of its signing keys — issued for that importer's
+public key with `nsc generate activation --target-account <key> --subject <subject>`. The server
+checks it in `accounts.go:2863–2882` (`checkAuth`: account-token position first, then `tokenReq` →
+`checkActivation`, then the `accounts` list) and `3046–3087` (`checkActivation`: the token's issuer must
+be the exporting account or a signing key of it, the subject the importing account, the import subject
+contained in the token's, not expired, not in the export's `revocations`).
+
+**The docs**: `grep -rn -i 'activation' raw/nats-docs/` finds two sentences — `learn/security/operator-mode.md:14`
+("A few `nsc` capabilities aren't in `nats auth` v0.4.0 yet — activation tokens and importing a single
+account into an existing operator among them. For those, keep using `nsc` on the same store.") and
+`learn/security/cross-account.md:260` ("`nats auth` has no activation tokens for private exports; its
+substitute is `--token-position`…"). Neither says what a token is, who signs it, what it contains, how
+it expires or how it is revoked. `grep -c -i nsc raw/nats-docs/_llms.txt` is **0**: the 861-page mirror
+has no `nsc` page at all, so the tool the sentences defer to is documented nowhere in the tree either.
+
+**Why it matters**: an architect choosing between the three export guards cannot find, on docs.nats.io,
+that two of them (`accounts`, and any revocation) rewrite the exporter's JWT per tenant and one
+(`token_req`) does not — the decision that bank row 167 asks about.
+
+**Suggested fix**: a page under `learn/security/` — *Private exports and activation tokens* — with the
+export flag, the token's fields (`sub` = importing account, `nats.subject`, `nats.kind`, `exp`,
+`issuer_account` when a signing key signs), the `nsc` commands, `revocations`, and the comparison with
+`accounts` and `account_token_position`. Until `nats auth` gains the command, the page has to name `nsc`.

@@ -2,12 +2,12 @@
 title: Cross-account sharing
 type: concept
 area: [security, jetstream, kv]
-since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
+since: [2.10]   # present at v2.10.0 (share and the request-info header, accounts.go:132,1919); not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-03
 tags: [exports, imports, stream-export, service-export, prefix, to, external, api-prefix, 10021, 10022, 10024]
 aliases: [exports, imports, export, import, cross-account, account import, account export, activation token, api prefix, external]
-sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-service-imports, s-nats-server-share-import-observed, s-jwt-imports-exports-activation, s-nsc-imports-exports-activation, s-natscli-auth-exports-imports, s-docs-config-accounts-exports-imports]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -53,6 +53,14 @@ subject when an import uses `prefix:` or `to:` — plus the negative rule, "Neve
 subject name to bridge accounts; use an explicit export/import" (source:
 [[s-docs-security-checklist]]).
 
+**What the exporting side learns about the caller** is a header, not a permission: on every request
+that crosses a service import the server stamps `Nats-Request-Info` with the requester's account, and
+with the user too when the *importing* account's import carries `share: true` — the switch a
+multi-tenant service turns on per tenant. The header, its two shapes, the first-hop rule on chained
+imports and the `max_payload` edge are on [[service-import-request-info]] (source:
+[[s-nats-server-service-imports]]; [[s-nats-server-share-import-observed]]).
+
+
 ## What configures it
 
 ```
@@ -92,6 +100,56 @@ Both accounts must then be pushed. `nats auth` v0.4.0 has **no activation tokens
 exports; its substitute is `--token-position`, "which keys a wildcard export so each importing account
 can only import the subject carrying its own account key". For activation tokens, use [[nsc]] on the
 same store.
+
+## Who may import: the three export guards
+
+An export with nothing set is public. Three settings on the **export** narrow it, and the server tries
+them in a fixed order (`checkAuth`, `accounts.go:2863–2882`): the account-token position first, then
+the activation token, then the account list (source: [[s-nats-server-service-imports]]). **Only two of
+the three exist in operator mode**: a JWT export has `token_req` and `account_token_position` and no
+account list at all — `accounts: [A, B]` is a config-mode key (source:
+[[s-jwt-imports-exports-activation]]; `accounts.go:3606–3625` registers a JWT export with nothing but
+those two). They differ in the one thing that matters when tenants come and go — **whose
+definition changes**:
+
+| guard | on the export | on each import | the exporter's definition changes when an importer joins? |
+|---|---|---|---|
+| `accounts: [A, B]` — **config mode only** | the list | nothing | **yes**, every time (a config edit and a reload) |
+| activation token | `token_req: true` (`nsc add export --private`) | `token`: an activation JWT the exporter issued to *this* importer | **no** on join; **yes** on revocation (`revocations` lives on the export) |
+| account token position | `account_token_position: <n>` on a wildcard subject (`nsc add export --account-token-position`, `nats auth … --token-position`) | the import subject must carry the importer's own account key at token `n` | **no**, and no token to mint |
+
+**The activation token** is a JWT whose `sub` is the importing account's public key, with
+`nats.subject` = the subject it may import, `nats.kind` = stream or service, optional `nbf` / `exp`,
+and `issuer_account` = the exporting account when a **signing key** signs it. The exporter mints it —
+
+```
+nsc add export --account FABRIC --service --subject "api.>" --private
+nsc generate activation --account FABRIC --subject "api.>" --target-account <tenant-account-key> --output-file tenant.jwt
+```
+
+— and the importer puts it into its import (`nsc add import --account TENANT --token tenant.jwt`);
+`nsc` fills the subject, the type and the source account from the token and refuses one meant for
+another account (source: [[s-nsc-imports-exports-activation]]). The server then checks, on every
+import (`checkActivation`, `accounts.go:3044–3087`): the token decodes; its issuer is the exporting
+account or one of its signing keys; its `sub` is the importer; the import subject is contained in the
+token's; it has not expired — and when it does the server drops the import on a timer, no JWT push
+needed; and the importer is not in the export's `revocations` (source:
+[[s-nats-server-service-imports]]; the field rules in [[s-jwt-imports-exports-activation]]).
+
+Two tooling limits: `nats auth` 0.4.0 has `--token-position` and `--share` but **no `--private` and
+no activation command** — a private export still needs `nsc` on the same store (source:
+[[s-natscli-auth-exports-imports]]); and `nsc` refuses `--private` together with
+`--account-token-position` ("account token position is only valid for public exports")
+(source: [[s-nsc-imports-exports-activation]]).
+
+**In config mode** the same export accepts `accounts`, `latency`, `response_type`,
+`response_threshold`, `account_token_position` and `allow_trace`, and an import accepts `prefix`,
+`to`, `share` and `allow_trace` (`opts.go:4228–4283`, `4480–4514`); the generated docs reference lists
+four keys on each side and none of `share`, `allow_trace`, `latency`, `response_threshold` or
+`account_token_position` — docs issue #79 (source: [[s-docs-config-accounts-exports-imports]];
+[[s-nats-server-service-imports]]). There is no activation token in config mode; the `accounts` list
+is the guard.
+
 
 ## Sharing JetStream: streams and KV buckets
 
@@ -248,7 +306,8 @@ older than the archive (source: [[s-relnotes-2.10]]).
 - **2.11.9**: subject interest propagated to leaf nodes "when daisy chaining imports/exports"
   (#7255). **2.11.12**: a subscription leak in a cluster when an import/export overlaps the `$JS.>`
   namespace (#7720). **2.11.15**: CVE-2026-33246 ("systems using leafnodes and service imports");
-  messages from leafnodes to non-shared service imports rebuild the request-info header.
+  messages from leafnodes to non-shared service imports rebuild the request-info header — the
+  leafnode spoofing of `Nats-Request-Info`, on [[service-import-request-info]].
 
 
 ### The 2.12 line
@@ -269,9 +328,6 @@ older than the archive (source: [[s-relnotes-2.10]]).
 - Whether **`nats account backup` / `nats account restore`** is the intended migration path between
   accounts. A maintainer says so in [[s-gh-4535-unauthenticated-connections]] and the commands exist
   at natscli v0.4.0 ([[s-natscli-account-tls]]), but no docs page describes the use.
-- **Service export `response_type`** and the full import field list are in the generated reference
-  under `reference/config/accounts/exports/` and `imports/`, indexed in
-  `inbox/config-keys-table.md`, and not yet read.
 
 ### The 2.14 line
 
@@ -295,4 +351,4 @@ import of `$JS.ACK.<stream>.>` must be rewritten before the default flips ([[js-
 [[s-nats-server-auth-and-tls]] · [[s-docs-mirrors-and-sources]] ·
 [[s-docs-object-store-under-the-hood]] · [[s-docs-authorization]] ·
 [[s-docs-security-checklist]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-service-imports]] · [[s-nats-server-share-import-observed]] · [[s-jwt-imports-exports-activation]] · [[s-nsc-imports-exports-activation]] · [[s-natscli-auth-exports-imports]] · [[s-docs-config-accounts-exports-imports]]

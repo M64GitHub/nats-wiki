@@ -7,7 +7,7 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -385,6 +385,17 @@ ran the command* (source: [[s-docs-putting-it-together]]). See [[leafnode]] and 
 for both prefixes and requires both, because those are **your local import subjects** — none of this
 is in the docs (source: [[s-natscli-stream-external]]). See [[cross-domain-sourcing]].
 
+```
+# sharing between accounts: the flags 0.4.0 has (and --private / an activation command it does not)
+nats auth account exports add Api "api.>" FABRIC --service --token-position 2
+nats auth account imports add Api "api.>" TENANT --service --source <FABRIC-key> --local api.> --share
+```
+
+`--share` puts the requester's user into `Nats-Request-Info` on the exporter's side
+([[service-import-request-info]]); a private export needs `nsc` ([[nsc]]) (source:
+[[s-natscli-auth-exports-imports]]).
+
+
 ## The `$SYS` requests the CLI does not wrap
 
 `nats server request` has subcommands for `variables`, `connections`, `subscriptions`, `routes`,
@@ -454,4 +465,4 @@ nats bench js consume --stream S --consumer C …          # binds an existing d
 [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-kubernetes]] ·
 [[s-docs-single-server]] · [[s-docs-stream-backup-restore]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7684-certificate-expiry]] ·
-[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]]
+[[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-natscli-auth-exports-imports]]

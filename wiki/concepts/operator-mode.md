@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [operator, jwt, nkeys, ed25519, signing-keys, scoped, revocation, bearer, resolver, creds]
 aliases: [decentralized auth, decentralized authentication, jwt auth, operator, trust chain, nkeys, scoped signing key, resolver]
-sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-docs-authentication-basics, s-docs-authorization, s-docs-cross-account, s-gh-5941-restrict-leafnode-subjects, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.11]
+sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-docs-authentication-basics, s-docs-authorization, s-docs-cross-account, s-gh-5941-restrict-leafnode-subjects, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.11, s-jwt-imports-exports-activation, s-nsc-imports-exports-activation]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -189,6 +189,20 @@ a seed, and it reduces the credential to a single document that must never leak"
   [[s-gh-7834-leafnode-same-js-domain]]; [[streams-not-visible-across-a-leafnode]],
   [[tls-in-nats]]).
 
+## Private exports and activation tokens
+
+The JWT form of "who may import" is not an account list — an account JWT's export has no such field —
+but `token_req: true` plus an **activation token** per importer: a JWT the exporting account (or a
+signing key of it) issues for one importing account, one subject and one kind, which the importer
+carries in its import's `token`. The exporter's JWT does not change when an importer joins; it does
+when one is revoked, because `revocations` live on the export (source:
+[[s-jwt-imports-exports-activation]]). `nsc add export --private` and `nsc generate activation
+--target-account <key> --subject <subject>` mint them (source: [[s-nsc-imports-exports-activation]]);
+the commands, the check order and the alternative `account_token_position` are on
+[[cross-account-sharing]], and the requester identity the exporter sees on
+[[service-import-request-info]].
+
+
 ## Why an operator cares
 
 Choose operator mode when tenants must issue their own credentials, or when the user list would
@@ -261,4 +275,4 @@ a JWT.
 [[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] ·
 [[s-docs-mqtt-auth-and-clustering]] · [[s-docs-websocket-browsers-and-origins]] ·
 [[s-docs-authentication-basics]] · [[s-docs-authorization]] · [[s-docs-cross-account]] ·
-[[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.11]]
+[[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.11]] · [[s-jwt-imports-exports-activation]] · [[s-nsc-imports-exports-activation]]

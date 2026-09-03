@@ -7,9 +7,9 @@ verified-against: nsc v2.15.0
 verified-on: 2026-08-31
 tags: [tool, nsc, operator-mode, jwt, nkeys, accounts, users]
 aliases: [nsc, "nats-io/nsc"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-docs-config-and-jwt-backup]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-docs-config-and-jwt-backup, s-nsc-imports-exports-activation, s-jwt-imports-exports-activation]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # nsc
@@ -97,6 +97,21 @@ nats auth operator backup  ACME acme-operator.backup --key backup-curve.nk
 nats auth operator restore ACME acme-operator.backup --key backup-curve.nk
 ```
 
+```
+# sharing between accounts — the part nats auth 0.4.0 cannot do (source: nsc v2.15.0)
+nsc add export   --account FABRIC --service --subject "api.>" --private            # token_req: true
+nsc generate activation --account FABRIC --subject "api.>" --target-account <tenant-key> --output-file tenant.jwt
+nsc add import   --account TENANT --token tenant.jwt                               # subject, type, source filled from the token
+nsc add import   --account TENANT --service --src-account <fabric-key> --remote-subject "api.>" --share   # put the user in Nats-Request-Info
+nsc add export   --account FABRIC --service --subject "api.*.>" --account-token-position 2               # public, keyed by the importer's account
+```
+
+`--share` is refused on a stream import ("only services can set the share property"); `--private` and
+`--account-token-position` are refused together. What each flag writes into the account JWT is on
+[[cross-account-sharing]] and [[service-import-request-info]] (source:
+[[s-nsc-imports-exports-activation]]; [[s-jwt-imports-exports-activation]]).
+
+
 ## When a push fails
 
 `nsc push` and `nats auth account push` both publish the account JWT to **`$SYS.REQ.CLAIMS.UPDATE`**
@@ -138,4 +153,4 @@ sends, and `nsc push --prune` needs `allow_delete: true` on the resolver.
 ## Sources
 
 [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-operator-mode]] ·
-[[s-docs-decentralized-auth]] · [[s-gh-7854-jwt-push-timeout]] · [[s-docs-config-and-jwt-backup]]
+[[s-docs-decentralized-auth]] · [[s-gh-7854-jwt-push-timeout]] · [[s-docs-config-and-jwt-backup]] · [[s-nsc-imports-exports-activation]] · [[s-jwt-imports-exports-activation]]

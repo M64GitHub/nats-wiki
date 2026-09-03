@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-09-03
 tags: [js-api, err_code, schemas, paging, acl, errors.json]
 aliases: ["$JS.API", js api, err_code, ApiError, error envelope]
-sources: [s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-docs-stream-config, s-docs-consumer-config, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-jetstream-log-warnings, s-gh-5859-unexpected-nats-timeout, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-docs-stream-config, s-docs-consumer-config, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-jetstream-log-warnings, s-gh-5859-unexpected-nats-timeout, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-service-imports]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -208,6 +208,16 @@ the subject; **replies all carry a `type` hint**. The schemas live in the
 [`jsm.go`](https://github.com/nats-io/jsm.go/tree/main/schemas) repository — the same schemas the
 docs' generated reference pages are built from.
 
+## The header every API request carries
+
+The API knows who is asking because every JetStream-enabled account imports the system account's
+`$JS.API.>` as a service import that the server forces to `share = true` (`jetstream.go:787–797`), so
+each request arrives with a full `Nats-Request-Info` header — account, user, client — and a request
+without one is dropped unless it comes from the system account itself (`jetstream_api.go:809–815`).
+The same header, with `share` decided by the importing account, is what any cross-account service
+gets: [[service-import-request-info]] (source: [[s-nats-server-service-imports]]).
+
+
 ## Where it lives
 
 The error definitions are generated from **`server/errors.json`** in the `nats-server` repo, one
@@ -346,4 +356,4 @@ older than the archive (source: [[s-relnotes-2.10]]).
 [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]] · [[s-docs-stream-config]] ·
 [[s-docs-consumer-config]] · [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] ·
 [[s-relnotes-2.14.0]] ·
-[[s-nats-server-jetstream-log-warnings]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-service-imports]]
