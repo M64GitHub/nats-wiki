@@ -4203,3 +4203,40 @@ missing `js-meta-only` collector, surveyor's shifted `raftz` labels (`collector_
 G6), rows 22, 57, 59, 60, 83, 84, 85 gain the page, row 165 (exporter #218) added and answered —
 127 / 164 → **131 / 165**. Lint: **345 pages**, wanted 0, drift 0, unlanded 0, unverified 11,
 staleness 0 behind 2.14.6.
+
+## 2026-09-03 — phase E closed: the reference layer (step 4)
+
+Every clause of the plan's *Done when* checked with the tool that measures it. The Reference group
+of `wiki/index.md` carries the three lines (`system-subjects`, `stream-and-consumer-config`,
+`metrics`, nine pages in the folder); each of the three pages carries `verified-against: nats-server
+2.14.6` (`metrics` the exporter's v0.20.2 and surveyor's v0.9.11 as well) and a *How this was
+derived* section naming file, line and run; `monitoring-endpoints` lists the fifteen paths the mux
+registers and nothing else. **Bank**: rows 82, 139, 140, 146 filled; rows 15–17, 21, 22, 28, 57, 59,
+71, 83–85, 88, 116, 151, 160 name the page that now answers them; row 129 filled by `metrics` (the
+`production-alerting` runbook stays with G6); rows 161–165 added over the phase — 131 / 165, `own` 13.
+**`inbox/docs-issues.md`**: #65–#78 each have a row in *Where the wiki records each of these* —
+fourteen issues from the phase, eleven `wrong-value` or `missing` and three `enhancement`, two
+destinations new to the file (`jsm.go`, `nats-surveyor`); every contradiction the plan's *What the
+read found* listed is among them. **Docs coverage of the two trees**, stated as the plan asks:
+`reference/system/` — 23 pages, 22 read into a summary (`s-docs-system-monitor-reference`:
+`monitor.md` and the 14 endpoint pages other than `raftz`; `s-docs-monitor-raftz`;
+`s-docs-system-advisories-and-metrics`: `advisory.md` + 3, `metric.md` + 1), 1 skipped with a reason
+— `errors.md`, the system error strings a client is shown, which is phase F's material (the plan's
+scope decision 5). `reference/jetstream/` — 59 pages, 58 read (`s-docs-jetstream-advisories-reference`:
+`advisory.md` + 22, `metric.md` + 1; `s-docs-jetstream-api-index`: `api.md`, the four index pages
+and the 25 operation pages; `s-docs-stream-config`, `s-docs-consumer-config`,
+`s-docs-jetstream-headers`), 1 not re-ingested — `errors.md`, already the source of the 222-code table
+on [[error-codes]] through [[s-adr-7-server-error-codes]]. The megaplan's baseline read 1/23 and
+3/59. `python3 tools/check-staleness.py`: 0 behind 2.14.6, 0 without `verified-against`, 7 authority
+unknown (unchanged). `local/scratch/INDEX.md` pruned: the promoted discussion, issue, Stack Overflow,
+jsm.go schema, Synadia and release-page caches deleted after their `raw/` copies were checked (the
+release pages were the `--offline` input of `tools/triage-releases.py`; a `--fetch` restores them);
+gh#3772 and the discussions comment cache kept for phase G, the server and exporter sources at their
+tags and the five run directories kept as the unedited originals. Over the phase (four sessions,
+2026-09-03; three ingests of 8 + 8 + 9 summaries): 317 → **345 pages**, three reference pages,
+25 summaries, four new raw collections (`jsm-go`, `nats-cli`, `prometheus-nats-exporter-src`,
+`nats-surveyor-src`), eight system-subject runs, three update passes and thirteen scrapes on the
+lab, 45 page-ripples with five in-place corrections, docs issues 64 → 78, server issues 3 → 5
+(SI-4, SI-5), bank 121 / 160 → 131 / 165, unverified 12 → 11; lint clean at drift 0 · unlanded 0,
+wanted 0, staleness 0 behind 2.14.6. The plan's result line written; phase F proposed in
+`local/megaplan.md`.

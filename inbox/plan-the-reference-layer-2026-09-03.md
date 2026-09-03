@@ -1,5 +1,7 @@
 # Plan — the reference layer: three lookup tables (proposed 2026-09-03)
 
+**Result (2026-09-03, all four steps done in four sessions).** Three reference pages, each read from the server at v2.14.6 and run on the lab, each with *How this was derived*: `system-subjects` (every `$SYS` subject — the fifteen `PING.<Z>` requests and the three with no HTTP twin, the account requests, the events with their observed bodies and heartbeats), `stream-and-consumer-config` (38 + 35 fields with default, arrival, mutability and the refusal string) and `metrics` (167 exporter series at v0.20.2 by collector, surveyor's 105 at v0.9.11, the series behind the alerts, the leader-only `num_pending` rule); `monitoring-endpoints` corrected to the mux's fifteen paths; 25 summaries; four new raw collections (`jsm-go`, `nats-cli`, `prometheus-nats-exporter-src`, `nats-surveyor-src`); 45 ripples with five in-place corrections; docs issues **#65–#78**, server issues **SI-4, SI-5**; docs coverage `reference/system/` 22/23 and `reference/jetstream/` 58/59 (the two `errors.md` by decision); bank 121 / 160 → **131 / 165** (rows 82, 129, 139, 140, 146 filled, 161–165 added). Lint: 345 pages, wanted 0, drift 0, unlanded 0, unverified 11, staleness 0 behind 2.14.6. **Next:** phase F, the client side (`inbox/plan-the-client-side-<DATE>.md`) — read `raw/nats-docs/learn/core-nats/`, `learn/resilient-clients/`, `learn/services/` and `reference/protocols/` end to end first (29 articles and four index pages, none summarised).
+
 Say **`start the plan inbox/plan-the-reference-layer-2026-09-03.md`** to work this file — name it
 explicitly, a bare `start the plan` takes the newest `inbox/plan-*.md`. `CLAUDE.md` → *Operation:
 plan* says how: one step at a time, `status:` rewritten in place, `wiki/log.md` appended, lint run,
@@ -266,7 +268,7 @@ with a series and a version for each — otherwise the `status:` line says it st
 `production-alerting`. Index, log, lint. Report the series count per collector, whether surveyor
 ran, and the row-129 decision.
 
-## Step 4 — close the phase · status: open
+## Step 4 — close the phase · status: done 2026-09-03 — every *Done when* clause measured (index, the fourteen *Where the wiki records* rows for #65–#78, the bank cells, `check-staleness.py` 0 behind, lint 0 · 0, wanted 0); the two trees' coverage in `wiki/log.md` (22/23, 58/59, the two `errors.md` by decision); `local/scratch/INDEX.md` pruned; the result line above; phase F proposed in `local/megaplan.md`
 
 Index (the Reference group gains three lines), `inbox/docs-issues.md`'s *Where the wiki records each
 of these* rows for every issue the plan added, the bank cells re-checked against *Done when*,
