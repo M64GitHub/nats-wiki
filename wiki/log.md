@@ -4240,3 +4240,30 @@ lab, 45 page-ripples with five in-place corrections, docs issues 64 → 78, serv
 (SI-4, SI-5), bank 121 / 160 → 131 / 165, unverified 12 → 11; lint clean at drift 0 · unlanded 0,
 wanted 0, staleness 0 behind 2.14.6. The plan's result line written; phase F proposed in
 `local/megaplan.md`.
+
+## 2026-09-03 — phase F, the read and the plan: the client side
+
+Operation: plan (written), no ingest. Read end to end, for `inbox/plan-the-client-side-2026-09-03.md`:
+`raw/nats-docs/learn/core-nats/` (11 pages + the chapter index), `learn/resilient-clients/` (8 + index),
+`learn/services/` (6 + index), `reference/protocols/` (4 + index), and — beyond the megaplan's list,
+because the chapters point at them — `reference/services/` (3 + index), `concepts/` (11) and
+`reference/config/mappings/` (4). 45 articles; none summarised yet, none entered the wiki today. The
+read's notes are cached as `local/scratch/digest-*.md` (never cited). What it found, carried into the
+plan's *What the read found*: the three `learn/` chapters are unversioned by design, so every
+`verified-against` this phase writes comes from the server at v2.14.6, nats.go at v1.53.1 and natscli
+0.4.0; `reference/protocols/client.md`'s `-ERR` table gives 1 s / 1024 / 10 MB where the server has
+`AUTH_TIMEOUT` 2 s, `MAX_CONTROL_LINE_SIZE` 4096 and `MAX_PENDING_SIZE` 64 MB (`const.go:117,90,102`)
+and never states the ping defaults; `learn/resilient-clients/slow-consumers.md:100` says nats.go
+discards slow-consumer reports without a callback while nats.go installs `defaultErrHandler` (v1.52.0
+`:1853–1856`, to re-pin); ADR-40's "two consecutive PONGs" disagrees with the chapter and with nats.go's
+`pout > MaxPingsOut` — and `upgrade-a-cluster` carries the ADR's four-minute figure (a wiki bug, fixed in
+step 3); `learn/services/scaling.md:150,272` make queue-group delivery readiness-aware, against the
+random start index at `client.go:5516–5519` (a run in step 2); `reference/services.md` describes
+capabilities the schemas do not have; `concepts/` restates the deep dive (nine pages to fold, two already
+ingested, three surplus sentences). Verified while reading, from the binaries: `nats reply --queue`
+defaults to `NATS-RPLY-22`; `nats request --replies=1 --reply-timeout=300ms --wait-for-empty
+--timeout=5s`; `nats server mappings` and `nats trace --deliver` exist on 0.4.0; gh#7577's chosen
+answer (row 25) read from the comment cache. Plan: nine steps (core NATS ×2, resilient clients ×2, the
+wire protocol, services, `core-or-jetstream`, the client entities, close), ~28 summaries, 12 pages, the
+runs named per step. `local/megaplan.md` phase F: `plan file:` set, `next:` = start step 1, sessions
+revised ~3 → ~9. No page, bank cell or docs-issue row changed; lint unchanged at 0 · 0.
