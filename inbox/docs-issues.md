@@ -135,6 +135,9 @@ row.
 | 73 | `consumer/get-next.md` gives the pull request's `batch` a "Maximum: 256"; the server has no such ceiling — a pull of 300 and of 100000 was served on 2.14.6; the only limits are the consumer's `max_batch` (`409 Exceeded MaxRequestBatch of N`) and the server's `max_request_batch` | `reference/jetstream/api/consumer/get-next.md` | nats-docs | wrong-value | medium | not filed | wiki states the real ceiling |
 | 74 | The consumer schema describes `opt_start_time` as "Start time used with the DeliverByStartSequence deliver policy"; it is used with `DeliverByStartTime` | `schemas/jetstream/api/v1/consumer_configuration.json` (jsm.go v0.4.1; the docs never render it, #4) | jsm.go | wrong-value | low | not filed | — |
 | 75 | `stream/restore.md` labels its request section "A response from the JetStream $JS.API.STREAM.RESTORE API" | `reference/jetstream/api/stream/restore.md` | nats-docs | enhancement | low | not filed | — |
+| 76 | `learn/monitoring/prometheus-and-dashboards.md` says "The full set of metric names, check flags, and surveyor options is documented in Reference" — no page of the reference tree lists a series name; and the exporter's default prefix for every core series, `gnatsd_`, is stated nowhere in the docs (only the JetStream `jetstream_` default is), so a reader who omits `-prefix nats` gets names no dashboard expects | `learn/monitoring/prometheus-and-dashboards.md` (lines 23–32, 149) | nats-docs | missing | medium | not filed | wiki tables every series under both prefixes (`reference/metrics`) |
+| 77 | `nats-surveyor`'s `--prefix` is documented — the README's flag block and `--help` — as "Replace the default prefix for all the metrics"; at v0.9.11 the flag is parsed into a field declared `Prefix string // TODO` that nothing reads, and every name is built with the literal `nats` namespace: `--prefix x` renames nothing | `nats-io/nats-surveyor` README.md (the usage block) and `cmd/root.go:238` (the help text) | nats-surveyor | wrong-value | low | not filed | wiki says the flag is a no-op |
+| 78 | The docs' sample `nats_consumer_num_pending{account,stream_name,consumer_name} 20` never says the value is computed on the consumer's leader only and reads **0 on every replica** — the 3 / 0 / 3 readings operators have reported since 2023 (exporter issue #218, unanswered) — nor that the series carries seventeen labels, `is_consumer_leader` among them | `learn/monitoring/prometheus-and-dashboards.md` (lines 32–43) | nats-docs | enhancement | medium | not filed | wiki states the leader rule with the server lines and the run |
 
 ---
 
@@ -3255,6 +3258,75 @@ from the JetStream $JS.API.STREAM.RESTORE API". Cosmetic; the fields (`config`, 
 *Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
 reader here can get from a finding to the prose that uses it. A recipient of the report can ignore it.
 
+## 76 · The docs promise a reference list of metric names that does not exist, and never name the `gnatsd_` prefix
+
+**Docs.** `raw/nats-docs/learn/monitoring/prometheus-and-dashboards.md` line 149: "The full set of
+metric names, check flags, and surveyor options is documented in [Reference](/reference/.md)." Lines
+23–32: "`-prefix nats` renames the metrics from the exporter's default `jetstream_` prefix to `nats_`"
+and "By default the exporter prefixes JetStream metrics with `jetstream_`; the `-prefix nats` flag
+renames them to the `nats_` prefix used here".
+
+**The reference tree.** `grep -rlE 'gnatsd_|jetstream_consumer|nats_consumer_num_pending|nats_core_'
+raw/nats-docs/` matches one file — the learn page itself. `reference/jetstream/metric/` and
+`reference/system/metric/` are the advisory-type schemas (the ack metric event and service latency),
+not series names.
+
+**Exporter, v0.20.2** — `collector/collector.go:34–35`: `CoreSystem = "gnatsd"`,
+`JetStreamSystem = "jetstream"`; `:456–461` (`getSystem`): `-prefix` replaces whichever namespace a
+collector uses. The exporter's own README (line 154–162) shows `gnatsd_varz_in_bytes`.
+
+**Observed, 2026-09-03** (`raw/prometheus-nats-exporter-src/metrics-observed-v0.20.2.md`, runs A and
+B): with every collector on and no `-prefix`, 139 `gnatsd_*` and 28 `jetstream_*` series; with
+`-prefix nats`, the same 167 names under `nats_`.
+
+**Suggested fix:** either add the reference page the link promises (the exporter's series by
+collector, as `wiki/reference/metrics.md` does) or drop the sentence; and state that the default
+prefix is `gnatsd_` for every collector except `/jsz`, and that `-prefix nats` renames both.
+
+## 77 · `nats-surveyor --prefix` is documented as renaming the metrics; it does nothing
+
+**Docs.** `raw/github-repos/nats-io__nats-surveyor.README.md` line 49 (the usage block, identical to
+`nats-surveyor --help` at v0.9.11): `--prefix string  Replace the default prefix for all the metrics.
+(NATS_SURVEYOR_PREFIX)`.
+
+**Source, v0.9.11** (the Go module cache, quoted in the appendix of
+`raw/nats-surveyor-src/metrics-observed-v0.9.11.md`): `cmd/root.go:238` defines the flag with that
+help and `:333` stores it in `opts.Prefix`; `surveyor/surveyor.go:82` declares the field as
+`Prefix string // TODO`; no other line reads it. Every descriptor is built with
+`prometheus.BuildFQName("nats", …)` — `surveyor/collector_statz.go:391` for the `nats_core_*` family,
+`:574–652` for `nats_stream_*` / `nats_consumer_*`.
+
+**Observed, 2026-09-03** (run S3): `nats-surveyor … --prefix x --jsz all` → 102 `nats_*` series, 0
+`x_*`.
+
+**Suggested fix:** implement the flag (thread `opts.Prefix` into `BuildFQName`) or remove it from the
+README, the help and the `NATS_SURVEYOR_PREFIX` environment variable. `destination` is the surveyor
+repository because the text and the code live there.
+
+## 78 · `nats_consumer_num_pending` is 0 on every replica but the leader, and the page does not say so
+
+**Docs.** `raw/nats-docs/learn/monitoring/prometheus-and-dashboards.md` lines 32–43: "The lag field
+`num_pending` becomes `nats_consumer_num_pending` … `nats_consumer_num_pending{account="ORDERS",stream_name="ORDERS",consumer_name="shipping"} 20`",
+presented as *the* series for a consumer's lag, with three labels.
+
+**Server, v2.14.6** — `consumer.go:5628–5632` (`streamNumPending`): `if o.mset == nil || o.mset.store
+== nil || !o.isLeader() { o.npc, o.npf = 0, 0; return 0, nil }`; `:3558–3565`: a follower's
+`num_ack_pending` and `num_redelivered` come from the replicated store state. `num_pending` is
+therefore leader-only on `CONSUMER.INFO`, `/jsz` and `STATSZ` alike.
+
+**Observed, 2026-09-03** (`metrics-observed-v0.20.2.md` runs H1-n1 / H1-n2;
+`metrics-observed-v0.9.11.md` run S1): `nats consumer info` *Unprocessed Messages: 20*; the leader's
+exporter `jetstream_consumer_num_pending … 20`, both followers' `0`; surveyor 20 / 0 / 0. The series
+carries seventeen labels, including `is_consumer_leader="true|false"`.
+
+**Public report.** `nats-io/prometheus-nats-exporter` issue #218 (2023-04-11, open, no maintainer
+reply; `raw/gh-issues/exporter-issue-218.md`): "`nats_consumer_num_pending` … 3 / 0 / 3" across three
+pods, resolved by the reporter with `is_consumer_leader="true"`.
+
+**Suggested fix:** one sentence after the sample — the value is computed on the consumer's leader and
+is 0 on the replicas; alert on `nats_consumer_num_pending{is_consumer_leader="true"}` (exporter) or run
+surveyor with `--jsz-leaders-only` — and a sample that shows the label.
+
 ### Where the wiki records each of these
 
 | # | wiki page |
@@ -3331,3 +3403,6 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 73 | `wiki/reference/stream-and-consumer-config.md` — *Consumer fields* (`max_batch`) and *What the docs do not render*; `wiki/summaries/s-nats-server-config-mutability-observed.md` |
 | 74 | `wiki/reference/stream-and-consumer-config.md` — *Consumer fields* (`opt_start_time`); `wiki/summaries/s-jsm-go-config-schemas.md` |
 | 75 | `wiki/summaries/s-docs-jetstream-api-index.md` |
+| 76 | `wiki/reference/metrics.md` — *The naming rule, and the prefix nobody documents*, *What the docs say, and what they do not*; `wiki/entities/prometheus-nats-exporter.md` — *What an operator needs to know* |
+| 77 | `wiki/reference/metrics.md` — *The naming rule…*; `wiki/entities/nats-surveyor.md` — *What bites you*; `wiki/summaries/s-nats-surveyor-metrics-observed.md` |
+| 78 | `wiki/reference/metrics.md` — *Which node's exporter to read*; `wiki/concepts/consumer.md` — *The consumer's numbers as time series*; `wiki/entities/prometheus-nats-exporter.md` — *What bites you* |

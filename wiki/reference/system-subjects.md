@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [system-account, "$SYS", "$SYS.REQ", events, monitoring, acl]
 aliases: ["$SYS", "$SYS.REQ", "$SYS.REQ.SERVER", system subjects, system account subjects, system events, system requests]
-sources: [s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-docs-system-advisories-and-metrics, s-docs-jetstream-api-index, s-docs-jetstream-advisories-reference, s-gh-5768-track-connected-clients, s-gh-5902-leafnode-connect-events, s-nats-server-kick-ldm-mqtt-session, s-nats-server-auth-and-tls, s-gh-7854-jwt-push-timeout, s-docs-accounts-and-multitenancy, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-docs-system-advisories-and-metrics, s-docs-jetstream-api-index, s-docs-jetstream-advisories-reference, s-gh-5768-track-connected-clients, s-gh-5902-leafnode-connect-events, s-nats-server-kick-ldm-mqtt-session, s-nats-server-auth-and-tls, s-gh-7854-jwt-push-timeout, s-docs-accounts-and-multitenancy, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-surveyor-metrics-observed]
 created: 2026-09-03
 updated: 2026-09-03
 ---
@@ -219,6 +219,15 @@ nats --server nats://app:app@host:4222 req '$SYS.REQ.USER.INFO' ''              
   **2.12.6**: `$SYS.REQ.USER.INFO` returns the account and user name tags (#7973) (source:
   [[s-relnotes-2.12]]).
 
+## What surveyor makes of these requests
+
+`nats-surveyor` v0.9.11 turns `$SYS.REQ.SERVER.PING.STATSZ` (and `JSZ`, `RAFTZ` on request) into 105
+time series from one system-account connection — the per-server, per-route and per-account counters,
+`ha_assets`, the meta group's replica state and Raft indices, and the stream and consumer series —
+observed against the lab on 2026-09-03 and tabled on [[metrics]] (source:
+[[s-nats-surveyor-metrics-observed]]).
+
+
 ## Related
 
 [[monitoring-endpoints]] · [[advisories]] · [[js-api-subjects]] · [[account]] ·
@@ -232,4 +241,4 @@ nats --server nats://app:app@host:4222 req '$SYS.REQ.USER.INFO' ''              
 [[s-gh-5768-track-connected-clients]] · [[s-gh-5902-leafnode-connect-events]] ·
 [[s-nats-server-kick-ldm-mqtt-session]] · [[s-nats-server-auth-and-tls]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-docs-accounts-and-multitenancy]] · [[s-relnotes-2.10]] ·
-[[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-surveyor-metrics-observed]]

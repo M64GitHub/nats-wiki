@@ -7,9 +7,9 @@ verified-against: nats-top v0.6.4
 verified-on: 2026-08-31
 tags: [tool, nats-top, monitoring, connections, slow-consumers, mit]
 aliases: [nats-top, "nats-io/nats-top"]
-sources: [s-docs-ecosystem, s-github-repo-facts]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-gh-2818-counters-exact-or-sampled, s-nats-server-traffic-counters-and-ha-assets]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # nats-top
@@ -65,6 +65,17 @@ nats-top -u                                # show the subscriptions column
 nats-top -ms 8443 -cert c.pem -key k.pem -cacert ca.pem   # over HTTPS
 ```
 
+## The counters it shows are exact, and per server
+
+The message and byte counts are not sampled: every inbound message adds one and its payload length to
+the server's counters atomically (`client.go:4345–4346`, `:1607–1633`, v2.14.6), and `/varz` and
+`/connz` read them with an atomic load (`monitor.go:1900–1907`) — "Yes that is correct", in the
+maintainer's words, with the caveat "it's per server though — nats top is not cluster aware". The byte
+figures are payload bytes, not wire bytes. A cluster total is the sum over every node's
+[[prometheus-nats-exporter]] ([[metrics]]) (source: [[s-gh-2818-counters-exact-or-sampled]],
+[[s-nats-server-traffic-counters-and-ha-assets]]).
+
+
 ## Related
 
 [[monitoring-endpoints]] · [[nats-cli]] · [[nats-surveyor]] · [[prometheus-nats-exporter]] ·
@@ -72,4 +83,4 @@ nats-top -ms 8443 -cert c.pem -key k.pem -cacert ca.pem   # over HTTPS
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-gh-2818-counters-exact-or-sampled]] · [[s-nats-server-traffic-counters-and-ha-assets]]

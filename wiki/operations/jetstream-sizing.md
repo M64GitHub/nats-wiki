@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks, s-gh-8333-high-cardinality-subjects, s-gh-5202-max-unique-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-nats-server-filestore-recovery, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-gh-8001-jetstream-startup-slow-50m, s-relnotes-2.10, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks, s-gh-8333-high-cardinality-subjects, s-gh-5202-max-unique-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-nats-server-filestore-recovery, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-gh-8001-jetstream-startup-slow-50m, s-relnotes-2.10, s-relnotes-2.12, s-relnotes-2.14, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -750,6 +750,24 @@ wiki could contain.
   gets" (#8486).
 
 
+## HA assets: the unit the maintainers size by
+
+Asked how many streams and consumers a 3- or 5-node cluster can hold, the maintainer answered in a
+different unit: "We generally focus on HA Assets, or replicated JetStream assets. In our global
+clusters we limit servers, at the moment, to 2k HA Assets. We have customers that have higher and are
+ok" (source: [[s-gh-5128-ha-assets]]). On 2.14.6 the figure is **per server** — `ha_assets` in `/varz`
+→ `jetstream.stats`, `/jsz` and `STATSZ` is the number of Raft groups the server runs
+(`jetstream.go:2623`): every R>1 stream and consumer it holds a replica of, plus the meta group; R1
+assets count nowhere. An R3 stream with ten R3 consumers is therefore **eleven assets on each of three
+servers**, and a cluster of five sharing 2,000 R3 streams with one R3 consumer each carries 1,200 per
+server. `jetstream { limits { max_ha_assets } }` (no default) refuses new groups above it and takes
+the server out of placement (source: [[s-nats-server-traffic-counters-and-ha-assets]]); the series to
+trend it are `gnatsd_varz_jetstream_stats_ha_assets` and surveyor's `nats_core_jetstream_ha_assets`
+([[metrics]]). The advice that goes with the number: muxed streams with filtering consumers or R1
+mirrors, and R1 consumers a client can recreate from a stored sequence
+([[jetstream-slows-as-consumers-grow]]).
+
+
 ## Related
 
 [[replicas]] · [[stream]] · [[consumer]] · [[raft-in-nats]] · [[filestore-layout]] ·
@@ -770,4 +788,4 @@ wiki could contain.
 [[s-nats-server-object-store-observed]] · [[s-docs-object-store-chunking]] ·
 [[s-docs-monitoring-profiling]] · [[s-gh-7483-varz-cpu-in-containers]] ·
 [[s-nats-server-monitoring-observed]] · [[s-docs-hardening]] ·
-[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-gh-5202-max-unique-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-server-filestore-recovery]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-gh-5202-max-unique-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-server-filestore-recovery]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]]

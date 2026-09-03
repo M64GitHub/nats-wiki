@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-advisories-and-metrics, s-docs-jetstream-advisories-reference]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-advisories-and-metrics, s-docs-jetstream-advisories-reference, s-prometheus-nats-exporter-metrics-observed, s-gh-6182-what-to-alert-on]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -249,6 +249,17 @@ Not a ranking from a source — a reading of what the rest of this wiki shows co
 ([[raft-in-nats]]), but a stream whose leader keeps moving is a symptom
 ([[stream-leader-keeps-moving]]).
 
+**None of the four is a time series.** `MAX_DELIVERIES`, the quorum-lost pair, `OUT_OF_STORAGE` and
+`API.LIMIT_REACHED` exist only as events; neither `prometheus-nats-exporter` nor `nats-surveyor`
+counts them. The series that stand *near* each — `jetstream_consumer_num_redelivered` (outstanding,
+not a rate), surveyor's `nats_core_jetstream_cluster_raft_group_replica_peer_offline`, the
+`reserved_storage` against `max_storage` comparison, `gnatsd_varz_jetstream_stats_api_errors` and
+surveyor's `nats_core_jetstream_api_pending` — are mapped condition by condition on [[metrics]], with
+what the exporter cannot scrape at all (`/healthz?js-meta-only=true`). The seven-item alert list gh#6182
+asked for and never had answered is mapped there too (source:
+[[s-prometheus-nats-exporter-metrics-observed]], [[s-gh-6182-what-to-alert-on]]).
+
+
 ## Capturing advisories into a stream
 
 Advisories are **published once and stored nowhere**: "if nobody is subscribed when one fires, it is
@@ -395,4 +406,4 @@ service-latency metric's real subject and every body are on [[system-subjects]] 
 [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
 [[s-docs-advanced-publishing]] ·
-[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-advisories-and-metrics]] · [[s-docs-jetstream-advisories-reference]]
+[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-advisories-and-metrics]] · [[s-docs-jetstream-advisories-reference]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-gh-6182-what-to-alert-on]]

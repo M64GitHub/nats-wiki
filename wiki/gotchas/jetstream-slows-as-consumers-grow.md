@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [consumer-count, consumer-info, meta-leader, raft-traffic, subject-filters, republish]
 aliases: ["too many consumers", "100k consumers", "consumer info is slow", "throughput collapses with many consumers"]
-sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed, s-relnotes-2.10, s-relnotes-2.11]
+sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed, s-relnotes-2.10, s-relnotes-2.11, s-gh-5128-ha-assets]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -239,6 +239,18 @@ not make the info call cheap.
   lock, "improving consumer create performance on heavily loaded streams" (#7700).
 
 
+## The maintainer's unit: HA assets
+
+The only public figure for "how many" is stated per server and in replicated assets, not consumers:
+"In our global clusters we limit servers, at the moment, to 2k HA Assets" — every R>1 stream or
+consumer replica a server holds ([[jetstream-sizing]], [[metrics]]). Consumers "are varied … if the
+consumer is simply inheriting the R3 from the parent stream, we expect these to be limited"; the
+designs offered are muxed streams with filtering consumers or R1 mirrors, R1 (even memory) consumers
+the client recreates on demand, and for the 100k-consumer case a muxed R3 KV holding each consumer's
+sequence to restart from with `OptStartingSeq` — "If you need over 100k feel free to reach out" (source:
+[[s-gh-5128-ha-assets]]).
+
+
 ## Related
 
 [[jetstream-sizing]] · [[consumer]] · [[direct-get]] · [[key-value]] · [[js-api]] ·
@@ -250,4 +262,4 @@ not make the info call cheap.
 [[s-synadia-jetstream-anti-patterns]] · [[s-adr-17-ordered-consumer]] · [[s-relnotes-2.14.0]] ·
 [[s-docs-raft-and-leaders]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6746-watch-many-keys]] ·
 [[s-gh-5044-restrict-durable-consumers]] · [[s-docs-get-direct]] ·
-[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-gh-5128-ha-assets]]

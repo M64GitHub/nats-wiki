@@ -4140,3 +4140,66 @@ filled, row 164 (own — the mutability question, searched and not found) added 
 answered rows gain the page — 124 / 163 → **127 / 164**. A harness lesson recorded in the observed
 file: pass 1 copied `allow_rollup_hdrs: true` forward and six cases had to be re-run. Lint: **335
 pages**, wanted 0, drift 0, unlanded 0, unverified 11, staleness 0 behind 2.14.6.
+
+## 2026-09-03 — phase E, step 3: `reference/metrics`
+
+`prometheus-nats-exporter` v0.20.2 and `nats-surveyor` v0.9.11 installed with `go install` (module
+versions confirmed with `go version -m`; both binaries print `0.0.0`), the exporter's `collector/`,
+`exporter/exporter.go` and `main.go` cached at the tag, and `server/client.go` + `raft.go` added to the
+v2.14.6 cache. **Three raw files quote the sources**: `raw/prometheus-nats-exporter-src/collector-v0.20.2.md`
+(the two namespaces `gnatsd` / `jetstream`, the flattening rule and its drop list, 33 JetStream
+descriptors and their labels, the `/jsz` query per `-jsz` value, `healthz_status` inverted, the inverted
+"defaulting to varz" test), the appendix of `raw/nats-surveyor-src/metrics-observed-v0.9.11.md`
+(`Prefix string // TODO`, the literal `nats` namespace, `jsServerLabels` vs `serverLabelValues`) and
+`raw/nats-server-src/traffic-counters-and-ha-assets-v2.14.6.md` (the atomic counters, the
+follower branch of consumer info, `streamNumPending`, `numRaftNodes`, `max_ha_assets` at creation and
+placement). **Thirteen scrapes on the lab** (three nodes, an R3 stream with 30 messages, a pull consumer
+holding 10 twice-delivered unacked messages, an R1 mirror and an R1 source on n2; scripts
+`metrics-run.sh` / `metrics-run2.sh` beside the exporter file): every collector on → **167 series**
+(139 `gnatsd_*`, 28 `jetstream_*`, 135 of the core ones gauges, four `connz` counters); `-prefix nats`
+renames all 167; the R1 streams and the mirror/source lag series appear on n2's exporter only;
+**`num_pending` 20 on the consumer leader, 0 on both followers** while `num_ack_pending` and
+`num_redelivered` agree (exporter and surveyor alike); `-jsz=streams` drops the `limit_*` series and
+the raft label; no collector flag → `[FTL] … no Collectors specified`; `-jsz=all` alone → "Defaulting
+to varz" and 84 `varz` series unasked; `gnatsd_healthz_status 0` on a healthy node; `-connz_detailed`
+prints `account=""` for a `$G` client (the server omits it); surveyor → **105 series**, `--prefix x`
+renaming nothing, `--jsz-leaders-only` 439 → 411 samples (one per asset, not half), the three `raftz`
+series with `cluster_name` and `server_id` swapped. Four discussions promoted (2818, 3857, 6182,
+5128) and one exporter issue (#218, 0 / 8 / 0 across pods, open since 2023) rendered into
+`raw/gh-issues/` — the first file there from another repository, the manifest row says so. **Nine
+summaries** (one over the step's seven: gh#3857 and gh#6182 are one-paragraph threads):
+`s-prometheus-nats-exporter-collector`, `s-prometheus-nats-exporter-metrics-observed`,
+`s-nats-surveyor-metrics-observed`, `s-nats-server-traffic-counters-and-ha-assets`,
+`s-gh-2818-counters-exact-or-sampled`, `s-gh-3857-consumer-pending-series`,
+`s-gh-6182-what-to-alert-on`, `s-gh-5128-ha-assets`,
+`s-exporter-issue-218-num-pending-differs-per-node`. **Page** `wiki/reference/metrics.md`: the naming
+rule and the prefix table; which node's exporter to read; one table per collector (`varz` 83, `connz`
+10 + 11 detailed, `healthz` 6, `routez` 3, `subsz` 12, `accstatz` 9, `accountz` 15, `leafz` 9,
+`gatewayz` 24, `jsz` 33) with field, labels, type and dated arrivals; surveyor's eight families;
+*The series behind the alerts* (quorum, lag, disk, consumer pending, redeliveries, down, latency —
+and what has no series: the advisories, `js-meta-only`, per-stream Raft lag, per-message latency);
+*Counters are exact*; `ha_assets`; the docs gaps; *How this was derived*; *Version notes*. **Ripple**
+(16 pages): four corrections in place — `prometheus-nats-exporter` (the three-label series sample
+replaced by the seventeen-label one, the prefix row and bullet now naming `gnatsd_`, "a blank
+invocation exports almost nothing" → it does not start), `nats-surveyor` (the cheat sheet's
+`--prefix nats` line, "halves the noise" → one sample per asset), `monitoring-endpoints` (*From an
+endpoint to a time series* rewritten: both prefixes, the pointer, the two facts), `slow-consumer-detected`
+(the *To verify* item on a per-account exporter metric struck and answered: `gnatsd_accstatz_slow_consumers`
+yes, per connection no) — and sections on `advisories` (*none of the four is a series*), `consumer`
+(*The consumer's numbers as time series*), `worker-pool`, `jetstream-out-of-disk`,
+`stream-has-high-message-lag`, `nats-top`, `jetstream-sizing` (*HA assets: the unit the maintainers
+size by*), `stream-placement` (`max_ha_assets` in peer selection), `jetstream-slows-as-consumers-grow`,
+`raft-in-nats` (surveyor's Raft series), `system-subjects`, `config-keys`. Not rippled:
+`nats-helm-charts` — the chart's `values.yaml` in `raw/github-repos/` states no exporter flags, so
+there is nothing to cite. **Docs issues #76–#78** (75 → 78): the learn page's dangling "documented in
+Reference" and the never-named `gnatsd_` default (`missing`); surveyor's `--prefix` help for a flag
+that is a `// TODO` (`wrong-value`, destination `nats-surveyor` — a new destination); the
+`nats_consumer_num_pending` sample that never says "leader only" (`enhancement`). **Three tool
+behaviours recorded on the entity pages and in neither inbox file, because they are code, not
+documentation and not nats-server** — candidates for the two tool repositories: the exporter's
+inverted flag test (`main.go:79–88`: no flags fatal, `-jsz` alone adds `varz`), the exporter's
+missing `js-meta-only` collector, surveyor's shifted `raftz` labels (`collector_statz.go:953` vs
+`:356–358`). **Bank**: rows 139, 153 and 129 filled (129 by the alert table; the runbook stays with
+G6), rows 22, 57, 59, 60, 83, 84, 85 gain the page, row 165 (exporter #218) added and answered —
+127 / 164 → **131 / 165**. Lint: **345 pages**, wanted 0, drift 0, unlanded 0, unverified 11,
+staleness 0 behind 2.14.6.

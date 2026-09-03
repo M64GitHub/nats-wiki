@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10047, 10028, max_bytes, max_file_store, reserved_storage, out-of-space, OUT_OF_STORAGE]
 aliases: ["JetStream out of disk", "insufficient storage resources available", "insufficient memory resources available", "JetStream out of resources will be DISABLED", "10047", "10028", "out of storage"]
-sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-prometheus-nats-exporter-metrics-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -288,6 +288,18 @@ restarts" (#8503)** — the release-note form of cause 3 above; consumer tiers d
 enforcing limits (#8484).
 
 
+## The series that see it coming
+
+The comparison `10047` makes — reservations against the store limit — is
+`gnatsd_varz_jetstream_stats_reserved_storage` against `gnatsd_varz_jetstream_config_max_storage`
+(exporter v0.20.2, `-varz`); the per-account form is `jetstream_account_storage_used` against
+`jetstream_account_max_storage` (`-jsz`, where `max_storage` is the account's *reservation* and prints
+`1.8446744073709552e+19` when unlimited); `gnatsd_varz_jetstream_stats_storage` is the logical figure
+above, not disk. Surveyor's are `nats_core_jetstream_filestore_reserved_bytes` / `_used_bytes` /
+`_size_bytes`. `SERVER.OUT_OF_STORAGE` has no series; the volume's free space is the node exporter's.
+Names and labels on [[metrics]] (source: [[s-prometheus-nats-exporter-metrics-observed]]).
+
+
 ## Related
 
 [[jetstream-sizing]] · [[malformed-or-corrupt-message]] · [[stream-directories-disappear]] ·
@@ -306,4 +318,4 @@ enforcing limits (#8484).
 - [[s-nats-server-filestore-layout]] — why the ceiling bounds a logical figure and the directory is
   bigger.
 - [[s-nats-helm-chart-values-2.14.6]] — the chart rendering `max_file_store` equal to the PVC size. ·
-[[s-gh-5924-filestore-dirs-vanished]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-prometheus-nats-exporter-metrics-observed]]

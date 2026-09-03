@@ -4,10 +4,10 @@ type: entity
 kind: tool
 area: [monitoring, topology, jetstream]
 verified-against: nats-surveyor v0.9.11
-verified-on: 2026-08-31
+verified-on: 2026-09-03
 tags: [tool, surveyor, monitoring, system-account, statz, raftz, prometheus]
 aliases: [nats-surveyor, surveyor, "nats-io/nats-surveyor"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-prometheus-and-dashboards, s-nats-server-system-subjects]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-prometheus-and-dashboards, s-nats-server-system-subjects, s-nats-surveyor-metrics-observed, s-prometheus-nats-exporter-collector, s-gh-3857-consumer-pending-series, s-exporter-issue-218-num-pending-differs-per-node]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -52,8 +52,10 @@ uses a System account instead of HTTP monitoring endpoints".
 - **Per-account metrics are opt-in and cardinality-sensitive.** `--accounts` and, worse,
   `--accounts-detailed` multiply series by account count; `--jsz-limit` (default 1024) and
   `--jsz-filter` exist because unbounded JetStream metrics are how you flatten Prometheus.
-- **`--jsz-leaders-only` halves the noise** on an R3 cluster by fetching stream and consumer metrics
-  only from leaders, which is where the authoritative numbers are anyway.
+- **`--jsz-leaders-only` keeps one sample per asset instead of one per replica** — three to one for
+  an R3 consumer, and the R1 assets unchanged (439 → 411 samples on the lab shape) — which is where the
+  authoritative numbers are anyway: `num_pending` is 0 on every replica but the leader (source:
+  [[s-nats-surveyor-metrics-observed]]).
 
 ## Cheat sheet
 
@@ -65,7 +67,7 @@ nats-surveyor … --jsz-filter stream_total_messages,consumer_num_pending
 nats-surveyor … --raftz                 # metalayer Raft group metrics
 nats-surveyor … --accounts              # per-account metrics (watch cardinality)
 nats-surveyor … --gatewayz              # gateway metrics
-nats-surveyor … --prefix nats --port 7777
+nats-surveyor … --port 7777             # --prefix is accepted and ignored at v0.9.11 (see below)
 nats-surveyor … --log-level debug
 ```
 
@@ -82,6 +84,42 @@ is the structural reason it can survey a whole topology from one connection whil
 [[s-nats-server-system-subjects]]).
 
 
+## What bites you
+
+Run at v0.9.11 against a 2.14.6 lab cluster on 2026-09-03, with the source lines from the module cache
+(source: [[s-nats-surveyor-metrics-observed]]):
+
+- **`--prefix` does nothing.** The flag is parsed and stored (`cmd/root.go:238`, `:333`) into a field
+  declared `Prefix string // TODO` (`surveyor/surveyor.go:82`) that nothing reads; every name is built
+  with the literal `nats` namespace. `--prefix x` produced 102 `nats_*` series and no `x_*`. Its help
+  text is `inbox/docs-issues.md` #77. Dashboards use `nats_core_*`, `nats_stream_*`,
+  `nats_consumer_*` as they are — the same JetStream names the exporter produces under `-prefix nats`,
+  which is the one place the two tools agree ([[s-prometheus-nats-exporter-collector]]).
+- **One sample per replica, and `num_pending` is 0 off the leader.** `nats_consumer_num_pending` read
+  20 on the consumer's leader and 0 on both followers; `num_ack_pending` and `num_redelivered` agreed on
+  all three. There is **no `is_consumer_leader` label** — compare `server_name` with `consumer_leader`,
+  or pass `--jsz-leaders-only`, which keeps one sample per asset (three → one for R3, R1 unchanged).
+  The exporter's form of the same finding is issue #218
+  ([[s-exporter-issue-218-num-pending-differs-per-node]]); the thread that asked whether surveyor has
+  the series was never answered ([[s-gh-3857-consumer-pending-series]]).
+- **The labels are not the exporter's.** Streams are `stream`, not `stream_name`; the cluster is
+  `cluster_name` on JetStream series and `server_cluster` on core ones; `server_id` is always the NKey
+  id. A dashboard written for one tool does not query the other.
+- **The three `--raftz` series carry shifted labels** at v0.9.11: `nats_core_raftz_meta_committed` /
+  `_applied` / `_pindex` print `cluster_name="<server id>"` and `server_id="<cluster>"` — the
+  descriptors are declared with `server_id, server_name, cluster_name` (`collector_statz.go:953`) and
+  filled with values in the order cluster, name, id (`:356–358`, `:2163–2169`). Read them by
+  `server_name`.
+- **`nats_up` and the survey counters are the health of the survey**: `nats_survey_surveyed_count`
+  below `nats_survey_expected_count` means a server did not answer `PING.STATSZ` in `--timeout` (3 s),
+  and `nats_up 0` means no connection at all — with, the README says, no other series.
+- **What it has that the exporter lacks** — the reason to run both: per-route traffic and
+  `pending_bytes`, per-account JetStream reservations and tiers, `ha_assets`, stream and consumer
+  **leader counts** per server, the meta group's Raft indices, API pending, CPU and RTT per server.
+  What it lacks: `/healthz`, per-connection series, the `/varz` config echoes. The full list is on
+  [[metrics]].
+
+
 ## Related
 
 [[prometheus-nats-exporter]] · [[monitoring-endpoints]] · [[raft-in-nats]] · [[nats-helm-charts]] ·
@@ -89,4 +127,4 @@ is the structural reason it can survey a whole topology from one connection whil
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-prometheus-and-dashboards]] · [[s-nats-server-system-subjects]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-prometheus-and-dashboards]] · [[s-nats-server-system-subjects]] · [[s-nats-surveyor-metrics-observed]] · [[s-prometheus-nats-exporter-collector]] · [[s-gh-3857-consumer-pending-series]] · [[s-exporter-issue-218-num-pending-differs-per-node]]

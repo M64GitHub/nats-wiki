@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [placement, server_tags, no-suitable-peers, 10005, meta-leader]
 aliases: [placement, server_tags, tags, "no suitable peers for placement"]
-sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config]
+sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -230,6 +230,20 @@ permitted in placement` (`stream.go:2276`). Free to change by update (not exerci
 [[stream-and-consumer-config]] with the other fields (source: [[s-nats-server-stream-consumer-config]]).
 
 
+## `max_ha_assets` in peer selection
+
+Beyond tags and storage, `selectPeerGroup` counts each peer's HA assets from the assignments it holds
+("HAAssets under usage is async, so calculate here in realtime", `jetstream_cluster.go:7912–7935`,
+v2.14.6) and, when `jetstream { limits { max_ha_assets } }` is set, **discards a peer whose reported
+count exceeds it** — `Peer selection: discard <name>@<cluster> (HA Asset Count: N) exceeds max ha asset
+limit of M for stream placement` (`:8031–8035`; the count includes the `_meta_` group, "hence > and
+not >="). For a replicated stream the remaining peers are then sorted preferring fewer HA assets
+(`:8087–8088`). The same limit is checked again when the group is created: `Maximum HA Assets limit
+reached: M` and `system limit reached` to the caller (`:2953–2959`). What an HA asset is, and the
+maintainers' 2k-per-server figure, are on [[jetstream-sizing]] and [[metrics]] (source:
+[[s-nats-server-traffic-counters-and-ha-assets]], [[s-gh-5128-ha-assets]]).
+
+
 ## Related
 
 [[replicas]] · [[raft-in-nats]] · [[stream]] · [[error-codes]] · [[js-api-subjects]] ·
@@ -240,4 +254,4 @@ permitted in placement` (`stream.go:2276`). Free to change by update (not exerci
 
 [[s-docs-placement]] · [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] ·
 [[s-gh-7982-no-suitable-peers]] · [[s-adr-7-server-error-codes]] · [[s-docs-scaling-and-peers]] ·
-[[s-natscli-backup-restore]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]]
+[[s-natscli-backup-restore]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]]

@@ -6,7 +6,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [message-lag, log-warnings, publish, backpressure, puback, replicas, raft]
 aliases: ["has high message lag", "high message lag", "JetStream warnings in the log", "streamLagWarnThreshold"]
-sources: [s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-replication-and-r3, s-docs-monitoring-jetstream-health, s-gh-5859-unexpected-nats-timeout, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.10]
+sources: [s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-replication-and-r3, s-docs-monitoring-jetstream-health, s-gh-5859-unexpected-nats-timeout, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -213,6 +213,17 @@ sourcing consumer; the fix is in the 2.15 preview (#8384). Details on [[mirrors-
 (source: [[s-gh-6005-sourcing-memory-stream-restart]], [[s-relnotes-2.10]]).
 
 
+## The series
+
+The meta layer's accepted-but-unapplied count is `gnatsd_varz_jetstream_meta_pending` (exporter
+v0.20.2, `-varz`, from `/varz` → `jetstream.meta.pending`), with `_meta_pending_requests` and
+`_meta_pending_infos` beside it; surveyor's nearest is `nats_core_jetstream_api_pending`. A mirror's or
+source's lag is `jetstream_stream_mirror_lag` / `jetstream_stream_source_lag` — on the node that holds
+the mirror, and an R1 mirror is on exactly one. **A stream's own replica lag has no series**: `/jsz?raft=1`
+reports it in `replicas[].lag`, an array neither tool flattens. Names and labels on [[metrics]]
+(source: [[s-prometheus-nats-exporter-metrics-observed]]).
+
+
 ## To verify
 
 - **`since:` is deliberately absent.** The `has high message lag` warning appears in no release body from v2.10.0 to v2.14.6 (the word *lag* occurs once, in v2.12.5's `/jsz` consistency fix); its threshold is read from the v2.14.6 source, and the release that introduced the warning is not in any source read.
@@ -232,4 +243,4 @@ sourcing consumer; the fix is in the 2.15 preview (#8384). Details on [[mirrors-
 - [[s-nats-server-jetstream-resources]] — the out-of-resources line's two callers.
 - [[s-docs-replication-and-r3]] — quorum commit and what a `PubAck` promises.
 - [[s-docs-monitoring-jetstream-health]] ·
-[[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.10]]
+[[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]]

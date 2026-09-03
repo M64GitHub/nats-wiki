@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-09-03
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -483,6 +483,17 @@ From the release bodies (source: [[s-relnotes-2.12]]):
 ([[nats-server-2.15-preview]]).
 
 
+## `max_ha_assets`, measured
+
+The value `jetstream { limits { max_ha_assets } }` is compared with is the server's `ha_assets` — the
+number of Raft groups it runs, **including the meta group** (`jetstream.go:2623`, v2.14.6; no default,
+0 is unlimited). It is enforced when a group would be created (`Maximum HA Assets limit reached`,
+`system limit reached` to the caller) and at placement, where a peer above it is discarded
+(`jetstream_cluster.go:2953–2959`, `8031–8035`). The maintainers' operating figure is 2,000 per server;
+the series to trend it is `gnatsd_varz_jetstream_stats_ha_assets` ([[metrics]], [[jetstream-sizing]];
+source: [[s-nats-server-traffic-counters-and-ha-assets]], [[s-gh-5128-ha-assets]]).
+
+
 ## Related
 
 [[defaults-and-limits]] · [[jetstream-sizing]] · [[replicas]] · [[stream-placement]] ·
@@ -500,4 +511,4 @@ From the release bodies (source: [[s-relnotes-2.12]]):
 [[s-docs-accounts-and-multitenancy]] · [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-hardening]] · [[s-docs-rolling-upgrades]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-nats-server-route-cluster-formation]] · [[s-nats-server-systemd-units]] ·
 [[s-nats-server-mqtt-websocket-observed]] · [[s-docs-websocket-tls-and-proxies]] ·
 [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] ·
-[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]]
+[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]]

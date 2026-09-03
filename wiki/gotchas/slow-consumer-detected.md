@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -166,7 +166,13 @@ Each of these is a hypothesis. None is sourced.
   back rather than the reader being dropped. Whether any per-connection field records *this connection
   was disconnected as a slow consumer* is still unread; the rest of the `/connz` response schema has
   not been gone through field by field. See [[monitoring-endpoints]].
-- Whether the Prometheus exporter emits a per-connection or per-account slow-consumer metric.
+- ~~Whether the Prometheus exporter emits a per-connection or per-account slow-consumer metric.~~ —
+  **answered 2026-09-03**: per account **yes**, `gnatsd_accstatz_slow_consumers{account_name="…"}`
+  (`-accstatz`, one sample per account including `$SYS`); per server `gnatsd_varz_slow_consumers`,
+  `gnatsd_varz_slow_consumer_stats_clients` / `_routes` / `_gateways` / `_leafs` and
+  `gnatsd_varz_stalled_clients`; per connection **no** — `-connz_detailed` exports `pending_bytes`,
+  the traffic counters, `rtt` and `idle` per `cid`, and no slow-consumer or stall field. Names and
+  labels on [[metrics]] (source: [[s-prometheus-nats-exporter-metrics-observed]]).
 - Whether the server logs the connection id or client name at a higher debug level, as it does for
   [[no-suitable-peers-for-placement|peer selection]] — `debug` is reloadable
   ([[config-keys]]), so this is cheap to test on a running server.
@@ -273,4 +279,4 @@ diffing the default reports at v2.10.29 and v2.11.17 (source: [[s-relnotes-2.11]
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]]
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]]

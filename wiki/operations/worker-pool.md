@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -191,6 +191,18 @@ removed on a WorkQueuePolicy stream when consumers did not cover the entire subj
 (#6003). Below 2.10.22, a lost or stuck work item may be the server's fault before the workers'.
 
 
+## The series to watch
+
+Four series on [[metrics]] describe a pool from outside (exporter v0.20.2 names, `-jsz=all`):
+`jetstream_consumer_num_pending{is_consumer_leader="true"}` is the backlog — the leader's copy only,
+the replicas print 0; `jetstream_consumer_num_ack_pending` against the configured `max_ack_pending`
+says how close the pool is to the shared ceiling above; `jetstream_consumer_num_waiting == 0` for a
+pull consumer means **nobody is fetching**, which is what a stalled pool looks like from the server;
+`jetstream_consumer_num_redelivered` counts messages currently outstanding on a second or later
+delivery — a level, not a rate, and the max-deliveries drop itself has no series (source:
+[[s-prometheus-nats-exporter-metrics-observed]]).
+
+
 ## Related
 
 [[consumer]] · [[ack-and-redelivery]] · [[stream]] · [[retention-policies]] · [[priority-groups]] ·
@@ -199,4 +211,4 @@ removed on a WorkQueuePolicy stream when consumers did not cover the entire subj
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]]

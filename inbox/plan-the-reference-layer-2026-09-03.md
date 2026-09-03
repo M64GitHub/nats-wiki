@@ -220,7 +220,7 @@ if one exists (`storage type`, `cannot change`, `stream edit`), `own` otherwise.
 marked ingested. Index, log, lint. Report the fixed/one-way/free counts for both tables, and what the
 `batch: 300` run returned.
 
-## Step 3 — `reference/metrics` · status: open
+## Step 3 — `reference/metrics` · status: done 2026-09-03 — both tools installed at their tags (exporter v0.20.2, surveyor v0.9.11, `go version -m`), the collector source cached and extracted, thirteen scrapes on the lab (`metrics-observed-v0.20.2.md` with two scripts, `metrics-observed-v0.9.11.md` with a source appendix), `traffic-counters-and-ha-assets-v2.14.6.md`, gh#2818 / #3857 / #6182 / #5128 and exporter issue #218 promoted; nine summaries (335 → 345 pages); the page (167 exporter series by collector, 105 surveyor series, the alert table, the leader-only `num_pending` rule, exact counters, `ha_assets`); 16 pages rippled; docs issues **#76–#78** (a new destination, `nats-surveyor`); three tool-code behaviours noted for the tool repos; rows 139, 153, **129 filled** (the page states the series per condition with versions; the runbook stays with G6), seven rows gain the page, row 165 added — bank 131 / 165; lint 0 · 0, wanted 0
 
 *Operation: ingest*, seven summaries at most. **Install** the exporter at the entity's tag:
 `go install github.com/nats-io/prometheus-nats-exporter@v0.20.2`, and try

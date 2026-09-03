@@ -214,7 +214,7 @@ exists to answer live in `inbox/question-bank.md`.
 
 ## Reference
 
-*Lookup tables: defaults and limits, config keys, `$JS.API` subjects, monitoring endpoints.*
+*Lookup tables: defaults and limits, config keys, `$JS.API` subjects, monitoring endpoints, metrics.*
 
 - [[defaults-and-limits]] — every default the server uses when you set nothing, each read from the
   v2.14.6 source with file and line, or from a cited docs page.
@@ -236,6 +236,11 @@ exists to answer live in `inbox/question-bank.md`.
   the default the server applies, the minor it arrived in, whether it can change after creation (with
   the refusal string), the CLI flag, and the rule that bites; the limits that clamp a consumer; which
   clock stamps a message; the pull `batch` that has no ceiling.
+- [[metrics]] — every series `prometheus-nats-exporter` v0.20.2 emits from a 2.14.6 server, by collector,
+  with the endpoint field, labels and type of each; the two default prefixes (`gnatsd_`, `jetstream_`)
+  and the one flag that renames both; surveyor's 105 names and its `--prefix` that does nothing; which
+  node's exporter to read (`num_pending` is 0 off the consumer leader); the series behind the alerts and
+  what has none; the exact counters; `ha_assets`.
 
 ## Entities
 
@@ -508,6 +513,10 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-config-mutability-observed]] — three passes of raw API updates on 2.14.6: every refusal
   string, what sealing forces, an ephemeral's defaults, `subjects_filter`, and a pull of `batch: 300`
   served in full.
+- [[s-nats-server-traffic-counters-and-ha-assets]] — the counters `/varz` and `/connz` report are atomic
+  and count payload bytes; a follower's consumer info takes `num_ack_pending` from the replicated state but
+  `num_pending` from a function that returns 0 unless leader; `ha_assets` is the Raft-node count (meta group
+  included) and `max_ha_assets` is checked at group creation and at placement.
 
 **The `nats.go` client source**
 
@@ -752,6 +761,14 @@ exists to answer live in `inbox/question-bank.md`.
   gateways, and there is no `LEAFNODE.DISCONNECT`.
 - [[s-gh-3944-subjects-in-a-stream]] — which subjects a stream holds: `subjects_filter` on `STREAM.INFO`,
   and "everything except X" as a `filter_subjects` list.
+- [[s-gh-2818-counters-exact-or-sampled]] — "Yes that is correct": the traffic counters are exact — and per
+  server; "nats top is not cluster aware".
+- [[s-gh-3857-consumer-pending-series]] — the maintainer's definition of `num_pending`, and a 2023 "not sure
+  that metric is there" the wiki's runs answer: both tools export it, leader only.
+- [[s-gh-6182-what-to-alert-on]] — seven alert targets asked for a 2.10.19 cluster, zero replies; mapped to
+  series on `metrics`.
+- [[s-gh-5128-ha-assets]] — "we generally focus on HA Assets": 2k per server in Synadia's global clusters,
+  muxed streams and R1 mirrors, R1 consumers recreated from a stored sequence.
 
 **Synadia blog (continued)**
 
@@ -861,6 +878,18 @@ exists to answer live in `inbox/question-bank.md`.
   timing with zero slack, the reloader's `/etc/`-only watch, `configChecksumAnnotation`, the
   JetStream storage block with no `hostPath` value anywhere in it, and `max_file_store` rendered
   equal to the PVC size.
+**prometheus-nats-exporter and nats-surveyor**
+
+- [[s-prometheus-nats-exporter-collector]] — the v0.20.2 source: `gnatsd` and `jetstream` namespaces, the
+  flattening rule and what it drops, 33 JetStream series with seventeen labels, the `/jsz` query each `-jsz`
+  value sends, `healthz_status` inverted, no `js-meta-only`, the inverted "defaulting to varz" test.
+- [[s-prometheus-nats-exporter-metrics-observed]] — ten scrapes on 2.14.6: 167 series, 135 of 139 core ones
+  gauges, `-prefix nats` renaming all, an R1 stream visible on one node, `num_pending` 20 / 0 / 0 across the
+  replicas, no-flags fatal, `-jsz` alone adding `varz`, `account=""` for `$G` clients.
+- [[s-nats-surveyor-metrics-observed]] — three scrapes at v0.9.11: 105 series under a hard-coded `nats`
+  namespace, `--prefix` a `// TODO`, one sample per replica unless `--jsz-leaders-only`, the `raftz` series
+  with shifted labels, and the coverage the exporter lacks.
+
 
 **GitHub issues — `nats-io/nats-server`**
 
@@ -868,6 +897,9 @@ exists to answer live in `inbox/question-bank.md`.
   reservation; **open since 2023-06-29** with an unanswered counter-example.
 - [[s-issue-8322-dynamic-maxstore-shrinks]] — the auto-sized `max_file_store` ratcheting downwards at
   every restart, reported twice two years apart, fixed by PR #8503 in **2.14.6**.
+- [[s-exporter-issue-218-num-pending-differs-per-node]] — `nats-io/prometheus-nats-exporter` #218, open and
+  unanswered since 2023: `nats_consumer_num_pending` 3 / 0 / 3 across the pods, the reporter settling on
+  `is_consumer_leader="true"`; reproduced on 2.14.6 and explained from the server source.
 
 **GitHub, CNCF and the repositories**
 

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-surveyor-metrics-observed]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -477,6 +477,19 @@ are on [[stream-leader-keeps-moving]].
   (source: [[s-relnotes-2.15-preview]]).
 
 
+## The Raft numbers as series
+
+`prometheus-nats-exporter` exports nothing of `/raftz`; `nats-surveyor` v0.9.11 fills the gap in two
+ways (source: [[s-nats-surveyor-metrics-observed]]). From the meta block every `STATSZ` carries:
+`nats_core_jetstream_cluster_raft_group_leader` (1 on the meta leader), `_size`, `_replicas` and, from
+the leader only, one sample per peer of `_replica_peer_current`, `_replica_peer_offline` and
+`_replica_peer_active` (nanoseconds since last contact — "very large values may imply raft is
+stalled"). With `--raftz`, the meta group's `nats_core_raftz_meta_committed`, `_applied` and `_pindex`
+— whose `cluster_name` and `server_id` labels are shifted at v0.9.11 (read them by `server_name`).
+Nothing exports a stream's or consumer's own group; `/raftz?acc=…&group=…` on [[monitoring-endpoints]]
+remains the way. Names on [[metrics]].
+
+
 ## Related
 
 [[replicas]] · [[stream-placement]] · [[stream]] · [[consumer]] · [[monitoring-endpoints]] ·
@@ -497,4 +510,4 @@ are on [[stream-leader-keeps-moving]].
 [[s-docs-scaling-and-peers]] · [[s-docs-your-first-cluster]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7463-jetstream-corruption]] ·
 [[s-nats-server-lame-duck]] · [[s-synadia-jetstream-memory-patterns]] ·
-[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-surveyor-metrics-observed]]
