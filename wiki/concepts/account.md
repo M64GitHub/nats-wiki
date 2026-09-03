@@ -2,11 +2,12 @@
 title: Account
 type: concept
 area: [security, jetstream, core]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [account, multitenancy, "$G", "$SYS", system_account, no_auth_user, 10039, isolation]
 aliases: [account, accounts, tenant, multitenancy, "$G", "$SYS", system account, global account]
-sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client, s-docs-auth-callout, s-docs-authentication-basics, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-config-management, s-docs-decentralized-auth, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-hardening, s-docs-leaf-nodes, s-docs-putting-it-together, s-docs-security-checklist, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-5941-restrict-leafnode-subjects, s-gh-7017-kv-across-accounts, s-gh-7505-auth-callout-nkey, s-gh-7834-leafnode-same-js-domain, s-gh-7854-jwt-push-timeout, s-issue-4281-insufficient-storage, s-nats-server-leafnode-js-domains, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client, s-docs-auth-callout, s-docs-authentication-basics, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-config-management, s-docs-decentralized-auth, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-hardening, s-docs-leaf-nodes, s-docs-putting-it-together, s-docs-security-checklist, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-5941-restrict-leafnode-subjects, s-gh-7017-kv-across-accounts, s-gh-7505-auth-callout-nkey, s-gh-7834-leafnode-same-js-domain, s-gh-7854-jwt-push-timeout, s-issue-4281-insufficient-storage, s-nats-server-leafnode-js-domains, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -356,6 +357,10 @@ one account user — though a listener-scoped username or token cannot be combin
 
 ## Version notes: the 2.10 line
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch accounts from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - `$SYS.REQ.USER.INFO` is since 2.10.0 (#3671); `no_auth_user` may name an nkey user since 2.10.8
   (#4938); several `trusted_operators` in one config file since 2.10.21 (#5896) (source:
   [[s-relnotes-2.10]]).
@@ -413,6 +418,17 @@ one account user — though a listener-scoped username or token cannot be combin
   assets between accounts. A maintainer says so in [[s-gh-4535-unauthenticated-connections]] and the
   commands exist at natscli v0.4.0 ([[s-natscli-account-tls]]); no docs page describes the use.
 
+### The 2.14 line
+
+**2.14.3**: inherited JWT default permissions are refreshed when account claims are updated (#8276);
+external auth config cleared on a claims update (#8275); `NoAuthUser` checks connection restrictions;
+`/accstatz` no longer omits accounts with only leaf connections (2.14.2, #8252) (source:
+[[s-relnotes-2.14]]). **2.14.4**: `healthz` skips expired JWT accounts (#8379); JWT validation no
+longer crashes the server on whitespace-only permissions; a resolver whose parent directory is
+missing no longer panics at startup (2.14.3, #8329). **2.14.6**: consumer tiers distinguished when
+enforcing account limits (#8484).
+
+
 ## Related
 
 [[nats-server]] · [[stream]] · [[error-codes]] · [[config-keys]] · [[monitoring-endpoints]] ·
@@ -437,4 +453,4 @@ one account user — though a listener-scoped username or token cannot be combin
 [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7017-kv-across-accounts]] ·
 [[s-gh-7505-auth-callout-nkey]] · [[s-gh-7834-leafnode-same-js-domain]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-issue-4281-insufficient-storage]] ·
-[[s-nats-server-leafnode-js-domains]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-nats-server-leafnode-js-domains]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

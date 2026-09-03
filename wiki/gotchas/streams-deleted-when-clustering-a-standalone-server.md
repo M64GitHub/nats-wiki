@@ -2,13 +2,14 @@
 title: "streams deleted when clustering a standalone server"
 type: gotcha
 area: [topology, jetstream, deploy]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [orphan, standalone, cluster, migration, data-loss, meta-layer]
 aliases: ["orphaned streams", "streams marked orphan", "standalone to cluster", "R1 to R3 migration"]
 sources: [s-gh-7831-standalone-to-cluster, s-docs-raft-and-leaders, s-docs-surviving-node-loss, s-nats-server-jetstream-cluster]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # "streams deleted when clustering a standalone server"

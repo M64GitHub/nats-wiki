@@ -2,6 +2,7 @@
 title: "JetStream slows down as the consumer count grows"
 type: gotcha
 area: [jetstream, deploy, monitoring]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [consumer-count, consumer-info, meta-leader, raft-traffic, subject-filters, republish]

@@ -9,7 +9,7 @@ tags: [connect_urls, no_advertise, client_advertise, seed-urls, loadbalancer, ku
 aliases: ["seed URLs", "server discovery", "connect_urls", "no_advertise", "client_advertise", "LoadBalancer vs seed URLs", "client connection URLs"]
 sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls, s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # How clients reach a cluster
@@ -192,6 +192,10 @@ the *proxy* presents the certificate; whether the listener itself runs TLS is de
 and never picks 4222 — a bare host becomes `wss://host:443`, `ws://host` becomes port 80, and
 `nats://host:4222` keeps the port while losing the scheme, sending a WebSocket handshake to the plain
 client port. The failure looks like the server being down.
+
+## To verify
+
+- **`since:` is deliberately absent.** `client_advertise`, `no_advertise` and INFO-driven discovery are dated by no release body from v2.10.0 to v2.14.6 (the first body naming discovery at all is v2.14.0's `ignore_discovered_servers`), and the docs' generated config reference carries no *since* for them.
 
 ## Related
 

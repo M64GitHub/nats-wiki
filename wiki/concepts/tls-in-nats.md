@@ -2,11 +2,12 @@
 title: TLS in NATS
 type: concept
 area: [security, deploy, topology]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, mtls, verify, verify_and_map, handshake_first, tls_timeout, encryption-at-rest, prev_key, tls_cert_not_after]
 aliases: [tls, mtls, mutual tls, verify_and_map, handshake_first, encryption at rest, tls block, certificates]
-sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -251,6 +252,10 @@ What fixes that is a `tls {}` block carrying the right `ca_file`, not one added 
 
 ## Version notes: which key arrived when
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch TLS from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 | key | since | note |
 |---|---|---|
 | leafnode `handshake_first` | 2.10.0 (#4119) | 2.10.1 fixes a remote with no `tls` block (#4565) |
@@ -294,6 +299,19 @@ OCSP fixes along the line: staple resumption for gateways after a certificate re
   logs that TLS is required (#8420).
 
 
+### The 2.14 line
+
+- **2.14.1**: client certificates "without subject DNs but with DNS subject alternate names" are
+  permitted (#8100); TLS handshake timeouts and non-TLS record errors logged at debug (#8096); TLS
+  listeners work with the PROXY protocol (#8130); in-process connections no longer revert to
+  TLS-required on an async `INFO` (#8205) (source: [[s-relnotes-2.14]]). **2.14.3**: PROXY detection,
+  TLS sniffing with `allow_non_tls` and v1 address-family parsing fixed (#8302); OCSP loops release
+  their timers (#8204).
+- **2.14.4 — an authentication bypass**: "Fixed an authentication bypass with TLS `verify_and_map`
+  authenticating users with blank passwords" (no CVE id in the body; the same fix as 2.12.14);
+  `allow_non_tls` no longer logs that TLS is required at startup (#8420).
+
+
 ## Related
 
 [[rotate-tls-certificates]] · [[account]] · [[subject-permissions]] · [[operator-mode]] ·
@@ -308,4 +326,4 @@ OCSP fixes along the line: staple resumption for gateways after a certificate re
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
 [[s-natscli-account-tls]] · [[s-adr-35-filestore-compression]] ·
-[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

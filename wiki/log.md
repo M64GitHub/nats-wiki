@@ -3937,3 +3937,131 @@ table, *Which patch to be on*, *The docs' upgrade guide against the bodies*).
 `subject-transforms`, `nats-server-2.14` (the 2.12 twins); the 2.11 summary's forward link to the
 2.12 summary restored; index line. Bank unchanged at 119 / 158. Unlanded 0; lint clean, 315 pages,
 drift 0. Docs issues 53 → 60 over steps 3–5.
+
+## 2026-09-03 — ingest: the 2.14 line, v2.14.0 → v2.14.6, and the 2.15 preview (phase D, step 6)
+
+The seven 2.14 bodies read as one changelog into `s-relnotes-2.14`, folding the three per-patch
+summaries (`s-relnotes-2.14.0`, `-2.14.1`, `-2.14.4`) by reference; the v2.15.0-preview.1 body read
+whole into `s-relnotes-2.15-preview`. Both checked against the docs' 2.14 upgrade guide
+(`s-docs-upgrade-to-2.14`): every guide feature is in the v2.14.0 body except "sourcing streams can
+now perform deduplication when fanning in multiple sources" (in no body; kept as the guide's claim,
+marked as such on `nats-server-2.14`), and the guide's frozen-stream / `write error` account is its
+own wording for #7788. The guide omits `ignore_discovered_servers`, the `404 No Messages` change
+(#7466 — also listed by 2.11.11), the divergent-consumer-state reset, the info-API deprioritisation
+and every patch. The keys and subjects the bodies introduce were **verified in the server source**
+and the excerpts recorded in `raw/nats-server-src/feature-flags-dial-timeout-and-2.15-subjects.md`
+(manifest row extended): `dial_timeout` at both levels with its `DEFAULT_ROUTE_DIAL` = `1s` fallback
+(`opts.go`, `const.go`, `leafnode.go` at v2.14.6); `feature_flags.go` at v2.14.6 — exactly two
+flags, `js_ack_fc_v2` and `js_raft_delete_range`, both `false`, the second with a source warning that
+older peers panic — and at the preview tag a third, `js_snapshot_sources`, with **`js_ack_fc_v2`
+still `false`** ("Enabled: TBD"), so the v2.14.0 body's "enabled by default in v2.15" has not
+happened in the preview; `$JS.API.CONSUMER.RESET` at `jetstream_api.go:159`; the preview's
+`$JS.API.STREAM.CANCEL_MOVE.<stream>` (account-level, rolls back any in-flight desired state),
+`$JS.API.STREAM.PEER.EVACUATE.<stream>`, `$JS.API.SERVER.EVACUATE` and `$JS.API.META.RESCUE`
+(system account), none of which exist at v2.14.6; the `AckFlowControl` constraints
+(`consumer.go:758–780`). Three docs gaps → **docs issues #61** (`dial_timeout` documented nowhere),
+**#62** (`reference/config/feature_flags.md` names no flag; the panic warning on
+`js_raft_delete_range` is documented nowhere), **#63** (`$JS.API.CONSUMER.RESET` absent from the
+consumer API index). The change layer: no default moved in 2.14 — what moved is behaviour (info
+APIs deprioritised #7898, Raft refusing to start on a bad snapshot #7566 …, overrun stepdown #7853,
+JSONP removed 2.14.3, the 4096-slot semaphore 2.14.4, R > 1 updates rejected non-clustered 2.14.6
+#8464, the reservation ratchet 2.14.6 #8503) and the keys that arrived (`feature_flags`,
+`ignore_discovered_servers`, reloadable `remotes`, `max_concurrent_io`, `dial_timeout`, the
+`in_client_*` counters); *Which patch to be on* on the 2.14 entity (2.14.1 consumer accounting,
+2.14.3 counters/compression/encryption and the security batch, 2.14.4 `verify_and_map`, 2.14.5
+#8449, 2.14.6 #8488 / #8491 / #8503); the 2.12 twins (2.14.1–2.14.5 = 2.12.9, .10, .12, .14, .15;
+2.14.6 has none). The 2.15 entity's *To verify* rewritten (the body is read whole; the backup v2
+format and #8429 known from one sentence each; no date; nothing says whether `js_ack_fc_v2` flips
+before 2.15.0). `inbox/relnotes-toc.md` regenerated: every 2.14 row and the preview row now carry a
+summary link (7 + 1 with a summary; 26 ★ unchanged).
+
+**Ripple: 46 pages.** `nats-server-2.14` (*The seven releases, from the bodies*, *Which patch to be
+on*, *The docs' upgrade guide against the bodies*; two lines corrected), `nats-server-2.15-preview`
+(*The preview body, read whole*), `upgrade-a-cluster` (*The 2.14 line*, *The 2.15 preview*),
+`consumer`, `ack-and-redelivery`, `stream`, `retention-policies`, `mirrors-and-sources`,
+`publishing`, `message-scheduling`, `key-value`, `direct-get`, `replicas`, `raft-in-nats`,
+`meta-layer`, `filestore-layout`, `js-api`, `js-api-subjects` (the preview's four subjects verified
+at the tag), `leafnode` (`dial_timeout` with file and line), `gateway`, `tls-in-nats`,
+`auth-callout`, `account`, `subject-permissions`, `cross-account-sharing`, `mqtt`, `websocket`,
+`monitoring-endpoints` (*What arrived in 2.14*), `defaults-and-limits` (*Defaults that moved during
+2.14*), `config-keys` (*Keys that arrived during 2.14*), `error-codes` (the `AckFlowControl`
+refusals), `jetstream-sizing`, `jetstream-out-of-disk`, `jetstream-recovery-is-slow`,
+`consumer-keeps-redelivering` (2.14.2–2.14.6 beyond the table), `stream-leader-keeps-moving`
+(overrun stepdown as a deliberate cause), `stream-placement`, `backup-and-restore-jetstream`,
+`reload-server-config`, `install-nats-server`, `run-nats-behind-a-proxy`, `rebalance-streams`,
+`disaster-recovery`, `evict-a-sick-server`; `verified-on` re-set to 2026-09-03 on the five pages
+whose keys or subjects were checked in the source (`leafnode`, `config-keys`, `defaults-and-limits`,
+`js-api-subjects`, `js-api`) and on the two release entities; index lines for both summaries and the
+docs-issues bullet recounted (63: 55 `nats-docs`, 6 ADR repo, 1 `natscli`, 1 blog). Bank unchanged at
+119 / 158 — no open row is closed by release notes alone; rows 63, 64, 130, 14, 9, 13, 76, 91, 139
+gain material. Unlanded 0; lint clean, **317 pages**, drift 0, staleness 0. Docs issues 60 → 63.
+
+## 2026-09-03 — the `since:` sweep over the reader layer (phase D, step 7)
+
+The measured half of the change layer. A script listed every page under `concepts/`, `internals/`,
+`operations/`, `gotchas/` and `reference/` with `verified-against` and no `since:` — **55** (three of
+them with an empty `since: []`). For each, the 2.10 release bodies were grepped for the page's
+subject: a fix to the subject in a 2.10.x body proves it present at 2.10, the oldest line this wiki
+covers, which is what `since: [2.10]` means here (the plan's convention; the frontmatter line now
+carries the comment *present at 2.10, the oldest line this wiki covers; not the arrival* so no reader
+takes it for a birth date). **47 pages** got `since: [2.10]`; on the 21 concept and internals pages
+among them a *Since* line at the head of *Version notes* says so in words, names the first 2.10.x
+body that patches the subject and cites `s-relnotes-2.10`; `subject-transforms` states the one real
+arrival — stream-level transforms, republish on mirrors and sources and the partition function are
+*Added* in v2.10.0 (#3814 …) while account-level mapping is older. **8 pages** could not be dated
+from any source read and keep no `since:`, each with a one-line `## To verify` item saying why:
+`jetstream-domain`, `cross-domain-sourcing` and `streams-not-visible-across-a-leafnode` (domains are
+first patched in v2.12.5; no body records their arrival), `object-store` (no body names it; ADR-20
+gives no server version), `ordered-consumer` (ADR-17 gives none; v2.11.2 is the first body to mention
+them), `how-clients-reach-a-cluster` (`client_advertise` / `no_advertise` dated by nothing read),
+`kv-watchers-stall-the-cluster` (watchers named only in v2.11.5) and `stream-has-high-message-lag`
+(the warning appears in no body). The pre-existing 17 pages with a `since:` were left as they were,
+including `websocket`'s `[2.11]`, which the page justifies (the cookie settings). Residue **55 → 0**
+by the script's measure (a page has `since: [x]`, or the `## To verify` reason). Lint clean, 317
+pages, drift 0, unlanded 0.
+
+## 2026-09-03 — the default change layer: `check-defaults.py` at v2.10.29, v2.11.17, v2.12.15 (phase D, step 8)
+
+`python3 tools/check-defaults.py --tag v2.10.29 / v2.11.17 / v2.12.15` (the last patch of each line;
+tarballs cached under `.cache/`), three reports in `inbox/` beside the v2.14.6 one, unregistered as
+the plan says. Totals, disagree / unresolved / agree of 216 documented defaults: **v2.10.29 13 / 37 /
+166 · v2.11.17 14 / 29 / 173 · v2.12.15 14 / 27 / 175 · v2.14.6 15 / 26 / 175**. The *server* column
+diffed in sequence:
+
+| hop | resolved value moved | keys that become resolvable (arrivals) | keys that become unresolvable |
+|---|---|---|---|
+| v2.10.29 → v2.11.17 | none | `jetstream.max_buffered_msgs` = 10,000 and `max_buffered_size` = 128 MB (2.11.0 #5796); `jetstream.strict` unset = off (2.11.0); `mqtt.js_api_timeout` = 5s (2.11.3); `websocket.ping_interval` → global 2m (2.11.12 #7614); `cluster` / `gateway` / `leafnodes.write_deadline` → global 10s (parsed at v2.11.17, announced only by 2.12.1 #7405) | — |
+| v2.11.17 → v2.12.15 | **`jetstream.max_buffered_msgs` 10,000 → 100,000** (2.12.0 #6633, confirmed by the body; docs print the 2.11 value — #22) | `jetstream.limits.batch.max_inflight_per_stream` = 50, `max_inflight_total` = 1,000, `max_msgs` = 1,000 (2.12.0, ADR-50; all agree with the docs) | `jetstream.strict` — 2.12 inverted the option (`NoJetStreamStrict = !v`), the mechanism of "on by default" |
+| v2.12.15 → v2.14.6 | none | `jetstream.info_queue_limit` → `request_queue_limit` = 10,000 (2.14.0 #7898, the key unnamed in the body; docs print 100,000 — #22) | — |
+
+So the archive's one default that *moved* on a documented key is `max_buffered_msgs`, and it was
+already in the bodies and on the pages; the rest of the diff is arrivals, which is the change layer
+the resolver can see — the semaphore, `dial_timeout` and the feature-flag defaults are keys whose
+defaults the docs never state, so the reports are blind to them (they are on the pages from step 6).
+One finding the diff produced that the bodies could not: **docs issue #64** — five generated pages
+say "Available since NATS Server `2.12`" for keys the 2.11 line parses (`write_timeout` 2.11.11,
+`websocket.ping_interval` 2.11.12, the three block-level `write_deadline` at v2.11.17), verified in
+`opts.go` at v2.11.17 and v2.10.29 and recorded in
+`raw/nats-server-src/backported-keys-v2.11.17.md` (manifest row extended). A second product:
+`info_queue_limit` had been missed in step 6 because the 2.14.0 body names the queue and not the
+key; now on `s-relnotes-2.14`, `config-keys` and `defaults-and-limits`. Ripple: the four release
+entities each gain *The default diff at v2.x.y*; `slow-consumer-detected` gains the #64 note. The
+older tags' extra *unresolved* rows are the keys their parsers lack, not resolver gaps — reported,
+not papered over. Lint clean.
+
+## 2026-09-03 — phase D closed: the change layer (step 9)
+
+Grep-verified: each of the five release entities cites its `s-relnotes-*` summary in `sources:` and
+in the body (2.10 ×9, 2.11 ×6, 2.12 ×8, 2.14 ×6, 2.15-preview ×3 links) and no "not a changelog"
+note remains. Bank rows **159** (which patch of a minor to be on, and what each fixed) and **160**
+(when a key, default, subject or header arrived) added as `own` — the discussions index and the
+comment cache were searched for *release notes*, *changelog*, *what's new*, *which version*, *patch
+release* and hold only gh#3778 (row 63) and a maintainer's "be current with the latest version and
+patched release" — and both answered on arrival by the release entities' *Which patch to be on*
+sections and the reference tables' per-minor *Defaults that moved* / *Keys that arrived*. Bank 119 /
+158 → **121 / 160**, `own` 11. Nothing struck in the backlog (no section is this phase's). The plan's
+result line written. Over the phase (two sessions, 2026-09-03): 70 release bodies, the TOC, five
+per-minor summaries, five entities rewritten, ~170 version-note sections, `since:` on every reader
+page with `verified-against` (47 + 8 reasons, residue 0), three default reports and the diff, docs
+issues #54–#64, the subject-tree correction; 310 → 317 pages, bank 116 / 137 → 121 / 160, docs issues
+53 → 64, unverified 12 (unchanged), lint clean at drift 0 · unlanded 0 · staleness 0 behind 2.14.6.

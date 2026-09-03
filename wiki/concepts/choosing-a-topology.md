@@ -2,13 +2,14 @@
 title: Choosing a topology
 type: concept
 area: [topology, deploy, jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [topology, route, gateway, leafnode, supercluster, multi-region, decision, quorum]
 aliases: [which topology, cluster vs gateway vs leafnode, leafnode or gateway, topology decision, super-cluster or leafnode]
-sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-4823-leafnode-supercluster-duplicates, s-nats-server-jetstream-cluster]
+sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-4823-leafnode-supercluster-duplicates, s-nats-server-jetstream-cluster, s-relnotes-2.10]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Choosing a topology
@@ -148,6 +149,12 @@ question-bank row **Q103**.
 6. **Odd server counts, always** — an even count tolerates the same single failure at the cost of an
    extra server (source: [[s-docs-jetstream-in-a-cluster]]).
 
+## Version notes
+
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch routes, gateways and leafnodes from v2.10.12 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 ## Related
 
 [[leafnode]] · [[gateway]] · [[jetstream-domain]] · [[multi-region-jetstream]] ·
@@ -160,7 +167,7 @@ question-bank row **Q103**.
 [[s-docs-jetstream-in-a-cluster]] · [[s-gh-6328-jetstream-behind-gateways]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-topology]] ·
 [[s-gh-7494-supercluster-degradation]] ·
-[[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-nats-server-jetstream-cluster]]
+[[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]]
 
 ## To verify
 

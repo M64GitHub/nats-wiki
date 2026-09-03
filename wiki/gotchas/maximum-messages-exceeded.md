@@ -2,6 +2,7 @@
 title: "maximum messages exceeded (10077) on publish"
 type: gotcha
 area: [jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10077, discard, DiscardNew, max_msgs, max_bytes, max_msgs_per_subject, purge, workqueue]

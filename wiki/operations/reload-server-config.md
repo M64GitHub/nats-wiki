@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [reload, SIGHUP, dry-run, include, reloader, configmap, accounts, max_subscriptions]
 aliases: [reload, SIGHUP, "config reload", "reload config", "add an account", "nats-server --signal reload"]
-sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry, s-docs-cross-account, s-docs-putting-it-together, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-config-management, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-hardening, s-docs-accounts-and-multitenancy, s-nats-server-topology, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-gh-7684-certificate-expiry, s-docs-cross-account, s-docs-putting-it-together, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -312,6 +312,15 @@ all fall on that side.
 The practical rule: treat any `websocket {}` change except a certificate path as a **restart**, and
 make certificate rotations their own edit. See [[websocket]] and [[run-nats-behind-a-proxy]].
 
+## Version notes: the 2.14 line
+
+**2.14.0**: **`leafnodes { remotes }` can be added and removed by reload** (#7937) — a new remote no
+longer needs a restart; `feature_flags` is a new top-level block, and the docs mark it *Requires
+Restart* (source: [[s-relnotes-2.14]]). **2.14.4**: `/varz` reports the JetStream limits after a
+reload changed them (#8394) — before it, `max_file_store` raised by reload (2.12.7) was applied but
+not shown. **2.14.5**: `dial_timeout` arrives; whether it reloads was not tested.
+
+
 ## Related
 
 [[install-nats-server]] · [[upgrade-a-cluster]] · [[rebalance-streams]] · [[config-keys]] ·
@@ -327,4 +336,4 @@ make certificate rotations their own edit. See [[websocket]] and [[run-nats-behi
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] ·
 [[s-gh-7684-certificate-expiry]] ·
-[[s-docs-cross-account]] · [[s-docs-putting-it-together]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-cross-account]] · [[s-docs-putting-it-together]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

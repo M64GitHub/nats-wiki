@@ -2,11 +2,12 @@
 title: Cross-account sharing
 type: concept
 area: [security, jetstream, kv]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [exports, imports, stream-export, service-export, prefix, to, external, api-prefix, 10021, 10022, 10024]
 aliases: [exports, imports, export, import, cross-account, account import, account export, activation token, api prefix, external]
-sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-cross-account, s-gh-5606-cross-account-jetstream, s-gh-7017-kv-across-accounts, s-nats-server-auth-and-tls, s-docs-mirrors-and-sources, s-docs-object-store-under-the-hood, s-docs-authorization, s-docs-security-checklist, s-gh-5941-restrict-leafnode-subjects, s-gh-7881-cross-domain-sourcing, s-natscli-stream-external, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -237,6 +238,10 @@ multiple different accounts" (#6704).
 
 ## Version notes: the 2.11 line
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch imports and exports from v2.10.17 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - **2.11.2**: the same subject may be imported from several accounts (#6704, the 2.10.28 backport);
   a deadlock updating account claims with imports and exports fixed (#6726) (source:
   [[s-relnotes-2.11]]).
@@ -268,6 +273,16 @@ multiple different accounts" (#6704).
   under `reference/config/accounts/exports/` and `imports/`, indexed in
   `inbox/config-keys-table.md`, and not yet read.
 
+### The 2.14 line
+
+**2.14.3**: **service-import replies can now be delivered across cluster routes** (#8317) — an import
+whose responder sat on another node could lose the reply; message tracing works with service imports
+and exports (source: [[s-relnotes-2.14]]). **2.14.4**: consumer-reset responses are no longer dropped
+when sent through a service import (#8407). **2.14.6**: removal from service-import response maps is
+constant-time (#8463). The v2 ack subjects (2.14.0, `js_ack_fc_v2`) are the reason an export or
+import of `$JS.ACK.<stream>.>` must be rewritten before the default flips ([[js-api]]).
+
+
 ## Related
 
 [[account]] · [[subject-permissions]] · [[operator-mode]] · [[key-value]] ·
@@ -280,4 +295,4 @@ multiple different accounts" (#6704).
 [[s-nats-server-auth-and-tls]] · [[s-docs-mirrors-and-sources]] ·
 [[s-docs-object-store-under-the-hood]] · [[s-docs-authorization]] ·
 [[s-docs-security-checklist]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-gh-7881-cross-domain-sourcing]] · [[s-natscli-stream-external]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

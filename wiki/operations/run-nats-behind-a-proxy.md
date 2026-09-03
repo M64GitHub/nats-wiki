@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [websocket, nginx, ingress, proxy, advertise, handshake_timeout, ping_interval, kubernetes, no_tls]
 aliases: [websocket behind nginx, nats behind a proxy, wss ingress, websocket proxy, proxy_read_timeout]
-sources: [s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.12]
+sources: [s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-09-01
 updated: 2026-09-03
 ---
@@ -224,6 +224,16 @@ anything except certificate paths means a **restart**, not a reload ([[reload-se
   (#7781).
 
 
+## Version notes: the 2.14 line
+
+**2.14.1**: TLS listeners work with the PROXY protocol where enabled (#8130) — before it a TLS
+listener behind a PROXY-speaking balancer failed the handshake (source: [[s-relnotes-2.14]]).
+**2.14.2**: compressed-WebSocket buffer corruption fixed (#8244). **2.14.3**: PROXY-protocol
+detection, TLS sniffing with `allow_non_tls` and v1 address-family parsing fixed (#8302); trusted-proxy
+tracking no longer leaks closed clients (#8307). **2.14.4**: `allow_non_tls` no longer logs that TLS
+is required (#8420).
+
+
 ## Related
 
 [[websocket]] · [[leafnode]] · [[tls-in-nats]] · [[reload-server-config]] ·
@@ -233,4 +243,4 @@ anything except certificate paths means a **restart**, not a reload ([[reload-se
 
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-your-first-websocket-connection]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.12]]
+[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

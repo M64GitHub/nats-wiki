@@ -161,6 +161,18 @@ the CVE at 2.10.27, the withdrawn 2.10.28.
   supported is **not stated by any source read**; no support-lifecycle document has been ingested.
   The 2.11 and 2.12 lines kept receiving patches through 2026.
 
+## The default diff at v2.10.29
+
+`python3 tools/check-defaults.py --tag v2.10.29` (2026-09-03; `inbox/check-defaults-v2.10.29.md`,
+unregistered): of the 216 documented defaults, **13 disagree, 37 unresolved, 166 agree** — against
+15 / 26 / 175 at v2.14.6. The 11 extra *unresolved* rows are keys the 2.10 parser does not have:
+`jetstream { strict }`, `max_buffered_msgs`, `max_buffered_size`, `mqtt { js_api_timeout }`,
+`websocket { ping_interval }` and the block-level `write_deadline` (all 2.11), the three
+`jetstream.limits.batch` keys (2.12), `info_queue_limit` (2.14). No resolved default moves between
+v2.10.29 and v2.11.17: what the diff shows is arrivals, not changes (source: [[s-relnotes-2.10]],
+the diff in `wiki/log.md` under 2026-09-03).
+
+
 ## Related
 
 [[nats-server-2.11]] · [[upgrade-a-cluster]] · [[key-value]] · [[object-store]] · [[stream]] ·

@@ -2,11 +2,12 @@
 title: Filestore layout on disk
 type: internals
 area: [jetstream, deploy]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [filestore, block-size, index.db, tombstone, compaction, disk, sizing, psim, o.dat]
 aliases: [filestore, file store, blocks, blk, msg blocks, index.db, on-disk layout, storage overhead, bytes per message]
-sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -337,6 +338,10 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
 
 ## Version notes
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch the filestore from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - Read and measured at **2.14.6**. `index.db` is at `fullStateVersion = 4`; the server parses
   versions 1–4, so a store written by an older server is readable.
 - **2.12** changed the filestore's cache to elastic pointers, which alters RSS but not any figure on
@@ -422,6 +427,31 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
 - Whether the 2MB `compactMinimum` or the block-size clamps changed before 2.14 — no release note
   read so far mentions either.
 
+### The 2.14 line
+
+- **2.14.0**: read and write errors from the filesystem "handle[d] more thoroughly" (#7788 — the
+  guide's frozen stream); recovery from a partial purge after a hard kill (#7676); async stream
+  state snapshots (#7876) (source: [[s-relnotes-2.14]]). **2.14.1**: encryption-mode conversion
+  clears caches, "avoiding block-level corruption" (#8105, #8166); block-cache aliasing fixed (#8187).
+  **2.14.2**: **the block-skip check disabled on extremely high subject counts** (#8227); the lock
+  released after a write error (#8232); the per-subject last block with a limit of 1 (#8254).
+- **2.14.3**: **compaction no longer corrupts compressed or encrypted blocks** (#8312); `s2_fast`
+  writer options applied consistently (#8047). **2.14.4**: the 4096-slot I/O semaphore and
+  `max_concurrent_io` (#8336); cache buffers recycled when the weak reference is collected (#8395);
+  faster delete maps and AVL sequence sets (#8403, #8406); snapshot encode buffers sized up front
+  (#8405); a smaller subject-tracking structure (#8412); **blocks with unsynced or truncated key
+  files removed and counted as lost data instead of failing recovery** (#8365), key files synced
+  more aggressively (#8366); a race between concurrent limit removals that could disable writes
+  (#8378); a race between storing and compaction (#8400); sparse delete blocks applied from a
+  snapshot (#8404).
+- **2.14.6**: the block sync no longer skips blocks compacted in the same pass (#8456), syncs the
+  directory once per pass rather than per block (#8461), and runs under the I/O semaphore (#8462);
+  **inline compaction honours `sync_interval: always`** (#8475); the dynamic `max_file_store` no
+  longer shrinks after restarts (#8503).
+- **2.15 preview**: `sources.db` (above); and `sync_interval: always` on a replicated stream syncs the
+  Raft log, not the message blocks (#8447) (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[jetstream-sizing]] · [[stream]] · [[stream-compression]] · [[jetstream-out-of-disk]] ·
@@ -439,4 +469,4 @@ formula applied to other message shapes (all `nats-server 2.14.6`, R1, no compre
 - [[s-docs-object-store-chunking]] — the docs' unquantified per-message-overhead claim these
   numbers answer.
 - [[s-docs-object-store-under-the-hood]] — the qualitative disk-reclamation warning the bulk-delete
-  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [websocket, ws, wss, no_tls, allowed_origins, same_origin, jwt_cookie, compress, LEAFNODE_WS, advertise]
 aliases: [WebSocket, websocket, "websocket {}", ws, wss, browser client, allowed_origins]
-sources: [s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-09-01
 updated: 2026-09-03
 ---
@@ -220,6 +220,15 @@ the hub decides, and the link works either way.
 WebSocket clients" fixed (#8244). The CVE fixes are those of 2.11.14 and 2.11.15, above.
 
 
+### The 2.14 line
+
+**2.14.1**: a leafnode over an already-compressed WebSocket no longer negotiates compression on top
+(#7969) (source: [[s-relnotes-2.14]]). **2.14.2**: **"potential protocol-level corruption from buffer
+misuse in compressed WebSocket clients"** fixed (#8244). **2.14.3**: the `/mqtt` upgrade no longer
+panics when MQTT is disabled. **2.14.6**: WebSocket client buffers recycled more aggressively when
+reallocating into larger buffers (#8518).
+
+
 ## Related
 
 [[mqtt]] · [[run-nats-behind-a-proxy]] · [[leafnode]] · [[subject-permissions]] · [[tls-in-nats]] ·
@@ -243,4 +252,4 @@ WebSocket clients" fixed (#8244). The CVE fixes are those of 2.11.14 and 2.11.15
 
 [[s-docs-websocket-your-first-websocket-connection]] · [[s-docs-websocket-browsers-and-origins]] ·
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

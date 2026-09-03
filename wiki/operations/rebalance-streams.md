@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [peer-remove, replicas, catchup, lag, current, quorum, 10075, 10202, retire-a-node]
 aliases: [rebalance, "peer-remove", "peer remove", "move a stream", "retire a node", "add a node", "scale a cluster"]
-sources: [s-docs-scaling-and-peers, s-docs-placement, s-docs-rolling-upgrades, s-docs-surviving-node-loss, s-docs-jetstream-in-a-cluster, s-gh-4342-memory-stream-backup]
+sources: [s-docs-scaling-and-peers, s-docs-placement, s-docs-rolling-upgrades, s-docs-surviving-node-loss, s-docs-jetstream-in-a-cluster, s-gh-4342-memory-stream-backup, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Rebalance streams across a cluster
@@ -203,6 +203,18 @@ Wiring that check into monitoring is what turns "one change at a time" from a di
 — see [[replicas]].
 
 
+## Version notes: the 2.14 line, and the preview
+
+**2.14.2**: "fixed a drift that could occur in the peer sets after a peer remove of an online node"
+(#8258) — the step this runbook says to do last, on a node that is still up, could leave the
+stream's peer set wrong (source: [[s-relnotes-2.14]]). **2.14.3**: in-flight meta proposal tracking
+kept consistent during stream moves (#8261). **2.15 preview**: the shape of this runbook changes —
+`$JS.API.STREAM.PEER.EVACUATE.<stream>` evacuates one peer and its consumers from one stream,
+`$JS.API.SERVER.EVACUATE` (system account) evacuates everything from a node "without having to
+peer-remove first", and `$JS.API.STREAM.CANCEL_MOVE.<stream>` rolls back any in-flight scale, move or
+retention change; all three verified at the preview tag (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[build-a-3-node-cluster]] · [[upgrade-a-cluster]] · [[reload-server-config]] · [[replicas]] ·
@@ -213,4 +225,4 @@ Wiring that check into monitoring is what turns "one change at a time" from a di
 
 [[s-docs-scaling-and-peers]] · [[s-docs-placement]] · [[s-docs-rolling-upgrades]] ·
 [[s-docs-surviving-node-loss]] · [[s-docs-jetstream-in-a-cluster]] ·
-[[s-gh-4342-memory-stream-backup]]
+[[s-gh-4342-memory-stream-backup]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

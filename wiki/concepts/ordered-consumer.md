@@ -8,7 +8,7 @@ tags: [ordered-consumer, ephemeral, heartbeats, gap-detection]
 aliases: [ordered consumer, OrderedConsumer]
 sources: [s-gh-5243-kv-watchers-at-scale, s-adr-17-ordered-consumer, s-adr-8-key-value-store, s-docs-reading-back, s-docs-kv-watching, s-gh-6746-watch-many-keys]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Ordered consumer
@@ -93,6 +93,8 @@ replicating because it is rebuilt on failure — see the consumer-replica rules 
 - The ADR names **no server version**, and it is dated 2021-09-29 with status *Implemented*. The
   `idle_heartbeat` of 5s and `ack_wait` of ~22h are **client defaults described in the ADR**, not
   server defaults, and individual clients may differ.
+- **`since:` is deliberately absent.** A client-side construct: ADR-17 names no server version ([[s-adr-17-ordered-consumer]]), and the first release body to mention ordered consumers is v2.11.2 (as unaffected by the consumer-consistency change) — presence at 2.11, not an arrival.
+
 
 ## The plain ephemeral it is built on
 

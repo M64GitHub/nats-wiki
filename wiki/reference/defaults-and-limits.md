@@ -2,11 +2,12 @@
 title: Defaults and limits
 type: reference
 area: [core, jetstream, deploy]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-03
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -461,6 +462,30 @@ Values this table states as of 2.14.6 that the 2.10 release bodies date (source:
 (source: [[s-relnotes-2.12]])
 
 
+## Defaults that moved during 2.14
+
+| default or limit | change | since |
+|---|---|---|
+| `feature_flags { }` | new; at v2.14.6 two flags, `js_ack_fc_v2` and `js_raft_delete_range`, **both `false`** (`feature_flags.go:22–47`) | 2.14.0 (#7866) |
+| `$JS.ACK` / `$JS.FC` subject format | v1 stays the default; v2 available behind `js_ack_fc_v2` — still `false` at the 2.15 preview tag | 2.14.0 (#7860) |
+| `no_wait` pull with no `expires`, nothing pending | no status → **`404 No Messages`** | 2.14.0 (#7466; also 2.11.11) |
+| JetStream API queue | one queue → info/list requests **queued separately, deprioritised** | 2.14.0 (#7898) |
+| a Raft node with a missing, corrupt or misaligned snapshot | starts → **refuses to start** | 2.14.0 (#7566, #7580, #7620) |
+| an overrun Raft leader | keeps leading → **steps down** | 2.14.0 (#7853) |
+| `leafnodes { remotes }` | restart → **reloadable** | 2.14.0 (#7937) |
+| `leafnodes { remotes [ { ignore_discovered_servers } ] }` | new, `false` | 2.14.0 (#8067) |
+| `jetstream.info_queue_limit` | new; unset → **`request_queue_limit`** (10,000) — the docs print 100,000 (#22) | 2.14.0 (#7898) |
+| num pending | every replica → **consumer leaders only** | 2.14.1 (#8172) |
+| JSONP on monitoring | supported → **removed** | 2.14.3 |
+| concurrent disk I/O | CPU-scaled → **4096** slots (`max_concurrent_io`, 4–8192) | 2.14.4 (#8336) |
+| **`leafnodes { dial_timeout }`**, `remotes [ { dial_timeout } ]` | new; unset → **`1s`** (`DEFAULT_ROUTE_DIAL`, `const.go:156`); a remote's value overrides the block's | 2.14.5 (#8427) — undocumented, #61 |
+| stream update with `replicas > 1` on a non-clustered server | accepted → **rejected** | 2.14.6 (#8464) |
+| unset `max_file_store` at restart | recomputed from free disk, shrinking → **no longer shrinks** | 2.14.6 (#8503) |
+| `sync_interval: always` on a **replicated** stream (preview) | syncs stream writes → **syncs the Raft log only**; R1 unchanged | 2.15 preview (#8447) |
+
+(source: [[s-relnotes-2.14]], [[s-relnotes-2.15-preview]])
+
+
 ## Related
 
 [[config-keys]] · [[jetstream-sizing]] · [[stream]] · [[consumer]] · [[ack-and-redelivery]] ·
@@ -480,4 +505,4 @@ Values this table states as of 2.14.6 that the 2.10 release bodies date (source:
 [[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] ·
 [[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

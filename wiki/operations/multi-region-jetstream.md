@@ -3,13 +3,14 @@ title: Multi-region JetStream
 type: operation
 kind: pattern
 area: [topology, jetstream, deploy]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [multi-region, leafnode, jetstream-domain, gateway, quorum, sourcing, mirror, geo-affinity]
 aliases: [multi region, multi-region availability, global deployment, regional read replica, geo distribution]
 sources: [s-gh-7438-multi-region-availability, s-gh-6328-jetstream-behind-gateways, s-docs-super-clusters, s-docs-jetstream-in-a-cluster, s-docs-leaf-nodes, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-nats-server-topology, s-nats-server-jetstream-cluster]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Multi-region JetStream

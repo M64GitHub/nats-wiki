@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [backup, restore, snapshot, memory-streams, chunk-size, window-size, 10064, 10130, consumers]
 aliases: [backup, restore, snapshot, "nats stream backup", "nats stream restore", "back up a stream"]
-sources: [s-docs-stream-backup-restore, s-nats-server-snapshot-restore, s-gh-4342-memory-stream-backup, s-natscli-backup-restore, s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-natscli-account-tls, s-gh-7831-standalone-to-cluster, s-relnotes-2.12]
+sources: [s-docs-stream-backup-restore, s-nats-server-snapshot-restore, s-gh-4342-memory-stream-backup, s-natscli-backup-restore, s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-natscli-account-tls, s-gh-7831-standalone-to-cluster, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -280,6 +280,17 @@ mirrors** ([[leafnode]], [[mirrors-and-sources]], and the promotion procedure in
 
 Neither path is a flag, and both have to be planned **before** the restart, not after.
 
+## Version notes: the 2.14 line, and the preview
+
+**2.14.4**: "stream snapshot endpoints now more strictly check the reply subject for validity"
+(source: [[s-relnotes-2.14]]). **2.14.6**: "fixed some issues that could prevent stream snapshots
+from taking place on a clean shutdown" (#8465) — a stream's own state snapshot, not a backup, but the
+thing a fast restart depends on. **2.15 preview**: **backup and restore v2** (#7882) — "a new backup
+format for stream snapshots which reads out per-message rather than per-block", which "now correctly
+includes non-replicated consumers on follower nodes"; a 2.14 backup omits an R1 consumer that lives
+on a follower (source: [[s-relnotes-2.15-preview]]). The format itself was not read.
+
+
 ## Related
 
 [[disaster-recovery]] · [[backup-and-restore-identity]] · [[mirrors-and-sources]] · [[stream]] ·
@@ -291,4 +302,4 @@ Neither path is a flag, and both have to be planned **before** the restart, not 
 
 [[s-docs-stream-backup-restore]] · [[s-nats-server-snapshot-restore]] · [[s-natscli-backup-restore]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-docs-disaster-recovery]] · [[s-docs-mirrors-as-dr]] ·
-[[s-natscli-account-tls]] · [[s-gh-7831-standalone-to-cluster]] · [[s-relnotes-2.12]]
+[[s-natscli-account-tls]] · [[s-gh-7831-standalone-to-cluster]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

@@ -8,7 +8,7 @@ tags: [leafnode, jetstream-domain, system-account, extending-jetstream, verify_a
 aliases: ["JetStream using domains", "JetStream not extended domains differ", "leafnode streams not visible", "extending JetStream", "js-domain"]
 sources: [s-gh-7834-leafnode-same-js-domain, s-nats-server-leafnode-js-domains, s-gh-5859-unexpected-nats-timeout, s-docs-accounts-and-multitenancy, s-nats-server-object-store-leafnode, s-docs-leaf-nodes]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Streams are not visible across a leafnode
@@ -187,6 +187,8 @@ first row of the table above — the operator just happens to be standing at the
 
 - Whether a leafnode that extends a hub's JetStream retains any **local** durability when the link
   drops. The thread asks; no public source read so far answers it.
+- **`since:` is deliberately absent.** The symptom is about JetStream domains across a leafnode, and no release body from v2.10.0 to v2.14.6 dates domains (first patched in v2.12.5); see [[jetstream-domain]].
+
 
 ## Related
 

@@ -3,7 +3,7 @@ title: JetStream storage on Kubernetes
 type: operation
 kind: pattern
 area: [deploy, jetstream]
-since: []
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [kubernetes, hostPath, PVC, volumeClaimTemplates, storageClassName, statefulset, block-storage, NFS, max_file_store, fileStore]

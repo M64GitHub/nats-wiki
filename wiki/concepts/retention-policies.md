@@ -2,11 +2,12 @@
 title: Retention policies
 type: concept
 area: [jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -263,6 +264,10 @@ attached to the stream.
 
 ## Version notes
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch the three retention policies from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - **The `limits` → `interest` swap is since 2.10.0**: "Allow switching between limits and interest
   retention policies" (#4361; the PR is "Allow switching from limits-based to interest-based
   retention in stream update") (source: [[s-relnotes-2.10]]).
@@ -313,6 +318,19 @@ consumer (source: [[s-gh-7032-max-msgs-known-good]]; the arithmetic is on [[jets
 the no-cap statement on [[stream]]).
 
 
+### The 2.14 line
+
+- **2.14.0**: **sourcing and mirroring from a WorkQueue or Interest stream is supported** — the server
+  "automatically upgrades to a durable consumer with `AckFlowControl` policy and uses consumer reset
+  where necessary" (#7613); rollups are allowed once a stream hits `discard_new_per_subject` (#7974)
+  (source: [[s-relnotes-2.14]]).
+- **2.14.1**: on a clustered WorkQueue stream the delivery policy is enforced correctly (#8126); the
+  redelivered-state drift "with workqueue or interest-based streams with `max_deliver`" fixed (#8102).
+  **2.14.3**: a catch-up is no longer skipped when limits are exceeded (#8265). **2.14.6**:
+  `AckFlowControl` consumers sourcing a WorkQueue stream no longer ack messages outside their filter
+  (#8431, #8528) — before it, a filtered source could consume messages it never copied.
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[ack-and-redelivery]] · [[worker-pool]] · [[jetstream-out-of-disk]] ·
@@ -323,4 +341,4 @@ the no-cap statement on [[stream]]).
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
 [[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
 [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
-[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

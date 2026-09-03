@@ -213,6 +213,10 @@ sourcing consumer; the fix is in the 2.15 preview (#8384). Details on [[mirrors-
 (source: [[s-gh-6005-sourcing-memory-stream-restart]], [[s-relnotes-2.10]]).
 
 
+## To verify
+
+- **`since:` is deliberately absent.** The `has high message lag` warning appears in no release body from v2.10.0 to v2.14.6 (the word *lag* occurs once, in v2.12.5's `/jsz` consistency fix); its threshold is read from the v2.14.6 source, and the release that introduced the warning is not in any source read.
+
 ## Related
 
 [[nats-timeout]] · [[malformed-or-corrupt-message]] · [[jetstream-out-of-disk]] ·

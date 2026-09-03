@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [install, systemd, docker, kubernetes, http_port, store_dir, LimitNOFILE, lame-duck]
 aliases: [install, installation, "install NATS", "set up a server", "first server", nats-server service]
-sources: [s-docs-getting-started, s-nats-server-signals, s-gh-6070-lame-duck-under-systemd, s-docs-single-server, s-docs-hardening, s-nats-server-systemd-units, s-docs-kubernetes, s-docs-config-management, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-rolling-upgrades, s-docs-your-first-cluster, s-gh-3569-connect-to-route-port, s-gh-5924-filestore-dirs-vanished, s-nats-helm-chart-values-2.14.6, s-nats-server-lame-duck, s-nats-server-route-cluster-formation, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-getting-started, s-nats-server-signals, s-gh-6070-lame-duck-under-systemd, s-docs-single-server, s-docs-hardening, s-nats-server-systemd-units, s-docs-kubernetes, s-docs-config-management, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-rolling-upgrades, s-docs-your-first-cluster, s-gh-3569-connect-to-route-port, s-gh-5924-filestore-dirs-vanished, s-nats-helm-chart-values-2.14.6, s-nats-server-lame-duck, s-nats-server-route-cluster-formation, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -442,6 +442,17 @@ leafnodes, not routes — [[leafnode]], [[choosing-a-topology]].
 **Running from flags instead of a file costs you the reload.** `nats-server -js -m 8222` is fine for a
 demo; a config file is what makes `systemctl reload` meaningful ([[config-keys]]).
 
+## Version notes: the 2.14 line
+
+The 2.12.9–2.12.15 items above are 2.14.1–2.14.5 under this line's numbers (source:
+[[s-relnotes-2.14]]). Of its own: **2.14.0** built with Go 1.26.2, 2.14.6 with 1.26.7; **2.14.1**
+demotes TLS-handshake-timeout and non-TLS-record errors to debug (#8096) and makes server shutdown
+idempotent for embedded use (#8163); **2.14.3** demotes noisy per-connection lines (#8289), removes
+JSONP from the monitoring endpoints, and stops long-running reconnect and OCSP loops holding timers
+(#8204); **2.14.5** fixes a logger deadlock on a close error (#8430) — a server that hung while
+writing its log; **2.14.6** frees client write buffers that grew past "a rational size" (#8515).
+
+
 ## Related
 
 [[build-a-3-node-cluster]] · [[jetstream-sizing]] · [[monitoring-endpoints]] · [[config-keys]] ·
@@ -459,4 +470,4 @@ demo; a config file is what makes `systemctl reload` meaningful ([[config-keys]]
 [[s-docs-encryption-and-tls]] · [[s-docs-forming-a-cluster]] · [[s-docs-rolling-upgrades]] ·
 [[s-docs-your-first-cluster]] · [[s-gh-3569-connect-to-route-port]] ·
 [[s-gh-5924-filestore-dirs-vanished]] · [[s-nats-helm-chart-values-2.14.6]] ·
-[[s-nats-server-lame-duck]] · [[s-nats-server-route-cluster-formation]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-nats-server-lame-duck]] · [[s-nats-server-route-cluster-formation]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

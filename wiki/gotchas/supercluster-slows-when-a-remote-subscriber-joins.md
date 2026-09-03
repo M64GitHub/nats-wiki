@@ -2,13 +2,14 @@
 title: "a supercluster slows down when a remote subscriber joins"
 type: gotcha
 area: [topology, core, monitoring]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, stalled_clients, stalls, no_fast_producer_stall, bench]
 aliases: ["supercluster performance degradation", "slow gateway", "cross-region slowdown", "producer stalled", "geo-affinity not working"]
 sources: [s-gh-7494-supercluster-degradation, s-nats-server-topology, s-docs-super-clusters, s-docs-monitoring-endpoints]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # A supercluster slows down when a remote subscriber joins

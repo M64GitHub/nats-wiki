@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [10047, 10028, max_bytes, max_file_store, reserved_storage, out-of-space, OUT_OF_STORAGE]
 aliases: ["JetStream out of disk", "insufficient storage resources available", "insufficient memory resources available", "JetStream out of resources will be DISABLED", "10047", "10028", "out of storage"]
-sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-issue-4281-insufficient-storage, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-jetstream-resources, s-gh-7463-jetstream-corruption, s-docs-sizing-and-resources, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -277,6 +277,17 @@ bug where it would incorrectly limit total reservations" (#7895); tiered reserva
 exceeding the maximum store size is rejected before proposal (#8389) (source: [[s-relnotes-2.12]]).
 
 
+### The 2.14 line
+
+**2.14.1**: storage reservations for un-tiered streams "made consistent between creates/updates and
+clustered/non-clustered modes" (#8170); `JetStreamMaxMemory` / `JetStreamMaxStore` honoured in
+embedded mode (#8184) (source: [[s-relnotes-2.14]]). **2.14.4**: a publish that would exceed the
+maximum store size is rejected before proposal (#8389); the disk I/O semaphore (#8336). **2.14.6**:
+**"dynamic filestore reservations no longer incorrectly shrink based on used storage after
+restarts" (#8503)** — the release-note form of cause 3 above; consumer tiers distinguished when
+enforcing limits (#8484).
+
+
 ## Related
 
 [[jetstream-sizing]] · [[malformed-or-corrupt-message]] · [[stream-directories-disappear]] ·
@@ -295,4 +306,4 @@ exceeding the maximum store size is rejected before proposal (#8389) (source: [[
 - [[s-nats-server-filestore-layout]] — why the ceiling bounds a logical figure and the directory is
   bigger.
 - [[s-nats-helm-chart-values-2.14.6]] — the chart rendering `max_file_store` equal to the PVC size. ·
-[[s-gh-5924-filestore-dirs-vanished]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

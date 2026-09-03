@@ -2,13 +2,14 @@
 title: Gateway
 type: concept
 area: [topology, deploy, core]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, gossip, reject_unknown_cluster, 7222, stalled_clients]
 aliases: [gateways, super-cluster, supercluster, super cluster, cluster of clusters, geo-affinity, geo affinity]
-sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster]
+sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster, s-relnotes-2.14, s-relnotes-2.10]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Gateway
@@ -169,6 +170,19 @@ Both need the system account. `/gatewayz` is the HTTP equivalent — see [[monit
 When a cross-region publisher slows down, `/varz` → `stalled_clients` and `/connz` → `stalls` are the
 counters that say so.
 
+## Version notes: the 2.14 line
+
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch gateways from v2.10.12 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
+**2.14.2**: "quorum needed is now calculated correctly when bootstrapping the metalayer when gateway
+URLs resolve to multiple IP addresses" (#8238) — a gateway name behind a round-robin DNS record
+could be counted more than once (source: [[s-relnotes-2.14]]). **2.14.3**: a race in gateway
+`CONNECT` handling (#8306). **2.14.6**: routes missing after a reconnect when gossiped URLs were
+rejected (#8527).
+
+
 ## Related
 
 [[leafnode]] · [[choosing-a-topology]] · [[multi-region-jetstream]] · [[build-a-3-node-cluster]] ·
@@ -180,7 +194,7 @@ counters that say so.
 [[s-docs-super-clusters]] · [[s-docs-putting-it-together]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-4823-leafnode-supercluster-duplicates]] ·
-[[s-gh-6328-jetstream-behind-gateways]] · [[s-nats-server-jetstream-cluster]]
+[[s-gh-6328-jetstream-behind-gateways]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]]
 
 ## To verify
 

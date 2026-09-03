@@ -3,11 +3,12 @@ title: Evict a sick-but-not-dead server
 type: operation
 kind: runbook
 area: [topology, deploy, core, jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [evict, sick-node, hardware-failure, kick, lame-duck, peer-remove, slow-consumer, system-requests, kubernetes]
 aliases: [remove a server from a cluster, kick clients off a server, evict a node, sick node, hardware failure]
-sources: [s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session, s-nats-server-jetstream-cluster, s-nats-server-lame-duck, s-docs-kubernetes, s-adr-61-meta-quorum-rescue, s-docs-scaling-and-peers, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session, s-nats-server-jetstream-cluster, s-nats-server-lame-duck, s-docs-kubernetes, s-adr-61-meta-quorum-rescue, s-docs-scaling-and-peers, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-09-01
 updated: 2026-09-03
 ---
@@ -191,6 +192,17 @@ fixed (#8258). **2.12.14**: "Raft elections now correctly ignore votes from remo
   client abandons a server that stops answering — were not read from any client source here. The
   server-side `ping_interval` / `ping_max` are the other direction.
 
+### The 2.14 line, and the preview
+
+**2.14.2**: peer-set drift after peer-removing an online node fixed (#8258) — step 2 above on a
+server that is up (source: [[s-relnotes-2.14]]). **2.14.4**: elections ignore votes from removed
+peers (#8353) — a peer-removed server that is still running can no longer swing an election.
+**2.15 preview**: **`$JS.API.SERVER.EVACUATE`** (system account) moves every stream and consumer off
+a node "with full transfer of data and state without having to peer-remove first" (#8443) — the
+runbook this page wants and 2.14 does not have; verified at the preview tag (source:
+[[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[meta-layer]] · [[raft-in-nats]] · [[stream-leader-keeps-moving]] · [[slow-consumer-detected]] ·
@@ -201,4 +213,4 @@ fixed (#8258). **2.12.14**: "Raft elections now correctly ignore votes from remo
 
 [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-kick-ldm-mqtt-session]] ·
 [[s-nats-server-jetstream-cluster]] · [[s-nats-server-lame-duck]] · [[s-docs-kubernetes]] ·
-[[s-adr-61-meta-quorum-rescue]] · [[s-docs-scaling-and-peers]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-adr-61-meta-quorum-rescue]] · [[s-docs-scaling-and-peers]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

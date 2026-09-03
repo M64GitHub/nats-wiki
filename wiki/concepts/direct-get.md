@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [direct-get, allow_direct, mirror_direct, last_by_subj, multi_last, batch, EOB]
 aliases: [direct get, allow_direct, "$JS.API.DIRECT.GET", direct read, mirror_direct]
-sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store, s-synadia-reliable-delivery-dlq, s-relnotes-2.11]
+sources: [s-docs-get-direct, s-adr-31-direct-get, s-docs-mirrors-and-sources, s-docs-kv-under-the-hood, s-synadia-jetstream-anti-patterns, s-gh-5044-restrict-durable-consumers, s-adr-8-key-value-store, s-synadia-reliable-delivery-dlq, s-relnotes-2.11, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -189,6 +189,16 @@ to handle deleted messages (#7751); **2.11.2** gave subject delete markers the c
 direct get (#6826).
 
 
+## Version notes: the 2.14 line
+
+**2.14.6**: "stream reads are now isolated with a separate lock, which improves the performance of
+direct gets", and looking up matching sequences for multi-subject gets is faster (#8486) — before it,
+a direct get contended with the stream's write lock (source: [[s-relnotes-2.14]]). **2.14.2**: the
+block-skip check that a filtered read makes is disabled on streams with extremely high subject
+counts (#8227), which changes how a `last_by_subj` read walks a million-subject stream
+([[filestore-layout]]).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[key-value]] · [[object-store]] · [[mirrors-and-sources]] ·
@@ -198,4 +208,4 @@ direct get (#6826).
 
 [[s-docs-get-direct]] · [[s-adr-31-direct-get]] · [[s-docs-mirrors-and-sources]] ·
 [[s-docs-kv-under-the-hood]] · [[s-synadia-jetstream-anti-patterns]] ·
-[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]] · [[s-synadia-reliable-delivery-dlq]] · [[s-relnotes-2.11]]
+[[s-gh-5044-restrict-durable-consumers]] · [[s-adr-8-key-value-store]] · [[s-synadia-reliable-delivery-dlq]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]]

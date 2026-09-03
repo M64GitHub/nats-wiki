@@ -2,6 +2,7 @@
 title: "stream directories disappear from store_dir"
 type: gotcha
 area: [jetstream, deploy]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [filestore, store_dir, tmpfs, ram-disk, tmpreaper, msg-block, kubernetes]

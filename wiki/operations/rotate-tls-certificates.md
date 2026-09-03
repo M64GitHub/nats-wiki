@@ -3,13 +3,14 @@ title: Rotate TLS certificates
 type: operation
 kind: runbook
 area: [security, deploy, monitoring]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, certificates, rotation, expiry, tls_cert_not_after, nats-account-tls, reload, SIGHUP]
 aliases: [certificate rotation, cert rotation, certificate expiry, tls renewal, rotate certs]
 sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units, s-docs-hardening, s-nats-server-tls-reload, s-docs-security-checklist]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Rotate TLS certificates

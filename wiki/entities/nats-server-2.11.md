@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [release, 2.11, api-level-1, ttl, priority-groups, tracing, cve, withdrawn, changelog]
 aliases: ["2.11", v2.11, v2.11.0, v2.11.2, v2.11.9, v2.11.17, v2.11.1-binary]
-sources: [s-docs-upgrade-to-2.12, s-adr-43-per-message-ttl, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-raft-and-leaders, s-docs-placement, s-docs-auth-callout, s-relnotes-2.11.2, s-relnotes-2.11.5, s-issue-6921-last-per-subject-acks, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11]
+sources: [s-docs-upgrade-to-2.12, s-adr-43-per-message-ttl, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-raft-and-leaders, s-docs-placement, s-docs-auth-callout, s-relnotes-2.11.2, s-relnotes-2.11.5, s-issue-6921-last-per-subject-acks, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11, s-relnotes-2.12]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -187,6 +187,19 @@ Helm deployment, is on [[install-nats-server]].
   before 2.14.0 shipped; the 2.12 line continued to 2.12.15 (2026-08-12). No source read states a
   support or end-of-life policy.
 
+## The default diff at v2.11.17
+
+`python3 tools/check-defaults.py --tag v2.11.17` (2026-09-03; `inbox/check-defaults-v2.11.17.md`):
+**14 disagree, 29 unresolved, 173 agree**. Diffed against v2.10.29, **eight keys become resolvable**
+and no resolved value moves: `jetstream { max_buffered_msgs }` = 10,000 and `max_buffered_size` =
+128 MB (2.11.0, #5796 — the 10,000 the docs still print is *this* line's value), `jetstream { strict }`
+unset, so off (2.11.0; the docs' `true` is 2.12's), `mqtt { js_api_timeout }` = 5s (2.11.3),
+`websocket { ping_interval }` inheriting the global 2m (2.11.12, #7614), and `cluster` / `gateway` /
+`leafnodes { write_deadline }` inheriting the global 10s — parsed at v2.11.17 although only the
+2.12.1 body announces them (#7405). The docs date all five of the last group to 2.12; the 2.11 line
+ships them — `inbox/docs-issues.md` **#64** (source: [[s-relnotes-2.11]], [[s-relnotes-2.12]]).
+
+
 ## Related
 
 [[nats-server-2.12]] · [[nats-server-2.10]] · [[message-ttl]] · [[priority-groups]] ·
@@ -196,4 +209,4 @@ Helm deployment, is on [[install-nats-server]].
 
 [[s-docs-upgrade-to-2.12]] · [[s-adr-43-per-message-ttl]] · [[s-adr-42-priority-groups]] ·
 [[s-adr-8-key-value-store]] · [[s-docs-raft-and-leaders]] · [[s-docs-placement]] ·
-[[s-docs-auth-callout]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.11.5]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]]
+[[s-docs-auth-callout]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.11.5]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]

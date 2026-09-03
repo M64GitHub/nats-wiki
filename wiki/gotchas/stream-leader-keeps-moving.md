@@ -2,13 +2,14 @@
 title: "stream leader keeps moving"
 type: gotcha
 area: [jetstream, topology, monitoring]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [leader-election, leader-elected, quorum-lost, flapping, stepdown, overrun, heartbeat, lost-quorum, advisories, mqtt, 10008, 10071]
 aliases: ["leader flapping", "leader elections keep happening", "stream leader changes", "leader_elected advisories", "NO quorum, stalled", "quorum loss after days"]
-sources: [s-gh-7533-quorum-loss-mqtt, s-nats-server-jetstream-cluster, s-nats-server-kick-ldm-mqtt-session, s-docs-monitoring-advisories-and-events, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-lame-duck, s-docs-scaling-and-peers, s-docs-rolling-upgrades, s-adr-61-meta-quorum-rescue, s-synadia-jetstream-memory-patterns, s-docs-replication-and-r3, s-k8s-760-jetstream-pvc-per-replica, s-docs-upgrade-to-2.12, s-docs-kubernetes, s-nats-server-raftz]
+sources: [s-gh-7533-quorum-loss-mqtt, s-nats-server-jetstream-cluster, s-nats-server-kick-ldm-mqtt-session, s-docs-monitoring-advisories-and-events, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-gh-6490-high-message-lag, s-nats-server-jetstream-log-warnings, s-nats-server-lame-duck, s-docs-scaling-and-peers, s-docs-rolling-upgrades, s-adr-61-meta-quorum-rescue, s-synadia-jetstream-memory-patterns, s-docs-replication-and-r3, s-k8s-760-jetstream-pvc-per-replica, s-docs-upgrade-to-2.12, s-docs-kubernetes, s-nats-server-raftz, s-relnotes-2.14]
 created: 2026-09-01
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # "stream leader keeps moving"
@@ -205,6 +206,22 @@ loss — and what caused that on 2.12.1 is not established anywhere public (sour
 [[raft-in-nats]] (elections, the write path, overrun protection) · [[meta-layer]] (the group whose
 loss stalls creates cluster-wide, the timing constants, the five-minute rejoin)
 
+## Version notes: the 2.14 line
+
+- **2.14.0**: "Raft nodes will step down if overrun" (#7853) — a new, *deliberate* cause of a
+  leader moving: a leader whose proposals outrun commit and apply steps down so a healthier peer
+  takes over, and the guide adds that if a majority are equally overloaded the group stays degraded
+  (source: [[s-relnotes-2.14]]). On 2.14 a leader that moves under sustained publish load with
+  `high message lag` beside it is this before it is anything in the ranked list above.
+- **2.14.2**: peers tracked after an inactivity stall during catch-up (#8226); peer-set drift after
+  peer-removing an online node (#8258) — the five-minute rejoin's neighbour. **2.14.3**: nodes stop
+  voting and campaigning after write errors (#8290). **2.14.4**: elections ignore votes from removed
+  peers (#8353); proposals carry the term, "preventing situations where stale proposals from a
+  previous term could make changes in a new term after a fast election" (#8370). **2.14.6**: a
+  signalling issue that could stall catch-ups, and a stale snapshot from a previous Raft group with
+  the same name (#8501).
+
+
 ## Related
 
 [[stream-has-high-message-lag]] · [[malformed-or-corrupt-message]] · [[slow-consumer-detected]] ·
@@ -220,4 +237,4 @@ loss stalls creates cluster-wide, the timing constants, the five-minute rejoin)
 [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-lame-duck]] ·
 [[s-docs-scaling-and-peers]] · [[s-docs-rolling-upgrades]] · [[s-adr-61-meta-quorum-rescue]] ·
 [[s-synadia-jetstream-memory-patterns]] · [[s-docs-replication-and-r3]] ·
-[[s-k8s-760-jetstream-pvc-per-replica]] · [[s-docs-upgrade-to-2.12]] · [[s-docs-kubernetes]] · [[s-nats-server-raftz]]
+[[s-k8s-760-jetstream-pvc-per-replica]] · [[s-docs-upgrade-to-2.12]] · [[s-docs-kubernetes]] · [[s-nats-server-raftz]] · [[s-relnotes-2.14]]

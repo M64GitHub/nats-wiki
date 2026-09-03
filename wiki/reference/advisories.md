@@ -2,6 +2,7 @@
 title: Advisories and system events
 type: reference
 area: [monitoring, jetstream, core]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]

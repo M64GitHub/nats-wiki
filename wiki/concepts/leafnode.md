@@ -2,11 +2,12 @@
 title: Leafnode
 type: concept
 area: [topology, security, jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-03
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -317,6 +318,10 @@ Needs the system account. `Spoke` is a property of **where you ran the command**
 
 ## Version notes: the 2.10 line
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch leafnodes from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - **Compression is since 2.10.0**, "where the default now is `s2_auto` to compress relative to the
   RTT of the hub" (#4167, #4230); the S2 writer concurrency was set to 1 in 2.10.2 (#4570) (source:
   [[s-relnotes-2.10]]).
@@ -365,6 +370,25 @@ Needs the system account. `Spoke` is a property of **where you ran the command**
   contention between leafnodes and clients (#8139, #8159).
 
 
+### The 2.14 line
+
+- **2.14.0**: **`remotes` can be added and removed by config reload** (#7937) — the table above says
+  reload; **`remotes[].ignore_discovered_servers`** — connect only to the configured URLs, ignoring
+  the ones the hub advertises (#8067) (source: [[s-relnotes-2.14]]). **2.14.1**: no compression
+  negotiation over an already-compressed WebSocket (#7969); lock contention between leafnodes and
+  clients reduced (#8139, #8159). **2.14.3**: leaf connections no longer bypass `Nats-Trace-Dest`
+  publish permissions; observer state cleared under `js_cluster_migrate` when a remote is removed
+  (#8304); stale `/varz` leaf-remote state fixed (#8308).
+- **2.14.5**: **`leafnodes { dial_timeout }`**, and per remote in `remotes [ { dial_timeout } ]` —
+  "allowing it to be increased above the default 1 second for high-latency links" (#8427). At
+  v2.14.6 the fallback is `DEFAULT_ROUTE_DIAL` = `1s` (`const.go:156`), the block-level value applies
+  to every remote and a remote's own value overrides it (`opts.go:232–238, 275–280`; `leafnode.go:604–608,
+  763–764`). A remote that logs a dial failure on a satellite or intercontinental link and never
+  reaches the TLS handshake is this. **Documented nowhere** — `inbox/docs-issues.md` #61.
+- **2.15 preview**: with the system account bridged, the domain-prefixed JS API operates on the leaf
+  node's JetStream from the hub (#8429) (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[gateway]] · [[choosing-a-topology]] · [[jetstream-domain]] · [[account]] ·
@@ -380,7 +404,7 @@ Needs the system account. `Spoke` is a property of **where you ran the command**
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-tls-reload]] ·
 [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
 
 ## To verify
 

@@ -2,11 +2,12 @@
 title: Stream placement
 type: internals
 area: [topology, jetstream, deploy]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [placement, server_tags, no-suitable-peers, 10005, meta-leader]
 aliases: [placement, server_tags, tags, "no suitable peers for placement"]
-sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore, s-relnotes-2.10, s-relnotes-2.11]
+sources: [s-docs-placement, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-gh-7982-no-suitable-peers, s-adr-7-server-error-codes, s-docs-scaling-and-peers, s-natscli-backup-restore, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -175,6 +176,10 @@ only the streams that need the strongest durability placed onto it by tag
 
 ## Version notes
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch placement from v2.10.11 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - `nats stream cluster step-down --preferred <server>` requires **nats-server 2.11 or newer**.
 
 ### The 2.10 line
@@ -204,6 +209,19 @@ empty placement will no longer incorrectly trigger a stream move" (#7222).
 - Cross-cluster placement (pinning a stream to one cluster in a supercluster) is out of scope of the
   ingested source, which covers only the single-cluster tag case.
 
+### The 2.14 line, and the preview
+
+**2.14.1**: "stream and consumer assignment errors are now surfaced" (#8208) — before it a placement
+that failed inside the meta layer could be silent (source: [[s-relnotes-2.14]]). **2.14.3**:
+assignment handling refactored "for more consistent migration and info behavior" (#8262); in-flight
+proposal tracking consistent during stream moves (#8261). **2.14.4**: a consumer created immediately
+after its clustered stream no longer gets `stream not found` (#8410). **2.15 preview**: the
+desired-state metalayer makes changing placement or replicas mid-move, and cancelling a move
+(`$JS.API.STREAM.CANCEL_MOVE.<stream>`), "much safer"; `$JS.API.STREAM.PEER.EVACUATE.<stream>` and
+`$JS.API.SERVER.EVACUATE` move assets off a peer or a server with "full transfer of data and state
+without having to peer-remove first" (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[replicas]] · [[raft-in-nats]] · [[stream]] · [[error-codes]] · [[js-api-subjects]] ·
@@ -214,4 +232,4 @@ empty placement will no longer incorrectly trigger a stream move" (#7222).
 
 [[s-docs-placement]] · [[s-docs-raft-and-leaders]] · [[s-docs-replication-and-r3]] ·
 [[s-gh-7982-no-suitable-peers]] · [[s-adr-7-server-error-codes]] · [[s-docs-scaling-and-peers]] ·
-[[s-natscli-backup-restore]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]]
+[[s-natscli-backup-restore]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

@@ -257,6 +257,18 @@ assets as offline rather than misread them. From 2.12.9 (2026-05-20) the twin is
 2.14.1, 2.12.10 = 2.14.2, 2.12.12 = 2.14.3, 2.12.14 = 2.14.4, 2.12.15 = 2.14.5 (source:
 [[s-relnotes-2.12]]).
 
+## The default diff at v2.12.15
+
+`python3 tools/check-defaults.py --tag v2.12.15` (2026-09-03; `inbox/check-defaults-v2.12.15.md`):
+**14 disagree, 27 unresolved, 175 agree**. Diffed against v2.11.17, **one resolved default moves**
+and it is the one the bodies announce: `jetstream { max_buffered_msgs }` **10,000 → 100,000**
+(2.12.0, #6633; the docs print the 2.11 value — #22). Three keys become resolvable — the atomic
+batch limits `jetstream.limits.batch.max_inflight_per_stream` = 50, `max_inflight_total` = 1,000,
+`max_msgs` = 1,000 (2.12.0, ADR-50), all agreeing with the docs — and `strict` becomes *unresolved*
+because 2.12 inverted the option (`NoJetStreamStrict = !v`), which is how "on by default" was
+implemented (source: [[s-relnotes-2.12]]; the diff in `wiki/log.md` under 2026-09-03).
+
+
 ## Related
 
 [[nats-server-2.11]] · [[nats-server-2.14]] · [[priority-groups]] · [[js-api]] ·

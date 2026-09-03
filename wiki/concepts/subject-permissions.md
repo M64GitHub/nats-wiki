@@ -2,11 +2,12 @@
 title: Subject permissions
 type: concept
 area: [security, core]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [permissions, allow, deny, default_permissions, allow_responses, queue-group, _INBOX, "$JS.API"]
 aliases: [permissions, authorization, allow list, deny list, publish permissions, subscribe permissions, default_permissions, allow_responses]
-sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -311,6 +312,10 @@ nats stream info ORDERS --json | jq '.config | {allow_msg_schedules, allow_rollu
 
 ## Version notes: the 2.11 line
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch subject permissions from v2.10.22 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - **2.11.16 closes two ACL loopholes**: "Overlapping wildcard patterns in ACL `deny` patterns are
   now enforced correctly" and "Queue subscriptions can no longer incorrectly bypass non-queue ACL
   `deny` patterns"; the same release restricts `no_auth_user` to client connections and enforces
@@ -330,6 +335,17 @@ queue-subscription `deny` fix, and the reason a queue-group permission that work
 2.12.13 or earlier may not on 2.12.14.
 
 
+### The 2.14 line
+
+**2.14.0**: the v2 ack subjects behind `js_ack_fc_v2` — a permission written against
+`$JS.ACK.<stream>.>` stops matching once the flag is on, because the domain and account hash come
+first ([[js-api]]) (source: [[s-relnotes-2.14]]). **2.14.3**: leaf connections no longer bypass
+`Nats-Trace-Dest` publish permission checks. **2.14.4**: "several paths that enforce the permissions
+of queue subscriptions no longer treat the whole permission as a subject literal" — a
+`subject queue` permission was matched as one token string; MQTT clients can no longer subscribe to
+`$MQTT.>`.
+
+
 ## Related
 
 [[account]] · [[operator-mode]] · [[auth-callout]] · [[tls-in-nats]] · [[cross-account-sharing]] ·
@@ -345,4 +361,4 @@ queue-subscription `deny` fix, and the reason a queue-group permission that work
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-docs-auth-callout]] · [[s-docs-cross-account]] · [[s-docs-decentralized-auth]] ·
 [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]]

@@ -2,11 +2,12 @@
 title: "$JS.API subjects"
 type: reference
 area: [jetstream, security]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-09-01
+verified-on: 2026-09-03
 tags: [js-api, subjects, acl, system-account]
 aliases: ["JS.API", "$JS.API", js api subjects, jetstream api subjects]
-sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers, s-nats-server-jetstream-cluster, s-relnotes-2.11]
+sources: [s-adr-1-jetstream-json-api, s-docs-stream-config, s-docs-consumer-config, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-docs-auth-callout, s-gh-7854-jwt-push-timeout, s-nats-server-leafnode-js-domains, s-adr-60-reliable-sourcing, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-adr-59-sourcing-and-mirroring, s-docs-authorization, s-docs-stream-backup-restore, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-7881-cross-domain-sourcing, s-nats-server-object-store-observed, s-docs-jetstream-headers, s-nats-server-jetstream-cluster, s-relnotes-2.11, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -278,6 +279,26 @@ until the time specified is reached, after which point it will resume automatica
 (source: [[s-relnotes-2.11]]). The consumer reset subject is 2.14.0 ([[s-relnotes-2.14.0]]).
 
 
+### The 2.14 line, and the preview's subjects
+
+`$JS.API.CONSUMER.RESET.<stream>.<consumer>` is 2.14.0 (#7489; `jetstream_api.go:159` at v2.14.6)
+and **absent from the docs' consumer API index**, which lists nine consumer endpoints — `inbox/docs-issues.md`
+#63 (source: [[s-relnotes-2.14]]). The v2 forms `$JS.ACK.<domain>.<account hash>.<stream>.<consumer>.>`
+and `$JS.FC.<domain>.<account hash>.<stream>.<consumer>.>` exist from 2.14.0 behind `js_ack_fc_v2`
+(#7860), off by default and still off at the 2.15 preview tag.
+
+Verified in `jetstream_api.go` at **v2.15.0-preview.1** (source: [[s-relnotes-2.15-preview]]):
+
+| subject | account | what |
+|---|---|---|
+| `$JS.API.STREAM.CANCEL_MOVE.<stream>` | the stream's | cancels an in-flight move — and, per the source comment, "any in-flight desired state … which includes a scale up/down or a retention change" (#8476). New; distinct from the system-account `…ACCOUNT.STREAM.CANCEL_MOVE.<account>.<stream>` above |
+| `$JS.API.STREAM.PEER.EVACUATE.<stream>` | the stream's | evacuates one peer, and the consumers on it, from a stream (#8443) |
+| `$JS.API.SERVER.EVACUATE` | **system** | evacuates every stream and consumer from a node "without having to peer-remove first" (#8443) |
+| `$JS.API.META.RESCUE` | **system** | the broadcast above (#8408) |
+
+None of the four exists at v2.14.6.
+
+
 ## Related
 
 [[js-api]] · [[error-codes]] · [[stream]] · [[consumer]] · [[account]] · [[advisories]] ·
@@ -289,4 +310,4 @@ until the time specified is reached, after which point it will resume automatica
 [[s-adr-1-jetstream-json-api]] · [[s-docs-stream-config]] · [[s-docs-consumer-config]] ·
 [[s-relnotes-2.14.0]] · [[s-adr-8-key-value-store]] · [[s-synadia-jetstream-anti-patterns]] · [[s-nats-server-auth-and-tls]] · [[s-docs-auth-callout]] · [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-leafnode-js-domains]] · [[s-adr-10-extended-purge]] ·
 [[s-adr-60-reliable-sourcing]] · [[s-adr-61-meta-quorum-rescue]] ·
-[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]]
+[[s-adr-59-sourcing-and-mirroring]] · [[s-docs-authorization]] · [[s-docs-stream-backup-restore]] · [[s-gh-5044-restrict-durable-consumers]] · [[s-nats-server-object-store-observed]] · [[s-gh-5606-cross-account-jetstream]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-docs-jetstream-headers]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

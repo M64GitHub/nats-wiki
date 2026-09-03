@@ -2,11 +2,12 @@
 title: Replicas
 type: concept
 area: [jetstream, topology]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [replicas, r3, r5, durability, quorum, sync_interval]
 aliases: [replication, R1, R3, R5, num_replicas, replica count]
-sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore, s-nats-server-jetstream-cluster, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-single-server, s-docs-disaster-recovery, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-stream-config, s-docs-raft-and-leaders, s-docs-sizing-and-resources, s-adr-31-direct-get, s-docs-mirrors-as-dr, s-docs-jetstream-in-a-cluster, s-k8s-760-jetstream-pvc-per-replica, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-docs-get-direct, s-docs-kubernetes, s-docs-mirrors-and-sources, s-docs-placement, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-upgrade-to-2.12, s-docs-worker-pool, s-docs-your-first-cluster, s-gh-4342-memory-stream-backup, s-gh-6490-high-message-lag, s-gh-7831-standalone-to-cluster, s-gh-7982-no-suitable-peers, s-nats-server-jetstream-resources, s-natscli-backup-restore, s-nats-server-jetstream-cluster, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-relnotes-2.10]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -263,6 +264,10 @@ read-after-write checks**, such as confirming a publish landed (source: [[s-docs
 
 ## Version notes: the 2.11 line
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch replicated streams from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - **`cluster_traffic: owner`** — since 2.11.0 an account's `jetstream` block can carry its assets'
   Raft traffic "into the asset account instead of using the system account" (#5466, #5947); the
   choice is reported as `traffic_account` and `system_account` on stream and consumer info and in
@@ -387,6 +392,21 @@ timeout as unknown and resend with a `Nats-Msg-Id` so the duplicate is dropped �
 the next line ([[meta-layer]]; source: [[s-nats-server-jetstream-cluster]]).
 
 
+### The 2.14 line, and the preview
+
+- **2.14.0**: a Raft node **will not start** on a missing, corrupt or misaligned snapshot (#7566,
+  #7580, #7620); an overrun leader steps down (#7853); stream state snapshots on replicated streams
+  are asynchronous (#7876) (source: [[s-relnotes-2.14]]). **2.14.1**: storage reservations for
+  un-tiered streams consistent between clustered and non-clustered modes (#8170). **2.14.6**: **a
+  stream config update with `replicas > 1` is rejected on a non-clustered server** (#8464) — before
+  it the update was accepted and could not be honoured; inline compaction honours `sync_interval:
+  always` (#8475); consumer tiers distinguished when enforcing limits (#8484).
+- **2.15 preview**: on a replicated stream `sync_interval: always` "now sync[s] their WAL entries but
+  no longer sync[s] upper stream layer writes" — "dramatically improves performance"; R1 streams
+  unchanged (#8447) (source: [[s-relnotes-2.15-preview]]). The durability argument for `always` on
+  R3 becomes: the Raft log is synced, the message blocks are not.
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[raft-in-nats]] · [[stream-placement]] · [[retention-policies]] ·
@@ -408,4 +428,4 @@ the next line ([[meta-layer]]; source: [[s-nats-server-jetstream-cluster]]).
 [[s-docs-upgrade-to-2.12]] · [[s-docs-worker-pool]] · [[s-docs-your-first-cluster]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7831-standalone-to-cluster]] · [[s-gh-7982-no-suitable-peers]] ·
-[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-nats-server-jetstream-resources]] · [[s-natscli-backup-restore]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-relnotes-2.10]]

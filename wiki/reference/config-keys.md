@@ -2,11 +2,12 @@
 title: Config keys
 type: reference
 area: [deploy, core, jetstream, security, topology]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-on: 2026-09-03
 tags: [config, reload, restart-only, server_tags, jetstream]
 aliases: [config, configuration, server config, config file, reload]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-docs-config-management, s-nats-server-lame-duck, s-docs-connection-limits-config, s-nats-server-constants-2.14.6, s-docs-sizing-and-resources, s-docs-placement, s-docs-upgrade-to-2.12, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-operator-mode, s-docs-auth-callout, s-nats-server-topology, s-docs-leaf-nodes, s-docs-super-clusters, s-docs-replication-and-r3, s-docs-accounts-and-multitenancy, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-hardening, s-docs-rolling-upgrades, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-nats-server-route-cluster-formation, s-nats-server-systemd-units, s-nats-server-mqtt-websocket-observed, s-docs-websocket-tls-and-proxies, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-docs-monitoring-profiling, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -453,6 +454,21 @@ From the release bodies (source: [[s-relnotes-2.12]]):
 | **`jetstream { max_concurrent_io }`** | 2.12.14 / 2.14.4 (#8336) — undocumented, #59 |
 
 
+## Keys that arrived during 2.14
+
+| key | since |
+|---|---|
+| **`feature_flags { <name>: <bool> }`** — `js_ack_fc_v2`, `js_raft_delete_range` at v2.14.6 (`feature_flags.go:22–25`); an unknown name is silently `false`; a non-boolean value is `error parsing feature flag "<name>": expected bool` (`opts.go:1842–1862`). Remove before downgrading below 2.14. The docs page names no flag — `inbox/docs-issues.md` #62 | 2.14.0 (#7866) |
+| `leafnodes { remotes [ { ignore_discovered_servers } ] }` | 2.14.0 (#8067) |
+| `leafnodes { remotes }` — **reloadable** (add and remove remotes by `SIGHUP`) | 2.14.0 (#7937) |
+| `jetstream { info_queue_limit }` — the separate, deprioritised queue for info and list requests; unset → `request_queue_limit` (10,000), not the docs' 100,000 (#22) | 2.14.0 (#7898) |
+| `jetstream { max_concurrent_io }` — default 4096, bounds 4–8192 (#59) | 2.14.4 (#8336) |
+| **`leafnodes { dial_timeout }`** and **`leafnodes { remotes [ { dial_timeout } ] }`** — durations; unset or `<= 0` → `1s` (`opts.go:2872–2873, 3211–3212`; `const.go:156`). Documented nowhere — #61 | 2.14.5 (#8427) |
+
+(source: [[s-relnotes-2.14]]). The 2.15 preview adds `feature_flags { js_snapshot_sources }`
+([[nats-server-2.15-preview]]).
+
+
 ## Related
 
 [[defaults-and-limits]] · [[jetstream-sizing]] · [[replicas]] · [[stream-placement]] ·
@@ -470,4 +486,4 @@ From the release bodies (source: [[s-relnotes-2.12]]):
 [[s-docs-accounts-and-multitenancy]] · [[s-docs-config-and-jwt-backup]] · [[s-docs-forming-a-cluster]] · [[s-docs-hardening]] · [[s-docs-rolling-upgrades]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-nats-server-route-cluster-formation]] · [[s-nats-server-systemd-units]] ·
 [[s-nats-server-mqtt-websocket-observed]] · [[s-docs-websocket-tls-and-proxies]] ·
 [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] ·
-[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-monitoring-profiling]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

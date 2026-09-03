@@ -2,13 +2,14 @@
 title: "Critical write error: malformed or corrupt message"
 type: gotcha
 area: [jetstream, topology, deploy]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [raft, corruption, wal, filestore, quorum, resetClusteredState, upgrade]
 aliases: ["malformed or corrupt message", "Critical write error", "Wrong index", "Error storing entry to WAL", "JetStream out of resources will be DISABLED", "corrupted JetStream cluster"]
 sources: [s-gh-7463-jetstream-corruption, s-nats-server-jetstream-log-warnings, s-nats-server-jetstream-resources, s-docs-rolling-upgrades]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # "Critical write error: malformed or corrupt message"

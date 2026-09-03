@@ -2,6 +2,7 @@
 title: "Slow Consumer Detected in the server log"
 type: gotcha
 area: [monitoring, core]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
@@ -239,6 +240,17 @@ connection, `retry` keeps trying. Before 2.11.11 the only behaviour was the one 
 configuring write deadlines on a finger-grained basis" (#7405; the config reference gives `10s` for
 each) (source: [[s-relnotes-2.12]]). Before it the top-level `write_deadline` governed every
 connection type; `write_timeout` (2.11.11 / 2.12.2) chooses what happens when it is missed.
+
+
+### Which line actually has `write_timeout` and the per-block `write_deadline`
+
+The docs' generated pages say "Available since NATS Server `2.12`" for `write_timeout`, for the
+`cluster` / `gateway` / `leafnodes` `write_deadline` and for `websocket { ping_interval }`. The 2.11
+line ships them: `write_timeout` in 2.11.11 (#7513), `websocket { ping_interval }` in 2.11.12
+(#7614), and the three block-level `write_deadline` keys are parsed at v2.11.17 (`opts.go:1948, 2138,
+2636`) although only the 2.12.1 body announces them (#7405) — `inbox/docs-issues.md` #64, found by
+diffing the default reports at v2.10.29 and v2.11.17 (source: [[s-relnotes-2.11]],
+[[s-relnotes-2.12]]). An operator on 2.11.11 or later may set them.
 
 
 ## Related

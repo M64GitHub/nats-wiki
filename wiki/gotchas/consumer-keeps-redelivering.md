@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [redelivery, ack, ack_wait, max_deliver, max_ack_pending, backoff, nak, batch, last_per_subject, defect, measured]
 aliases: ["consumer keeps redelivering", "messages processed twice", "messages redelivered after ack", "acked messages redelivered", "redelivery loop", "acks not registered", "tries: 2", "duplicate deliveries", "consumer-keeps-redelivering"]
-sources: [s-issue-6921-last-per-subject-acks, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-5631-nak-not-immediate, s-nats-server-nak-backoff-observed, s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.14.1, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-issue-6921-last-per-subject-acks, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-5631-nak-not-immediate, s-nats-server-nak-backoff-observed, s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.14.1, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-09-03
 updated: 2026-09-03
 ---
@@ -273,6 +273,19 @@ deleted messages left in the pending state (#7984) (source: [[s-relnotes-2.12]])
 nak actually waits, why a nak never reports a failure.
 [[consumer]] — the batch is on the clock, and what `nats consumer info` shows.
 
+## Version notes: the 2.14 line
+
+The version table above stops at 2.14.1. The rest of the line, from the seven bodies (source:
+[[s-relnotes-2.14]]): **2.14.2** fixed "potential protocol-level corruption from rewriting `$JS.ACK`
+subjects" (#8242) — an ack whose subject was mangled in flight is an ack the server never counted;
+**2.14.6** fixed "a flow control problem where replicated consumers could get stuck after a leader
+change" (#8488), "various consumer create issues that could destroy the state of an existing
+consumer with the same name" (#8491) — a re-create by a client with the same durable name could reset
+the floor to the start policy and replay — and delivery counts that underflowed below zero (#8512).
+A consumer on 2.14.2–2.14.5 that replays from the beginning after a leader change or after its
+client reconnected and re-created it is one of those two.
+
+
 ## Related
 
 [[worker-pool]] · [[dead-letter-queue]] · [[nats-timeout]] · [[duplicate-messages-across-a-leafnode]]
@@ -286,4 +299,4 @@ nak actually waits, why a nak never reports a failure.
 [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] ·
 [[s-gh-5631-nak-not-immediate]] · [[s-nats-server-nak-backoff-observed]] ·
 [[s-docs-delivery-and-acknowledgment]] · [[s-docs-acknowledgment]] · [[s-relnotes-2.11.5]] ·
-[[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

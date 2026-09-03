@@ -8,7 +8,7 @@ tags: [kv, watch, ephemeral-consumers, consumer-churn, readloop, healthz, meta-l
 aliases: ["Consumer assignment not cleaned up retrying", "Readloop processing time", "too many KV watchers", "kv watcher misses updates", "1000 watchers"]
 sources: [s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-nats-server-jetstream-log-warnings, s-adr-8-key-value-store, s-synadia-jetstream-anti-patterns, s-docs-kv-watching]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # KV watchers pile up and the cluster stops recovering
@@ -147,6 +147,10 @@ matches. That naming decision is made once, before the first put ([[key-value]])
 ## Explained by
 
 [[key-value]] for what a watch is built from, [[ordered-consumer]] for what one costs.
+
+## To verify
+
+- **`since:` is deliberately absent.** No release body from v2.10.0 to v2.14.6 dates KV watchers; the one body that names watchers is v2.11.5 (#7003, a log-noise fix). The symptom's version range is unknown beyond the thread's own 2.10.12.
 
 ## Related
 

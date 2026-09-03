@@ -9,7 +9,7 @@ tags: [external, api-prefix, deliver-prefix, jetstream-domain, sourcing, mirror,
 aliases: [cross-domain sourcing, cross domain mirror, source from another domain, external stream, api prefix, deliver prefix]
 sources: [s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-nats-server-leafnode-js-domains, s-docs-mirrors-and-sources, s-gh-5606-cross-account-jetstream, s-docs-cross-account, s-gh-7438-multi-region-availability, s-adr-59-sourcing-and-mirroring, s-docs-mirrors-as-dr, s-nats-server-mirrors-observed, s-issue-5106-object-store-mirror-list]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Cross-domain JetStream sourcing
@@ -258,3 +258,5 @@ added only for this.
 - The `Consumer` (`StreamConsumerSource`) branch — sourcing through a **named durable** with an
   explicit deliver subject — is in the CLI and the server struct and is **not covered here**. No
   source in `raw/` explains when to use it.
+- **`since:` is deliberately absent.** The runbook rests on JetStream domains and the `external` block, and no release body from v2.10.0 to v2.14.6 records when either arrived (the first body patching domains is v2.12.5); see [[jetstream-domain]].
+

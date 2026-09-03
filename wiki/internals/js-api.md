@@ -2,11 +2,12 @@
 title: The JetStream API and its errors
 type: internals
 area: [jetstream, security]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14
-verified-on: 2026-08-31
+verified-on: 2026-09-03
 tags: [js-api, err_code, schemas, paging, acl, errors.json]
 aliases: ["$JS.API", js api, err_code, ApiError, error envelope]
-sources: [s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-docs-stream-config, s-docs-consumer-config, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-jetstream-log-warnings, s-gh-5859-unexpected-nats-timeout, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-adr-1-jetstream-json-api, s-adr-7-server-error-codes, s-docs-stream-config, s-docs-consumer-config, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-jetstream-log-warnings, s-gh-5859-unexpected-nats-timeout, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -271,6 +272,10 @@ done with subject permissions on `$JS.API.*.<stream>`, not with a JetStream-spec
 
 ## Version notes
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch the `$JS.API` request-reply layer from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - **The request queue limit is since 2.10.21**: "Global JetStream API queue hard limit for
   protecting the system" (#5900, #5923), with the pending count exposed in `statsz` and `/jsz`
   (#5923, #5926) (source: [[s-relnotes-2.10]]). The value on this page is read from the 2.14.6
@@ -315,6 +320,21 @@ done with subject permissions on `$JS.API.*.<stream>`, not with a JetStream-spec
 - ADR-7 is **Partially Implemented** and dated 2021-05-12; whether the generalisation beyond
   JetStream has since happened is not established by anything ingested.
 
+### The 2.14 line
+
+- **2.14.0**: **`$JS.API.CONSUMER.RESET.<stream>.<consumer>`** (#7489); the v2 ack and flow-control
+  subjects behind `js_ack_fc_v2` (#7860); **info and list requests queued separately, below
+  create/update/delete** (#7898) — the API queue that drops requests under pressure now has two
+  lanes; a `no_wait` pull with no expiry answers `404 No Messages` (#7466) (source:
+  [[s-relnotes-2.14]]). **2.14.1**: assignment errors surfaced (#8208). **2.14.3**: `CONNZ` and
+  `SUBSZ` pagination guard `Offset` / `Limit` overflow; consumer-reset responses through a service
+  import fixed in 2.14.4 (#8407). **2.14.6**: internal delete proposals no longer counted in the JS
+  API statistics (#8502).
+- **2.15 preview**: `$JS.API.STREAM.CANCEL_MOVE.<stream>`, `$JS.API.STREAM.PEER.EVACUATE.<stream>`,
+  `$JS.API.SERVER.EVACUATE`, `$JS.API.META.RESCUE`, all verified in `jetstream_api.go` at the
+  preview tag (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[error-codes]] · [[js-api-subjects]] · [[message-ttl]] ·
@@ -326,4 +346,4 @@ done with subject permissions on `$JS.API.*.<stream>`, not with a JetStream-spec
 [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]] · [[s-docs-stream-config]] ·
 [[s-docs-consumer-config]] · [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] ·
 [[s-relnotes-2.14.0]] ·
-[[s-nats-server-jetstream-log-warnings]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

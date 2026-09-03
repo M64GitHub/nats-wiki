@@ -2,12 +2,12 @@
 title: Publishing to a stream
 type: concept
 area: [jetstream]
-since: []
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [PubAck, Nats-Msg-Id, duplicate, duplicate_window, async-publish, atomic-batch, fast-ingest, AllowAtomicPublish, AllowBatchPublish, Nats-Batch-Id, Nats-Expected-Last-Subject-Sequence, exactly-once, persist_mode]
 aliases: [publish, PubAck, pub ack, exactly once, exactly-once, deduplication, dedup, Nats-Msg-Id, msg id, async publish, atomic batch, batch publish, fast ingest, publish acknowledgement]
-sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12]
+sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -273,6 +273,10 @@ schedule and publishes a message as one atomic operation (source: [[s-adr-51-mes
 
 ## Version notes: the 2.12 line
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch publishing and the `PubAck` from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - **Atomic batch publish is 2.12.0** (#6966 … #7330, ADR-50). Its patches: **2.12.1** — a batch
   deduplicates on `Nats-Msg-Id` (#7391), rejects unsupported commits (#7368), checks the batch subject
   rather than the committing message's (#7342); **2.12.2** — the unsupported-header check looked at
@@ -301,6 +305,19 @@ schedule and publishes a message as one atomic operation (source: [[s-adr-51-mes
   `Nats-Expected-Last-Sequence`) have their own error codes on rejection.
   `reference/jetstream/api/headers.md` is in `raw/` and has not been read.
 
+## Version notes: the 2.14 line
+
+- **Fast-ingest batch publishing is 2.14.0** (#7778, #7892, #7894, #7945, ADR-50), and so is the
+  **end-of-batch commit** — `Nats-Batch-Commit: eob` on a final message that is not persisted
+  (#7403). Its patches: **2.14.1** parses the batch sequence as a `uint64` (#8094) and no longer
+  double-pools committed atomic-batch entries (#8098); **2.14.3** fixes failed fast-batch commits with
+  `gapOk` (#8308) and the end-of-batch max-size checks and R1 rewrites (#8305); **2.14.4** fixes
+  string ownership for the expected last sequence per subject in a batch (#8377); **2.14.6** a data
+  race on the batch ID (#8369) (source: [[s-relnotes-2.14]]).
+- **2.14.4**: a publish exceeding the maximum store size is rejected before proposal (#8389) — the
+  same fix as 2.12.14.
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[consumer]] · [[subject-transforms]] · [[error-codes]] ·
@@ -318,4 +335,4 @@ schedule and publishes a message as one atomic operation (source: [[s-adr-51-mes
 - [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] — the releases the two batch modes shipped
   in.
 - [[s-relnotes-2.14.0]] — the `Nats-Batch-Commit: eob` end-of-batch commit.
-- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]]
+- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]]

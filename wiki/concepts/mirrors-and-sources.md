@@ -2,11 +2,12 @@
 title: Mirrors and sources
 type: concept
 area: [jetstream, topology, deploy]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8001-jetstream-startup-slow-50m, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8001-jetstream-startup-slow-50m, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -451,6 +452,10 @@ recreated, a file stream that lost its unflushed last block — depends on the r
 
 ## Version notes: the 2.11 line
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch mirrors and sources from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - **2.11.0** is where the 2.10.19 → 2.10.22 clipping story ends: "Consumer starting sequence is now
   always respected, except for consumers used for sources/mirrors" (#6253) — sources keep the
   clipping, everything else keeps its requested sequence (source: [[s-relnotes-2.11]]).
@@ -481,6 +486,25 @@ recreated, a file stream that lost its unflushed last block — depends on the r
   source consumer already being set up is not scheduled again, "avoiding potential setup storms"
   (#8111); a mirror consumer retries immediately on a last-sequence mismatch "avoiding stalling for
   longer than necessary" (#8152).
+
+
+## Version notes: the 2.14 line, and the preview
+
+- **2.14.0**: WorkQueue and Interest upstreams supported through the durable `JS_MIRROR_*` /
+  `JS_SRC_*` consumers with `AckFlowControl` (#7613, ADR-60); deduplication can be disabled on a
+  sourcing stream (#7651) — the guide's "deduplicate when fanning in multiple sources" is in no body;
+  `feature_flags { js_raft_delete_range }` (one Raft entry per gap, off by default, and the source
+  warns that older peers panic on it) (source: [[s-relnotes-2.14]]).
+- **2.14.1**: a mirror consumer retries immediately on a last-sequence mismatch (#8152); a source
+  consumer already in set-up is not scheduled again (#8111); skip errors propagated (#8152).
+  **2.14.4**: stale error responses on source or mirror creation dropped by recreating the
+  subscription (#8356). **2.14.6**: a data race reading the consumer's direct or sourcing status,
+  and that status can no longer be changed by a consumer update (#8478); `AckFlowControl` sources no
+  longer ack outside the filter on a WorkQueue upstream (#8431, #8528).
+- **2.15 preview**: source recreation detected (#8384) and `sources.db` (#8282, above), the
+  `js_snapshot_sources` flag ("Introduced: 2.15.0", off), and "shorter wait for durable source/mirror
+  consumer resets" — the heartbeats short-circuit the recreation backoff (#8323) (source:
+  [[s-relnotes-2.15-preview]]).
 
 
 ## Related
@@ -537,4 +561,4 @@ stream **cannot** have while it mirrors or sources another.
 [[s-adr-57-kv-subject-transforms]] · [[s-docs-disaster-recovery]] · [[s-docs-get-direct]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-5606-cross-account-jetstream]] ·
 [[s-gh-6328-jetstream-behind-gateways]] · [[s-gh-7017-kv-across-accounts]] ·
-[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

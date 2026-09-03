@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [auth_callout, issuer, auth_users, xkey, allowed_accounts, ADR-26, "$SYS.REQ.USER.AUTH", oidc, ldap]
 aliases: [auth callout, authorization callout, external auth, "$SYS.REQ.USER.AUTH", auth_callout]
-sources: [s-docs-auth-callout, s-gh-7505-auth-callout-nkey, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-authentication-basics, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-auth-callout, s-gh-7505-auth-callout-nkey, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-authentication-basics, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -180,6 +180,15 @@ be a bearer token (#7074); 2.11.9 also accepts one issued by a scoped signing ke
 checks when no `CONNECT` message is sent" (source: [[s-relnotes-2.12]]).
 
 
+### The 2.14 line
+
+**2.14.4**: "Combining `no_auth_user` with auth callouts will no longer skip authentication checks
+when no `CONNECT` message is sent" — a client that opened a socket and sent nothing could be admitted
+as the no-auth user without the callout ever running (the same fix as 2.12.14, no CVE id) (source:
+[[s-relnotes-2.14]]). **2.14.3**: external auth configuration is cleared correctly when account
+claims are updated (#8275); `NoAuthUser` checks connection restrictions.
+
+
 ## Related
 
 [[account]] · [[subject-permissions]] · [[operator-mode]] · [[tls-in-nats]] · [[js-api-subjects]] ·
@@ -189,4 +198,4 @@ checks when no `CONNECT` message is sent" (source: [[s-relnotes-2.12]]).
 
 [[s-docs-auth-callout]] · [[s-gh-7505-auth-callout-nkey]] · [[s-nats-server-auth-and-tls]] ·
 [[s-docs-security-checklist]] ·
-[[s-docs-authentication-basics]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-authentication-basics]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

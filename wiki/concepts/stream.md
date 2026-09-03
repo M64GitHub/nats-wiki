@@ -2,11 +2,12 @@
 title: Stream
 type: concept
 area: [jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -362,6 +363,10 @@ Its other rules, and where they sit against *What you cannot change later*:
 
 ## Version notes: the 2.10 line
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch streams from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 From the release bodies (source: [[s-relnotes-2.10]]):
 
 - **Since 2.10.0**: `subject_transform` on a stream and republish on mirrors and sources
@@ -459,6 +464,33 @@ and the newest message block is never compacted. See [[filestore-layout]] for th
 [[jetstream-sizing]] for what to do with it.
 
 
+## Version notes: the 2.14 line
+
+From the seven release bodies (source: [[s-relnotes-2.14]]):
+
+- **2.14.0**: `allow_batch_publish` — fast-ingest batch publishing (#7778 …); recurring schedules,
+  sampling and rollups under `allow_msg_schedules` (#7504 …); **rollups allowed at the
+  `discard_new_per_subject` limit** (#7974); **stream state snapshots on replicated streams taken
+  asynchronously** (#7876); sourcing from WorkQueue and Interest streams (#7613); deduplication may
+  be disabled when sourcing (#7651); stream info and list requests queued behind writes (#7898).
+- **2.14.1**: republish subjects validated (#8127); reservations consistent between create/update and
+  clustered/non-clustered (#8170). **2.14.2**: purges consistent between file and memory stores
+  (#8241); scale-down consistent (#8253). **2.14.3**: catch-up no longer skipped when limits are
+  exceeded, "preventing possible stream desync" (#8265); zero consumer limits mean unlimited on an
+  update (#8286); `MultiLastSeqs` no longer reorders the configured subjects (#8315).
+- **2.14.4**: a publish over the maximum store size is rejected before proposal (#8389); a stream
+  recreated while a node was down is not taken for an update by the returning node (#8413); the
+  snapshot endpoints check the reply subject more strictly. **2.14.5**: idempotent creates no longer
+  risk data loss when an offline node catches up from a meta snapshot (#8449).
+- **2.14.6**: **a config update with `replicas > 1` is rejected on a non-clustered server** (#8464);
+  the created time survives recovery on a standalone server (#8471); snapshots no longer prevented
+  on a clean shutdown (#8465); stream reads under a separate lock (#8486).
+- **2.15 preview**: `$JS.API.STREAM.CANCEL_MOVE.<stream>` rolls back any in-flight scale, move or
+  retention change; `$JS.API.STREAM.PEER.EVACUATE.<stream>`; a v2 backup format; and on a
+  replicated stream `sync_interval: always` syncs the Raft log but no longer the stream layer
+  (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[consumer]] · [[retention-policies]] · [[replicas]] · [[stream-placement]] · [[raft-in-nats]] ·
@@ -490,4 +522,4 @@ and the newest message block is never compacted. See [[filestore-layout]] for th
 [[s-issue-4281-insufficient-storage]] · [[s-synadia-jetstream-anti-patterns]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

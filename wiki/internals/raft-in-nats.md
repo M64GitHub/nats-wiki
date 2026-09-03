@@ -2,11 +2,12 @@
 title: RAFT in nats-server
 type: internals
 area: [topology, jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -338,6 +339,10 @@ The parameters the docs say live there are **constants at v2.14.6, with no confi
 
 ## Version notes
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch the Raft layer from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - `--preferred` on `nats stream cluster step-down` requires **nats-server 2.11 or newer**
   (source: [[s-docs-raft-and-leaders]], [[s-docs-placement]]). See [[nats-server-2.11]].
 - **2.12** — async stream flushing for replicated streams; better protection against leader
@@ -446,6 +451,32 @@ saw `10071` session-persist failures, then `10008`, then 5-second publish timeou
 order — and nobody answered the thread (source: [[s-gh-7533-quorum-loss-mqtt]]). The causes, ranked,
 are on [[stream-leader-keeps-moving]].
 
+### The 2.14 line
+
+- **2.14.0**: **"Raft nodes will step down if overrun"** (#7853) — the body's whole statement of
+  overrun protection; **a node will no longer start if its snapshot is missing, corrupt or misaligned
+  with the log** (#7566, #7580, #7620); consistent group rename moving to or off R1 (#7802)
+  (source: [[s-relnotes-2.14]]).
+- **2.14.1**: temporary snapshots ignored on recovery after a crash (#8101); append-entry caches
+  invalidated on WAL truncation and snapshot install (#8149); no proposals to remove unknown peers
+  (#8154); in-flight checkpoints cancelled on reset (#8180, #8202). **2.14.2**: peers tracked after
+  an inactivity stall during catch-up (#8226); quorum computed correctly when bootstrapping with
+  gateway URLs that resolve to several IPs (#8238); peer-set drift after peer-removing an online
+  node (#8258).
+- **2.14.3**: **no voting or candidacy after write errors** (#8290); checkpoints abort on a closed
+  node (#8296); `ApplyCommit` handles the post-snapshot index (#8321); uncommitted membership changes
+  reverted on truncation or snapshot (#8332); peer-state decoding bounded (#8310). **2.14.4**:
+  elections ignore votes from removed peers (#8353); **proposals carry the term from JetStream, so a
+  stale proposal from a previous term cannot land after a fast election** (#8370); the append-entry
+  iterator's end handled (#8372); the transport layer decoupled without behaviour change (#8181).
+- **2.14.6**: a signalling issue that could stall catch-ups fixed; the pending append-entry cache
+  bounded by size as well as count; **a stale snapshot from a previous Raft group no longer replayed
+  when the group name was unchanged** (#8501).
+- **2.15 preview**: `$JS.API.META.RESCUE` verified at the preview tag as a system-account broadcast
+  "every online server evaluates and responds to … independently"; the evacuate subjects
+  (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[replicas]] · [[stream-placement]] · [[stream]] · [[consumer]] · [[monitoring-endpoints]] ·
@@ -466,4 +497,4 @@ are on [[stream-leader-keeps-moving]].
 [[s-docs-scaling-and-peers]] · [[s-docs-your-first-cluster]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7463-jetstream-corruption]] ·
 [[s-nats-server-lame-duck]] · [[s-synadia-jetstream-memory-patterns]] ·
-[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

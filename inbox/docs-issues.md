@@ -120,6 +120,10 @@ row.
 | 58 | `release-notes/upgrade-to-2.12.md` lists "`GOMAXPROCS` and `GOMEMLIMIT` in server stats" among what is new in 2.12 ("now also contains the effective Go limits"). The change shipped in **v2.10.28 and v2.11.2** (2025-04-25) — both bodies: "`GOMAXPROCS` and `GOMEMLIMIT` are now reported in both `statsz` and `varz` (#6791)", PR merged 2025-04-11 — five months before v2.12.0 | `release-notes/upgrade-to-2.12.md` line 44 | nats-docs | wrong-value | low | not filed | wiki: `nats-server-2.12` § *The docs' upgrade guide against the bodies* (via `s-relnotes-2.12`), `monitoring-endpoints` |
 | 59 | `jetstream { max_concurrent_io }` — the size of the server-wide disk I/O semaphore, added in v2.12.14 / v2.14.4 (#8336) when the default rose from a CPU-scaled count to **4096** — has no page in the generated `reference/config/jetstream/` tree and no mention anywhere else; the server bounds it to 4 – 8192 | `reference/config/jetstream/` (no page) | nats-docs | missing | medium | not filed | wiki: `jetstream-sizing` § *Version notes: the 2.12 line*, `filestore-layout` |
 | 60 | The `proxies { trusted [ … ] }` block — ADR-55 trusted proxies, v2.12.0 (#7153): "enforcing that connections arrive via a NATS protocol-aware proxy" — is documented nowhere; the generated reference has `proxy_protocol` and `authorization { proxy_required }`, and `reference/system/errors.md` names the `Proxy is not trusted` error "from a proxy not in the list of trusted proxies", but no page says how that list is configured | `reference/config/` (no `proxies` page); `reference/system/errors.md` line 11 | nats-docs | missing | medium | not filed | wiki: `run-nats-behind-a-proxy` § *Version notes: the 2.12 line* |
+| 61 | `leafnodes { dial_timeout }` and `leafnodes { remotes [ { dial_timeout } ] }` — added in v2.14.5 / v2.12.15 (#8427): "allowing it to be increased above the default 1 second for high-latency links" — have no page in the generated `reference/config/leafnodes/` tree and no mention anywhere else in the docs; at v2.14.6 the fallback is `DEFAULT_ROUTE_DIAL` (`1s`) and a remote's value overrides the block's | `reference/config/leafnodes/` and `…/leafnodes/remotes/` (no page) | nats-docs | missing | medium | not filed | wiki: `leafnode` § *The 2.14 line*, `config-keys` § *Keys that arrived during 2.14*, `defaults-and-limits` (via `s-relnotes-2.14`) |
+| 62 | `reference/config/feature_flags.md` documents the block as "Toggles for features that are not yet on by default. Names are server-internal and change between releases" and names **no flag** — while `release-notes/upgrade-to-2.14.md` tells operators to set `js_ack_fc_v2`, and the server at v2.14.6 defines exactly two flags, the second of which (`js_raft_delete_range`) carries a source warning that enabling it makes older peers **panic**; neither name, nor the warning, is documented | `reference/config/feature_flags.md` (whole page) | nats-docs | missing | medium | not filed | wiki: `config-keys` § *Keys that arrived during 2.14*, `mirrors-and-sources` § *Version notes: the 2.14 line*, `nats-server-2.14` (via `s-relnotes-2.14`) |
+| 63 | `$JS.API.CONSUMER.RESET.<stream>.<consumer>` — the consumer reset API of v2.14.0 (#7489, ADR-60) — is absent from `reference/jetstream/api/consumer.md`, which lists nine consumer endpoints, and has no page under `reference/jetstream/api/consumer/`; the 2.14 upgrade guide describes the API without its subject | `reference/jetstream/api/consumer.md` lines 4–14; `reference/jetstream/api/consumer/` (no page) | nats-docs | missing | medium | not filed | wiki: `js-api-subjects` § *Documented elsewhere, absent from the API index* and § *The 2.14 line*, `consumer` (via `s-relnotes-2.14`) |
+| 64 | Five generated config pages say "Available since NATS Server `2.12`" for keys the **2.11 line ships**: `write_timeout` (v2.11.11, #7513), `websocket { ping_interval }` (v2.11.12, #7614), and the block-level `cluster` / `gateway` / `leafnodes` `write_deadline` (parsed at v2.11.17, announced only by v2.12.1's #7405). An operator on 2.11.17 reads that the keys are not available to them | `reference/config/write_timeout.md`, `reference/config/websocket/ping_interval.md`, `reference/config/cluster/write_deadline.md`, `reference/config/gateway/write_deadline.md`, `reference/config/leafnodes/write_deadline.md` | nats-docs | wrong-value | low | not filed | wiki: `slow-consumer-detected` § *The 2.11 line* / *The 2.12 line*, `nats-server-2.11` § *The default diff* (via `s-relnotes-2.11`, `s-relnotes-2.12`) |
 
 ---
 
@@ -2899,6 +2903,135 @@ this row.
 linked from `proxy_required` and from the ADR-55 write-up.
 
 
+## 61 · Leafnode `dial_timeout` has no page
+
+**Impact: a leafnode remote over a high-latency link that never completes the TCP handshake in one
+second reconnects forever, and the one setting that fixes it — shipped for exactly that case — cannot
+be found in the documentation.**
+
+**Docs.** `grep -rli dial_timeout raw/nats-docs/` (861 pages, fetched 2026-08-31) matches **no
+file**. `reference/config/leafnodes/` holds `advertise, authorization, compression, host,
+isolate_leafnode_interest, listen, min_version, no_advertise, port, reconnect, remotes, tls,
+write_deadline, write_timeout`; `reference/config/leafnodes/remotes/` holds `account, compression,
+credentials, deny_exports, deny_imports, disabled, first_info_timeout, hub, ignore_discovered_servers,
+isolate_leafnode_interest, jetstream_cluster_migrate, nkey, no_randomize, proxy, request_isolation,
+tls, url, ws_compression, ws_no_masking`. `ignore_discovered_servers` (v2.14.0, #8067) *is*
+documented, so the generator has run since 2.14.0; `dial_timeout` (v2.14.5, 2026-08-12) is not.
+
+**Release notes.** `raw/release-notes/v2.14.5.md`, *Added / Leafnodes*: "New `dial_timeout` option
+can be specified in the `leafnode` config block or for specific remotes in the configuration,
+allowing it to be increased above the default 1 second for high-latency links (#8427)". The same
+line is in `v2.12.15.md`.
+
+**Server, v2.14.6** (`raw/nats-server-src/feature-flags-dial-timeout-and-2.15-subjects.md` §1):
+`server/opts.go` lines 232–238 (`LeafNodeOpts.DialTimeout`: "If not set (or <= 0),
+DEFAULT_ROUTE_DIAL is used"), 275–280 (`RemoteLeafOpts.DialTimeout`: "If not set (or <= 0), the
+server-wide LeafNodeOpts.DialTimeout is used, which itself defaults to DEFAULT_ROUTE_DIAL (1
+second)"), 2872–2873 (`case "dial_timeout"` in the `leafnodes` block, a duration) and 3211–3212 (the
+same inside a `remotes` entry); `server/const.go` line 156, `DEFAULT_ROUTE_DIAL = 1 * time.Second`;
+`server/leafnode.go` lines 604–608 (the fallback) and 763–764 (the per-remote override).
+
+**Suggested fix:** a `reference/config/leafnodes/dial_timeout.md` and a
+`reference/config/leafnodes/remotes/dial_timeout.md`, each "Available since NATS Server 2.14.5",
+type duration, default `1s`, with the sentence that the remote's value overrides the block's; and a
+line on `learn/topologies/leaf-nodes.md` (or wherever high-latency remotes are discussed) naming it.
+
+
+## 62 · The `feature_flags` reference page names no flag, and the one that can panic older peers is documented nowhere
+
+**Impact: the 2.14 upgrade guide tells operators to set `feature_flags { js_ack_fc_v2: true }` to
+test the ack-subject migration, and the only reference page for the block says its names are
+"server-internal and change between releases"; the second flag the server ships, `js_raft_delete_range`,
+carries a source comment that turning it on in a mixed-version cluster makes older peers panic, and
+no documentation page names it, let alone warns.**
+
+**Docs.** `raw/nats-docs/reference/config/feature_flags.md`, the whole page: "Available since NATS
+Server `2.14` · Requires Restart · Toggles for features that are not yet on by default. Names are
+server-internal and change between releases." Type `{ string: boolean }`, choices `true`, `false`.
+`js_ack_fc_v2` appears in the docs only in `release-notes/upgrade-to-2.14.md` (lines 74–82).
+`grep -rl js_raft_delete_range raw/nats-docs/` matches nothing.
+
+**Release notes.** `raw/release-notes/v2.14.0.md`: "Feature flags in the server configuration
+(#7866) — ADR: …/ADR-53.md" (no flag named), and under *Domain-aware ack and flow control subjects*:
+"This is disabled by default and can be enabled with the `js_ack_fc_v2` feature flag, this will be
+enabled by default in v2.15". `js_raft_delete_range` is named in no release body.
+
+**Server, v2.14.6** (`raw/nats-server-src/feature-flags-dial-timeout-and-2.15-subjects.md` §2):
+`server/feature_flags.go` lines 22–25 define exactly two names, `js_ack_fc_v2` and
+`js_raft_delete_range`; lines 27–47 give each its default (`false`), its "Introduced: 2.14.0" and
+"Enabled: TBD" lines, and for the second: "WARNING: Only enable once every peer in the cluster is on
+a version that supports receiving `deleteRangeOp`. Older peers panic on apply of an unknown stream
+entry operation." Lines 53–60: an unknown name is "Not supported" and reads as `false`.
+`server/opts.go` lines 1842–1862 parse the block; a non-boolean value is the error
+`error parsing feature flag "<name>": expected bool, got <type>`. At `v2.15.0-preview.1` the file
+adds a third, `js_snapshot_sources` ("Introduced: 2.15.0"), and `js_ack_fc_v2` is still `false`.
+
+**Suggested fix:** list the flags the release documents — name, what it toggles, the release it was
+introduced in, the default, and the mixed-version warning for `js_raft_delete_range` — on
+`reference/config/feature_flags.md`, and replace "Names are server-internal and change between
+releases" with a pointer to that list; a `feature_flags` section in each upgrade guide from 2.14 on
+saying which flags flipped.
+
+
+## 63 · The consumer reset API is missing from the JetStream API reference
+
+**Impact: an operator who reads in the 2.14 upgrade guide that "consumer delivery state can now be
+reset back to the acknowledgement floor, or to an arbitrary sequence" and goes to the API reference
+to find the subject and the request body finds nine consumer endpoints and no reset.**
+
+**Docs.** `raw/nats-docs/reference/jetstream/api/consumer.md` lines 4–14 list CREATE, DELETE, INFO,
+LIST, NAMES, MSG.NEXT, LEADER.STEPDOWN, PAUSE and UNPIN; `raw/nats-docs/reference/jetstream/api/consumer/`
+holds those nine pages. `release-notes/upgrade-to-2.14.md` line 22 describes the API and links
+ADR-60 without giving the subject. `grep -rl CONSUMER.RESET raw/nats-docs/` matches only the upgrade
+guide (and only because the wiki's grep is case-insensitive on "Consumer reset").
+
+**Release notes.** `raw/release-notes/v2.14.0.md`, *Added / JetStream*: "Consumer reset API (#7489)
+— It is now possible to reset a consumer back to an earlier sequence number using the
+`$JS.API.CONSUMER.RESET.stream.consumer` API without deleting and recreating it — ADR:
+…/ADR-60.md#consumer-delivery-state-reset-api".
+
+**Server, v2.14.6** (`raw/nats-server-src/feature-flags-dial-timeout-and-2.15-subjects.md` §3):
+`server/jetstream_api.go` line 159, `JSApiConsumerResetT = "$JS.API.CONSUMER.RESET.%s.%s"`. The
+request and reply shapes are on `wiki/reference/js-api-subjects.md` from ADR-60.
+
+**Suggested fix:** a `reference/jetstream/api/consumer/reset.md` page (subject, the empty payload
+and the `{"seq": <n>}` form, the delivery-policy constraints ADR-60 states, the reply), and a row in
+the `consumer.md` index; the `PAUSE` and `UNPIN` rows show the generator already carries 2.11
+additions, so this is a data gap, not a tooling one.
+
+
+## 64 · Five config keys "available since 2.12" that the 2.11 line parses
+
+**Impact: the generated `Available since` line dates a key to the minor it first shipped on the
+main line, not to the patch releases that carried it; an operator on 2.11.11+ who wants
+`write_timeout`, or on 2.11.12+ who wants a WebSocket ping interval, is told the key is not
+available to them.**
+
+**Docs.** `raw/nats-docs/reference/config/write_timeout.md`, `websocket/ping_interval.md`,
+`cluster/write_deadline.md`, `gateway/write_deadline.md`, `leafnodes/write_deadline.md` (fetched
+2026-08-31) — each: "Available since NATS Server `2.12`".
+
+**Release notes.** `raw/release-notes/v2.11.11.md` line 25: "Added `write_timeout` option for
+clients, routes, gateways and leafnodes which controls the behaviour on reaching the
+`write_deadline`" (2025-11-13). `raw/release-notes/v2.11.12.md` line 26: "Added WebSocket-specific
+ping interval configuration with `ping_internal` in the `websocket` block (#7614)" (2026-01-27). The
+block-level `write_deadline` is announced only in `v2.12.1.md` (#7405) — no 2.11 body names it.
+
+**Server** (`raw/nats-server-src/backported-keys-v2.11.17.md`): `server/opts.go` at **v2.11.17** —
+`case "write_timeout"` at line 1303 (top level), 1950 (`parseCluster`), 2140 (`parseGateway`), 2638
+(`parseLeafNodes`); `case "write_deadline"` inside the same three block parsers at lines 1948, 2138,
+2636; `case "ping_interval"` in `parseWebsocket` at line 5211. At **v2.10.29** none of these
+block-level cases exists (`"write_timeout"` occurs zero times). Found by diffing
+`tools/check-defaults.py` reports at v2.10.29 and v2.11.17: the four `write_deadline` /
+`ping_interval` rows go from *unresolved* to *agrees* between the two tags.
+
+**Suggested fix:** "Available since NATS Server `2.11.11`" (`write_timeout`), "`2.11.12`"
+(`websocket.ping_interval`), and for the three block-level `write_deadline` pages the 2.11 patch
+that carried #7405 (the 2.12.1 twin, v2.11.10, is the likely one; its body does not say). More
+generally, if the generator takes *since* from the main-line minor, say so on the page, or take it
+from the oldest tag whose parser accepts the key.
+
+
 ## Internal — where this wiki records each of these
 
 *Not part of the report.* This table maps each finding to the page in this wiki that carries it, so a
@@ -2965,3 +3098,7 @@ reader here can get from a finding to the prose that uses it. A recipient of the
 | 58 | `wiki/entities/nats-server-2.12.md`; `wiki/summaries/s-relnotes-2.12.md` — *The docs' upgrade guide against the bodies* |
 | 59 | `wiki/operations/jetstream-sizing.md` — *Version notes: the 2.12 line*; `wiki/internals/filestore-layout.md`; `wiki/summaries/s-relnotes-2.12.md` |
 | 60 | `wiki/operations/run-nats-behind-a-proxy.md` — *Version notes: the 2.12 line*; `wiki/summaries/s-relnotes-2.12.md` |
+| 61 | `wiki/concepts/leafnode.md` — *The 2.14 line*; `wiki/reference/config-keys.md` — *Keys that arrived during 2.14*; `wiki/reference/defaults-and-limits.md` — *Defaults that moved during 2.14*; `wiki/summaries/s-relnotes-2.14.md` |
+| 62 | `wiki/reference/config-keys.md` — *Keys that arrived during 2.14*; `wiki/concepts/mirrors-and-sources.md` — *Version notes: the 2.14 line, and the preview*; `wiki/entities/nats-server-2.14.md` — *The docs' upgrade guide against the bodies*; `wiki/summaries/s-relnotes-2.14.md` |
+| 63 | `wiki/reference/js-api-subjects.md` — *Documented elsewhere, absent from the API index* and *The 2.14 line, and the preview's subjects*; `wiki/concepts/consumer.md` — *The 2.14 line*; `wiki/summaries/s-relnotes-2.14.md` |
+| 64 | `wiki/gotchas/slow-consumer-detected.md` — *The 2.11 line* and *The 2.12 line*; `wiki/entities/nats-server-2.11.md` — *The default diff*; `wiki/log.md` 2026-09-03 (phase D, step 8) |

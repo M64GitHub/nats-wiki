@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [recovery, restore, startup, index.db, sources, backward-scan, clean-shutdown, SIGKILL, healthcheck, cardinality, kubernetes, measured, unanswered-upstream]
 aliases: ["Restored messages for stream in minutes", "JetStream restart takes minutes", "stream restore slow", "server slow to start with large stream", "Healthcheck failed during startup", "jetstream startup slow", "recovery slow after restart", "jetstream-recovery-is-slow"]
-sources: [s-gh-8001-jetstream-startup-slow-50m, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-gh-8001-jetstream-startup-slow-50m, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-09-02
 updated: 2026-09-03
 ---
@@ -214,6 +214,21 @@ always used for trailing deletes (#7782) and a race rebuilding block state (#778
 [[s-relnotes-2.12]]).
 
 
+### The 2.14 line, and the preview
+
+- **2.14.0**: recovery from a partial purge after a hard kill (#7676); a Raft node **refuses to start**
+  on a missing, corrupt or misaligned snapshot (#7566, #7580, #7620) — not slow, stopped, and on
+  purpose (source: [[s-relnotes-2.14]]). **2.14.1**: temporary snapshots ignored on recovery after a
+  crash (#8101). **2.14.2**: the block-skip check disabled above a million subjects (#8227).
+  **2.14.4**: `max_concurrent_io` bounds the recovery task queue (#8336); **blocks with unsynced or
+  truncated key files are removed and counted as lost data "instead of failing to recover
+  altogether"** (#8365). **2.14.6**: snapshots no longer prevented on a clean shutdown (#8465) — a
+  clean stop that recovered block by block was this; the stream's created time survives recovery on
+  a standalone server (#8471).
+- **2.15 preview**: `sources.db` (#8282) ends cause 1; the `js_snapshot_sources` flag ("Introduced:
+  2.15.0", off) carries the index in stream snapshots (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[jetstream-sizing]] · [[kubernetes-storage]] · [[upgrade-a-cluster]] · [[stream]] ·
@@ -223,4 +238,4 @@ always used for trailing deletes (#7782) and a race rebuilding block state (#778
 
 [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-filestore-recovery]] ·
 [[s-nats-server-stream-scale-observed]] · [[s-gh-8333-high-cardinality-subjects]] ·
-[[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

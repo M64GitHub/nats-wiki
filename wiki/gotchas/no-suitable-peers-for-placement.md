@@ -2,13 +2,14 @@
 title: "no suitable peers for placement"
 type: gotcha
 area: [topology, jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [10005, placement, server_tags, replicas, debug-logs]
 aliases: ["no suitable peers", 10005, "JSClusterNoPeersErrF", "cannot increase replicas"]
 sources: [s-gh-7982-no-suitable-peers, s-docs-placement, s-docs-sizing-and-resources, s-adr-7-server-error-codes, s-nats-server-mqtt-websocket-observed, s-nats-server-jetstream-cluster]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # "no suitable peers for placement"

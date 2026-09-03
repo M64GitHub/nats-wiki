@@ -3,13 +3,14 @@ title: Set up operator mode
 type: operation
 kind: runbook
 area: [security]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [operator, jwt, nats-auth, nsc, resolver, account-push, creds, scoped-signing-key]
 aliases: [operator mode setup, jwt setup, nsc setup, nats auth setup, account resolver setup]
 sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-03
 ---
 
 # Set up operator mode

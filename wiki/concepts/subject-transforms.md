@@ -2,7 +2,7 @@
 title: Subject transforms and republish
 type: concept
 area: [jetstream, core]
-since: []
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [subject_transform, republish, wildcard, partition, split, Nats-Stream, Nats-Subject, Nats-Sequence, Nats-Last-Sequence, Nats-Msg-Size, 10052, sharding]
@@ -148,6 +148,11 @@ nothing: **`*` is a token, never a prefix.**
   consumer filter must be written against the **stored** subject, not the published one.
 
 ## Version notes
+
+**Since 2.10.0 for stream-level transforms.** `subject_transform` on a stream, republish on mirrors
+and sources, and the partition function are listed under *Added* in the v2.10.0 body (#3814, #3823,
+#3827, #4035, #4354, #4400, #4403, #4512; #4010; wildcard-token removal #4152); account-level subject
+mapping is older than the archive, so the frontmatter says `[2.10]` (source: [[s-relnotes-2.10]]).
 
 - **Stream subject transforms and republish on mirrors and sources are since 2.10.0** (#3814,
   #3823, #3827, #4035, #4354, #4400, #4403, #4512; #4010), with wildcard-token removal (#4152) and

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [message-scheduling, allow_msg_schedules, Nats-Schedule, cron, delayed-publish, message-ttl]
 aliases: [message scheduler, scheduled messages, delayed publishing, delayed message, cron schedule, Nats-Schedule, allow_msg_schedules]
-sources: [s-adr-51-message-scheduler, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-gh-7672-cron-schedules, s-gh-7628-scheduler-vs-nak, s-synadia-delayed-scheduling, s-relnotes-2.12]
+sources: [s-adr-51-message-scheduler, s-nats-server-message-schedules-observed, s-docs-jetstream-headers, s-gh-7672-cron-schedules, s-gh-7628-scheduler-vs-nak, s-synadia-delayed-scheduling, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-09-01
 updated: 2026-09-03
 ---
@@ -339,6 +339,16 @@ patterns" for counters and schedules (#8240); **2.12.12** — malformed schedule
 decode (#8269). Cron and `@every` are 2.14 ([[nats-server-2.14]]).
 
 
+## Version notes: the 2.14 patches
+
+Repeating and cron schedules, `Nats-Schedule-Source` and `Nats-Schedule-Rollup` are 2.14.0 (#7504,
+#7687, #7688; #7506; #7559) (source: [[s-relnotes-2.14]]). Then: **2.14.1** — `Nats-Schedule-Next:
+purge` "now correctly checks if the target is a schedule" (#8135); **2.14.2** — configuration
+constraints on counter streams and schedules "to prevent incorrect usage patterns" (#8240);
+**2.14.3** — schedule drift fixed (#8308) and malformed schedule state rejected on decode (#8269).
+The 2.12 twins carry the same fixes ([[nats-server-2.12]]).
+
+
 ## Related
 
 [[stream]] · [[message-ttl]] · [[retention-policies]] · [[mirrors-and-sources]] · [[publishing]] ·
@@ -351,4 +361,4 @@ decode (#8269). Cron and `@every` are 2.14 ([[nats-server-2.14]]).
 [[s-docs-jetstream-headers]] · [[s-gh-7672-cron-schedules]] · [[s-gh-7628-scheduler-vs-nak]]
 
 Run directly, not read: `raw/nats-server-src/message-schedules-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01. · [[s-synadia-delayed-scheduling]] · [[s-relnotes-2.12]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01. · [[s-synadia-delayed-scheduling]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

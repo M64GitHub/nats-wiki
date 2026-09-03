@@ -2,6 +2,7 @@
 title: Unauthenticated clients still connect
 type: gotcha
 area: [security]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: ["$G", "$SYS", no_auth_user, accounts, auth_required, sysAccOnlyNoAuthUser, 2.10.2]

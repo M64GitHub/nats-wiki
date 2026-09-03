@@ -2,11 +2,12 @@
 title: The meta layer
 type: internals
 area: [jetstream, topology, monitoring]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [meta-layer, meta-group, meta-leader, raft, quorum, orphan, peer-remove, election, 10008, healthz, jsz, meta_compact, extension_hint, observer, snapshot]
 aliases: [meta group, meta leader, metadata controller, metalayer, meta-layer, "_meta_", JetStream meta layer, metadata leader, meta controller]
-sources: [s-nats-server-jetstream-cluster, s-docs-jetstream-in-a-cluster, s-docs-raft-and-leaders, s-adr-61-meta-quorum-rescue, s-gh-7831-standalone-to-cluster, s-nats-server-leafnode-js-domains, s-docs-scaling-and-peers, s-gh-7438-multi-region-availability, s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-nats-server-jetstream-cluster, s-docs-jetstream-in-a-cluster, s-docs-raft-and-leaders, s-adr-61-meta-quorum-rescue, s-gh-7831-standalone-to-cluster, s-nats-server-leafnode-js-domains, s-docs-scaling-and-peers, s-gh-7438-multi-region-availability, s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-09-01
 updated: 2026-09-03
 ---
@@ -265,6 +266,10 @@ to the system account (source: [[s-nats-server-raftz]]; field table on [[monitor
 
 ## Version notes
 
+**Since.** `since: [2.10]` in the frontmatter means *present at 2.10, the oldest line this wiki covers*:
+the 2.10 release bodies patch the meta group from v2.10.0 on and none records the arrival, which is
+older than the archive (source: [[s-relnotes-2.10]]).
+
 - `meta_compact`, `meta_compact_size`, `meta_compact_sync` — **2.12** (source: the config reference,
   via [[config-keys]]).
 - `--host` / placement on `nats server cluster step-down` — **2.11** or newer (the CLI warns).
@@ -337,6 +342,28 @@ to the system account (source: [[s-nats-server-raftz]]; field table on [[monitor
   create issued right after the `no metadata leader` line still timed out, a consumer create 3 s
   later got `10008`.
 
+### The 2.14 line
+
+- **2.14.0**: account, stream and consumer info and list requests are **queued separately and
+  deprioritised** relative to create/update/delete (#7898) — a poller no longer competes with writes
+  for the meta leader's API queue (source: [[s-relnotes-2.14]]). **2.14.1**: assignment errors
+  surfaced (#8208); metalayer state preserved in cases where it was wrongly removed on shutdown
+  (#8199); the local meta log reset correctly when extending the group to a parent domain (#8142);
+  a consumer's local state survives a failed clean-up proposal (#8198). **2.14.2**: quorum when
+  bootstrapping with multi-IP gateway URLs (#8238); peer-set drift after removing an online node
+  (#8258). **2.14.3**: a data race on the meta node at shutdown (#8260); in-flight proposal tracking
+  consistent during stream moves (#8261); assignment handling refactored (#8262); recovery snapshots
+  leave no phantom streams or consumers (#8324). **2.14.4**: a stream recreated while a node was
+  down is not taken for an update by the returning node, "avoiding stale Raft groups from continuing
+  to run" (#8413). **2.14.5**: **the idempotent-create data-loss path when an offline node catches
+  up from a meta snapshot** (#8449). **2.14.6**: a consumer create could destroy an existing
+  consumer's state (#8491).
+- **2.15 preview**: the **desired-state metalayer** (#8432 … #8476) — "a new desired state
+  reconciliation engine for streams and consumers" that makes mid-move changes, cancellations and
+  peer-removes "much safer"; `$JS.API.SERVER.EVACUATE` and `$JS.API.STREAM.PEER.EVACUATE.<stream>`;
+  `$JS.API.META.RESCUE` (source: [[s-relnotes-2.15-preview]]).
+
+
 ## Related
 
 [[raft-in-nats]] · [[replicas]] · [[stream-placement]] · [[stream]] · [[consumer]] ·
@@ -351,4 +378,4 @@ to the system account (source: [[s-nats-server-raftz]]; field table on [[monitor
 [[s-nats-server-jetstream-cluster]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-docs-raft-and-leaders]] · [[s-adr-61-meta-quorum-rescue]] ·
 [[s-gh-7831-standalone-to-cluster]] · [[s-nats-server-leafnode-js-domains]] ·
-[[s-docs-scaling-and-peers]] · [[s-gh-7438-multi-region-availability]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-docs-scaling-and-peers]] · [[s-gh-7438-multi-region-availability]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

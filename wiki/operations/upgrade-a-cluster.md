@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [rolling-upgrade, lame-duck, SIGUSR2, meta-leader, downgrade, PodDisruptionBudget, ldm]
 aliases: [rolling upgrade, "upgrade NATS", "roll a cluster", lame duck, ldm, "upgrade nats-server"]
-sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -353,6 +353,40 @@ From the 15 release bodies (source: [[s-relnotes-2.12]]):
   storage grow no longer needs a restart, but a shrink still does.
 
 
+### The 2.14 line
+
+From the seven release bodies (source: [[s-relnotes-2.14]]):
+
+- **No 2.14 release is withdrawn and none carries a warning**; there is no downgrade floor stated
+  for 2.14 → 2.12 beyond the `feature_flags` rule above. The rule that does exist is *which patch*:
+  **2.14.0 alone** can redeliver acked messages from drifted consumer state (fixed 2.14.1, #8102,
+  #8156, #8168); **2.14.3** is the floor for counters, compression or encryption (#8311, #8312) and
+  for the security batch; **2.14.4** for `verify_and_map` (the blank-password bypass) and for
+  `no_auth_user` beside auth callout; **2.14.5** for the idempotent-create data loss (#8449);
+  **2.14.6** for replicated consumers that stick after a leader change (#8488) and for a consumer
+  create that could destroy an existing consumer's state (#8491).
+- **The hop changes no default.** What 2.14.0 changes is behaviour: info API requests are queued
+  behind create/update/delete (#7898) — a monitoring poller that hammered `STREAM.INFO` now waits
+  behind writes; a Raft node with a bad snapshot **refuses to start** (#7566, #7580, #7620) — a node
+  that stays down after an unclean stop may be doing that on purpose; a `no_wait` pull with no
+  expiry gets `404 No Messages` (#7466, already in 2.11.11 and 2.12.2).
+- **2.14.3 removes JSONP** from the monitoring endpoints — a dashboard using `?callback=` breaks.
+- **2.14.5's `dial_timeout`** is the fix for leafnode remotes over high-latency links that never got
+  past the TCP handshake in the default 1 s ([[leafnode]]).
+- **The 2.12 twins**: 2.14.1–2.14.5 are 2.12.9, 2.12.10, 2.12.12, 2.12.14, 2.12.15 on the same days,
+  so an operator on 2.12.15 upgrading to 2.14.6 gets 2.14.6's fixes and the 2.14.0 features, nothing
+  else new.
+
+### The 2.15 preview
+
+`v2.15.0-preview.1` (2026-08-24) is a preview, not a release candidate, and contains the changes
+"up to and including v2.14.5". It adds `$JS.API.SERVER.EVACUATE` and `$JS.API.STREAM.PEER.EVACUATE.<stream>`
+(move assets off a node "without having to peer-remove first"), `$JS.API.STREAM.CANCEL_MOVE.<stream>`,
+`$JS.API.META.RESCUE`, a v2 backup format, `sources.db`, and changes what `sync_interval: always`
+does on a replicated stream. It does **not** yet flip the `$JS.ACK` v2 default (source:
+[[s-relnotes-2.15-preview]]).
+
+
 ## Pitfalls
 
 **Do not size `lame_duck_duration` against JetStream.** The docs advise setting it to cover "how long
@@ -429,4 +463,4 @@ rolling restart is the last node's.
 [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] · [[s-nats-server-systemd-units]] ·
 [[s-docs-scaling-and-peers]] · [[s-gh-4342-memory-stream-backup]] ·
 [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-40-nats-connection]] ·
-[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]

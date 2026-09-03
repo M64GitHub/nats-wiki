@@ -1,5 +1,7 @@
 # Plan — the change layer: release notes 2.10.0 → 2.14.6 (proposed 2026-09-03)
 
+**Result (2026-09-03, all nine steps done in two sessions).** 70 release bodies in `raw/release-notes/` with a manifest row; `inbox/relnotes-toc.md` (70 rows, 26 ★) in the viewer with every 2.14 row and the preview linked to a summary; five change-layer summaries (`s-relnotes-2.10`, `-2.11`, `-2.12`, `-2.14`, `-2.15-preview`) read per minor and checked against the two upgrade guides and the server source; the five release entities rewritten as changelogs with *Which patch to be on* and *The default diff*; ~170 version-note sections rippled; **`since:` on every reader page with `verified-against`** — 47 given `[2.10]` in step 7, 8 with a stated reason instead, residue 0; `inbox/check-defaults-v2.10.29 / v2.11.17 / v2.12.15.md` and the default diff per minor in `wiki/log.md` (one documented default moved: `max_buffered_msgs`, 2.12.0); docs issues **#54–#64** (60 → 64 this session), one wiki correction (the subject tree is 2.10.10); bank 116 / 137 → 121 / 160. Lint: 317 pages, wanted 0, drift 0, unlanded 0, staleness 0 behind 2.14.6. **Next:** phase E, the reference layer (`inbox/plan-the-reference-layer-<DATE>.md`) — read `raw/nats-docs/reference/system/` and `reference/jetstream/api/` end to end first.
+
 Say **`start the plan inbox/plan-change-layer-2026-09-03.md`** to work this file — name it
 explicitly, a bare `start the plan` takes the newest `inbox/plan-*.md`. `CLAUDE.md` → *Operation:
 plan* says how: one step at a time, `status:` rewritten in place, `wiki/log.md` appended, lint run,
@@ -144,7 +146,7 @@ guide and the notes disagree is a docs issue. Ripple to `nats-server-2.12`, `pub
 `message-scheduling`, `stream`, `filestore-layout`, `jetstream-recovery-is-slow`, `js-api`,
 `defaults-and-limits`. Bank, docs issues, log, lint.
 
-## Step 6 — ingest the 2.14 line and the 2.15 preview (7 + 1 releases) · status: open
+## Step 6 — ingest the 2.14 line and the 2.15 preview (7 + 1 releases) · status: done 2026-09-03 — `s-relnotes-2.14` (the seven bodies as one changelog, the three per-patch summaries folded by reference, the guide checked line by line: one unconfirmed claim, the frozen-stream wording as the guide's own, the omissions listed) and `s-relnotes-2.15-preview` (the body read whole; the four new subjects **verified at the preview tag**, and `js_ack_fc_v2` found still `false` there); the keys the bodies introduce verified at v2.14.6 in `raw/nats-server-src/feature-flags-dial-timeout-and-2.15-subjects.md`; docs issues **#61** (`dial_timeout` undocumented), **#62** (`feature_flags.md` names no flag; the `js_raft_delete_range` panic warning nowhere), **#63** (`CONSUMER.RESET` absent from the API index); **46 pages rippled**; the TOC regenerated (every 2.14 row linked); bank unchanged (119 / 158); unlanded 0, lint clean, 317 pages.
 
 `s-relnotes-2.14.md` folds the existing [[s-relnotes-2.14.0]], [[s-relnotes-2.14.1]] and
 [[s-relnotes-2.14.4]] by reference and reads 2.14.2, 2.14.3, 2.14.5 and 2.14.6 for the first time as
@@ -153,7 +155,7 @@ a line; `s-relnotes-2.15-preview.md` is the preview body as it stands on 2026-09
 `nats-server-2.14`, `nats-server-2.15-preview`, `consumer`, `mirrors-and-sources`, `raft-in-nats`,
 `ack-and-redelivery`, and the pages the 2.14.x fixes already touch. Bank, docs issues, log, lint.
 
-## Step 7 — the `since:` sweep · status: open
+## Step 7 — the `since:` sweep · status: done 2026-09-03 — 55 pages listed by script; **47** got `since: [2.10]` (the frontmatter line carries the convention as a comment; the 21 concept and internals pages say it in words at the head of *Version notes*, naming the first 2.10.x body that patches the subject; `subject-transforms` states the real 2.10.0 arrival of stream-level transforms); **8** keep no `since:` with a one-line `## To verify` reason (domains ×3, object store, ordered consumer, client discovery, KV watchers, the message-lag warning — none dated by any source read); residue **0**; lint clean.
 
 The measured half of *done when*. A short script (in the log, or `tools/lint.py` if it earns a
 place there) lists every non-summary, non-entity page with `verified-against` and no `since:`. For
@@ -166,7 +168,7 @@ so, and keeps no `since:`. Bump `updated:`; re-check `verified-against` / `verif
 page where a default, key or subject was touched. Report the count (55 → 0, or the residue with
 reasons). Log, lint.
 
-## Step 8 — the default diff per minor · status: open
+## Step 8 — the default diff per minor · status: done 2026-09-03 — `inbox/check-defaults-v2.10.29.md` (13 / 37 / 166), `-v2.11.17.md` (14 / 29 / 173), `-v2.12.15.md` (14 / 27 / 175) beside the v2.14.6 report (15 / 26 / 175); the server column diffed in sequence and recorded in `wiki/log.md` as *the default change layer*: **one documented default moved** (`max_buffered_msgs` 10,000 → 100,000 at 2.12.0, already in the bodies), twelve keys are arrivals (eight at 2.11, three batch limits at 2.12, `info_queue_limit` at 2.14 — the last one missed by step 6 because the body names the queue and not the key, now on the summary and both reference tables); the diff also produced docs issue **#64** (five pages "since 2.12" for keys the 2.11 line parses — verified in `opts.go` at v2.11.17 / v2.10.29, `raw/nats-server-src/backported-keys-v2.11.17.md`); the four release entities carry their diff; lint clean.
 
 `python3 tools/check-defaults.py --tag v2.10.29`, `--tag v2.11.17`, `--tag v2.12.15` (the last patch
 of each line; the tarballs cache under `.cache/`), then diff the *server* column of each report
@@ -178,7 +180,7 @@ one the viewer shows); the diffs go into `wiki/log.md` as the *default change la
 release entities. Expect more *unresolved* at older tags — the resolver was written against 2.14.6
 source — and report it, not paper over it. Log, lint.
 
-## Step 9 — close: entities, bank, result line · status: open
+## Step 9 — close: entities, bank, result line · status: done 2026-09-03 — every release entity cites its `s-relnotes-*` summary (grep: 2.10 ×9, 2.11 ×6, 2.12 ×8, 2.14 ×6, 2.15-preview ×3 body links) and no "not a changelog" note remains; bank rows **159–160** added (`own` — the discussions index and comment cache hold no asked form) and answered on arrival, 119 / 158 → **121 / 160**; nothing struck in the backlog; result line written; megaplan phase D closed.
 
 Verify by grep that each of the five release entities cites its `s-relnotes-*` summary and that no
 "not a changelog" note remains; fill every `answered by` the phase earned and add the rows the notes

@@ -8,7 +8,7 @@ tags: [jetstream-domain, domain, default_js_domain, js-domain, mapping, external
 aliases: [domain, js domain, js-domain, jetstream domains, "$JS.<domain>.API", default_js_domain]
 sources: [s-nats-server-leafnode-js-domains, s-docs-leaf-nodes, s-gh-7438-multi-region-availability, s-gh-7881-cross-domain-sourcing, s-gh-7834-leafnode-same-js-domain, s-nats-server-object-store-leafnode, s-docs-mqtt-auth-and-clustering, s-natscli-stream-external, s-nats-server-jetstream-cluster, s-issue-5106-object-store-mirror-list]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # JetStream domain
@@ -208,3 +208,5 @@ exists, because the leaf can reach JetStream through the hub.
   `inbox/docs-issues.md` #26.
 - Whether a domain may be changed on a running deployment without losing stream state has not been
   established from any source.
+- **`since:` is deliberately absent.** No release body from v2.10.0 to v2.14.6 records when JetStream domains arrived; the first body that patches them is v2.12.5, so they are present by 2.12 and older than that — and the wiki's floor convention (`[2.10]` = present at 2.10) cannot be asserted from any source read (checked 2026-09-03 over the 70 bodies behind [[s-relnotes-2.10]] … [[s-relnotes-2.14]]).
+

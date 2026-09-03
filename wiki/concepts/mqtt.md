@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [mqtt, qos, retained, sessions, client-id, topic-conversion, "$MQTT", stream_replicas, MQTT_WS]
 aliases: [MQTT, mqtt, "mqtt {}", MQTT broker, "$MQTT", MQTT_WS, mosquitto]
-sources: [s-docs-mqtt-your-first-mqtt-client, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-qos-sessions-and-retained, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7533-quorum-loss-mqtt, s-nats-server-kick-ldm-mqtt-session, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12]
+sources: [s-docs-mqtt-your-first-mqtt-client, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-qos-sessions-and-retained, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7533-quorum-loss-mqtt, s-nats-server-kick-ldm-mqtt-session, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
 created: 2026-09-01
 updated: 2026-09-03
 ---
@@ -352,6 +352,19 @@ MQTT is disabled. **2.12.14**: packet identifiers for QoS 1 and 2 issued by a mo
 (#8359); QoS 2 messages released on a resumed session keep their QoS and packet ID (#8414).
 
 
+### The 2.14 line
+
+**2.14.0**: retained messages "can no longer contain the ASCII DEL character (0x7F) in the subject"
+(#8071) — the one `### Changed` MQTT line of the minor (source: [[s-relnotes-2.14]]). **2.14.1**:
+invalid subject characters rejected (#8104, #8112). **2.14.3**: the security batch — partial `CONNECT`
+packets, the `PUBLISH` underflow panic, `$MQTT.deliver.pubrel` subscriptions, deny rules on retained
+and QoS replay paths, the `/mqtt` upgrade panic with MQTT disabled. **2.14.4**: packet identifiers
+for QoS 1 and 2 from a monotonic counter (#8358); pending QoS 1/2 deliveries no longer leak on a
+downgrade to QoS 0 (#8359); QoS 2 messages released on a resumed session keep their QoS and packet
+ID (#8414); **MQTT clients can no longer subscribe to `$MQTT.>`**, "closing a potential permission
+bypass". These are the 2.12.9–2.12.14 lines under 2.14 numbers.
+
+
 ## Related
 
 [[websocket]] · [[stream]] · [[subject-permissions]] · [[account]] · [[operator-mode]] ·
@@ -377,4 +390,4 @@ MQTT is disabled. **2.12.14**: packet identifiers for QoS 1 and 2 issued by a mo
 [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-mqtt-topics-and-subjects]] ·
 [[s-docs-mqtt-qos-sessions-and-retained]] · [[s-docs-mqtt-auth-and-clustering]] ·
 [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-nats-server-monitoring-observed]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-kick-ldm-mqtt-session]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]]
+[[s-nats-server-monitoring-observed]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-kick-ldm-mqtt-session]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]

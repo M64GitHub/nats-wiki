@@ -5,10 +5,10 @@ kind: release
 area: [deploy, jetstream, security]
 since: [2.15]
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-03
 tags: [release, 2.15, preview, js_ack_fc_v2, acl-migration, sources.db, js_snapshot_sources, recovery]
 aliases: ["2.15", v2.15, "v2.15.0-preview.1"]
-sources: [s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-filestore-recovery, s-gh-8001-jetstream-startup-slow-50m, s-nats-server-stream-scale-observed, s-gh-6005-sourcing-memory-stream-restart]
+sources: [s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-nats-server-filestore-recovery, s-gh-8001-jetstream-startup-slow-50m, s-nats-server-stream-scale-observed, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.15-preview, s-relnotes-2.14]
 created: 2026-08-31
 updated: 2026-09-03
 ---
@@ -93,13 +93,40 @@ recreated — reported on 2.10.19 in 2024, reverted then, and reported again on 
 [[s-gh-6005-sourcing-memory-stream-restart]]). See [[mirrors-and-sources]].
 
 
+## The preview body, read whole
+
+`raw/release-notes/v2.15.0-preview.1.md` (2026-08-24, Go 1.27.0, "contains all changes up to and
+including v2.14.5" — so none of the 2.14.6 fixes) lists eight additions, one change and one
+improvement. The subjects below were **verified in `server/jetstream_api.go` at the preview tag**
+(source: [[s-relnotes-2.15-preview]]):
+
+| what | subject or key | note |
+|---|---|---|
+| **desired-state metalayer** (#8432 … #8476) | — | "a new desired state reconciliation engine for streams and consumers"; changing placement or replicas mid-move, cancelling a move, and peer-removing are "now much safer" |
+| **cancel a stream move** (#8476) | `$JS.API.STREAM.CANCEL_MOVE.<stream>` | account-level; the source comment: rolls back *any* in-flight desired state, "which includes a scale up/down or a retention change". The system-account `$JS.API.ACCOUNT.STREAM.CANCEL_MOVE.<account>.<stream>` already exists on 2.14 |
+| **evacuate a server** (#8443) | `$JS.API.SERVER.EVACUATE` | system account; moves the streams and their consumers off a node "without having to peer-remove first" — the 2.15 form of [[evict-a-sick-server]] and [[rebalance-streams]] |
+| **evacuate a peer from one stream** (#8443) | `$JS.API.STREAM.PEER.EVACUATE.<stream>` | account-level |
+| **metalayer rescue** (#8408) | `$JS.API.META.RESCUE` | above; system account, a broadcast every online server answers on its own |
+| **backup and restore v2** (#7882) | — | "reads out per-message rather than per-block" and "now correctly includes non-replicated consumers on follower nodes" — [[backup-and-restore-jetstream]] |
+| **source stream recreation detected** (#8384) | — | above |
+| **source indexing** (#8282) | `feature_flags { js_snapshot_sources }` | above; the flag is "Introduced: 2.15.0 … only emitting v1", default `false` |
+| **domain-prefixed JS API in the system account** (#8429) | — | operate on a leaf node's JetStream from the hub when the system account is bridged ([[jetstream-domain]]) |
+| **`sync_interval: always` on replicated streams** (#8447, the one `### Changed`) | — | syncs the Raft WAL entries but "no longer sync[s] upper stream layer writes"; R1 streams unaffected ([[replicas]]) |
+| shorter wait for durable source/mirror consumer resets (#8323) | — | heartbeats short-circuit the recreation backoff |
+
+**What the preview does not do:** flip `js_ack_fc_v2`. At the preview tag `feature_flags.go` still
+has it `false` with "Enabled: TBD"; the v2.14.0 body's "enabled by default in v2.15" is intent, not
+yet code. Three flags exist there — `js_ack_fc_v2`, `js_raft_delete_range`, `js_snapshot_sources` —
+all off (source: [[s-relnotes-2.15-preview]]; the 2.14 side is [[s-relnotes-2.14]]).
+
+
 ## To verify
 
-- **Beyond the ack-subject default and the source index, nothing about 2.15 is known from an ingested
-  source.** The preview's release body has been read for its recovery lines only (the metalayer
-  rescue endpoint `$JS.API.META.RESCUE` is mentioned there and not yet on any page); the docs mirror
-  has no 2.15 guide.
-- No release date is announced in anything read.
+- The preview body is read whole (above); the docs mirror has no 2.15 guide, and the backup v2
+  format (#7882) and the domain-prefixed system-account API (#8429) are known from the body's one
+  sentence each, not from the source.
+- No release date is announced in anything read, and nothing read says whether `js_ack_fc_v2` flips
+  before 2.15.0 ships.
 
 ## Related
 
@@ -108,4 +135,4 @@ recreated — reported on 2.10.19 in 2024, reverted then, and reported again on 
 
 ## Sources
 
-[[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-6005-sourcing-memory-stream-restart]]
+[[s-docs-upgrade-to-2.14]] · [[s-relnotes-2.14.0]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.15-preview]] · [[s-relnotes-2.14]]

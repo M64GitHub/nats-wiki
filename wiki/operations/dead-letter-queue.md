@@ -3,6 +3,7 @@ title: Dead-letter queue
 type: operation
 kind: pattern
 area: [jetstream]
+since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [dead-letter, dlq, max_deliver, advisories, term, replay, direct-get]

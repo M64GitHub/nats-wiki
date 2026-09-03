@@ -8,7 +8,7 @@ tags: [objectstore, chunks, digest, OBJ_, Nats-Rollup, soft-delete, links, chunk
 aliases: [object store, OBJ_, "$O.", object bucket, OBJ_ stream]
 sources: [s-adr-20-object-store, s-docs-stream-config, s-docs-kv-ttl-and-limits, s-docs-object-store-under-the-hood, s-docs-object-store-chunking, s-docs-object-store-your-first-object, s-docs-object-store-metadata-and-links, s-docs-object-store-watching-and-listing, s-nats-server-object-store-observed, s-gh-6836-object-store-list-slow, s-nats-server-object-store-leafnode, s-nats-server-leafnode-js-domains, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Object Store
@@ -385,6 +385,8 @@ expected:
   discard rest on the docs alone. A client-library test would settle them.
 - **`ErrDigestMismatch` has not been observed.** Producing one means corrupting a stored chunk behind
   the server's back.
+- **`since:` is deliberately absent.** No release body from v2.10.0 to v2.14.6 records the object store's arrival or patches it by name, and ADR-20 names no server version ([[s-adr-20-object-store]]); KV, which it is built beside, is dated 2.6.0 by ADR-8, but that is not a statement about the object store.
+
 
 ## When a KV value should have been an object
 

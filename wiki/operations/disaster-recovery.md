@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [disaster-recovery, promotion, failover, mirror, lag, rpo, 10065, meta-quorum, dr]
 aliases: [DR, failover, "promote a mirror", "site loss", "recover a stream", RPO]
-sources: [s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-docs-stream-backup-restore, s-natscli-backup-restore, s-docs-surviving-node-loss, s-adr-61-meta-quorum-rescue, s-nats-server-snapshot-restore, s-docs-config-and-jwt-backup, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster]
+sources: [s-docs-disaster-recovery, s-docs-mirrors-as-dr, s-docs-stream-backup-restore, s-natscli-backup-restore, s-docs-surviving-node-loss, s-adr-61-meta-quorum-rescue, s-nats-server-snapshot-restore, s-docs-config-and-jwt-backup, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster, s-relnotes-2.15-preview, s-relnotes-2.14]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-03
 ---
 
 # Disaster recovery
@@ -253,6 +253,19 @@ Three details of `nats server cluster peer-remove` that the runbook above relies
   on either side. Stop the server, or remove its `cluster {}` block, inside that window.
 
 
+## Version notes: the preview, from its own release body
+
+The `v2.15.0-preview.1` body confirms the rescue above — "the new `$JS.API.META.RESCUE` endpoint can
+temporarily lower the quorum-needed for the metalayer, in order to facilitate the recovery of a
+system where nodes have been permanently lost and the metalayer cannot reach quorum" (#8408) — and
+the subject at the preview tag is a system-account broadcast that "every online server evaluates and
+responds to … independently". Beside it: `$JS.API.SERVER.EVACUATE`, the planned-maintenance
+counterpart, and a **v2 backup format** that includes the non-replicated consumers on follower nodes
+that a 2.14 backup omits (#7882) (source: [[s-relnotes-2.15-preview]]). On 2.14 the data-loss fixes
+that matter to a recovery are 2.14.5's idempotent-create path (#8449) and 2.14.0's refusal to start a
+Raft node on a bad snapshot (source: [[s-relnotes-2.14]]).
+
+
 ## Related
 
 [[backup-and-restore-jetstream]] · [[backup-and-restore-identity]] · [[mirrors-and-sources]] ·
@@ -265,4 +278,4 @@ Three details of `nats server cluster peer-remove` that the runbook above relies
 [[s-docs-disaster-recovery]] · [[s-docs-mirrors-as-dr]] · [[s-docs-stream-backup-restore]] ·
 [[s-natscli-backup-restore]] · [[s-docs-surviving-node-loss]] · [[s-adr-61-meta-quorum-rescue]] ·
 [[s-nats-server-snapshot-restore]] · [[s-docs-config-and-jwt-backup]] ·
-[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]]
+[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.15-preview]] · [[s-relnotes-2.14]]
