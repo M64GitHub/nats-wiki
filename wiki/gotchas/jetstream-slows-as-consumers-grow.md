@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [consumer-count, consumer-info, meta-leader, raft-traffic, subject-filters, republish]
 aliases: ["too many consumers", "100k consumers", "consumer info is slow", "throughput collapses with many consumers"]
-sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed, s-relnotes-2.10, s-relnotes-2.11, s-gh-5128-ha-assets, s-gh-3405-consumer-filtering-performance]
+sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed, s-relnotes-2.10, s-relnotes-2.11, s-gh-5128-ha-assets, s-gh-3405-consumer-filtering-performance, s-nats-server-stream-topology-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -210,6 +210,35 @@ list, consumer info and consumer list requests are **queued below create-update-
 (source: [[s-relnotes-2.14.0]]). That protects stream operations from an info-heavy client — it does
 not make the info call cheap.
 
+## The two numbers, measured on 2.14.6
+
+Both guidance figures above were run on the current line, one axis at a time (source:
+[[s-nats-server-stream-topology-observed]], run C — one laptop, so an ordering and a mechanism, not a
+limit):
+
+- **Consumers on one stream are not the expensive axis.** 1 / 10 / 100 / 300 / 1,000 filtered
+  consumers on one stream: publish rate **197,506 / 216,850 / 218,176 / 211,130 / 199,888 msg/s** —
+  flat. `CONSUMER.INFO` on one of the thousand: **0.2 ms**. A restart with 1,005 consumers on a
+  1.1 M-message stream: **300.80 ms**. `CONSUMER.LIST` is **4.7–4.9 ms and 145,202 bytes at both 305
+  and 1,005 consumers**, because the response is paged (`limit` 256) and never grows past one page.
+- **The ~300 is about disjoint filters on *one* consumer, and it is a create-time cost.**
+  `CONSUMER.CREATE` at 1 / 10 / 100 / **300** / 1,000 / 2,000 / 5,000 filters: 1.0 / 1.2 / 1.4 /
+  **4.6** / **33.7** / 128.6 / **784.0 ms**. The **first fetch stays 0.2–0.4 ms at every count**, and
+  the single wildcard covering all 1,000 subjects costs **0.8 ms** to create. So cause 3's fix — rework
+  the subject hierarchy so a wildcard does the job — is the right one for a different reason than
+  "scanning blocks": at rest the many-filter consumer read as fast as the wildcard one, and it was
+  *creating* it that cost three orders of magnitude more.
+
+**And the shape the two numbers exist to compare.** The same 300-way fan-out, 300,000 × 128 B, built
+both ways: *300 streams with one consumer each* — RSS 203.5 MiB, disk 64,800 KiB, ingest 127,068 msg/s;
+*one stream with 300 filtered consumers* — RSS **73.9 MiB**, disk **53,708 KiB**, ingest **194,513
+msg/s**. **2.75× the RSS and 1.5× less ingest for the many-streams shape**, on every axis measured —
+which is why the default is one stream with filtered consumers ([[stream-topology-design]]).
+
+None of this contradicts the "no hard cap" note above: nothing failed at any count, and the numbers
+say *where the cost is*, not where a wall is.
+
+
 ## What filtering is *not* the cause of
 
 Worth stating on this page, because the first instinct when a stream gets slow is to suspect the
@@ -278,4 +307,4 @@ sequence to restart from with `OptStartingSeq` — "If you need over 100k feel f
 [[s-synadia-jetstream-anti-patterns]] · [[s-adr-17-ordered-consumer]] · [[s-relnotes-2.14.0]] ·
 [[s-docs-raft-and-leaders]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6746-watch-many-keys]] ·
 [[s-gh-5044-restrict-durable-consumers]] · [[s-docs-get-direct]] ·
-[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-gh-5128-ha-assets]] · [[s-gh-3405-consumer-filtering-performance]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-gh-5128-ha-assets]] · [[s-gh-3405-consumer-filtering-performance]] · [[s-nats-server-stream-topology-observed]]

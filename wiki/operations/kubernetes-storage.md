@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [kubernetes, hostPath, PVC, volumeClaimTemplates, storageClassName, statefulset, block-storage, NFS, max_file_store, fileStore]
 aliases: [hostPath, hostpath vs pvc, kubernetes storage, jetstream pvc, persistent volume, storageClassName, volumeClaimTemplates, emptyDir]
-sources: [s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-nats-server-filestore-layout, s-gh-8001-jetstream-startup-slow-50m, s-nats-server-stream-scale-observed]
+sources: [s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-nats-helm-chart-values-2.14.6, s-gh-5924-filestore-dirs-vanished, s-nats-server-filestore-layout, s-gh-8001-jetstream-startup-slow-50m, s-nats-server-stream-scale-observed, s-gh-6478-s3-offload-and-query]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # JetStream storage on Kubernetes
@@ -187,6 +187,23 @@ must cover bytes ÷ read rate for the largest stream on the node. The causes and
 [[jetstream-recovery-is-slow]].
 
 
+## Not an object-store mount either
+
+"Block storage, never NFS" is usually read as a rule about network *file* systems. It also excludes the
+newer temptation: an object store presented as a filesystem — an S3 bucket behind rclone, s3fs or a CSI
+driver — under `store_dir`. The reasons are mechanical rather than about latency: an object store
+**cannot append**, so a file the server rewrites in place (`index.db`, the last block) becomes a
+whole-object PUT each time; providers charge per operation, so a busy stream multiplies API calls; and
+most object stores handle many small files badly (source: [[s-gh-6478-s3-offload-and-query]]).
+
+The public evidence is one person's experiment, and it is worth knowing how it ended: an rclone mount
+with `--vfs-write-back=10m` under `store_dir` worked well enough to be screenshotted — sealed blocks
+migrating to S3, retention deletes propagating — and then produced missing blocks with
+`corrupted on transfer` in the log. The author stopped there. Treat it as evidence that the shape is
+attractive and unsupported, not as a recipe. What NATS has instead of tiered storage is on
+[[event-sourcing-on-jetstream]].
+
+
 ## Related
 
 [[jetstream-sizing]] · [[filestore-layout]] · [[jetstream-out-of-disk]] ·
@@ -204,4 +221,4 @@ must cover bytes ÷ read rate for the largest stream on the node. The causes and
   `hostPath`, and `max_file_store` rendered equal to the PVC size.
 - [[s-gh-5924-filestore-dirs-vanished]] — what a `store_dir` that does not survive the pod looks like
   when it happens.
-- [[s-nats-server-filestore-layout]] — why the ceiling must sit below the volume. · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-stream-scale-observed]]
+- [[s-nats-server-filestore-layout]] — why the ceiling must sit below the volume. · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-6478-s3-offload-and-query]]

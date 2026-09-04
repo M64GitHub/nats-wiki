@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-04
 tags: [subjects, tokens, wildcards, "*", ">", reserved-prefixes, "$SYS", "_INBOX", max_subscription_tokens, max_sub_tokens, max_control_line, Invalid Subject, Invalid Publish Subject, pedantic, cardinality]
 aliases: [subject, subjects, wildcard, wildcards, tokens, subject naming, reserved prefixes, "$ prefix", "_INBOX prefix", max_subscription_tokens, max_sub_tokens, "Invalid Subject", "Invalid Publish Subject", subject length limit, subject token limit, "Permissions Violation for Subscription to, too many tokens"]
-sources: [s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-nats-cli-core-commands, s-gh-8333-high-cardinality-subjects, s-nats-server-stream-scale-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-publish-subscribe, s-gh-5172-mapping-in-config-or-stream, s-docs-core-nats-chapter, s-client-releases-and-issues, s-synadia-subject-hierarchies, s-gh-4170-subject-indexing-internals]
+sources: [s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-nats-cli-core-commands, s-gh-8333-high-cardinality-subjects, s-nats-server-stream-scale-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-publish-subscribe, s-gh-5172-mapping-in-config-or-stream, s-docs-core-nats-chapter, s-client-releases-and-issues, s-synadia-subject-hierarchies, s-gh-4170-subject-indexing-internals, s-nats-server-stream-topology-observed]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -142,6 +142,32 @@ belongs in the account's `mappings` or in a stream's transform is the maintainer
 for a stream goes in the stream (source: [[s-gh-5172-mapping-in-config-or-stream]]).
 
 
+### Cardinality on one axis, measured
+
+The figures above come from streams that differed in more than their subject count. Run E of the
+stream-topology runs changed **nothing but the number of distinct subjects** — the same stream, the
+same 1,000,000 × 128 B messages, the same 13-byte subject shape `c.%07d.evt` — and each scene started
+from a purged lab (source: [[s-nats-server-stream-topology-observed]], nats-server 2.14.6, one laptop,
+so a ratio and never a limit):
+
+| at 10 / 10,000 / 1,000,000 distinct subjects | |
+|---|---|
+| RSS, stream filled | **50.0 / 78.0 / 294.0 MiB** ⇒ ~**256 B per subject** |
+| `index.db` after a clean stop | **738 / 170,549 / 17,000,550 B** — `Σ(len(subject) + 4)` plus a ~550-byte header |
+| `Took … to start JetStream` | 130.8 / 178.1 / **421.2 ms** clean; 245.8 / 279.1 / **604.9 ms** after SIGKILL |
+| fill rate | 179,717 / 185,289 / 198,078 msg/s — **the publish path did not move** |
+| `nats stream subjects` | 0.01 / 0.04 / **5.40 s** |
+| a consumer filtered on **one** subject | create 1.1 / 0.9 / 1.0 ms, first message 2.5 / 1.5 / 3.3 ms — flat |
+| a consumer on the **wildcard** `c.*.evt` | create 1.1 → **18.6 ms**, first message 0.1 → **19.2 ms** |
+
+So cardinality is a **RAM and subject-listing budget**, plus a few hundred milliseconds of recovery.
+It is not a throughput budget, and it is not a cost to a consumer that pins one subject; what it makes
+expensive is the **wildcard** consumer — 170× on create and 190× on first message between ten subjects
+and a million. `STREAM.INFO` with `subjects_filter` went 0.2 ms → **372.7 ms** over the same range and
+returns at most **100,000** entries per request (`JSMaxSubjectDetails`), paged by `offset`. Which
+tokens to spend that budget on is [[subject-design]].
+
+
 ## The 32-token cliff, and why "16 tokens" keeps being repeated
 
 Everybody repeats the number and nobody sources it. The docs' primer states "Limit to ~16 tokens and
@@ -253,4 +279,4 @@ subject.
 
 ## Sources
 
-[[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-gh-5097-subject-token-limit]] · [[s-gh-2855-publish-with-wildcards]] · [[s-nats-cli-core-commands]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-publish-subscribe]] · [[s-gh-5172-mapping-in-config-or-stream]] · [[s-docs-core-nats-chapter]] · [[s-client-releases-and-issues]] · [[s-synadia-subject-hierarchies]] · [[s-gh-4170-subject-indexing-internals]]
+[[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-gh-5097-subject-token-limit]] · [[s-gh-2855-publish-with-wildcards]] · [[s-nats-cli-core-commands]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-publish-subscribe]] · [[s-gh-5172-mapping-in-config-or-stream]] · [[s-docs-core-nats-chapter]] · [[s-client-releases-and-issues]] · [[s-synadia-subject-hierarchies]] · [[s-gh-4170-subject-indexing-internals]] · [[s-nats-server-stream-topology-observed]]

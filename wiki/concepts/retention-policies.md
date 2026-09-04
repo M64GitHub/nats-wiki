@@ -7,7 +7,7 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-gh-4499-workqueue-fanout-retention, s-gh-6571-source-mirror-or-one-stream, s-gh-6100-stream-per-subject-or-one]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-gh-4499-workqueue-fanout-retention, s-gh-6571-source-mirror-or-one-stream, s-gh-6100-stream-per-subject-or-one, s-adr-8-key-value-store]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -55,6 +55,70 @@ nats stream add FULFILLMENT --subjects "fulfill.>" --retention work --defaults
 ```
 
 `nats stream info` reports it in the `Options` block as `Retention: WorkQueue` / `Retention: Limits`.
+
+## Choosing retention: a task queue, an event log, a cache
+
+The three policies are usually presented as a menu. They are better read as the answer to **two
+questions asked in order**, because the first one excludes rather than chooses:
+
+1. **How many independent readers must see each message?** More than one — WorkQueue is out, before
+   anything else is considered, because there is no legal way to express it (the exclusion rule
+   below). Exactly one — WorkQueue is available, and probably right.
+2. **Does the message still have value once every reader has finished with it?** Yes — `limits`. No —
+   `interest`.
+
+Everything else is a limits question, not a retention one.
+
+| what you are building | retention | why | the shape |
+|---|---|---|---|
+| **a task queue** — each message is work for exactly one worker | **`workqueue`** | the first ack removes it, so no second worker can pick up finished work and nothing accumulates behind a completed job | one consumer per **non-overlapping** filter, or one consumer shared by a pool of identical workers ([[worker-pool]]); pull consumers must use `ack_policy: explicit` (`10084`) |
+| **an event log** — history several independent services replay | **`limits`** | an ack advances a *position*, it does not remove anything, so every reader keeps its own cursor over the same messages | limits (`max_age`, `max_bytes`, `max_msgs`) are the only thing that removes a message — or, for an event store meant to keep everything, **no limits at all** and a shard by time when disk or the subject index runs out (source: [[s-gh-7032-max-msgs-known-good]]; [[event-sourcing-on-jetstream]]) |
+| **a fan-out that must be complete but not kept** — every consumer processes every message, nothing is archived | **`interest`** | a message leaves when **every** interested consumer has acked it: the log stays bounded by progress rather than by a time or size guess | the consumers must exist **before** the messages: a message published on a subject no consumer's filter covers is dropped **immediately** (source: [[s-docs-retention-policies]]) |
+| **a cache — the current value per key** | **`limits`** with **`max_msgs_per_subject`** | the per-subject cap is what makes "the last *n* per key" a retention rule instead of a cleanup job | this is exactly what a [[key-value]] bucket is: `max_msgs_per_subject` = history (1–64), `discard: new`, `allow_direct` (source: [[s-adr-8-key-value-store]]). Use a bucket unless you need something it does not expose |
+
+**Limits still apply under all three** — retention says when a *finished* message may go, limits say
+when a stream is too old or too large. On an `interest` or `workqueue` stream they are the backstop for
+consumers that fall behind, and leaving them off there is how the disk fills (source:
+[[s-docs-shaping-the-stream]]).
+
+### What breaks on each wrong choice
+
+- **WorkQueue when more than one reader needs the message.** You find out on the *second* consumer, in
+  production, as a create error: a second unfiltered consumer gives `10099 multiple non-filtered
+  consumers not allowed on workqueue stream`, and two consumers whose filters overlap give
+  `10100 filtered consumer not unique on workqueue stream`. This is gh#4499 exactly — a fan-out design
+  built on `--retention=work`, diagnosed for two weeks as a filter bug, and the maintainer's answer is
+  the rule above: "Then dont use WorkQueue… **Use Interest or limits**" (source:
+  [[s-gh-4499-workqueue-fanout-retention]]). The two axes stay separate: instances of one app share a
+  consumer, different apps each get their own (source: [[s-docs-worker-pool]],
+  [[s-docs-filtering]]).
+- **WorkQueue when the data has a second life.** The first ack destroys it, a `term` destroys it just
+  the same with the work never done, and a purge to unstick a full stream throws away unprocessed jobs.
+  There is no replay, and no second reader can be added later — see the permanence rule in the next
+  section.
+- **Interest with no consumer, or one stalled consumer.** With no consumer whose filter covers the
+  subject, the message is dropped the moment it is published and nothing logs it — the failure looks
+  like a publisher problem. With one stalled consumer, nothing it still owes an ack on can be removed,
+  so the stream grows until its limits or the disk stop it ([[jetstream-out-of-disk]]). Interest makes
+  consumer-health monitoring a correctness requirement rather than an operational nicety.
+- **Limits when you needed the log bounded by progress.** `discard: old` (the default) removes the
+  oldest messages silently — a consumer that falls behind far enough simply never sees them, and the
+  first sign is a gap. `discard: new` inverts it: every publish is refused with `10077` until something
+  removes messages, and **the server logs nothing** at the default level
+  ([[maximum-messages-exceeded]]).
+- **A cache without `max_msgs_per_subject`.** A `limits` stream bounded only by `max_msgs` or
+  `max_age` keeps *n* messages across all keys, not *n* per key, so a hot key evicts the cold ones and
+  the "cache" loses exactly the values nobody has written recently.
+
+### Why the choice has to be made now
+
+Because it is effectively permanent — the next section is the whole argument: the server allows
+`limits` ↔ `interest` and refuses anything to or from `workqueue`, and even the allowed swap
+retroactively deletes what the new policy would not have kept. A wrong retention is a **new stream and
+a data migration**, not an edit. And since retention is per stream, a subject that needs a different one
+needs its own stream — the single exception the maintainers make to "one stream"
+([[stream-topology-design]]).
+
 
 ## What you cannot change later
 
@@ -410,4 +474,4 @@ and what a second one costs*.
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
 [[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
 [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
-[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-gh-4499-workqueue-fanout-retention]] · [[s-gh-6571-source-mirror-or-one-stream]] · [[s-gh-6100-stream-per-subject-or-one]]
+[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-gh-4499-workqueue-fanout-retention]] · [[s-gh-6571-source-mirror-or-one-stream]] · [[s-gh-6100-stream-per-subject-or-one]] · [[s-docs-retention-policies]] · [[s-docs-filtering]] · [[s-adr-8-key-value-store]] · [[s-docs-shaping-the-stream]]

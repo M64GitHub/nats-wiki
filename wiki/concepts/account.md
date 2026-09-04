@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [account, multitenancy, "$G", "$SYS", system_account, no_auth_user, 10039, isolation]
 aliases: [account, accounts, tenant, multitenancy, "$G", "$SYS", system account, global account]
-sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client, s-docs-auth-callout, s-docs-authentication-basics, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-config-management, s-docs-decentralized-auth, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-hardening, s-docs-leaf-nodes, s-docs-putting-it-together, s-docs-security-checklist, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-5941-restrict-leafnode-subjects, s-gh-7017-kv-across-accounts, s-gh-7505-auth-callout-nkey, s-gh-7834-leafnode-same-js-domain, s-gh-7854-jwt-push-timeout, s-issue-4281-insufficient-storage, s-nats-server-leafnode-js-domains, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed]
+sources: [s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-operator-mode, s-gh-4535-unauthenticated-connections, s-nats-server-auth-and-tls, s-docs-mqtt-auth-and-clustering, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-your-first-mqtt-client, s-docs-auth-callout, s-docs-authentication-basics, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-config-management, s-docs-decentralized-auth, s-docs-encryption-and-tls, s-docs-forming-a-cluster, s-docs-hardening, s-docs-leaf-nodes, s-docs-putting-it-together, s-docs-security-checklist, s-gh-5044-restrict-durable-consumers, s-gh-5606-cross-account-jetstream, s-gh-5941-restrict-leafnode-subjects, s-gh-7017-kv-across-accounts, s-gh-7505-auth-callout-nkey, s-gh-7834-leafnode-same-js-domain, s-gh-7854-jwt-push-timeout, s-issue-4281-insufficient-storage, s-nats-server-leafnode-js-domains, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-nats-server-stream-topology-observed]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Account
@@ -129,12 +129,39 @@ The account is the second half of every JetStream reservation, and the half `/va
 - **On an untiered account an `R3` stream counts three times** against the account limit, while the
   server limit counts a single replica's worth — the asymmetry is worked through in
   [[jetstream-sizing]].
-- **`max_consumers` is an account limit, and it is the only enforceable one.** Subject permissions
+- **`max_consumers` is an account setting, and it is the only enforceable lever** — though it is
+  enforced *per stream*, not per account (below). Subject permissions
   cannot tell a durable consumer from an ephemeral one, because modern clients create both on
   `$JS.API.CONSUMER.CREATE.<stream>.<name>` and the difference lives in the request body; per-account
   limits bound resource use regardless of who creates what (source:
   [[s-gh-5044-restrict-durable-consumers]], and [[subject-permissions]] for why the subject-level
   lever fails).
+
+### `max_consumers` is enforced per stream, not per account
+
+The one correction to the bullet above, and it changes what the limit is worth as a tenancy control.
+An account with `max_consumers: 2` held **four** consumers on 2.14.6 — two on `S1` and two more on
+`S2` — because the server compares the limit against `mset.numLimitableConsumers()` for **the one
+stream** (`consumer.go:1130–1137`; clustered, `jetstream_cluster.go:9587–9605`). `nats account info`
+renders it correctly, *"Consumers: Maximum 2 per stream"*; the documentation states only "the maximum
+number of consumers allowed", in the same shape as `max_streams`, which **is** per account. Recorded
+as docs issue **#124** (source: [[s-nats-server-stream-topology-observed]], runs D2 and D11).
+
+So an account's real consumer ceiling is `max_streams × max_consumers`, and the two limits are
+indistinguishable from the error — a per-stream refusal and an account refusal both return
+**`10026 maximum consumers limit reached`**. The other two, for comparison:
+
+| limit | what the tenant sees |
+|---|---|
+| account `max_streams` | `10027 maximum number of streams reached` on `$JS.API.STREAM.CREATE` |
+| account `max_file` | `10002 resource limits exceeded for account`, returned as the **`PubAck`** of the publish that would cross it |
+
+Two behaviours worth knowing when a tenant reports being stuck: the storage check **reserves the
+record** rather than filling to the byte (the account stopped 22 bytes short of its 64 MiB), and the
+budget comes back **immediately** — a `purge` freed storage and the next publish was accepted, and
+deleting a stream freed a `max_streams` slot at once. A mirror's and a source's internal consumers do
+**not** count against `max_consumers` ([[mirrors-and-sources]]).
+
 
 ## What crosses the boundary, and what cannot
 
@@ -466,4 +493,4 @@ map onto the asking account's own `$SYS.REQ.ACCOUNT.<acc>.<Z>` (`events.go:2385�
 [[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7017-kv-across-accounts]] ·
 [[s-gh-7505-auth-callout-nkey]] · [[s-gh-7834-leafnode-same-js-domain]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-issue-4281-insufficient-storage]] ·
-[[s-nats-server-leafnode-js-domains]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]]
+[[s-nats-server-leafnode-js-domains]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-server-stream-topology-observed]]

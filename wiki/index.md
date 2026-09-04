@@ -22,7 +22,8 @@ exists to answer live in `inbox/question-bank.md`.
 - [[ack-and-redelivery]] — at-least-once in practice: the four answers (ack, nak, term,
   in-progress), `ack_wait`, `max_deliver`, `max_ack_pending`, backoff, and the advisories.
 - [[retention-policies]] — `limits` / `interest` / `workqueue`: who decides a message is finished,
-  and why the choice is effectively permanent.
+  which to pick for a task queue, an event log, a fan-out and a cache, what breaks on each wrong
+  choice, and why the choice is effectively permanent.
 - [[replicas]] — R=1/R=3/R=5, what a `PubAck` promises, `sync_interval`, and why replicas are a
   durability knob rather than a throughput one.
 - [[key-value]] — a KV bucket is the stream `KV_<bucket>`: fixed properties, why a delete grows the
@@ -168,6 +169,19 @@ exists to answer live in `inbox/question-bank.md`.
 
 **Patterns**
 
+- [[subject-design]] — the subject tree is designed once and everything is laid over it: the three
+  shapes and the rule for picking one, token order (what you will filter on goes left), where a
+  wildcard belongs, cardinality measured at 10 / 10k / 1M subjects, the subjects a stream must never
+  be given, the tenant token against an account, and the three "limits" that are not limits.
+- [[stream-topology-design]] — how many streams, how many consumers on each, and how a second copy is
+  made: the one-stream default and the three reasons to leave it, what a stream costs at `R1` against
+  `R3`, the per-tenant question where the two public answers meet, what an account's limits actually cap
+  (`max_consumers` is per *stream*), the 300-way fan-out built both ways, and mirror against source
+  against the copy shape that does not exist.
+- [[event-sourcing-on-jetstream]] — one stream, a subject per aggregate: the OCC header a multi-subject
+  aggregate needs (2.11+), replay as an indexed range scan, projections and snapshots, what a million
+  aggregates cost in RAM and restart — and the dead end, **no tiered storage**, "planned but no
+  schedule" since 2023 with the one tested workaround abandoned on data corruption.
 - [[core-or-jetstream]] — the durability decision, per subject rather than per system: the rule the
   docs state ("does the next message supersede this one?"), what the two publishes look like on the
   wire and what each costs, the mixed design under an unchanged publisher, and the two ways it goes
@@ -905,6 +919,23 @@ dated to the release that introduced it.
   6.4 s after SIGKILL, 9.5 s with `index.db` deleted), a 1.6 GB sourcing stream at 2.57 s with an
   empty source and 23 ms without, 1.2 M subjects at ~380 B of RSS each and no periodic `index.db`,
   `--max-msgs 10000000000` accepted, and a `*` inside a token that pending counts and delivery disagree on.
+- [[s-gh-3871-tiered-storage-planned]] — "We have it planned but no schedule yet" (@derekcollison,
+  2023-02-16), asked again in 2024 against Kafka's and Pulsar's tiered storage and **never answered
+  again**; still open with no chosen answer. The community's block-symlink sidecar proposal, and one
+  team already offloading to GCS by hand.
+- [[s-gh-6478-s3-offload-and-query]] — 42 upvotes, the most-supported idea in the repository, and **no
+  maintainer has commented in it**: offload plus Parquet-on-S3 so third parties can query the history;
+  why object storage is not a filesystem (no append, per-operation billing, small-file penalty); and the
+  rclone `--vfs-write-back` mount that demonstrably worked, retention deletes included, until
+  `corrupted on transfer`.
+- [[s-nats-server-stream-topology-observed]] — runs A–F on 2.14.6, the cost half of rows 108/109/111/114:
+  an empty file stream is 8 KiB and ~55 KiB of RSS, 10,000 of them restart in 5.4 s and 1,000 `R3` ones
+  in 18 s; `ha_assets` = streams + 1; a filter over one message in a million is a 0.9 ms create; the
+  "~300" is disjoint filters on *one* consumer and it is a create-time cost; one stream with 300 filtered
+  consumers beats 300 streams on RSS (2.75×), disk and ingest; `10027`/`10026`/`10002` and an account's
+  `max_consumers` being **per stream**; `index.db` = Σ(len+4) + ~550 B and ~256 B of RSS per subject; a
+  sourcing stream costs 1.38–1.57× a mirror for the `Nats-Stream-Source` header it adds to every message;
+  and the consumer-made copy that delivers nothing (SI-9).
 - [[s-nats-server-redelivery-observed]] — runs G, H and I on 2.14.6: issue #6921's recipe delivering
   once each with the floor following; a redelivery loop as `tries:`, `consumer info`, the JSON counters
   and the `-DV` trace show it, with **nothing** at the default log level; `backoff: [10000]` stored as
@@ -1207,8 +1238,11 @@ the gap is recorded under `## To verify` on the `key-value` page.
 
 Reference: *(every reference table is written — see the Reference section above)*
 
-Patterns: *(none — `core-or-jetstream` was written 2026-09-04 for bank row 133, closing megaplan
-group G7, and is in the Operations section above with `services-on-core-nats`.)*
+Patterns: *(none — phase G1 wrote all four on 2026-09-04: `subject-design` (row 109),
+`stream-topology-design` (rows 108, 111, 114), the *Choosing retention* section on
+`retention-policies` (row 110) and `event-sourcing-on-jetstream` (rows 144, 198); `core-or-jetstream`
+was written the same day for row 133, closing megaplan group G7. All are in the Operations section
+above.)*
 
 Entities: *(all the repos, clients, tools, releases, products and organisations the ecosystem page
 names now have pages — see the Entities section above. People: none yet.)*

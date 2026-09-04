@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [meta-layer, meta-group, meta-leader, raft, quorum, orphan, peer-remove, election, 10008, healthz, jsz, meta_compact, extension_hint, observer, snapshot]
 aliases: [meta group, meta leader, metadata controller, metalayer, meta-layer, "_meta_", JetStream meta layer, metadata leader, meta controller]
-sources: [s-nats-server-jetstream-cluster, s-docs-jetstream-in-a-cluster, s-docs-raft-and-leaders, s-adr-61-meta-quorum-rescue, s-gh-7831-standalone-to-cluster, s-nats-server-leafnode-js-domains, s-docs-scaling-and-peers, s-gh-7438-multi-region-availability, s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-nats-server-jetstream-cluster, s-docs-jetstream-in-a-cluster, s-docs-raft-and-leaders, s-adr-61-meta-quorum-rescue, s-gh-7831-standalone-to-cluster, s-nats-server-leafnode-js-domains, s-docs-scaling-and-peers, s-gh-7438-multi-region-availability, s-gh-7533-quorum-loss-mqtt, s-gh-6892-evict-a-sick-node, s-nats-server-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-topology-observed]
 created: 2026-09-01
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # The meta layer
@@ -177,6 +177,29 @@ restart does not wait for contact again. A *standalone* server never extends unl
 discards its own meta state: leadership, every queued entry, **the whole snapshots directory**, the
 log, the peer set (to itself alone) and the term (sources: [[s-nats-server-jetstream-cluster]],
 [[s-nats-server-leafnode-js-domains]]; [[jetstream-domain]], [[leafnode]]).
+
+### What the meta layer costs per asset, measured
+
+Counted on the three-node lab at 2.14.6, one axis at a time (source:
+[[s-nats-server-stream-topology-observed]], run R3 — one laptop with three servers sharing a CPU and
+a disk, so an ordering, not a capacity figure):
+
+| streams at `R3` | 10 | 100 | 300 | 1,000 |
+|---|---|---|---|---|
+| `ha_assets` | **11** | **101** | **301** | **1001** — always streams **+ 1**, the meta group itself |
+| `$SYS/_js_/_meta_` on one node | 36 KiB | 156 KiB | 476 KiB | **628 KiB** |
+| wall clock to create them | — | 10.18 s | 23.01 s | **80.85 s** (P50 **107–112 ms** each) |
+
+At `R1` `ha_assets` is **0** even with 10,000 streams — it counts replicated assets only, which is why
+it is the right gauge for this layer and a useless one for a single server.
+
+**The two orders of magnitude are the point.** Creating a stream costs P50 **0.6 ms** at `R1` and
+**~110 ms** at `R3`; the difference is a Raft group being formed and agreed, not a stream being
+written. The same asymmetry shows on the way back up: a node holding 1,000 `R3` streams reported
+`Took 329.47ms to start JetStream` and then took **17.985 s** to answer `/healthz` 200, the remainder
+being the groups ([[jetstream-recovery-is-slow]]). The meta store itself stays small — under a
+megabyte at a thousand streams — because it holds assignments, not messages.
+
 
 ## Where it lives
 
@@ -378,4 +401,4 @@ older than the archive (source: [[s-relnotes-2.10]]).
 [[s-nats-server-jetstream-cluster]] · [[s-docs-jetstream-in-a-cluster]] ·
 [[s-docs-raft-and-leaders]] · [[s-adr-61-meta-quorum-rescue]] ·
 [[s-gh-7831-standalone-to-cluster]] · [[s-nats-server-leafnode-js-domains]] ·
-[[s-docs-scaling-and-peers]] · [[s-gh-7438-multi-region-availability]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-docs-scaling-and-peers]] · [[s-gh-7438-multi-region-availability]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-topology-observed]]

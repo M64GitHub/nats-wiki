@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-docs-concepts-jetstream, s-docs-core-nats-chapter, s-docs-jetstream-where-next, s-nats-server-core-or-jetstream-observed, s-gh-3507-no-external-store, s-gh-6100-stream-per-subject-or-one, s-gh-3772-jetstream-as-an-event-store]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-docs-concepts-jetstream, s-docs-core-nats-chapter, s-docs-jetstream-where-next, s-nats-server-core-or-jetstream-observed, s-gh-3507-no-external-store, s-gh-6100-stream-per-subject-or-one, s-gh-3772-jetstream-as-an-event-store, s-nats-server-stream-topology-observed, s-gh-3871-tiered-storage-planned, s-gh-6478-s3-offload-and-query]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -563,6 +563,26 @@ in a database the rest of the estate can query needs [[direct-get]] or a republi
 else — [[subject-transforms]] — not a storage option.
 
 
+### And there is no tier below them either
+
+The question that follows "memory or file" is whether old data can move somewhere cheaper, and the
+answer is no — with a date on it. "Currently, tiered storage support is **not built-in as an option to
+a stream's retention policy**" (2023-01-08); "**We have it planned but no schedule yet** on when we
+will do this work as of yet" (@derekcollison, **2023-02-16**), in the thread opened to ask exactly
+that. Asked again in 2024-10-31 and 2024-12-07 against Kafka's and Pulsar's tiered storage, the
+maintainer's reply was a question about requirements and there has been **no further maintainer
+comment**; the thread is still open, with no chosen answer, on 2026-09-04 (source:
+[[s-gh-3871-tiered-storage-planned]]). The most-upvoted idea in the repository — 42 votes for
+offloading to S3 in a queryable format — has **no maintainer comment at all** (source:
+[[s-gh-6478-s3-offload-and-query]]).
+
+So a stream's data lives where its `store_dir` is, for as long as its limits keep it. The two shapes
+that exist instead are an **archiving consumer** (a client that reads the stream and writes elsewhere,
+which is the maintainers' own suggestion) and **sharding by time** — a stream per period, closed when
+the period ends. Both are on [[event-sourcing-on-jetstream]], which is where this decision usually
+gets made.
+
+
 ## How many streams, and what a second one costs
 
 The default is **one stream with many subjects and many filtered consumers**, and the maintainers say
@@ -592,6 +612,32 @@ own stream. A subject that only needs a different *reader* does not — that is 
 The related but opposite question — one stream **per tenant** rather than per subject — is
 [[account]]'s territory as much as this page's, and the public answers point the other way; it is bank
 row 108 and phase G1's `stream-topology-design`.
+
+### What a stream costs when it is empty, and what a thousand cost
+
+The maintainers' "streams are cheap" has a floor, and it was measured on 2.14.6 (source:
+[[s-nats-server-stream-topology-observed]], one laptop — a ratio, never a limit):
+
+- **One empty file stream is 3 directories and 3 files** — `meta.inf` 516 B, `meta.sum` 16 B,
+  `msgs/1.blk` 0 B — which is **8 KiB** of allocated blocks, and **~53–58 KiB of RSS**. Both stay
+  linear: 1,000 streams are 8,000 KiB and 75.1 MiB, 10,000 are 80,000 KiB and 534.2 MiB.
+- **Creating them is fast at `R1` and slow at `R3`**: 1,592/s for the first thousand (P50 **0.6 ms**),
+  675/s for ten thousand — against **P50 107–112 ms** each for a replicated stream, because the cost is
+  the Raft group and not the stream ([[meta-layer]]).
+- **Having many streams does not slow the publish path into one of them**: 194,031 / 204,803 /
+  209,442 / 192,309 msg/s into the same stream with 1 / 10 / 100 / 1,000 streams on the server.
+- **The first message into a fresh stream costs ~4.4 ms.** 10,000 messages into 10,000 empty streams,
+  one each, took 43.97 s; the same 10,000 messages into the same streams again took 0.36 s.
+- **Spreading a volume over streams costs disk**: the same 100,000 × 128 B messages were 21,004 KiB
+  over 1,000 streams against 16,708 KiB in one stream with a tenant token — **1.26×**, and the
+  difference is per-stream block slack ([[filestore-layout]]).
+- **Restart is where the count is felt.** 1,001 streams: **125 ms** to start JetStream. 10,000 empty
+  streams: **5.4 s**. A node holding 1,000 `R3` streams: **18 s** to come back, and more than 10 s to
+  shut down.
+
+The design question these numbers serve — how many streams, and how many consumers on each — is
+[[stream-topology-design]].
+
 
 ## What a stream is, if you are coming from Kafka
 
@@ -640,4 +686,4 @@ for server-side filtering ([[filestore-layout]]).
 [[s-issue-4281-insufficient-storage]] · [[s-synadia-jetstream-anti-patterns]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-docs-concepts-jetstream]] · [[s-docs-core-nats-chapter]] · [[s-docs-jetstream-where-next]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-gh-3507-no-external-store]] · [[s-gh-6100-stream-per-subject-or-one]] · [[s-gh-3772-jetstream-as-an-event-store]]
+[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-docs-concepts-jetstream]] · [[s-docs-core-nats-chapter]] · [[s-docs-jetstream-where-next]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-gh-3507-no-external-store]] · [[s-gh-6100-stream-per-subject-or-one]] · [[s-gh-3772-jetstream-as-an-event-store]] · [[s-nats-server-stream-topology-observed]] · [[s-gh-3871-tiered-storage-planned]] · [[s-gh-6478-s3-offload-and-query]]

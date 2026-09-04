@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [filestore, block-size, index.db, tombstone, compaction, disk, sizing, psim, o.dat]
 aliases: [filestore, file store, blocks, blk, msg blocks, index.db, on-disk layout, storage overhead, bytes per message]
-sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-3405-consumer-filtering-performance, s-gh-4170-subject-indexing-internals, s-gh-3772-jetstream-as-an-event-store]
+sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-3405-consumer-filtering-performance, s-gh-4170-subject-indexing-internals, s-gh-3772-jetstream-as-an-event-store, s-nats-server-stream-topology-observed, s-gh-6478-s3-offload-and-query, s-gh-3871-tiered-storage-planned]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -107,6 +107,29 @@ times its own limit. Measured across seven stream shapes; the observed roll poin
 The encryption cap lives in `dynBlkSize`, which only runs when `autoTuneFileStorageBlockSize` left
 the size at zero. Whether an encrypted stream that sets `max_bytes` therefore gets a block over 2MB
 was not tested **(unverified)**.
+
+### Why sealed blocks make an offload look easy, and what happened to someone who tried
+
+A sealed block is an immutable file of a known size in a plain directory, which is exactly the shape
+Kafka's and Pulsar's tiered storage move to object storage — so "watch for completed blocks, copy them
+away, leave a symlink" is the obvious idea, and it has been proposed with a diagram and no maintainer
+response (source: [[s-gh-3871-tiered-storage-planned]]). One person built the mount version of it: an
+rclone volume with an S3-compatible backend as `store_dir`, with `--vfs-write-back=10m` so a block
+migrates only after ten minutes untouched. It **demonstrably worked** — a 12 MB stream with `1.blk`
+transferred and `2.blk` still local because the server was writing to it, and "the remote backend even
+respects NATS retention limits", deleting remotely what the server deleted locally. Then it began
+failing: two blocks missing, `corrupted on transfer`, and "that's where I stopped with this
+experiment" (source: [[s-gh-6478-s3-offload-and-query]]).
+
+Two things this says about the layout itself. The block being immutable is **not** the whole story:
+the per-subject index (`psim`) and the per-block `fss` live in memory and are rebuilt from the blocks,
+so a block that is slow or absent is not only a slow read — it is a slow *recovery*. And the file the
+server most depends on being current is `index.db`, a full-state snapshot rewritten wholesale rather
+than appended to; an **object store cannot append**, so every rewrite is a whole-object PUT, and
+providers charge per operation and handle many small files badly — which is the mechanical reason a
+naive mount is the wrong layer (source: [[s-gh-6478-s3-offload-and-query]]). The experiment above only
+avoided the worst of that because rclone's write-back kept the block being written on local disk.
+
 
 ### Deleting a message makes the file bigger
 
@@ -280,6 +303,21 @@ subject (source: [[s-gh-5202-max-unique-subjects]]).
 
 Streams are recovered in parallel across streams — one task queue of `min(64, max_concurrent_io)`
 workers since 2.11.11 / 2.12.2 — and serially within one stream.
+
+
+### The `index.db` arithmetic, checked against three cardinalities
+
+The formula above is not an estimate. The same stream filled with 1,000,000 × 128 B messages over
+10, 10,000 and 1,000,000 distinct 13-byte subjects, stopped cleanly each time, wrote an `index.db` of
+**738**, **170,549** and **17,000,550** bytes against a predicted `Σ(len(subject) + 4)` of 170, 170,000
+and 17,000,000 — the whole difference is a **~550-byte header**, flat across three orders of magnitude
+(source: [[s-nats-server-stream-topology-observed]], run E, nats-server 2.14.6).
+
+Two neighbours from the same runs. A **clean shutdown writes one `index.db` per stream**: 10,000 empty
+streams went from 30,000 files / 80,000 KiB to **40,000 files / 120,000 KiB** across the stop — the
+per-stream floor of an unclean stop is what those files buy back. And the in-memory side of the same
+index cost **~256 B of RSS per subject** (50.0 → 294.0 MiB from 10 to 1,000,000 subjects), which is the
+figure [[jetstream-sizing]] budgets with.
 
 
 ## What you can observe
@@ -504,4 +542,4 @@ no reply. The wiki's own answer to the first part is [[consumer-slow-on-a-sparse
 - [[s-docs-object-store-chunking]] — the docs' unquantified per-message-overhead claim these
   numbers answer.
 - [[s-docs-object-store-under-the-hood]] — the qualitative disk-reclamation warning the bulk-delete
-  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-3405-consumer-filtering-performance]] · [[s-gh-4170-subject-indexing-internals]] · [[s-gh-3772-jetstream-as-an-event-store]]
+  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-3405-consumer-filtering-performance]] · [[s-gh-4170-subject-indexing-internals]] · [[s-gh-3772-jetstream-as-an-event-store]] · [[s-nats-server-stream-topology-observed]] · [[s-gh-6478-s3-offload-and-query]] · [[s-gh-3871-tiered-storage-planned]]

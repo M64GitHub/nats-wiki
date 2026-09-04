@@ -69,4 +69,4 @@ Row 111, in part — the mechanism, with no numbers and at 2.9.
 
 ## Pages touched
 
-[[consumer]] · [[filestore-layout]] · [[jetstream-slows-as-consumers-grow]]
+[[consumer]] · [[filestore-layout]] · [[jetstream-slows-as-consumers-grow]] · [[stream-topology-design]]

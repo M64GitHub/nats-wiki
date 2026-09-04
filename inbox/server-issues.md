@@ -595,3 +595,9 @@ subscription in every realistic case. The failure is silent, and the visible sym
 `num_pending` climbing and `delivered` at zero, reads like a broken worker. No data-integrity or
 security effect: nothing is lost, nothing is delivered twice, and everything flows the moment an
 exact subscriber attaches.
+
+**Where the wiki records this:** `wiki/operations/stream-topology-design.md` — *How a second copy is
+made*, where it is stated as a design rule (row 114's third shape does not exist server-side, and a
+client has to make the copy); `wiki/concepts/mirrors-and-sources.md` — *What each copy costs,
+measured*. The run is `raw/nats-server-src/stream-topology-observed-v2.14.6.md`, runs F2/F3 (G1–G3,
+H1–H3), summarised in `wiki/summaries/s-nats-server-stream-topology-observed.md`.

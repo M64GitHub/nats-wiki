@@ -75,4 +75,4 @@ Row 108, in part — the default and its reason, with no numbers.
 
 ## Pages touched
 
-[[stream]] · [[raft-in-nats]] · [[retention-policies]]
+[[stream]] · [[raft-in-nats]] · [[retention-policies]] · [[stream-topology-design]]

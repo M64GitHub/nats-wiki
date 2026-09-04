@@ -5273,3 +5273,288 @@ Bank unchanged at **170 / 198** — rows 108, 109, 111 and 114 are answered when
 answer, and those are steps 4–7. Lint: 425 pages, drift 0, unlanded 0, wanted 0, staleness 0 behind
 2.14.6. Docs issues 123 → **124**, server issues 8 → **9**.
 **Next:** step 4, `subject-design` — the pattern page for row 109.
+
+## 2026-09-04 — plan `stream-and-subject-design`, step 4: `subject-design`, the pattern page for row 109
+
+**Operation: consolidate + one new page.** Bank row **109** — *how should I design a subject hierarchy
+for JetStream — token order, where the wildcards go, and what subject cardinality costs the filestore
+and filtered consumers?* — asked in [gh#4170](https://github.com/nats-io/nats-server/discussions/4170)
+and answered there with a frame and no numbers.
+
+**First, the summary step 3 owed.** Step 3 wrote `raw/nats-server-src/stream-topology-observed-v2.14.6.md`
+(1,478 lines, runs A–F) and no summary page, so nothing in the wiki could cite it — pages cite
+summaries here, never a raw path. **`wiki/summaries/s-nats-server-stream-topology-observed.md`** is that
+summary: the six runs' key claims section by section, the *what was not tested* list, and the three
+numbers read from the source rather than from a run. Steps 5, 6 and 7 all rest on it.
+
+**New page: `wiki/operations/subject-design.md`** (`kind: pattern`, `since: [2.10]`, verified against
+nats-server 2.14.6, 13 summaries cited). [[subjects-and-wildcards]] states the **rules** the server
+enforces; this states the **choices**, and deliberately does not restate them:
+
+- **The problem** as four mechanisms reading the same strings — the sublist, [[subject-permissions]]
+  ("your subject hierarchy **is** your authorization model — there isn't a separate ACL layer"), a
+  stream's subject list, a consumer's filter — and the fact that makes it expensive: you cannot rename
+  a subject in place.
+- **Start from the queries.** The maintainer's frame for exactly this question: "Its mostly in how you
+  want to define all possible sets within a stream and make sure they represent tokens in the subjects",
+  with the reason it is binding — a stream has **two lookup keys and only two**, by sequence and by
+  subject (source: `s-gh-4170-subject-indexing-internals`).
+- **The three shapes** (namespace-first, identifier-first, multi-dimensional) with the tie-break rule and
+  the sentence it rests on: **"You can prepend a tenant token; you cannot easily un-prepend one."**
+- **Token order**, argued twice and from two directions: the matcher (`*` recurses at every position,
+  `>` is one pointer check, a literal is a map lookup) and growth (`orders.>` can become `orders.v2.>`;
+  `orders.created` cannot become `orders.created.v2` without every subscriber changing).
+- **Cardinality**: entity ids yes, per-message ids no; the ART with path compression since **2.10.10**,
+  so long common prefixes cost little and random suffixes cost most; no configured maximum, the bound is
+  RAM; the correlation id goes in a header and **never in `Nats-Msg-Id`**.
+- **The four subjects a stream must never be given** — the request/reply hijack (#119, the stream's
+  `PubAck` arriving at 277 µs against the responder's 407 µs, and the docs' own tutorial walking into
+  it), a stream on `>`, the nine reserved prefixes (`$SYS.` `$JS.` `$JSC.` `$NRG.` `$KV.` `$OBJ.`
+  `_INBOX.` `_R_.` `_GR_.`), and sweeping a tree instead of listing subjects.
+- **The tenant token against an account** — clarity against isolation, not alternatives at one layer —
+  with the tenancy design itself left to phase G4.
+- **The version-token question carried as a disagreement**, because the sources disagree and both are
+  defensible, with the rule that reconciles them.
+- **The five places a subject string appears**, the two escape hatches (`mappings` at the account,
+  `{{partition(n,1)}}` in the stream) with the maintainer's rule for which layer, and the **migration
+  order** — stream filters, consumer filters, permissions, each of which fails *silently*.
+- **Run E's cardinality table**, and **the three "limits" that are not limits**: no 16-token cap (a
+  32-token stack array, a soft cliff), no 256-character cap (a 256-byte stack buffer; `max_control_line`
+  is the only real ceiling), and `max_subscription_tokens` off by default.
+
+**Ripple — ten pages, landing the step-3 runs where they belong.** [[subjects-and-wildcards]]
+(*Cardinality on one axis, measured*: ~256 B of RSS per subject, `index.db` at Σ(len+4) + ~550 B,
+131 → 421 ms of recovery, the publish path unmoved, and the wildcard consumer at 170×/190×);
+[[stream]] (*What a stream costs when it is empty*: 8 KiB and ~55 KiB of RSS, 1,592/s at R1 against
+P50 ~110 ms at R3, the publish rate flat from 1 to 1,000 streams, ~4.4 ms for the first message,
+1.26× the disk when a volume is spread, 125 ms → 5.4 s → 18 s of restart); [[filestore-layout]] (the
+`index.db` formula checked at three cardinalities — the whole difference is a flat ~550-byte header —
+and one `index.db` per stream written by a clean stop); [[jetstream-sizing]] (the per-stream floor and
+the per-subject RAM term as a table, and restart as the term that is neither RAM nor disk);
+[[jetstream-slows-as-consumers-grow]] (*The two numbers, measured*: consumers on one stream are flat to
+1,000, and the **~300 is disjoint filters on one consumer and a create-time cost** — 1.0 → 4.6 → 33.7 →
+784 ms while the first fetch stays 0.2 ms — plus the 300-way fan-out built both ways, 2.75× the RSS and
+1.5× less ingest for many streams); [[mirrors-and-sources]] (*What each copy costs*: 1.38–1.57×, and the
+one header that explains it; neither copy follows a delete, both survive the origin's deletion, their
+internal consumers do not count against `max_consumers`, and **SI-9** kills the third shape);
+[[consumer]] (*The seek, measured*: 0.9 ms create and `num_pending` 1 for one message in a million, and
+a non-matching filter answering `408` rather than erroring); [[account]] (**docs issue #124** —
+`max_consumers` is enforced **per stream**, so an account's real ceiling is `max_streams × max_consumers`
+and both refusals return the same `10026`; the bullet above it corrected from "an account limit" to "an
+account setting"); [[jetstream-recovery-is-slow]] (*The other axis: stream **count***, with a million
+subjects at 421 ms against a thousand `R3` streams at 18 s); [[meta-layer]] (*What the meta layer costs
+per asset*: `ha_assets` = streams + 1, the `_meta_` store 36 → 628 KiB, and the two orders of magnitude
+between an R1 and an R3 create).
+
+**Index**: `subject-design` under Operations → Patterns; the run summary in the Summaries section; and
+the *Patterns* line under *Wanted pages* rewritten to register **two deliberate red links** —
+`stream-topology-design` (steps 5) and `event-sourcing-on-jetstream` (step 7), both already linked from
+`subject-design` and both with their sources ingested.
+
+**Bank 170 → 171 / 198** (row 109 → [[subject-design]]). Lint: **427 pages**, frontmatter 0, orphans 0,
+broken links **0** with 2 wanted, drift **0**, unlanded ripples **0**, unverified 12 on 9 pages,
+staleness **0 behind 2.14.6**. Docs issues 124, server issues 9 — unchanged; this step recorded none,
+having introduced no new source.
+**Next:** step 5, `stream-topology-design` — the pattern page for rows 108, 111 and 114, carrying the
+`## Tenancy` section for #124 and SI-9 as a design rule.
+
+## 2026-09-04 — plan `stream-and-subject-design`, step 5: `stream-topology-design`, rows 108, 111 and 114
+
+**New page: `wiki/operations/stream-topology-design.md`** (`kind: pattern`, verified against
+nats-server 2.14.6, 12 summaries cited). Three bank rows in one page, because they are one question
+asked three ways — **how many streams**
+([gh#6100](https://github.com/nats-io/nats-server/discussions/6100)), **how many consumers on each**
+([gh#3405](https://github.com/nats-io/nats-server/discussions/3405)) and **how a second copy is made**
+([gh#6571](https://github.com/nats-io/nats-server/discussions/6571)) — and splitting them would put the
+trade-off on one page and the cost on another.
+
+**How many streams.** The default with its quote — "Many Consumers per single Stream is usually the
+simple and good pattern… **It's rarely a good idea to have stream per subject**" — resting on filtering
+being a seek rather than a scan, and the one reason the maintainers accept for leaving it: **policy,
+not performance** (retention, replicas, storage, placement and account are all per stream). Two more
+defensible reasons named: blast radius, and a different placement or account. Then the cost, as a table
+that separates the two worlds: at `R1` a stream creates in P50 **0.6 ms** and costs **8 KiB + ~53–58 KiB
+of RSS**; at `R3` it creates in P50 **107–112 ms** and is an **HA asset** (`ha_assets` = streams + 1
+against `R1`'s 0, `_meta_` 36 → 628 KiB). With the three facts that settle the usual argument: the
+publish path **did not move** between 1 and 1,000 streams, the **first** message into a fresh stream
+costs ~4.4 ms, and the same volume spread over 1,000 streams costs **1.26×** the disk. The answer to
+*where does "many streams" start to cost you*: **at `R1` count restart seconds** (10,000 streams = 5.4 s),
+**at `R3` count HA assets** — Synadia's operating figure of **2k per server**, the "on the order of 100s
+of thousands of assets" theoretical ceiling, and `max_ha_assets` as the enforceable number; 1,000 `R3`
+streams took **81 s to create and 18 s to come back**.
+
+**One stream per tenant, carried as the disagreement it is.** gh#6100's chosen answer says one stream;
+Synadia's per-tenant FIFO post recommends one stream per tenant at "roughly hundreds to low thousands
+of tenants" (named, not ingested — it reaches the wiki through
+[[s-gh-6100-stream-per-subject-or-one]]). The page says why both are right: per *subject* buys nothing
+a filter does not already give, per *tenant* buys an independent head of line, retention budget and
+restore. And the measurement puts the line where the blog's range is — 100 `R3` streams create in 10 s,
+1,000 in 81 s and recover in 18 s — so per-tenant streams are cheap at `R1` into the low thousands and
+bounded by cluster restart time at `R3`. The isolation alternative (an [[account]]) is named and left
+to phase G4.
+
+**`## Tenancy: what an account's limits actually cap`** — the section
+`inbox/docs-issues.md`'s *where the wiki records* table was already pointing at. Docs issue **#124**:
+an account's `max_consumers` is enforced **per stream**, so a `max_consumers: 2` account held four
+consumers, and a tenant's real ceiling is **`max_streams × max_consumers`**; `max_consumers` alone caps
+nothing at the account level. With the four codes (`10027`, `10026` for *both* consumer limits, `10002`
+as a `PubAck`), the storage check reserving the record (22 bytes of headroom at 64 MiB), the budget
+returning immediately on purge or delete, and a copy's internal consumers not counting.
+
+**How many consumers, and on what.** Consumers on one stream are flat to 1,000 on every axis measured;
+the **300-way fan-out built both ways** is the row's answer — 300 streams with one consumer each cost
+**2.75× the RSS** and **1.5× less ingest** than one stream with 300 filtered consumers, and more disk
+and more subscriptions besides. The two real thresholds: **~100,000 consumers** (published guidance;
+each is an HA asset at `R3`) and **~300 disjoint filters on one consumer**, sharpened by the runs into a
+**create-time** cost — 1.0 → 4.6 → 33.7 → 784 ms at 1 → 300 → 1,000 → 5,000 filters, with the first
+fetch flat at 0.2 ms. Plus the question before the count: instances of one app share a consumer,
+different apps each get their own (gh#4499), and live readers with no replay requirement need
+`republish` or [[direct-get]] rather than a consumer at all.
+
+**How a second copy is made.** The premise rejected first — "It's not because a stream is larger that
+delivery of messages to consumers takes longer" — and the one cost of a large stream named
+(per-subject index memory, which a copy does not reduce). Then the two shapes in a table: catch-up
+0.521 s against 0.652 s, disk **33,408 KiB against 46,192 KiB (1.38×**, and 1.57× with a transform),
+the `Nats-Stream-Source` header on every message that explains the difference, `10034` and `10031` for
+what a mirror may not be, and what only a source gives (several upstreams, its own subjects, a direct
+publish path). Neither follows a delete on the origin; both survive the origin's deletion. **And
+SI-9 as a design rule**: the third shape — a consumer delivering into a second stream — delivered
+**0 of 1,000** with nothing logged, because `Sublist.registerNotification` counts only an
+exact-subject subscriber and a stream's capture subject is a wildcard; the working form is a client,
+and its copy carries no origin header and gets its own sequence numbers, so neither side can say how
+far behind it is.
+
+Then the config block, a **seven-row trade-off table** (what each shape buys, what it costs, and the
+count at which it stops working) and six *when not to* rules.
+
+**Bookkeeping.** `stream-topology-design` added to the `## Pages touched` of
+[[s-gh-6100-stream-per-subject-or-one]], [[s-gh-3405-consumer-filtering-performance]] and
+[[s-gh-6571-source-mirror-or-one-stream]] — written at ingest time as an intention, landed now.
+`wiki/index.md`: the page under Operations → Patterns, and off the *Wanted pages* list, which now
+carries only `event-sourcing-on-jetstream` for step 7. **`inbox/server-issues.md`: SI-9 was missing its
+`Where the wiki records this` line** and now has one, pointing at this page and
+[[mirrors-and-sources]].
+
+**Bank 171 → 174 / 198** (rows 108, 111, 114). Lint: **428 pages**, frontmatter 0, orphans 0, broken
+links **0** with 1 wanted, drift **0**, unlanded ripples **0**, unverified 12 on 9 pages, staleness
+**0 behind 2.14.6**. Docs issues 124, server issues 9 — unchanged; no new source entered the wiki.
+**Next:** step 6, the `## Choosing retention` section on [[retention-policies]] for row 110.
+
+## 2026-09-04 — plan `stream-and-subject-design`, step 6: `## Choosing retention` on `retention-policies`, row 110
+
+**Operation: consolidate**, one section, no new source. Bank row **110** — *Limits, Interest or
+WorkQueue — how do I choose retention for a task queue, an event log and a cache, and what breaks when
+I choose wrong?* The page already carried every rule and every failure mode; what it lacked was the
+**decision**, which is why this is a section and not a page.
+
+**`## Choosing retention: a task queue, an event log, a cache`**, inserted before *What you cannot
+change later* so the permanence argument lands immediately after the choice, with
+`tools/add-section.py` (seven summaries into the frontmatter and the `## Sources` section; one of them,
+[[s-adr-8-key-value-store]], new to this page — for the bucket shape).
+
+**The reframe.** The three policies are usually presented as a menu; the section reads them as **two
+questions asked in order**, because the first one excludes rather than chooses: *how many independent
+readers must see each message* (more than one → WorkQueue is out before anything else is considered),
+then *does the message still have value once every reader has finished with it* (yes → `limits`, no →
+`interest`). Everything after that is a limits question, not a retention one.
+
+**Four workloads, in a table**: a **task queue** → `workqueue`, one consumer per non-overlapping filter
+or one shared by a pool, pull consumers on `ack_policy: explicit` (`10084`); an **event log** →
+`limits`, with limits as the only thing that removes a message — or, for an event store meant to keep
+everything, none at all plus a shard by time (row 27's maintainer answer, [[s-gh-7032-max-msgs-known-good]]);
+a **fan-out that must be complete but not kept** → `interest`, the case people miss, with the trap
+stated — the consumers must exist *before* the messages, because a message on a subject no filter covers
+is dropped immediately; and a **cache** → `limits` with **`max_msgs_per_subject`**, which is exactly
+what a [[key-value]] bucket is (history 1–64, `discard: new`, `allow_direct`).
+
+**`### What breaks on each wrong choice`** — the half the row asks for. WorkQueue with more than one
+reader is found on the *second* consumer as `10099` or `10100`, in production, and gh#4499 spent two
+weeks diagnosing it as a filter bug. WorkQueue when the data has a second life: the first ack destroys
+it, a `term` destroys it with the work never done, and the purge that unsticks a full stream throws
+away unprocessed jobs. Interest with **no** interested consumer drops the message at publish time with
+nothing logged — it reads as a publisher fault; Interest with one stalled consumer grows the stream to
+its limits. `limits` with `discard: old` discards silently and the first sign is a gap; with
+`discard: new` every publish is refused with `10077` and the server logs nothing. And a cache without
+`max_msgs_per_subject` keeps *n* messages across all keys rather than *n* per key, so a hot key evicts
+exactly the cold values a cache exists to hold.
+
+**`verified-against` deliberately left at `nats-server 2.14`**: the section restates claims already on
+the page and introduces no new version-bearing one, so bumping the field would imply a re-check that
+did not happen. `updated:` moved to 2026-09-04 by the tool, which is the honest record.
+
+`wiki/index.md`'s one-line entry for the page rewritten to name the new section. **Bank 174 → 175 /
+198** (row 110). Lint: **428 pages**, frontmatter 0, orphans 0, broken links **0** with 1 wanted
+(`event-sourcing-on-jetstream`, step 7), drift **0**, unlanded ripples **0**, unverified 12 on 9 pages,
+staleness **0 behind 2.14.6**.
+**Next:** step 7, `event-sourcing-on-jetstream` — the pattern page for rows 144 and 198.
+
+## 2026-09-04 — plan `stream-and-subject-design`, step 7: `event-sourcing-on-jetstream`, rows 144 and 198
+
+**Two ingests first, because row 198 had no source in the wiki.** The step-1 scout listed gh#3871
+(tiered storage) as **G8**, outside the eight it recommended, with "take it in a second pass **if the
+pages need them**". This page needed it: row 198's cell was a pointer, not an answer, and the only
+thing the wiki could say about tiering was one 2023 sentence quoted inside gh#3772. Both threads
+fetched whole with `python3 tools/fetch-discussion.py 3871 6478 --out raw/gh-discussions`, with a
+`raw/sources.md` entry and their scratch cache copies removed:
+
+- **[[s-gh-3871-tiered-storage-planned]]** — *Is Tiered Storage currently planned?* (2023-02-15,
+  General, **no chosen answer, still open**, 7 upvotes). One maintainer sentence: "We have it planned
+  but no schedule yet on when we will do this work as of yet" (@derekcollison, **2023-02-16**). Asked
+  again on 2024-10-31 against Kafka's `LocalTieredStorage` and 2024-12-07 against Pulsar's S3 offload —
+  the reply to the first was a question about requirements and there is **no further maintainer
+  comment**. Also a community proposal to symlink sealed 8 MB blocks out to remote storage (with a
+  diagram, unanswered) and one team already offloading to GCS by hand.
+- **[[s-gh-6478-s3-offload-and-query]]** — *S3 next level* (2025-02-09, Ideas, **42 upvotes, the
+  most-supported idea in the discussions index, and no maintainer has commented in it**). The proposal
+  is offload *plus* Parquet-on-S3 so third parties can query with DuckDB. The strongest content is the
+  reply saying why the naive version fails — an object store **cannot append**, providers charge per
+  operation, small files amplify cost, so a real design needs buffering, compaction and a cache-back
+  path — and the **tested** workaround: an rclone mount with an S3 backend as `store_dir` and
+  `--vfs-write-back=10m`, screenshotted working with retention deletes propagating, then abandoned
+  after `corrupted on transfer`.
+
+**New page: `wiki/operations/event-sourcing-on-jetstream.md`** (`kind: pattern`, `since: [2.11]`,
+verified against 2.14.6, 13 summaries). One stream, a subject per aggregate, `limits` retention with
+**no limits** for a keep-everything store. **The OCC header most designs get wrong**: subjects are
+exact, so an aggregate whose events span `order.1.created` and `order.1.shipped` gets no protection
+from a per-subject expectation on either — it needs `Nats-Expected-Last-Subject-Sequence-Subject`,
+which arrived in **2.11.0** and is silently ignored before it, with the half-sent form refused
+(`10193`) only since **2.12.0**. That pair of boundaries is why the page carries `since: [2.11]`
+rather than 2.10. Several events from one command is 2.12's atomic batch, with the abandonment that
+sends no error reply. Reading: an indexed range scan per aggregate (0.9 ms create, `num_pending` 1,
+2.3 ms to the message, measured), [[direct-get]] for current state, filtered consumers for
+projections, an [[ordered-consumer]] for a full replay. Snapshots in a [[key-value]] bucket keyed by
+aggregate, which is a `limits` stream with `max_msgs_per_subject`.
+
+**What a million aggregates cost** — run E's table, with four consequences drawn from it. Two are the
+page's own: **the subject index does not shrink when an aggregate goes quiet** (it is bounded by
+distinct subjects that still have messages, so on a keep-everything stream a dead entity costs its
+bytes forever — exactly the shape gh#4170's asker described, millions of short-lived ids a year), and
+**the per-aggregate read stays flat while the wildcard read goes 170× on create and 190× on first
+message**, so projections reading `events.>` are the expensive readers, not the aggregates. Plus:
+budget RAM per distinct subject **and multiply by replicas**, and the subject-listing API is paged at
+100,000 and took 372.7 ms a page at a million while `nats stream subjects` took 5.40 s.
+
+**The dead end, stated with dates rather than as a shrug**: 2023-01-08 "not built-in as an option to a
+stream's retention policy", 2023-02-16 "planned but no schedule", never answered again, and the
+highest-upvoted idea in the repository with no maintainer in it. The two workarounds are given
+honestly — the block-level offload that worked and then corrupted, and the archiving consumer the
+maintainers themselves suggest — with **sharding by time** named as the only supported way to bound
+an event store, and its own price (it buys index size and pays in HA assets).
+
+**Ripple, three pages.** [[stream]] — *And there is no tier below them either*, next to *Two storage
+backends, and there is no third*, because that is where the question is asked. [[filestore-layout]] —
+*Why sealed blocks make an offload look easy, and what happened to someone who tried*: the immutable
+block is not the whole story, because the per-subject index is rebuilt from the blocks, and the file
+the server most needs current is `index.db`, a full-state snapshot rewritten wholesale — which an
+object store cannot do cheaply. [[kubernetes-storage]] — *Not an object-store mount either*: the
+chart's "block storage, never `hostPath`, never NFS" rule reads as being about network filesystems and
+also excludes an object store behind rclone, s3fs or a CSI driver, for mechanical reasons rather than
+latency ones.
+
+**Bank 175 → 176 / 198**: row **144** answered, and row **198**'s cell rewritten from a pointer into
+an answer with a bold **No** and the evidence. Lint: **431 pages**, frontmatter 0, orphans 0, broken
+links **0**, **wanted 0**, drift **0**, unlanded ripples **0**, unverified 12 on 9 pages, staleness
+**0 behind 2.14.6**. Docs issues 124, server issues 9 — the two threads produced neither: gh#3871 and
+gh#6478 make no claim about the server that the server contradicts.
+**Next:** step 8, closing the group.

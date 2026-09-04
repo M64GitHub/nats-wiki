@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [mirror, sources, lag, mirror_direct, subject_transforms, filter_subject, external, dr, 10060, 10029, 10045, AckFlowControl, JS_SRC, workqueue]
 aliases: [mirror, mirrors, sources, source stream, stream sourcing, mirror_direct]
-sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8001-jetstream-startup-slow-50m, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-gh-6571-source-mirror-or-one-stream]
+sources: [s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-adr-31-direct-get, s-natscli-stream-external, s-gh-7881-cross-domain-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-60-reliable-sourcing, s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-disaster-recovery, s-docs-get-direct, s-gh-4342-memory-stream-backup, s-gh-5606-cross-account-jetstream, s-gh-6328-jetstream-behind-gateways, s-gh-7017-kv-across-accounts, s-gh-7438-multi-region-availability, s-gh-7831-standalone-to-cluster, s-adr-51-message-scheduler, s-synadia-delayed-scheduling, s-nats-server-mirror, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-relnotes-2.14.4, s-gh-8417-kv-mirror-file-vs-memory, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8001-jetstream-startup-slow-50m, s-gh-6005-sourcing-memory-stream-restart, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-gh-6571-source-mirror-or-one-stream, s-nats-server-stream-topology-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -542,6 +542,43 @@ copy for a consumer that must not affect the origin's interest bookkeeping, or a
 copy of the data plus its replication to buy nothing.
 
 
+## What each copy costs, measured
+
+The same origin stream copied both ways on 2.14.6, 200,000 × 128 B (source:
+[[s-nats-server-stream-topology-observed]], run F — one laptop, so ratios):
+
+| | mirror | sourcing stream |
+|---|---|---|
+| catch-up from cold | **0.521 s** | 0.652 s |
+| disk for the same messages | 33,408 KiB (= the origin's) | **46,192 KiB — 1.38×** |
+| with a subject transform, per message | **164.0 B** (origin 168.0 B) | **263.9 B — 1.57×** |
+
+**The difference is one header, on every message.** A sourcing stream stores
+`Nats-Stream-Source: ORIG 1 orig.*.evt from-orig.{{wildcard(1)}} orig.1.evt` — origin stream, origin
+sequence, the transform's source and destination, and the original subject — which is the same header
+`startingSequenceForSources` reads backwards at every start. A mirror stores none, which is why it
+costs exactly what the origin costs. So **choose a mirror unless you need something only a source
+gives**: its own subjects, several upstreams, or a direct publish path.
+
+Three more things the runs settled, all of them design rules rather than curiosities:
+
+- **Neither copy follows a delete on the origin.** `STREAM.MSG.DELETE` on the origin's sequence 5 left
+  the message readable in both the mirror and the sourcing stream. A copy is not a replica.
+- **Both survive the origin being deleted**, still complete and still readable.
+- **A mirror's and a source's internal consumers do not count against `max_consumers`** and are not
+  listed by `CONSUMER.NAMES`: the server counts `len(mset.consumers) - mset.sourcingConsumers`
+  (`stream.go:8587`). A copy does not spend a tenant's consumer budget ([[account]]).
+
+**And the third shape people reach for does not exist.** "A consumer that writes into a second stream"
+is not a server-side copy: a push consumer delivering to `copy2.evt`, with the second stream subscribed
+on `copy2.>`, delivered **0 of 1,000** messages with `num_pending` stuck at 1,000 and nothing logged —
+`Sublist.registerNotification` counts interest only for a subscription whose subject is *literally
+equal* to the deliver subject (`sublist.go:169–190`), and a stream's capture subject is a wildcard.
+Attaching a plain `nats sub copy2.evt` released all 1,000 at once. The working form is a **client**
+that pulls from the origin and publishes into the copy — and that copy carries no origin header and
+gets its own sequence numbers, so nothing of the origin's position survives (server issue **SI-9**).
+
+
 ## Related
 
 The promotion procedure that turns a mirror into a writable primary is [[disaster-recovery]];
@@ -596,4 +633,4 @@ stream **cannot** have while it mirrors or sources another.
 [[s-adr-57-kv-subject-transforms]] · [[s-docs-disaster-recovery]] · [[s-docs-get-direct]] ·
 [[s-gh-4342-memory-stream-backup]] · [[s-gh-5606-cross-account-jetstream]] ·
 [[s-gh-6328-jetstream-behind-gateways]] · [[s-gh-7017-kv-across-accounts]] ·
-[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-gh-6571-source-mirror-or-one-stream]]
+[[s-gh-7438-multi-region-availability]] · [[s-gh-7831-standalone-to-cluster]] · [[s-adr-51-message-scheduler]] · [[s-synadia-delayed-scheduling]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-relnotes-2.14.4]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-gh-6571-source-mirror-or-one-stream]] · [[s-nats-server-stream-topology-observed]]

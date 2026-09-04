@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [recovery, restore, startup, index.db, sources, backward-scan, clean-shutdown, SIGKILL, healthcheck, cardinality, kubernetes, measured, unanswered-upstream]
 aliases: ["Restored messages for stream in minutes", "JetStream restart takes minutes", "stream restore slow", "server slow to start with large stream", "Healthcheck failed during startup", "jetstream startup slow", "recovery slow after restart", "jetstream-recovery-is-slow"]
-sources: [s-gh-8001-jetstream-startup-slow-50m, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-gh-8001-jetstream-startup-slow-50m, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-topology-observed]
 created: 2026-09-02
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # JetStream startup or recovery is slow
@@ -158,6 +158,31 @@ parallelism now matches the I/O gated semaphore"). On older servers a hundred st
 serially; on newer ones a single huge stream still does (source:
 [[s-nats-server-filestore-recovery]]).
 
+## The other axis: stream *count*, not stream size
+
+Every cause above is about one large stream. The runs behind [[stream-topology-design]] measured the
+other shape — many small ones — and it is the more expensive axis by a wide margin (source:
+[[s-nats-server-stream-topology-observed]], runs A, A2 and R3; one laptop, so an ordering):
+
+| what is being restarted | `Took … to start JetStream` |
+|---|---|
+| 1,001 streams, 280,000 messages, clean stop | **125 ms** |
+| 10,000 empty streams, clean stop | **5.405 s** |
+| 10,000 streams with one message each, clean stop | **5.762 s** |
+| 10,000 streams, one write each since the last clean stop, after SIGKILL | **5.655 s**, with **10,000** `Filestore [E…] Stream state outdated, last block has additional entries, will rebuild` warnings — one per stream |
+| one stream, 1.1 M messages, 1,005 consumers | **300.80 ms** |
+| one stream, 1,000,000 distinct subjects, clean stop | **421 ms** (604.9 ms after SIGKILL) |
+| **a node holding 1,000 `R3` streams** | **`/healthz` 200 in 17.985 s** — `Took 329.47ms to start JetStream` and 1,000 `Restored` lines; the remaining 17 s is Raft groups. Its SIGTERM shutdown did not finish within 10 s |
+
+Read together with cause 3: a million subjects in one stream costs **421 ms**, and a thousand
+replicated streams costs **eighteen seconds**. If recovery time is the constraint, the number of
+**assets** is the term to design down, not the number of subjects.
+
+*Confirm:* count the `Restored` lines against the wall-clock gap to `/healthz` 200; if the
+`Took … to start JetStream` line is a small fraction of it, the time is in the Raft groups
+([[meta-layer]]), not in the filestore.
+
+
 ## Prevention
 
 - Do not leave a source configured that has nothing in the stream; review `sources` when a
@@ -238,4 +263,4 @@ always used for trailing deletes (#7782) and a race rebuilding block state (#778
 
 [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-nats-server-filestore-recovery]] ·
 [[s-nats-server-stream-scale-observed]] · [[s-gh-8333-high-cardinality-subjects]] ·
-[[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-topology-observed]]

@@ -69,4 +69,4 @@ Row 114, in part — when a second copy is **not** the answer; row 110 in part.
 
 ## Pages touched
 
-[[mirrors-and-sources]] · [[retention-policies]] · [[consumer]]
+[[mirrors-and-sources]] · [[retention-policies]] · [[consumer]] · [[stream-topology-design]]
