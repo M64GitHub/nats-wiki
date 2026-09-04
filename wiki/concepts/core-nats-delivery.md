@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [at-most-once, interest-graph, ordering, fire-and-forget, echo, NoEcho, max_payload, headers, no_header_support, wire-tap, subsz, nats-trace, reconnect, lame-duck, slow-consumer]
 aliases: [core NATS, at-most-once delivery, interest graph, fire and forget, core NATS ordering, message ordering in core NATS, echo, NoEcho, "Maximum Payload Violation", "nats: maximum payload exceeded", debugging delivery, why did my message not arrive]
-sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting, s-docs-protocol-client, s-nats-server-wire-protocol, s-gh-4984-micro-with-jetstream, s-docs-concepts-jetstream, s-docs-core-nats-chapter, s-gh-2961-js-and-core-one-cluster, s-adr-22-publish-retries, s-nats-server-core-or-jetstream-observed]
+sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting, s-docs-protocol-client, s-nats-server-wire-protocol, s-gh-4984-micro-with-jetstream, s-docs-concepts-jetstream, s-docs-core-nats-chapter, s-gh-2961-js-and-core-one-cluster, s-adr-22-publish-retries, s-nats-server-core-or-jetstream-observed, s-gh-4170-subject-indexing-internals]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -269,6 +269,25 @@ essentially" (source: [[s-gh-2961-js-and-core-one-cluster]]).
 wrong.
 
 
+## The ordering rule, stated a second time — and misread the same way
+
+[[core-nats-delivery]]'s ordering guarantee has a second, independent maintainer statement two years
+earlier than gh#7577, in a thread about JetStream internals (source:
+[[s-gh-4170-subject-indexing-internals]]):
+
+> "For JetStream yes, all consumption through consumers will be globally ordered. **For NATS core the
+> only ordering guarantee is per publishing connection.**" — @derekcollison, 2023-05-18
+
+What makes it worth citing is the asker's reply, which is the misreading this page exists to prevent:
+
+> "`only ordering guarantee is per publishing connection` helped me a lot. In the doc is only
+> `publisher` mentioned. **I didn't substitute `publisher` with `connection`.**"
+
+Two publishers in one process sharing one connection are ordered with respect to each other; one
+publisher that reconnects, or that opens a second connection for throughput, is not ordered with
+respect to itself. The docs' word is *publisher*; the server's unit is the **connection**.
+
+
 ## Related
 
 [[subjects-and-wildcards]] · [[publishing]] · [[nats-timeout]] · [[slow-consumer-detected]] ·
@@ -293,4 +312,4 @@ wrong.
 - [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] — the request/reply and queue-group
   pages of the chapter, for the two pointer sentences above.
 - [[s-gh-2760-one-connection-or-two]] — one connection or two, the maintainers' rule.
-- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-gh-4984-micro-with-jetstream]] · [[s-docs-concepts-jetstream]] · [[s-docs-core-nats-chapter]] · [[s-gh-2961-js-and-core-one-cluster]] · [[s-adr-22-publish-retries]] · [[s-nats-server-core-or-jetstream-observed]]
+- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-gh-4984-micro-with-jetstream]] · [[s-docs-concepts-jetstream]] · [[s-docs-core-nats-chapter]] · [[s-gh-2961-js-and-core-one-cluster]] · [[s-adr-22-publish-retries]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-gh-4170-subject-indexing-internals]]

@@ -5079,3 +5079,197 @@ and every behavioural claim on the twelve pages was run on the 2.14.6 binary and
 Lint: **417 pages**, drift 0, unlanded **0**, wanted **0**, unverified 12, staleness 0 behind 2.14.6.
 **Phase F is done.** Next: megaplan phase G, starting with G1 (stream and subject design), whose
 foundation is [[subjects-and-wildcards]] from step 1.
+
+## 2026-09-04 — phase G1 step 1: the scout for stream and subject design
+
+**Operation:** plan (written) + scout. Phase F closed this morning, so phase **G** of the maintainer's
+programme opens with its first group. Wrote `inbox/plan-stream-and-subject-design-2026-09-04.md` —
+eight steps for bank rows **108, 109, 110, 111, 114** and **144**, producing `subject-design`,
+`stream-topology-design`, a `## Choosing retention` section on [[retention-policies]] and a decision on
+where row 144 goes — then ran its step 1.
+
+**Sources promoted to `raw/`.** The six threads behind the rows, all with a chosen maintainer answer,
+fetched whole with `python3 tools/fetch-discussion.py 6100 4170 4499 3405 6571 3772 --out raw/gh-discussions`
+and recorded in `raw/sources.md`: `gh-6100` (stream per subject or one stream — @Jarema), `gh-4170`
+(subject indexing internals — @derekcollison), `gh-4499` (WorkQueue fan-out and `10100` — @ripienaar),
+`gh-3405` (filtered consumers do not table-scan — @derekcollison, @jnmoyne), `gh-6571` (source + mirror
+against one stream — @jnmoyne) and `gh-3772` (JetStream as an event store — @bruth, 10 upvotes). Nothing
+is ingested yet; the scout file is `inbox/scout-stream-and-subject-design-2026-09-04.md`.
+
+**What the scout searched.** The six threads; the 484-thread comment cache re-swept with this group's
+terms (five new candidates, of which gh#3908, gh#3871, gh#4417 are worth ingesting); **`synadia.com/blog`
+end to end — 111 posts**, never read systematically before; `natsbyexample.com`, the first source from
+that site in this wiki; and the Stack Exchange API on both NATS tags.
+
+**The finding that shapes the pages.** Three independent public sources state a **16-token subject
+limit** the server does not have — the docs primer (already recorded), Synadia's 2026-06-17
+*How to Design NATS Subject Hierarchies*, and the accepted answer on so#72585165. Phase F step 1 settled
+this on the binary (docs issues #81, #82): no length and no token limit exist; `max_control_line` bounds
+the line and `max_subscription_tokens` is off by default. The Synadia post adds two more numbers to check
+against the source (**256 characters**, a **32-token stack array**) and a third (**100,000** per-subject
+metadata entries per request). `subject-design` has to carry the folklore, the fact, and whether the
+advice is good for some other reason.
+
+**Two public disagreements the pages will carry rather than resolve.** Synadia's post says put a version
+token in the subject from day one; the accepted SO answer says never do that and version the schema in a
+header. And on row 108 itself: gh#6100's chosen answer says **one stream** ("rarely a good idea to have
+stream per subject", each replicated stream carrying its own Raft group) while Synadia's 2026-05-20
+*per-tenant FIFO* post recommends **one stream per tenant** at "hundreds to low thousands". They answer
+different questions — per subject against per tenant — and no public source measures either, which is
+why step 3 of the plan is runs on the 2.14.6 binary and why the page must say the numbers are its own.
+
+**Also found, and parked with the phase that wants it**: a Synadia post per open G-group (KV
+configuration → G3, tenant-isolated edge cold starts → G5, MQTT vs NATS for fleets → G8, three
+Kafka/RabbitMQ comparisons → G8) and **Jepsen: NATS 2.12.1** (2025-12-22), an external audit of exactly
+the consistency claims [[replicas]] and [[raft-in-nats]] make and the strongest unread source about
+correctness in the ecosystem — noted for phase I.
+
+**Bank**: no cell earned — the scout creates no page. 169 / 197 stands. Lint: **417 pages**, drift 0,
+unlanded 0, wanted 0, unverified 12, staleness 0 behind 2.14.6. **Next:** step 2, the ingest, once the
+user picks from the scout's recommendation (G1, G3, G4, G5, G6, G7 plus S1 and S7 — eight summaries).
+
+## 2026-09-04 — phase G1 step 2: the ingest — eight summaries for stream and subject design
+
+**Operation:** ingest, from the step-1 scout's recommendation taken whole. Cap: 8 summaries; delivered 8.
+
+**Summaries (8).** The six threads promoted in step 1 — [[s-gh-6100-stream-per-subject-or-one]] (row 108),
+[[s-gh-4170-subject-indexing-internals]] (109), [[s-gh-4499-workqueue-fanout-retention]] (110),
+[[s-gh-3405-consumer-filtering-performance]] (111), [[s-gh-6571-source-mirror-or-one-stream]] (114),
+[[s-gh-3772-jetstream-as-an-event-store]] (144) — plus two Synadia posts fetched into
+`raw/synadia-blog/` with their `raw/sources.md` entry: [[s-synadia-subject-hierarchies]] (2026-06-17)
+and [[s-synadia-expected-sequence-headers]] (2026-01-20).
+
+**Ripples (15), unlanded back to 0.** [[subjects-and-wildcards]] (three sections and three new rows in
+the reserved-prefix table), [[stream]] (*How many streams, and what a second one costs*; *What a stream
+is, if you are coming from Kafka*), [[raft-in-nats]] (*One Raft group per replicated asset*),
+[[retention-policies]] (*The exclusion rule, and how an operator actually meets it*), [[worker-pool]],
+[[error-codes]] (*The publish-expectation family*), [[consumer]] (*A filter is a seek, not a scan*),
+[[filestore-layout]], [[jetstream-slows-as-consumers-grow]], [[mirrors-and-sources]] (*A second copy is
+not a performance tool*), [[core-nats-delivery]], [[publishing]] (*The five expectation headers*),
+[[stream-and-consumer-config]], [[subject-permissions]], [[subject-transforms]].
+
+**What the ingest settled that the wiki did not have.**
+
+- **The 32-token cliff.** Three sources repeat "≤16 tokens" — the docs primer (#81), the accepted answer
+  on so#72585165, and Synadia's 2026-06-17 post. The post alone says it is guidance, not a limit, **and
+  gives the mechanism**: the sublist tokenizes into a stack array sized for 32. Verified at v2.14.6 —
+  `tsa := [32]string{}` at `sublist.go:576`, `:662`, `:1343`, `:1441`, `:1449`, `:1664` and
+  `var lnts [32]lnt` at `:869`. So the honest form is *the cliff is at 32 and 16 is half of it*; nothing
+  is rejected either way.
+- **Four reserved prefixes the docs' list omits**, all confirmed: `$JSC.` (`jetstream_cluster.go:11545`),
+  `$NRG.` (`raft.go:2360`), `_R_.` (`accounts.go:2450`), `_GR_.` (`gateway.go:49`).
+- **`JSMaxSubjectDetails = 100_000`** (`jetstream_api.go:435`) — the wiki knew the number, not the
+  constant or that there is no key to raise it.
+- **A `## To verify` item closed.** [[publishing]] asked since 2026-08-31 whether the expectation headers
+  have their own error codes. They have six, read from `jetstream_errors_generated.go:849–896`: `10060`,
+  `10070`, `10071`, `10164`, `10193` and — a **503**, not a 400 — `10163`. And `10071` carries a
+  different number depending on which header you sent: the per-subject branch answers with that
+  subject's last sequence (`stream.go:6455–6470`), the global branch with `mset.lseq`.
+- **A fifth expectation header the wiki had never named**: `Nats-Expected-Last-Subject-Sequence-Subject`,
+  **2.11.0** (#5281), which makes one entity's events share a sequence across several subjects; sending
+  it without its companion has been an error only since **2.12.0** (#7196), and was silent before.
+- **The Raft-asset ceiling, from a second maintainer and two years earlier than gh#5128**: "Each stream
+  and consumer having replicas >1 has an associated raft group… a theoretical upper may be on the order
+  of 100s of thousands of assets" — which is why many small streams with one consumer each spend the
+  HA-asset budget twice over one stream with many consumers.
+- **"A Kafka *partition* is comparable to a NATS stream"**, not a topic — the sentence row 136 will need.
+
+**Docs issue #123.** The same Synadia post explains wildcard cost with a matching path the server does
+not have — "individual subscriptions [match] via hash lookup" rather than trie traversal. There is no
+separate literal path: `Sublist.match` answers from a **whole-subject cache** for wildcard and literal
+subscriptions alike (`sublist.go:559–573`), and on a miss `matchLevel` walks a trie whose every level is
+a map, so the literal token *is* the hash lookup and `*` — not `>` — is the expensive form
+(`sublist.go:771–796`, `:96–99`). Destination: a published blog post, the second such row after #39. The
+post's other four checkable claims were verified and hold, and the row says so.
+
+**Two public disagreements now on the pages rather than resolved away.** Version tokens in the subject
+(Synadia: yes, from day one) against the schema version in a header (the accepted SO answer: never) —
+both on [[subject-transforms]] with the rule the post itself offers. And one stream (gh#6100) against one
+stream per tenant (Synadia's per-tenant FIFO post) — named on [[stream]], with the measurement left to
+step 3, because no public source measures either.
+
+**Bank**: 169 / 197 → **170 / 198**. Row **198** added — gh#3871, tiered storage, asked in 2023 and
+answered "planned but no schedule", re-asked in 2024 against Kafka's and Pulsar's, no further
+commitment. Row **112** re-pointed at the new `publishing` section. Rows 108–111, 114 and 144 stay open
+by design: a row is answered when a page states the answer, and those pages are steps 4–7.
+**Row 144 gets its own page** — `event-sourcing-on-jetstream` — decided in this step and written into
+the plan.
+
+`verified-on` moved to 2026-09-04 on the four pages where a source check actually happened today
+([[subjects-and-wildcards]], [[publishing]], [[error-codes]], [[stream-and-consumer-config]]); the
+authority is unchanged at nats-server 2.14.6.
+
+Lint: 417 → **425 pages**, drift 0, unlanded **0**, wanted 0, unverified 12, staleness 0 behind 2.14.6.
+**Next:** step 3, the runs — what many streams and many filtered consumers actually cost on the 2.14.6
+binary, because rows 108 and 111 have a shape in public and no numbers anywhere.
+
+## 2026-09-04 — plan `stream-and-subject-design`, step 3: the runs
+
+*Operation: plan*, step 3 of `inbox/plan-stream-and-subject-design-2026-09-04.md`. Rows **108**, **109**,
+**111** and **114** are answered in public with a *shape* and no number anywhere: "it's rarely a good
+idea to have stream per subject" (gh#6100), "the server doesn't do like a table scan" (gh#3405), "it's
+not because a stream is larger that delivery takes longer" (gh#6571). Six runs on the v2.14.6 binary
+put numbers next to the shapes. No wiki page changed in this step — steps 4–7 are the pages.
+
+**Written**: `raw/nats-server-src/stream-topology-observed-v2.14.6.md` (1,478 lines), with twelve run
+scripts, `stream-topology-topolab.py` (a stdlib client that speaks `$JS.API.*` directly, so ten
+thousand streams or five thousand filters can be created and each create timed), `-snap.py` and
+`-limits.conf` beside it, and a `raw/sources.md` row. One standalone server for A/C/D/E/F, the
+three-node lab for the R3 pass, a purpose-built two-account server for D. **Every number is one
+laptop**, and the file says so twice.
+
+**What the runs settled.** *A/B* — an empty file stream is **8 KiB and three files** on disk
+(`meta.inf` 516 B, `meta.sum` 16 B, `msgs/1.blk` 0 B) and **~53–58 KiB of RSS**, linear to 10,000;
+1,000 R1 streams create at 1,592/s; the publish rate into one stream **does not move** between 1 and
+1,000 streams (194k–209k msg/s); the **first** message into a fresh stream costs **~4.4 ms** and the
+next ones ~0.04 ms; the same 100,000 messages cost **1.26×** more disk spread over 1,000 streams than
+in one; a clean restart is **125 ms at 1,001 streams and 5.4 s at 10,000**, and after SIGKILL 10,000
+streams print 10,000 `Stream state outdated … will rebuild` warnings and still start in 5.7 s.
+*R3* — a replicated stream creates in **P50 ~110 ms** against R1's 0.6 ms, `ha_assets` is **streams +
+1**, the `_meta_` store grows 36 → 628 KiB from 10 to 1,000 streams, and a node holding 1,000 R3
+streams needs **18 s** to come back and **more than 10 s** to shut down. *C* — gh#3405 confirmed on
+2.14.6: one matching message in the middle of 1,000,001 is a **0.9 ms create, `num_pending` 1, 2.3 ms
+to the message**; 1,000 consumers on one stream cost nothing at publish time and 300 ms at restart;
+and the public **"~300"** is about **disjoint filters on one consumer**, where it is a **create-time**
+cost (1.0 → 4.6 → 33.7 → 784 ms at 1 → 300 → 1,000 → 5,000 filters) while the first fetch stays 0.2 ms
+and the wildcard equivalent costs 0.8 ms. The same 300-way fan-out: **300 streams with one consumer
+each cost 2.75× the RSS and take 1.5× longer to ingest** than one stream with 300 filtered consumers.
+*D* — `10027`, `10026`, `10002`, and the account's `max_consumers` is **per stream**. *E* — cardinality
+on one axis: `index.db` is **exactly Σ(len(subject)+4) + ~550 B**, a subject costs **~256 B of RSS**,
+restart goes 131 → 421 ms from 10 to a million subjects, and `STREAM.INFO` pages its subject list at
+**100,000** (`JSMaxSubjectDetails`). *F* — a sourcing stream costs **1.38–1.57×** a mirror because it
+stores a `Nats-Stream-Source` header on **every** message; a mirror may not have subjects (`10034`) or
+sources (`10031`); neither copy follows a `STREAM.MSG.DELETE` on the origin, and both survive the
+origin being deleted.
+
+**Two findings recorded.** Docs issue **#124** — an account's `max_consumers` is enforced **per
+stream** (`consumer.go:1130–1137` counting `mset.numLimitableConsumers()`, and the clustered twin at
+`jetstream_cluster.go:9587–9605`), while its reference page says only "The maximum number of consumers
+allowed", in the same shape as `max_streams`, which *is* per account. Observed: a `max_consumers: 2`
+account held **four** consumers, two per stream. `nats account info` renders the scope correctly and
+the docs never state it; the account limit and the per-stream one also return the identical `10026`.
+Server issue **SI-9** — **a push consumer delivers nothing when the only interest on its deliver
+subject is a wildcard**: a second stream subscribed on `copy2.>` never woke a consumer delivering to
+`copy2.evt` (0 of 1,000, `num_pending` stuck, nothing logged), and one plain `nats sub copy2.evt`
+released all 1,000 at once. Reproduced without a stream at all (`d.>` against `d.evt`), and the cause
+is `Sublist.registerNotification`'s exact-string test (`sublist.go:180–187`) disagreeing with
+`hasNoLocalInterest`'s `HasInterest`, which does count the wildcard. **This kills the third option of
+row 114 as a server-side design**: a consumer cannot make the copy on its own, a client has to — and
+the client copy carries no origin header and gets its own sequence numbers.
+
+**Also read from the source, for step 4.** Synadia's subject-hierarchy post's two remaining numbers are
+real: the **32-token stack array** (`sublist.go:576`, `:662`, …; `stree/stree.go:125`, `:143` for a
+filter's parts) and a **256-byte** stack buffer for the subject being reconstructed during a
+subject-tree walk (`stree/stree.go:127`, `:145`, `:154`, `:163`, `:491`). Neither is enforced —
+exceeding them costs an allocation, not a rejection — and the "16 tokens" three sources state appears
+nowhere in the server (docs issues #81, #82).
+
+**Two harness artefacts, labelled in the file and re-run by hand**: `tools/lab/cluster.sh stop k`
+returns before the process has released its ports, so the `start` that follows can be refused and the
+poll that follows *that* measures the harness (a 900 s and a 616 s reading, neither quoted anywhere).
+The re-runs give 5.7 s and 18.0 s.
+
+Bank unchanged at **170 / 198** — rows 108, 109, 111 and 114 are answered when the pages state the
+answer, and those are steps 4–7. Lint: 425 pages, drift 0, unlanded 0, wanted 0, staleness 0 behind
+2.14.6. Docs issues 123 → **124**, server issues 8 → **9**.
+**Next:** step 4, `subject-design` — the pattern page for row 109.

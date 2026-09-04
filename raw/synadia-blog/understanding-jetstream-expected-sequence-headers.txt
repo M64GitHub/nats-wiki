@@ -1,0 +1,237 @@
+NEW: The Edge Autonomy Gap report. AI is arriving at the edge — 500 practitioners say the infrastructure isn't ready.
+
+The creators of
+
+NATS Slack: 11K+ membersNATS GitHub: 41K+ stars
+
+ProductsSynadia PlatformSingle-tenant, fully managed NATS in your cloud. Enterprise control without operating it yourself.
+Synadia CloudMulti-tenant, hosted NATS. Build quickly with NATS, don't operate it.
+Synadia Deploy for KubernetesSelf-serve NATS & Synadia Platform deployment for Kubernetes environments.
+Synadia InsightsGranular, NATS-native observability including 100+ audit checks from our experts.
+Synadia ProtectA security gateway for NATS. Enforce policy on every connection and message.
+
+SolutionsDistributed & Agentic AI
+Connected Car
+Financial Services
+Microservices
+Smart Manufacturing
+
+Customers
+
+Resources
+### FEATURED
+RethinkConn 2026The biggest NATS event of the year
+Living on the EdgeEdge-to-core messaging patterns
+Synadia EducationLive NATS training from the experts
+
+### RESOURCES
+BlogDocsVideosNewsletterOn-demand Workshops
+
+### Comparisons
+NATS vs KafkaNATS vs Kinesis
+
+Edge Autonomy 2026
+ReportThe Edge Autonomy GapWhy the edge isn’t ready for AI
+AssessmentBenchmark your edgeGet your autonomy score in ~2 minutes
+
+CompanyHiring!
+
+Contact us
+
+The creators of
+
+Open main menu
+
+All posts
+
+# JetStream Expected Sequence Headers: Optimistic Concurrency Without Locks
+Peter Humulock
+
+• Jan 20, 2026
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in PerplexityShare on XShare on LinkedInShare via emailCopy as MarkdownCopy link
+
+NATS JetStream’s expected sequence headers provide a powerful mechanism for optimistic concurrency control. If you’re building systems where multiple processes need to write to the same stream without blocking each other, this feature is essential to understand.
+
+## The Problem: Concurrent Writes Without Locks
+
+When multiple processes try to write to the same stream simultaneously, you need a way to detect and handle conflicting writes. Traditional locking mechanisms can create bottlenecks and reduce throughput. Expected sequence headers solve this by detecting conflicts instead of preventing them.
+
+Here’s the scenario: two writers both read that a stream is at sequence 4. They both try to publish with the expectation that the stream is still at sequence 4. Only one succeeds, advancing the stream to sequence 5. The other is rejected because by the time it arrives, the stream has already moved to 5. The rejected writer retries with the updated sequence and succeeds.
+
+## One Stream, One Counter
+
+Before diving into the three types of expected sequence headers, it’s crucial to understand this: there is only one sequence counter per stream. Every message gets a unique, incrementing stream sequence number. The expected sequence headers validate against this single stream sequence.
+
+The three header types don’t create separate counters—they filter what they check against: the whole stream, a single subject, or a wildcard pattern.
+
+## The Three Approaches
+
+### Global: Stream-Level Validation
+
+Header: NATS-Expected-Last-Sequence
+
+Global sequence is the simplest approach. It tracks the stream’s last sequence number regardless of subject. If you have a single writer that needs strict ordering across all subjects, this is your option.
+
+Example scenario:
+
+- Publish to events.order.1 with expected sequence 0 → stream sequence becomes 1
+
+- Publish to events.user.5 with expected sequence 1 → stream sequence becomes 2
+
+- Publish to events.order.1 with expected sequence 2 → stream sequence becomes 3
+
+Each publish advances the global stream sequence, and you track that single counter across all subjects.
+
+When to use: You need strict ordering across all subjects, like maintaining a global event log.
+
+Go example:
+
+- 1
+
+_, err := js.Publish(ctx, "events.order.1", data,
+
+2
+
+jetstream.WithExpectLastSequence(0))
+
+### Per Subject: Subject-Level Validation
+
+Header: NATS-Expected-Last-Subject-Sequence
+
+Per subject sequence tracks ordering for each subject independently. Multiple writers can publish to different subjects without blocking each other. The catch: distinct subjects get their own tracking.
+
+Example scenario:
+
+- Publish to events.order.1 with expected 0 → stream sequence 1, last for order.1 is 1
+
+- Publish to events.order.2 with expected 0 → stream sequence 2, last for order.2 is 2
+
+- Publish to events.order.1 with expected 1 → stream sequence 3, last for order.1 is 3
+
+- Publish to events.order.2 with expected 2 → stream sequence 4, last for order.2 is 4
+
+Notice how the expected values jump (0, 0, 1, 2) because we’re tracking different subjects. The expected value is still a stream sequence number, not an independent counter starting from zero.
+
+Common mistake: Assuming events.order.1.created and events.order.1.shipped share sequence tracking. They don’t—they’re completely separate subjects with independent tracking.
+
+When to use: Multiple entities with independent lifecycles, where each entity uses a single subject like events.order.<id>, and you need concurrency control per entity.
+
+Go example:
+
+1
+
+_, err := js.Publish(ctx, "events.order.1", data,
+
+2
+
+jetstream.WithExpectLastSequencePerSubject(0))
+
+### Per Pattern: Pattern-Level Validation
+
+Headers: NATS-Expected-Last-Subject-Sequence + NATS-Expected-Last-Subject-Sequence-Subject
+
+Per pattern sequence is the most flexible option. You define a pattern that tracks the last message matching that pattern. This lets you group related subjects together.
+
+With this approach, order.1.created and order.1.shipped can share the same sequence tracking, while order.2.* stays independent.
+
+Example scenario:
+
+- Publish to events.order.1.created with pattern events.order.1.*, expected 0 → stream sequence 1
+
+- Publish to events.order.2.created with pattern events.order.2.*, expected 0 → stream sequence 2
+
+- Publish to events.order.1.shipped with pattern events.order.1.*, expected 1 → stream sequence 3
+
+- Publish to events.order.2.shipped with pattern events.order.2.*, expected 2 → stream sequence 4
+
+Each entity (order 1, order 2) tracks its own sequence across multiple subjects. When publishing order.1.shipped, you expect 1 (the stream sequence of the last order.1.* message), not 0.
+
+When to use: Entity events span multiple subjects, like order.1.created, order.1.shipped, order.1.delivered. Perfect for event sourcing scenarios.
+
+Go example:
+
+1
+
+_, err := js.Publish(ctx, "events.order.1.shipped", data,
+
+2
+
+jetstream.WithExpectLastSequenceForSubject(1, "events.order.1.*"))
+
+## Use Cases
+
+### Event Sourcing
+
+When building event-sourced systems, you often need to encode more information in subjects. Per pattern headers let you maintain ordering guarantees across all events for a specific entity while allowing concurrent writes to different entities.
+
+### Atomic Batch Publishing
+
+Expected sequence headers work hand-in-hand with NATS 2.12’s atomic batch publishing feature. You can use NATS-Expected-Last-Sequence on the first message of a batch to ensure the stream hasn’t changed since you started building your batch.
+
+## Failure Scenarios
+
+Let’s see what happens when sequence validation fails:
+
+Setup: Fresh stream at sequence 0
+
+- Writer A publishes with expected sequence 0 → succeeds, stream is now at 1
+
+- Writer B also tries to publish with expected sequence 0 → fails with “wrong last sequence: 1”
+
+The error message tells you the current sequence so you can retry with the correct value.
+
+## Key Takeaways
+
+-
+One sequence counter per stream: All three header types validate against the same stream sequence. They just filter differently.
+
+-
+Expected values are stream sequences: You’re always checking against actual stream sequence numbers, not independent per-subject counters.
+
+-
+Track and use returned sequences: After each publish, capture the returned sequence and use it for your next expected sequence check.
+
+-
+Choose based on your use case:
+
+- Global: Single writer, strict ordering across everything
+
+- Per subject: Multiple entities, one subject per entity
+
+- Per pattern: Multiple entities, multiple subjects per entity
+
+-
+Optimistic concurrency is about detection: These headers don’t prevent conflicts—they detect them. Your application handles retries.
+
+Expected sequence headers give you fine-grained control over concurrent writes in NATS JetStream. Whether you need global ordering, per-entity isolation, or grouped subject tracking, there’s a header strategy that fits your needs.
+
+The key insight: it’s all one stream sequence, just filtered three different ways.
+
+Want to see these headers in action with atomic batch publishing? Check out Atomic Batch Publishing in NATS 2.12.
+
+## Related posts
+
+All posts
+
+Open SourcePartitioned Consumer Groups in NATS JetStream: Ordered, Scalable ProcessingPeter Humulock•Jul 15, 2026
+
+Open SourcePull Consumer Priority Groups in NATS JetStream: Overflow, Pinned, and Prioritized RoutingPeter Humulock•Jun 22, 2026
+
+Open SourceJetStream Anti-Patterns: Avoid these pitfalls to scale more efficientlyAndrew Connolly•Jun 6, 2026
+
+Products Synadia CloudSynadia PlatformSynadia Deploy for KubernetesSynadia InsightsSynadia Protect
+Resources BlogDocsVideosSynadia EducationNATS vs KafkaNATS vs Kinesis
+Company AboutBrandCustomersContactCareersPress
+Legal TermsPrivacyDPASubprocessorsSupport LifecycleTrust Center
+
+Get the NATS Newsletter
+News and content from across the community
+
+Subscribe
+
+© 2026 Synadia Communications, Inc.
+
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in Perplexity
+X YouTube LinkedIn Slack GitHub
+
+Cancel

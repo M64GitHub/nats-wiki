@@ -7,9 +7,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [retention, limits, interest, workqueue]
 aliases: [retention, WorkQueue, Interest, Limits, retention policy]
-sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
+sources: [s-docs-retention-policies, s-docs-policies, s-docs-stream-config, s-adr-60-reliable-sourcing, s-adr-59-sourcing-and-mirroring, s-adr-10-extended-purge, s-docs-acknowledgment, s-docs-filtering, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-worker-pool, s-adr-7-server-error-codes, s-synadia-reliable-delivery-dlq, s-adr-51-message-scheduler, s-gh-7590-dlq-payload-loss, s-gh-7032-max-msgs-known-good, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-gh-4499-workqueue-fanout-retention, s-gh-6571-source-mirror-or-one-stream, s-gh-6100-stream-per-subject-or-one]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Retention policies
@@ -341,6 +341,65 @@ consumer on a workqueue stream must use `ack_policy: explicit` (10084). The fiel
 [[s-nats-server-config-mutability-observed]]).
 
 
+## The exclusion rule, and how an operator actually meets it
+
+The three policies are usually presented as a choice. In public they are almost never chosen — they
+are discovered, on the second consumer, as an error:
+
+```
+nats: error: Consumer creation failed: filtered consumer not unique on workqueue stream (10100)
+```
+
+That is gh#4499: a fan-out design — several independent applications, each of which must see **every**
+message, several instances of each sharing the work — built on a `--retention=work` stream. The first
+durable consumer on `EVENTS.*` is created; the second is refused (source:
+[[s-gh-4499-workqueue-fanout-retention]]). The maintainer's answer is the rule this section exists for:
+
+> "Then dont use WorkQueue. WorkQueue is designed for any message being processed succesfully once
+> only. **Use Interest or limits.** With those messages will distribute within multiple instances of
+> teh same App (they would share a consumer) and multiple apps all get all the messages (each app is a
+> consumer)." — @ripienaar, 2023-09-07
+
+**So the first question is not "which of three" but "how many independent readers does this message
+have".** One reader — WorkQueue is available. More than one — WorkQueue is excluded before anything
+else is considered, because there is no legal way to express it. And the two axes are separate:
+
+- **instances of one application share one consumer** — that is how work is distributed
+  ([[worker-pool]]);
+- **different applications get their own consumer** — that is how a message is seen twice, and it is
+  what `interest` and `limits` allow and `workqueue` forbids.
+
+The asker's first diagnosis was that the filter string was wrong. It was not; the *retention* was. Two
+weeks later: "I'm now using `limits` policy and it work as expected."
+
+### Do not split a stream to keep it small
+
+The other half of the same mistake is reaching for a second stream to protect the first. gh#6571 asks
+exactly that — a WorkQueue stream for a fast consumer plus a Limits **mirror** for a slow analytics
+one, against one Limits stream with both consumers on it — and the answer rejects the premise (source:
+[[s-gh-6571-source-mirror-or-one-stream]]):
+
+> "It's not because a stream is larger that delivery of messages to consumers takes longer, therefore
+> approach 2 is simpler, more efficient and doesn't have the Cons you list." — @jnmoyne, 2025-03-02
+
+Asked what a large stream *does* cost, the same answer names one thing: "Mostly increased memory usage
+if you have a lot of different subject being used in the stream (the servers maintain per subject
+indexing)" — a **subject cardinality** cost ([[subjects-and-wildcards]]), not a message-count one.
+
+A fast consumer and a slow consumer on one stream is the supported shape: consumers are independent
+cursors and the slow one does not hold the fast one back. What a slow consumer *does* hold, under
+`interest` or `workqueue`, is the data itself — which is the real reason that design needed `limits`.
+
+### Retention is one of the few honest reasons to split a stream
+
+Since retention is a stream property and cannot be changed for one subject, a subject that needs a
+different policy needs its own stream. That is the single exception the maintainers make to "one
+stream": "I would stick to one stream, **unless you need different retention policies for some
+subjects** for example" (source: [[s-gh-6100-stream-per-subject-or-one]]). The same is true of
+replication, storage backend and placement — and of nothing else. See [[stream]], *How many streams,
+and what a second one costs*.
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[ack-and-redelivery]] · [[worker-pool]] · [[jetstream-out-of-disk]] ·
@@ -351,4 +410,4 @@ consumer on a workqueue stream must use `ack_policy: explicit` (10084). The fiel
 [[s-docs-retention-policies]] · [[s-docs-policies]] · [[s-docs-stream-config]] ·
 [[s-docs-acknowledgment]] · [[s-adr-60-reliable-sourcing]] · [[s-adr-59-sourcing-and-mirroring]] · [[s-adr-10-extended-purge]] · [[s-docs-filtering]] ·
 [[s-docs-shaping-the-stream]] · [[s-docs-altering-stream-state]] ·
-[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]
+[[s-docs-worker-pool]] · [[s-adr-7-server-error-codes]] · [[s-synadia-reliable-delivery-dlq]] · [[s-adr-51-message-scheduler]] · [[s-gh-7590-dlq-payload-loss]] · [[s-gh-7032-max-msgs-known-good]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-gh-4499-workqueue-fanout-retention]] · [[s-gh-6571-source-mirror-or-one-stream]] · [[s-gh-6100-stream-per-subject-or-one]]

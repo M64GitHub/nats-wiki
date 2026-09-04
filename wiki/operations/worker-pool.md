@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-services-scaling, s-gh-4984-micro-with-jetstream, s-nats-server-services-observed, s-nats-server-core-or-jetstream-observed]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-services-scaling, s-gh-4984-micro-with-jetstream, s-nats-server-services-observed, s-nats-server-core-or-jetstream-observed, s-gh-4499-workqueue-fanout-retention]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -297,6 +297,27 @@ service subjects stay disjoint. [[core-or-jetstream]] is the decision, [[service
 synchronous half.
 
 
+## One consumer distributes; two consumers duplicate
+
+The distinction this page rests on, demonstrated in public rather than asserted. gh#4499's asker wanted
+several applications each to see every message and ran the obvious experiment: two processes bound to
+**one** consumer, five messages published. App 1 received messages 2, 4 and 5; app 2 received 1 and 3
+(source: [[s-gh-4499-workqueue-fanout-retention]]).
+
+That is this pattern working exactly as designed — and it is the wrong answer to *his* question, which
+needed each application to see all five. The rule in one line:
+
+- **instances of one application → one consumer**, shared; the server hands each message to whichever
+  instance asks for it next. That is a worker pool.
+- **different applications → one consumer each**; each gets its own cursor over the same stored
+  messages, and the stream's retention decides whether that is even allowed
+  ([[retention-policies]] — a `workqueue` stream refuses the second overlapping consumer with
+  `10100`).
+
+Worth stating to a team out loud, because the failure is silent in one direction: a second *instance*
+accidentally given its own durable name does not error — it quietly doubles the processing.
+
+
 ## Related
 
 [[consumer]] · [[ack-and-redelivery]] · [[stream]] · [[retention-policies]] · [[priority-groups]] ·
@@ -305,4 +326,4 @@ synchronous half.
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-services-scaling]] · [[s-gh-4984-micro-with-jetstream]] · [[s-nats-server-services-observed]] · [[s-nats-server-core-or-jetstream-observed]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-services-scaling]] · [[s-gh-4984-micro-with-jetstream]] · [[s-nats-server-services-observed]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-gh-4499-workqueue-fanout-retention]]

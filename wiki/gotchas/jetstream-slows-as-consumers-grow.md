@@ -7,9 +7,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [consumer-count, consumer-info, meta-leader, raft-traffic, subject-filters, republish]
 aliases: ["too many consumers", "100k consumers", "consumer info is slow", "throughput collapses with many consumers"]
-sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed, s-relnotes-2.10, s-relnotes-2.11, s-gh-5128-ha-assets]
+sources: [s-synadia-jetstream-anti-patterns, s-adr-17-ordered-consumer, s-relnotes-2.14.0, s-docs-raft-and-leaders, s-gh-5243-kv-watchers-at-scale, s-gh-6746-watch-many-keys, s-gh-5044-restrict-durable-consumers, s-docs-get-direct, s-nats-server-jetstream-log-warnings, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-mirrors-observed, s-relnotes-2.10, s-relnotes-2.11, s-gh-5128-ha-assets, s-gh-3405-consumer-filtering-performance]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # JetStream slows down as the consumer count grows
@@ -210,6 +210,22 @@ list, consumer info and consumer list requests are **queued below create-update-
 (source: [[s-relnotes-2.14.0]]). That protects stream operations from an info-heavy client — it does
 not make the info call cheap.
 
+## What filtering is *not* the cause of
+
+Worth stating on this page, because the first instinct when a stream gets slow is to suspect the
+filters. A filtered consumer does not scan the stream to find its messages: "the sever doesn't do like
+a table scan over all of the messages in the stream and things indexing are used to make operations to
+find the first and last message(s) in a stream very efficient indeed" (@jnmoyne, 2022-09-01 — source:
+[[s-gh-3405-consumer-filtering-performance]]). One matching message in a million-message stream is a
+seek.
+
+So the causes above are the causes: **how many** consumers there are, **how many disjoint filters** are
+on one of them, how often something calls `consumer info`, and how fast they churn. The *selectivity*
+of a filter is not one of them, and neither is the size of the stream behind it. The exception is
+already cause 5: on a mirror still catching up, or on a stream whose sequence space is mostly interior
+deletes, the indexed range degenerates ([[consumer-slow-on-a-sparse-stream]]).
+
+
 ## Explained by
 
 [[raft-in-nats]] (the meta group, and why meta-leader load is a cluster-wide symptom) ·
@@ -262,4 +278,4 @@ sequence to restart from with `OptStartingSeq` — "If you need over 100k feel f
 [[s-synadia-jetstream-anti-patterns]] · [[s-adr-17-ordered-consumer]] · [[s-relnotes-2.14.0]] ·
 [[s-docs-raft-and-leaders]] · [[s-gh-5243-kv-watchers-at-scale]] · [[s-gh-6746-watch-many-keys]] ·
 [[s-gh-5044-restrict-durable-consumers]] · [[s-docs-get-direct]] ·
-[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-gh-5128-ha-assets]]
+[[s-nats-server-jetstream-log-warnings]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-gh-5128-ha-assets]] · [[s-gh-3405-consumer-filtering-performance]]

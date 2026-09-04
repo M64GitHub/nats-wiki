@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-02
 tags: [filestore, block-size, index.db, tombstone, compaction, disk, sizing, psim, o.dat]
 aliases: [filestore, file store, blocks, blk, msg blocks, index.db, on-disk layout, storage overhead, bytes per message]
-sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-nats-server-filestore-layout, s-adr-35-filestore-compression, s-nats-server-jetstream-resources, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-mirror, s-gh-8417-kv-mirror-file-vs-memory, s-relnotes-2.14.4, s-nats-server-mirrors-observed, s-gh-8444-mirror-catchup-under-a-reader, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-5202-max-unique-subjects, s-gh-8001-jetstream-startup-slow-50m, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-3405-consumer-filtering-performance, s-gh-4170-subject-indexing-internals, s-gh-3772-jetstream-as-an-event-store]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Filestore layout on disk
@@ -418,6 +418,41 @@ older than the archive (source: [[s-relnotes-2.10]]).
   disk more aggressively" (#8366); a cache-weakening bug that raised memory and GC pressure (#8380).
 
 
+## What the index is for, in the maintainers' own words
+
+This page measures the index; three threads state what it is *for*, and together they are the public
+description of the filestore's read path.
+
+- **Two lookup keys, and only two.** "We have meta state that allows us to index efficiently by
+  sequence number and by subject… Within JetStream, you have two options, lookup by sequence or by
+  subject" (source: [[s-gh-4170-subject-indexing-internals]]). Everything a consumer can express is one
+  of those two, which is why a filter that is not a subject pattern does not exist.
+- **A filtered read is a bounded range walk.** "if a consumer is filtered to a specific subject, since
+  the index is present, it only performs a **linear scan over the blocks between the earliest and
+  latest events for that subject**" (source: [[s-gh-3772-jetstream-as-an-event-store]]) — and,
+  independently, "the sever doesn't do like a table scan over all of the messages in the stream…
+  indexing [is] used to make operations to find the first and last message(s) in a stream very
+  efficient" (source: [[s-gh-3405-consumer-filtering-performance]]).
+- **The cost is memory, and it scales with distinct subjects.** "Currently the subject addressing layer
+  to a stream takes more memory the more unique subjects that you have. We are working to make this
+  more memory friendly in future releases and plan to have some improvements in 2.10" (source:
+  [[s-gh-4170-subject-indexing-internals]], 2023-05) — the improvement being the ART index of 2.10.9
+  that [[subjects-and-wildcards]] cites, and the ~380 B per subject measured here.
+
+The **storage layer** itself, described by a maintainer rather than inferred: "a traditional
+append-only log style structure for making writes fast, however it supports some traditional 'data
+store' kind of operations, such as being able to get an individual message or mark a message for
+deletion", with subject indexing for server-side filtering (source:
+[[s-gh-3772-jetstream-as-an-event-store]]). That is the whole tension this page's layout comes from —
+an append-only log that has to support point deletes.
+
+**The question nobody has answered.** A 2025-07 follow-up on gh#4170 asks how a
+`subject -> (startSeq, endSeq)` index behaves on **sparse** subjects whose messages span a large
+interval, whether a skip scan exists, and whether history can be walked backwards efficiently. It has
+no reply. The wiki's own answer to the first part is [[consumer-slow-on-a-sparse-stream]], measured at
+6.5–9.4× on 2.14.6; the other two remain open.
+
+
 ## To verify
 
 - The **`sdm`/`SDMMeta`** (subject-delete-markers) and **`thw.db`** (TTL hash wheel) and `sched.db`
@@ -469,4 +504,4 @@ older than the archive (source: [[s-relnotes-2.10]]).
 - [[s-docs-object-store-chunking]] — the docs' unquantified per-message-overhead claim these
   numbers answer.
 - [[s-docs-object-store-under-the-hood]] — the qualitative disk-reclamation warning the bulk-delete
-  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+  measurement narrows. · [[s-nats-server-mirror]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-relnotes-2.14.4]] · [[s-nats-server-mirrors-observed]] · [[s-gh-8444-mirror-catchup-under-a-reader]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-5202-max-unique-subjects]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-3405-consumer-filtering-performance]] · [[s-gh-4170-subject-indexing-internals]] · [[s-gh-3772-jetstream-as-an-event-store]]

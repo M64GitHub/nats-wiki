@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [subject_transform, republish, wildcard, partition, split, Nats-Stream, Nats-Subject, Nats-Sequence, Nats-Last-Sequence, Nats-Msg-Size, 10052, sharding]
 aliases: [subject transform, transform, republish, subject mapping, partition, wildcard, sharding, "{{wildcard(1)}}", "{{partition(3,1)}}", nats server mappings]
-sources: [s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-mirrors-and-sources, s-docs-stream-config, s-docs-kv-watching, s-relnotes-2.10, s-relnotes-2.12, s-nats-server-stream-consumer-config, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5172-mapping-in-config-or-stream]
+sources: [s-docs-subject-mapping, s-adr-57-kv-subject-transforms, s-docs-mirrors-and-sources, s-docs-stream-config, s-docs-kv-watching, s-relnotes-2.10, s-relnotes-2.12, s-nats-server-stream-consumer-config, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5172-mapping-in-config-or-stream, s-synadia-subject-hierarchies]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Subject transforms and republish
@@ -230,6 +230,43 @@ consume; map in the stream when only the stream's consumers need the shard. The 
 and destination must obey are on [[subjects-and-wildcards]].
 
 
+## Mappings are how a subject schema changes without a flag day
+
+You cannot rename a subject in place: once `orders.customer.created` is in production, every publisher
+and subscriber is bound to that string (source: [[s-synadia-subject-hierarchies]]). Account-level
+`mappings` are the supported way out, because they let the two sides move independently —
+
+```
+mappings = {
+  "orders.customer.created": "orders.v1.customer.created"
+}
+```
+
+— legacy publishers keep sending the old subject while new subscribers consume the new one. This is
+also the one place a wildcard appears on the **publish** side: as a transform pattern, never as a
+publish target ([[subjects-and-wildcards]]).
+
+**The order of a migration matters**, and skipping a step is how it turns into an incident: stream
+subject filters, then consumer filters, then permissions. A consumer whose filter no longer matches
+fails silently rather than erroring ([[s-docs-filtering]]), and a permission that was not updated
+fails silently too ([[subject-permissions]]).
+
+**Should a version live in the subject at all?** The public sources disagree, and both positions are
+defensible:
+
+- **In the subject** — Synadia's post recommends `orders.v1.customer.created` from day one, because a
+  breaking change then produces a *different subject*: v1 and v2 subscribers coexist without inspecting
+  payloads, streams can be split along the version boundary, and `orders.v2.>` can be granted without
+  touching v1.
+- **In a header** — the accepted answer on
+  [so#72585165](https://stackoverflow.com/questions/72585165) says explicitly to avoid a version number
+  in the subject and to carry the schema version in the message header instead, keeping subjects stable.
+
+The post itself names the split and gives the rule this wiki would give: **if the change affects
+routing or subscription, it belongs in the subject; if it only affects payload parsing, a header is
+enough.**
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[mirrors-and-sources]] · [[key-value]] · [[worker-pool]] ·
@@ -243,4 +280,4 @@ and destination must obey are on [[subjects-and-wildcards]].
 - [[s-docs-mirrors-and-sources]] — the per-source transform, applied while copying.
 - [[s-docs-stream-config]] — the `subject_transform`, `republish` and per-source
   `subject_transforms` config fields.
-- [[s-docs-kv-watching]] — a KV key filter is a subject filter, so `*` is a whole token there too. · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-nats-server-stream-consumer-config]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-gh-5172-mapping-in-config-or-stream]]
+- [[s-docs-kv-watching]] — a KV key filter is a subject filter, so `*` is a whole token there too. · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-nats-server-stream-consumer-config]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-gh-5172-mapping-in-config-or-stream]] · [[s-synadia-subject-hierarchies]]

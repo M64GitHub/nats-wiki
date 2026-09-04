@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-cli-help-0.4.0, s-prometheus-nats-exporter-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-3857-consumer-pending-series, s-exporter-issue-218-num-pending-differs-per-node, s-nats-server-client-lifecycle-observed, s-docs-concepts-jetstream, s-docs-jetstream-where-next]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-cli-help-0.4.0, s-prometheus-nats-exporter-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-3857-consumer-pending-series, s-exporter-issue-218-num-pending-differs-per-node, s-nats-server-client-lifecycle-observed, s-docs-concepts-jetstream, s-docs-jetstream-where-next, s-gh-3405-consumer-filtering-performance, s-gh-6571-source-mirror-or-one-stream]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -663,6 +663,45 @@ consumer is the position marker, an ack is the reader saying a message is handle
 message has not yet been processed" (source: [[s-docs-jetstream-where-next]]).
 
 
+## A filter is a seek, not a scan
+
+The fact the whole "one big stream, many filtered consumers" design rests on, and it was asked in
+exactly the form that worries an architect: a stream on `foo.bar.>` holding a million messages, a new
+consumer filtering `foo.bar.baz.xyz` with **one** matching message somewhere in the middle — does it
+walk the million? (source: [[s-gh-3405-consumer-filtering-performance]])
+
+> "no the sever doesn't do like a table scan over all of the messages in the stream and things
+> indexing are used to make operations to find the first and last message(s) in a stream very
+> efficient indeed." — @jnmoyne, 2022-09-01
+
+Two things follow, and the second is the one that bites:
+
+- **The cost of a filtered read tracks the span of the filter's subjects in the sequence space**, not
+  the stream's size — the index gives first and last per subject, and the read walks the blocks
+  between them ([[filestore-layout]]).
+- **When that span is the whole stream and its interior is mostly deletes, the seek degenerates into a
+  scan.** That is the KV hot-key shape, and it is measured on
+  [[consumer-slow-on-a-sparse-stream]] rather than assumed.
+
+Two caveats on the quote. It is dated **2022 and 2.9** — five minors ago — and the asker never ran the
+benchmark he promised, so nothing was ever measured in public; and it says *efficient*, not *free*. The
+number of **filters** is a separate axis with its own threshold ([[jetstream-slows-as-consumers-grow]],
+~300 disjoint filters on one consumer).
+
+## Independent cursors mean a slow consumer costs the fast one nothing
+
+Asked whether a big stream would slow real-time delivery while an analytics consumer crawled through
+it, the answer was that the premise is wrong: "It's not because a stream is larger that delivery of
+messages to consumers takes longer" (source: [[s-gh-6571-source-mirror-or-one-stream]]). A fast
+consumer and a slow consumer on one stream is a supported shape, not a compromise — each has its own
+sequence, its own ack floor and its own `max_ack_pending`.
+
+What a slow consumer *does* hold is the **data**, and only under `interest` or `workqueue` retention,
+where the stream cannot delete a message until every interested consumer is finished with it
+([[retention-policies]]). Under `limits` it holds nothing, and the only cost of the big stream is
+per-subject index memory — a subject-design consequence ([[subjects-and-wildcards]]).
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
@@ -684,4 +723,4 @@ message has not yet been processed" (source: [[s-docs-jetstream-where-next]]).
 [[s-gh-4972-nak-with-delay-blocks]]
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-3857-consumer-pending-series]] · [[s-exporter-issue-218-num-pending-differs-per-node]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-concepts-jetstream]] · [[s-docs-jetstream-where-next]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-3857-consumer-pending-series]] · [[s-exporter-issue-218-num-pending-differs-per-node]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-concepts-jetstream]] · [[s-docs-jetstream-where-next]] · [[s-gh-3405-consumer-filtering-performance]] · [[s-gh-6571-source-mirror-or-one-stream]]

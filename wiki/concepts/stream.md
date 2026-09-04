@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-docs-concepts-jetstream, s-docs-core-nats-chapter, s-docs-jetstream-where-next, s-nats-server-core-or-jetstream-observed, s-gh-3507-no-external-store]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-docs-concepts-jetstream, s-docs-core-nats-chapter, s-docs-jetstream-where-next, s-nats-server-core-or-jetstream-observed, s-gh-3507-no-external-store, s-gh-6100-stream-per-subject-or-one, s-gh-3772-jetstream-as-an-event-store]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -563,6 +563,52 @@ in a database the rest of the estate can query needs [[direct-get]] or a republi
 else — [[subject-transforms]] — not a storage option.
 
 
+## How many streams, and what a second one costs
+
+The default is **one stream with many subjects and many filtered consumers**, and the maintainers say
+so plainly: "Many Consumers per single Stream is usually the simple and good pattern as a starting
+point. **It's rarely a good idea to have stream per subject**" (source:
+[[s-gh-6100-stream-per-subject-or-one]]). What makes it work is that filtering is indexed rather than
+scanned ([[consumer]]); what makes the alternative expensive is Raft.
+
+**What a replicated stream costs beyond its data.** "Each Stream, if replicated (3 or more replicas)
+will have some overhead for maintaing its own RAFT group" (source:
+[[s-gh-6100-stream-per-subject-or-one]]) — and the ceiling that follows from it, from a second
+maintainer: "Each stream and consumer having replicas >1 has an associated raft group… A theoretical
+upper may be **on the order of 100s of thousands of assets** could likely saturate the network and CPU
+of the servers within a given cluster" (source: [[s-gh-3772-jetstream-as-an-event-store]]). That is the
+same unit [[jetstream-slows-as-consumers-grow]] calls an **HA asset**, and it counts consumers as well
+as streams — so "many small streams, one consumer each" spends the budget twice.
+
+At `R1` neither statement applies: there is no Raft group, and the cost of a second stream is the
+per-stream floor on disk and in memory rather than a group in the meta layer.
+
+**The reason to split that both maintainers accept** is not performance but **policy**: "I would stick
+to one stream, **unless you need different retention policies for some subjects** for example" (source:
+[[s-gh-6100-stream-per-subject-or-one]]). Retention, replication, storage backend, placement and the
+account a stream lives in are all per-stream, so a subject needing a different one of those needs its
+own stream. A subject that only needs a different *reader* does not — that is a consumer.
+
+The related but opposite question — one stream **per tenant** rather than per subject — is
+[[account]]'s territory as much as this page's, and the public answers point the other way; it is bank
+row 108 and phase G1's `stream-topology-design`.
+
+## What a stream is, if you are coming from Kafka
+
+One sentence saves a whole architecture review: "Many people compare a Kafka topic with a NATS stream,
+but this is not correct. It would be more accurate that **a single *partition* is comparable to a NATS
+stream**, since it is the unit of total ordering and replication" (source:
+[[s-gh-3772-jetstream-as-an-event-store]]). A multi-partition topic is emulated with deterministic
+subject-token partitioning into several streams ([[subject-transforms]]) — which is also why
+throughput comparisons against a whole Kafka topic are not comparisons against one stream.
+
+The storage layer behind it, from the same maintainer: "NATS has it own custom storage layer that
+supports both in-memory and file-based persistence. It combines a traditional append-only log style
+structure for making writes fast, however it supports some traditional 'data store' kind of operations,
+such as being able to get an individual message or mark a message for deletion" — with subject indexing
+for server-side filtering ([[filestore-layout]]).
+
+
 ## Related
 
 [[consumer]] · [[retention-policies]] · [[replicas]] · [[stream-placement]] · [[raft-in-nats]] ·
@@ -594,4 +640,4 @@ else — [[subject-transforms]] — not a storage option.
 [[s-issue-4281-insufficient-storage]] · [[s-synadia-jetstream-anti-patterns]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-docs-concepts-jetstream]] · [[s-docs-core-nats-chapter]] · [[s-docs-jetstream-where-next]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-gh-3507-no-external-store]]
+[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-docs-concepts-jetstream]] · [[s-docs-core-nats-chapter]] · [[s-docs-jetstream-where-next]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-gh-3507-no-external-store]] · [[s-gh-6100-stream-per-subject-or-one]] · [[s-gh-3772-jetstream-as-an-event-store]]

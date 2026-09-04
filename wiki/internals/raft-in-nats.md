@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [raft, quorum, election, term, meta-group, commit, apply, stepdown]
 aliases: [raft, RAFT, consensus, leader election, meta group, quorum]
-sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-surveyor-metrics-observed]
+sources: [s-nats-server-jetstream-log-warnings, s-docs-rolling-upgrades, s-docs-raft-and-leaders, s-docs-replication-and-r3, s-docs-surviving-node-loss, s-docs-upgrade-to-2.14, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-adr-61-meta-quorum-rescue, s-docs-placement, s-docs-monitoring-advisories-and-events, s-docs-monitoring-endpoints, s-docs-disaster-recovery, s-docs-forming-a-cluster, s-docs-jetstream-in-a-cluster, s-docs-scaling-and-peers, s-docs-your-first-cluster, s-gh-6490-high-message-lag, s-gh-7438-multi-region-availability, s-gh-7463-jetstream-corruption, s-nats-server-lame-duck, s-synadia-jetstream-memory-patterns, s-nats-server-jetstream-resources, s-nats-server-jetstream-cluster, s-gh-7533-quorum-loss-mqtt, s-nats-server-raftz, s-docs-monitor-raftz, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-surveyor-metrics-observed, s-gh-6100-stream-per-subject-or-one, s-gh-3772-jetstream-as-an-event-store]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # RAFT in nats-server
@@ -490,6 +490,39 @@ Nothing exports a stream's or consumer's own group; `/raftz?acc=…&group=…` o
 remains the way. Names on [[metrics]].
 
 
+## One Raft group per replicated asset, and the ceiling that follows
+
+Every stream and every consumer with `replicas > 1` runs its own Raft group, on top of the one
+[[meta-layer]] group the cluster runs about itself. That is the sentence behind every "how many
+streams" answer:
+
+> "Each Stream, if replicated (3 or more replicas) will have some overhead for maintaing its own RAFT
+> group." — @Jarema, 2024-11-11 (source: [[s-gh-6100-stream-per-subject-or-one]])
+
+> "The theoretical upper bound is based on the raft traffic. At a steady state, this would be heart
+> beats among all the raft groups. **Each stream and consumer having replicas >1 has an associated raft
+> group.** So there will be a small amount of traffic overhead per *asset* created. A theoretical upper
+> may be on the order of **100s of thousands of assets** could likely saturate the network and CPU of
+> the servers within a given cluster." — @bruth, 2023-03-01 (source:
+> [[s-gh-3772-jetstream-as-an-event-store]])
+
+Three things an operator can act on:
+
+- **The steady-state cost is heartbeats**, not data. An idle replicated stream is not free; it is a
+  group exchanging append-entries traffic on `$NRG.>` forever.
+- **Consumers count.** A design of many small streams with one consumer each spends the budget twice
+  over one big stream with many consumers — the arithmetic behind
+  [[jetstream-slows-as-consumers-grow]]'s **HA asset** unit and the `ha_assets` series on [[metrics]].
+- **The stated ceiling is theoretical and per cluster**, and the same answer says the maintainers have
+  "yet to see large-scale users… hit these limits in practice". Synadia's own operational number is
+  much lower — 2,000 HA assets per server — and that is the one to plan against, not this one.
+
+The full-mesh route layer has its own ceiling for the same reason: "since all servers form a full mesh
+… a cluster can only grow so large before saturation occurs" (source:
+[[s-gh-3772-jetstream-as-an-event-store]]), which is the argument for a supercluster rather than a
+bigger cluster ([[gateway]], [[choosing-a-topology]]).
+
+
 ## Related
 
 [[replicas]] · [[stream-placement]] · [[stream]] · [[consumer]] · [[monitoring-endpoints]] ·
@@ -510,4 +543,4 @@ remains the way. Names on [[metrics]].
 [[s-docs-scaling-and-peers]] · [[s-docs-your-first-cluster]] · [[s-gh-6490-high-message-lag]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-7463-jetstream-corruption]] ·
 [[s-nats-server-lame-duck]] · [[s-synadia-jetstream-memory-patterns]] ·
-[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-surveyor-metrics-observed]]
+[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-cluster]] · [[s-gh-7533-quorum-loss-mqtt]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-surveyor-metrics-observed]] · [[s-gh-6100-stream-per-subject-or-one]] · [[s-gh-3772-jetstream-as-an-event-store]]

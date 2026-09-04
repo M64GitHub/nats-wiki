@@ -1,0 +1,429 @@
+NEW: The Edge Autonomy Gap report. AI is arriving at the edge — 500 practitioners say the infrastructure isn't ready.
+
+The creators of
+
+NATS Slack: 11K+ membersNATS GitHub: 41K+ stars
+
+ProductsSynadia PlatformSingle-tenant, fully managed NATS in your cloud. Enterprise control without operating it yourself.
+Synadia CloudMulti-tenant, hosted NATS. Build quickly with NATS, don't operate it.
+Synadia Deploy for KubernetesSelf-serve NATS & Synadia Platform deployment for Kubernetes environments.
+Synadia InsightsGranular, NATS-native observability including 100+ audit checks from our experts.
+Synadia ProtectA security gateway for NATS. Enforce policy on every connection and message.
+
+SolutionsDistributed & Agentic AI
+Connected Car
+Financial Services
+Microservices
+Smart Manufacturing
+
+Customers
+
+Resources
+### FEATURED
+RethinkConn 2026The biggest NATS event of the year
+Living on the EdgeEdge-to-core messaging patterns
+Synadia EducationLive NATS training from the experts
+
+### RESOURCES
+BlogDocsVideosNewsletterOn-demand Workshops
+
+### Comparisons
+NATS vs KafkaNATS vs Kinesis
+
+Edge Autonomy 2026
+ReportThe Edge Autonomy GapWhy the edge isn’t ready for AI
+AssessmentBenchmark your edgeGet your autonomy score in ~2 minutes
+
+CompanyHiring!
+
+Contact us
+
+The creators of
+
+Open main menu
+
+All posts
+
+# How to Design NATS Subject Hierarchies (Patterns, Pitfalls & Best Practices)
+Andrew Connolly
+
+• Jun 17, 2026
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in PerplexityShare on XShare on LinkedInShare via emailCopy as MarkdownCopy link
+
+Subject design is the first architectural decision you make on NATS, and the most expensive one to reverse. Publishers and subscribers both encode your subject schema into their code; changing it later means coordinating every service that touches the bus. Get the first two tokens right and the system stays flexible for years. Get them wrong and you’ll be writing migration playbooks.
+
+This is a practical guide to NATS subject design for engineers who already understand distributed systems and are coming from Kafka, RabbitMQ, or MQTT. By the end you’ll have a defensible naming convention, a pattern picked for your access shape, a clear story for versioning and multi-tenancy, and a list of mistakes you won’t make.
+
+## How NATS subjects work (the fundamentals)
+
+A NATS subject is a case-sensitive, dot-separated string of tokens that forms a hierarchical namespace. Publishers send messages to a fully specified subject; subscribers express interest using either a fully specified subject or a wildcard pattern. The hierarchy is the routing key, the authorization boundary, and (with JetStream) the storage filter — all at once.
+
+### Tokens and the . separator
+
+Each .-separated segment is a token. Tokens should be lowercase, alphanumeric, and use - rather than _ where you need a word break. A canonical example:
+
+- 1
+
+orders.customer.created
+
+Read left-to-right, this says: the orders domain, the customer entity, the created action. That ordering is deliberate — broader concepts on the left, narrower on the right — because wildcard subscriptions read in the same direction.
+
+### Wildcards: * vs >
+
+* matches exactly one token at its position. > matches one or more tokens and must be the final token in the pattern. Wildcards are valid in subscriptions and in server-side subject mappings; they are not valid in publishes.
+
+1
+
+orders.*.created # matches orders.customer.created, not orders.customer.line.created
+
+2
+
+orders.> # matches orders.customer.created and orders.customer.line.created
+
+3
+
+orders.*.> # matches anything two-or-more tokens deep under orders
+
+# matches orders.customer.created and orders.customer.line.createdorders.*.> # matches anything two-or-more tokens deep under orders">
+
+A publisher must always send a fully specified subject. If you find yourself wanting to publish to orders.*.created, you’ve confused publish with subscribe — fix the publisher, not the schema.
+
+### Constraints that matter
+
+Subjects are case-sensitive: Orders.Created and orders.created are different subjects, and mixing cases is a recipe for missed messages. Stick to lowercase.
+
+There is no hard cap on token count, but practical guidance is ≤16 tokens and ≤256 characters. The NATS server’s subscription matcher uses a stack-allocated array sized for 32 tokens; subjects beyond that spill to the heap. This is a soft performance cliff, not a hard limit — you won’t get rejected, but very deep subjects pay a small allocation cost on every match. Sixteen tokens is already more depth than any sensible schema needs.
+
+## The three subject design patterns
+
+Most production NATS schemas reduce to one of three patterns. Pick the one whose first token matches your dominant access pattern, because that’s the token your subscribers will wildcard on.
+
+### Namespace-first: {namespace}.{entity}.{action}
+
+Use when teams own domains and most subscribers want “everything for orders” or “everything for payments.” This is the default for service-oriented architectures.
+
+1
+
+orders.customer.created
+
+2
+
+orders.line.updated
+
+3
+
+payments.invoice.settled
+
+4
+
+inventory.sku.adjusted
+
+A payments team subscribes to payments.> and is done. Permissions follow the same shape: the orders service can publish on orders.> and nothing else.
+
+### Identifier-first: {identifier}.{namespace}.{action}
+
+Use when the dominant query is “everything that happened to this entity” — typical for per-tenant systems, per-device IoT fleets, or per-customer audit streams.
+
+1
+
+tenant-acme.orders.created
+
+2
+
+tenant-acme.payments.settled
+
+3
+
+customer-123.orders.created
+
+4
+
+customer-123.profile.updated
+
+A tenant-scoped consumer subscribes to tenant-acme.> and sees its entire world. This pattern aligns naturally with multi-tenancy: the first token is the isolation key.
+
+### Multi-dimensional: {env}.{region}.{service}.{entity}.{action}
+
+Use when routing genuinely depends on multiple cross-cutting dimensions — typically environment and region in addition to service.
+
+1
+
+prod.us-east.orders.customer.created
+
+2
+
+prod.eu-west.orders.customer.created
+
+3
+
+staging.us-east.payments.invoice.settled
+
+This pattern is powerful but expensive: it adds tokens to every subject, every subscription, and every permission rule. Don’t reach for it unless you actually route on environment or region (for example, regional replication via subject mappings). “It might be nice someday” is not a reason.
+
+### How to choose
+
+| | Primary access pattern | Use
+| Service-oriented (all orders, all payments) | Namespace-first
+| Entity-oriented (everything for customer X) | Identifier-first
+| Multi-tenant isolation | Identifier-first with tenant as the first token
+| Cross-environment or cross-region routing | Multi-dimensional
+
+If two patterns look equally good, default to namespace-first. It’s the easiest to grow into the others later (you can prepend a tenant token; you cannot easily un-prepend one).
+
+## Reserved subject prefixes you must not publish to
+
+NATS reserves several $-prefixed namespaces for server internals. You can subscribe to some of them for observability, but you must never publish to them.
+
+| | Prefix | Purpose
+| $SYS. | System events, account/connection telemetry, server monitoring
+| $JS. | JetStream API (stream/consumer management, acks)
+| $JSC. | JetStream cluster internals
+| $KV. | Key-Value store backing subjects
+| $OBJ. | Object Store backing subjects
+| $NRG. | Raft (NATS Replicated Group) coordination
+| _INBOX. | Request/reply inbox subjects
+
+In addition, _R_. and _GR_. are server-generated reply subjects used for routed/gateway replies — treat them as off-limits for application code.
+
+A safe pattern: subscribe to $SYS.> from a monitoring service to ingest server events, but keep your application’s root tokens free of any leading $ or _.
+
+## Performance: wildcards, cardinality, and what NATS does under the hood
+
+NATS matches subscriptions using a trie keyed on tokens, with a sublist cache that accelerates repeated lookups. Two practical consequences fall out of that design.
+
+### Wildcard vs individual subscriptions
+
+| | Scenario | Better choice
+| Large, dynamic subject space | Wildcards
+| Small, fixed interest set | Individual subscriptions
+| Sparse interest (e.g. 5 subjects out of 1,000) | Individual subscriptions
+| Interest defined by hierarchy, not enumeration | Wildcards
+
+Wildcards win when the set of subjects is open-ended or changes at runtime — you don’t want to call Subscribe every time a new customer ID appears. Individual subscriptions win when interest is narrow and stable, because the server can match them with a direct hash lookup rather than traversing the trie.
+
+### High cardinality and the correlation-ID mistake
+
+The single most common subject-design mistake is encoding high-cardinality, per-message data into the subject itself — most often a correlation ID or request ID.
+
+1
+
+# Don't do this
+
+2
+
+orders.customer.created.req-7f3a9b21-4c8e-11ee
+
+Every unique subject is a unique cache entry in the server’s matching paths. Burning the cache on values that will never be reused is wasteful and complicates JetStream filters and permissions. The right place for a correlation ID is a message header:
+
+1
+
+Subject: orders.customer.created
+
+2
+
+Header: X-Correlation-ID: req-7f3a9b21-4c8e-11ee
+
+One caveat: do not use the Nats-Msg-Id header for correlation. That header is reserved by JetStream for publish-side deduplication, and reusing it will silently drop “duplicate” messages.
+
+Entity IDs are fine — customer-123 as a token is bounded by your customer count and is exactly the kind of cardinality identifier-first patterns are built for. Per-request IDs are not.
+
+## Subjects and JetStream (streams and consumers)
+
+JetStream streams are defined by the subjects they capture. A stream’s subject filter decides what is persisted; a consumer’s filter decides what a given client sees from that stream. Both are subject patterns, so the schema you design for pub/sub is the same schema JetStream binds to.
+
+1
+
+# Stream captures all order events
+
+2
+
+Stream: ORDERS
+
+3
+
+subjects: orders.>
+
+4
+
+5
+
+# Consumer sees only created events
+
+6
+
+Consumer: orders-created-projector
+
+7
+
+filter_subject: orders.*.created
+
+# Consumer sees only created eventsConsumer: orders-created-projector filter_subject: orders.*.created">
+
+Two planning notes worth internalizing early:
+
+- One stream per top-level namespace is the common default. Putting orders.> and payments.> into the same stream couples their retention, replication, and storage budget. Split them at the namespace boundary unless you have a reason not to.
+
+- Consumer filter subjects share the wildcard rules. If your subjects don’t have a clean token for the dimension you want to filter on, you’ll either reshape the schema or do client-side filtering — both more painful than getting it right up front.
+
+JetStream also exposes per-subject metadata, but its subject-detail listings are paginated and capped (the server returns up to 100,000 subject entries per request). Schemas that explode subject cardinality — typically the correlation-ID-in-subject mistake — make these views unusable.
+
+## Subjects and security (permissions)
+
+NATS permissions are expressed as subject patterns. Your subject hierarchy is your authorization model — there isn’t a separate ACL layer.
+
+1
+
+# Orders service account
+
+2
+
+publish: ["orders.>"]
+
+3
+
+subscribe: ["orders.>", "_INBOX.>"]
+
+4
+
+5
+
+# Read-only analytics user
+
+6
+
+publish: []
+
+7
+
+subscribe: ["orders.*.created", "payments.*.settled"]
+
+"]subscribe: ["orders.>", "_INBOX.>"]# Read-only analytics userpublish: []subscribe: ["orders.*.created", "payments.*.settled"]">
+
+This is why the leading tokens matter so much:
+
+- Namespace-first schemas give you team-aligned permissions: each service owns service.> and nothing else.
+
+- Identifier-first schemas give you entity-aligned permissions: a tenant’s credentials can publish on tenant-acme.> and that boundary is enforced by the server.
+
+For hard multi-tenant isolation — where tenants must not be able to even observe each other’s traffic — combine identifier-first subjects with separate NATS Accounts. Accounts give you cryptographic isolation; the subject prefix gives you organizational clarity inside each account.
+
+## Common mistakes to avoid
+
+- Flat subjects. order_created, order_updated, payment_settled — no hierarchy means no wildcards, no clean permissions, no JetStream filters. You’re using NATS as a glorified pub/sub channel list.
+
+- Too many tokens. Anything past 8–10 tokens is usually a sign that you’re encoding data into the subject. Stay well below the ≤16 guidance.
+
+- Encoding payload data in subjects. Customer email, request ID, trace ID — none of these belong in the subject. Use headers.
+
+- Inconsistent casing or separators. Pick lowercase-with-dashes and enforce it. Orders.Created and orders-created and orders.created will all coexist if you let them.
+
+- No plan for evolution. Schemas change. If you haven’t decided how, you’ve decided to break things.
+
+## How to evolve a subject schema without breaking everything
+
+The honest answer: you can’t change a subject in place. Once orders.customer.created is in production, publishers and subscribers are bound to that string. Evolution means running old and new in parallel and migrating consumers.
+
+There are two tools for this: version tokens in the subject, and server-side subject mappings.
+
+### Version tokens: the contended point
+
+Our recommendation is to include a version token from day one:
+
+1
+
+orders.v1.customer.created
+
+The reason is routing. When a breaking change ships, orders.v2.customer.created is a different subject, which means:
+
+- v1 and v2 subscribers can run side by side without filtering on payload contents.
+
+- JetStream streams can be split or duplicated along the version boundary.
+
+- Permissions can grant migration access (orders.v2.>) without touching v1.
+
+The counter-view, held by parts of the NATS community and reflected in some official guidance, is that the version belongs in a header rather than the subject — keeping subjects stable and avoiding routine subject churn. That position is defensible when the version is a payload-schema concern only (additive changes that all subscribers handle).
+
+The trade-off is simple: if a version change affects routing or subscription behavior, put it in the subject. If it only affects payload parsing, a header is enough. Neither side is universally correct; pick based on what kind of changes you actually ship.
+
+### Subject mappings for migration
+
+NATS server-side subject mappings let you transform subjects in flight, which is the cleanest way to migrate publishers and subscribers independently:
+
+1
+
+mappings = {
+
+2
+
+"orders.customer.created": "orders.v1.customer.created"
+
+3
+
+}
+
+Now legacy publishers can keep sending the un-versioned subject while new subscribers consume the versioned one. Mappings are also the supported way to use wildcard sources — they’re the one place wildcards appear on the publish side, used as transform patterns.
+
+When you do evolve a schema, coordinate three things in order: stream filter updates, consumer filter updates, and permission updates. Skipping any of these is how migrations turn into incidents.
+
+## FAQ
+
+What is a NATS subject?
+A NATS subject is a case-sensitive, dot-separated string of tokens that names a destination for messages. Subjects are hierarchical: tokens go from broad to narrow, left to right. Publishers send to fully specified subjects; subscribers can use wildcards. The subject is simultaneously the routing key, the JetStream storage filter, and the unit of authorization.
+
+What’s the difference between * and > in NATS?
+* matches exactly one token at its position in the subject. > matches one or more tokens and must be the final token in the pattern. So orders.*.created matches orders.customer.created but not orders.customer.line.created, while orders.> matches both. Wildcards are valid in subscriptions and subject mappings, never in publishes.
+
+How many tokens can a NATS subject have?
+There is no hard cap, but stay at or below 16 tokens and 256 characters in practice. The server’s subscription matcher uses a stack-allocated array sized for 32 tokens; beyond that, matching spills to the heap and pays a small per-message allocation cost. This is a soft performance cliff, not a rejection threshold — but no real schema needs that depth.
+
+Should I put a version number in a NATS subject?
+If the version change affects routing or subscription behavior, yes — include a version token like orders.v1.customer.created so old and new can coexist cleanly. If it only affects payload parsing, a header is sufficient and avoids subject churn. The NATS community is genuinely split on this; the right answer depends on what kind of changes you ship.
+
+Can I put an ID in a NATS subject?
+Entity IDs are fine and are the basis of identifier-first patterns — customer-123.orders.created is exactly how per-entity routing works. Never embed per-message correlation or request IDs in the subject; they explode cardinality and pollute caches. Put correlation IDs in a custom header. Do not reuse Nats-Msg-Id, which JetStream uses for deduplication.
+
+What subject prefixes are reserved in NATS?
+The $-prefixed namespaces ($SYS., $JS., $JSC., $KV., $OBJ., $NRG.) and _INBOX. are reserved for NATS internals. You can subscribe to $SYS.> for monitoring and server telemetry, but never publish to any reserved prefix. Keep your application’s root tokens free of leading $ or _ to avoid accidental collisions.
+
+How do NATS subjects affect permissions?
+NATS permissions are subject patterns, so your subject hierarchy is your authorization model. A service granted publish: ["orders.>"] can publish anywhere under orders and nowhere else. Namespace-first schemas produce team-aligned permissions; identifier-first schemas produce entity- or tenant-aligned permissions. Design the hierarchy with the access boundaries you actually want to enforce.
+
+How do I design NATS subjects for multi-tenancy?
+Put the tenant identifier as the first token — tenant-acme.orders.created — so every tenant’s traffic lives under its own prefix and permissions can grant tenant-acme.> to that tenant alone. For hard isolation where tenants must not even observe each other’s traffic, combine identifier-first subjects with separate NATS Accounts, which provide cryptographic isolation at the server level.
+
+## Wrapping up
+
+NATS subject design rewards thinking that’s a step further ahead than most early decisions demand. The first two tokens determine your wildcard ergonomics, your permission model, your JetStream stream shape, and how painful your next migration will be. Pick a pattern that matches how you actually query — namespace-first for service-oriented systems, identifier-first for per-entity or multi-tenant ones, multi-dimensional only when routing truly depends on multiple dimensions.
+
+Keep subjects lowercase, hierarchical, and free of per-message data. Put correlation IDs in headers. Reserve the $ and _ prefixes for the server. Decide your versioning stance up front. Do that, and the rest of NATS — JetStream, permissions, accounts, mappings — falls into place around a schema that won’t fight you.
+
+Further reading: the NATS subject concepts documentation, ADR-6 on naming, and the Accounts guide for multi-tenant isolation.
+
+Want help from the NATS experts? Meet with our architects to get help tailored to your use case and environment.
+
+## Related posts
+
+All posts
+
+TechnologyThe cost of the stitched stack: why AI stalls before it reaches the edgeAndrew Connolly•Jul 24, 2026
+
+TechnologyHow to Stream NATS Messages to ClickHouse in Real TimeAndrew Connolly•Jul 10, 2026
+
+TechnologyFrom Solace to NATS: One Platform for Messaging, Streaming, and the EdgeAndrew Connolly•Jul 9, 2026
+
+Products Synadia CloudSynadia PlatformSynadia Deploy for KubernetesSynadia InsightsSynadia Protect
+Resources BlogDocsVideosSynadia EducationNATS vs KafkaNATS vs Kinesis
+Company AboutBrandCustomersContactCareersPress
+Legal TermsPrivacyDPASubprocessorsSupport LifecycleTrust Center
+
+Get the NATS Newsletter
+News and content from across the community
+
+Subscribe
+
+© 2026 Synadia Communications, Inc.
+
+Open in ChatGPTOpen in ClaudeOpen in CursorOpen in Perplexity
+X YouTube LinkedIn Slack GitHub
+
+Cancel

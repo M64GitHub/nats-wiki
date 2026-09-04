@@ -4,10 +4,10 @@ type: reference
 area: [jetstream, core]
 since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-09-01
+verified-on: 2026-09-04
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-system-errors, s-nats-server-client-errors, s-docs-protocol-client, s-nats-server-wire-protocol]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-system-errors, s-nats-server-client-errors, s-docs-protocol-client, s-nats-server-wire-protocol, s-synadia-expected-sequence-headers, s-gh-4499-workqueue-fanout-retention]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -223,6 +223,37 @@ only in the text, and code-matching cannot distinguish them from any other bad s
 the page's own rule about never matching on error text meeting a case where the code is not enough.
 
 
+### The publish-expectation family — six codes for five headers
+
+Every conditional publish ([[publishing]]) rejects through one of these. Read from
+`server/jetstream_errors_generated.go:849–896` at v2.14.6, with the header that raises each from
+`server/stream.go:640–644` and the check itself at `server/stream.go:6420–6500`.
+
+| code | HTTP | message | raised by |
+|---|---|---|---|
+| **10060** | 400 | `expected stream does not match` | `Nats-Expected-Stream` names a different stream |
+| **10070** | 400 | `wrong last msg ID: {id}` | `Nats-Expected-Last-Msg-Id` mismatch |
+| **10071** | 400 | `wrong last sequence: {seq}` | `Nats-Expected-Last-Sequence` **or** `Nats-Expected-Last-Subject-Sequence` mismatch |
+| **10164** | 400 | `wrong last sequence` | the constant form, with no sequence in the message |
+| **10193** | 400 | `missing sequence for expected last sequence per subject` | `Nats-Expected-Last-Subject-Sequence-Subject` sent **without** its companion — surfaced only since **2.12.0** (#7196) |
+| **10163** | 503 | `expected last sequence per subject temporarily unavailable` | the per-subject check cannot be made right now; a `503`, so retry rather than correct |
+
+**`10071` is two errors wearing one string.** The per-subject check runs first and answers with the
+last sequence **of that subject** (`fseq`, from `store.LoadLastMsg`); the stream-wide check answers
+with the stream's own last sequence (`mset.lseq`). A client that reads the number out of the message
+and retries with it is correct in both cases — but a human reading `wrong last sequence: 1` cannot tell
+which of the two it is without knowing which header was sent (source:
+[[s-synadia-expected-sequence-headers]]).
+
+### `10100` is a design error arriving as a create error
+
+`filtered consumer not unique on workqueue stream` is in the table above; what the table cannot say is
+*when* you meet it. It fires on the **second** consumer, so a fan-out design built on a `workqueue`
+stream works completely until the day a second application is added — at which point the fix is to
+change the stream's retention, which cannot be done without rethinking who deletes a message (source:
+[[s-gh-4499-workqueue-fanout-retention]], [[retention-policies]]).
+
+
 ## Reading a code
 
 **In a server log**, `ApiError` appends the code in parentheses:
@@ -402,4 +433,4 @@ summaries that put them there — [[s-adr-43-per-message-ttl]] (`10052`, `10165`
 [[s-docs-stream-backup-restore]] (`10064`) · [[s-gh-7982-no-suitable-peers]] (`10005`) ·
 [[s-issue-4281-insufficient-storage]] (`10028`, `10047`) · [[s-nats-server-snapshot-restore]]
 (`10060`, `10064`, `10130`) · [[s-docs-advanced-publishing]] (the eleven `JSAtomicPublish*` and
-`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-system-errors]] · [[s-nats-server-client-errors]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]
+`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-system-errors]] · [[s-nats-server-client-errors]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-synadia-expected-sequence-headers]] · [[s-gh-4499-workqueue-fanout-retention]]

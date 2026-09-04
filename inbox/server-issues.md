@@ -39,6 +39,7 @@ So the discipline here is different:
 | SI-6 | Config mode accepts `share: true` on a **stream** import and ignores it (`nats-server -t`: valid, exit 0; the parser applies `share` to service imports only), while the account-JWT library rejects the same import with `sharing information (for latency tracking) is only valid for services` — the two modes disagree on whether the key is an error | inconsistent | low | v2.14.6 | not filed |
 | SI-8 | With a leafnode holding *n* members of a queue group, a publisher on the hub sees the hub's own members split unevenly: the member that follows the leaf's *n* entries in the match list receives its own share plus the leaf's — two hub members and two leaf members split 148 / 52, 89 / 311, 297 / 103 and 302 / 98 over four runs; two and one 137 / 263; three and two 70 / 75 / 255; the control with no leaf member 196 / 204. The leaf's members receive nothing while the hub has one | unexpected | medium | v2.14.6 | not filed |
 | SI-7 | A `pedantic` client publishing to a subject that fails `IsValidLiteralSubject` — `orders.*.created` — receives `-ERR 'Invalid Publish Subject'` **and the message is delivered anyway**: both `processPub` and `processHeaderPub` send the error and return `nil`, so the publish is routed as a literal subject and wildcard subscribers get it. The error reads as a refusal and is not one | unexpected | low | v2.14.6 | not filed |
+| SI-9 | A **push consumer delivers nothing** when the only interest on its deliver subject is a **wildcard** subscription that covers it: `Sublist.registerNotification` counts interest only for a subscriber whose subject is *literally equal* to the deliver subject. A second stream subscribed on `copy.>` never wakes a consumer delivering to `copy.evt` — 0 of 1,000 messages, `num_pending` stuck at 1,000, nothing logged — and one plain `nats sub copy.evt` releases all of them at once | unexpected | medium | v2.14.6 | not filed |
 
 ---
 
@@ -495,3 +496,102 @@ which is the fallback rule, not the skew); a gateway; whether the skew changes w
 group — one hub member carries the leaf's share on top of its own, and an operator sizing a hub pool on
 "uniform across members" under-provisions it. No message is lost or duplicated; the leaf's members are
 simply never chosen while the hub has one.
+
+## SI-9 · A push consumer's deliver subject is only woken by an exact-subject subscriber
+
+**The observation.** On **v2.14.6**, `raw/nats-server-src/stream-topology-observed-v2.14.6.md`, runs
+F2 (`stream-topology-runF2.sh`) and F3 (`-runF3.sh`). A stream `SRC2` with 1,000 messages, a second
+stream `COPY2` whose only subject is `copy2.>`, and a durable **push** consumer on `SRC2` delivering
+to `copy2.evt`. Nothing else is connected:
+
+```
+--- does COPY2's subscription show up in the account sublist? ---
+num_subscriptions 11
+   src2.> sid 1 account $G
+   copy2.> sid 1 account $G
+create: ok
+consumer after 3s: delivered {'consumer_seq': 0, 'stream_seq': 0} num_pending 1000 push_bound None
+COPY2 messages: 0
+```
+
+`COPY2`'s interest is in the account sublist, `copy2.>` matches `copy2.evt`, and the consumer stays
+at zero. Start one ordinary subscriber on the **literal** deliver subject and everything moves at
+once:
+
+```
+### G2 · the same consumer with a real subscriber on copy2.evt
+consumer with a subscriber: delivered {'consumer_seq': 1000, 'stream_seq': 1000, ...} num_pending 0
+COPY2 messages: 1000
+```
+
+It is not about streams. Run F3 takes the stream out of it entirely — a plain
+`nats sub 'd.>'` against a consumer delivering to `d.evt`:
+
+```
+### H1 · a push consumer with only a WILDCARD subscriber on its deliver subject
+--- subscriber: nats sub 'd.>' (a wildcard that covers d.evt) ---
+with only a WILDCARD subscriber d.> : delivered 0 num_pending 1000
+--- what the wildcard subscriber saw ---
+0
+### H2 · now an EXACT subscriber on d.evt, same consumer
+with an EXACT subscriber d.evt : delivered 349 num_pending 651
+3
+```
+
+**The code.** A push consumer registers a notification on its deliver subject, and the sublist's
+initial interest test is an exact string comparison:
+
+```go
+169:	func (s *Sublist) registerNotification(subject, queue string, notify chan<- bool) error {
+170:		if subjectHasWildcard(subject) {
+171:			return ErrInvalidSubject
+172:		}
+…
+177:		var hasInterest bool
+178:		r := s.Match(subject)
+179:
+180:		if len(r.psubs)+len(r.qsubs) > 0 {
+181:			if queue == _EMPTY_ {
+182:				for _, sub := range r.psubs {
+183:					if string(sub.subject) == subject {
+184:						hasInterest = true
+185:						break
+186:					}
+187:				}
+```
+
+(`server/sublist.go:169–187` at v2.14.6.) `s.Match(subject)` has already found the wildcard
+subscription — it is in `r.psubs` — and the loop then discards it because its subject is `copy2.>`
+and not `copy2.evt`. The consumer's `o.active` is set from that value (`consumer.go:2134`,
+`:1822`), and `hasNoLocalInterest` (`:6477`) reads `o.acc.sl.HasInterest(o.cfg.DeliverSubject)`,
+which *does* count the wildcard — so the two tests in the same code path disagree about whether
+interest exists.
+
+**What would settle it.** Whether a wildcard subscription is *meant* to count as interest for a push
+consumer's deliver subject. There is a defensible reason for the exact test — a notification is
+registered on a literal subject and a wildcard subscriber may be a monitor rather than a worker — but
+if that is the intent, the consumer's silence should be visible. It is not: nothing is logged at any
+level, `num_pending` simply grows, and `CONSUMER.INFO` carries **no `push_bound` field at all** in
+this state — the same as when the consumer is working (it is `omitempty`, so `false` and "absent"
+are the same wire form). The narrower question: should `CONSUMER.INFO` distinguish "no interest on
+the deliver subject" from "bound and idle"?
+
+**Searched and not found.** `docs.nats.io`'s consumer chapter describes a push consumer's deliver
+subject without mentioning that the subscriber's subject must match it literally (`grep -rn` over the
+861-page mirror on 2026-09-04 for `deliver_subject`, `push consumer`, `no interest`). No entry among
+the 484 `nats-io/nats-server` discussions cached in `local/scratch/gh-index/threads-2026-09-03.md`
+matches `deliver subject` with `wildcard` or `no interest`.
+
+**What was not tested.** A **queue** deliver group (`deliver_group`), which takes the `qsubs` branch
+of the same loop and compares the queue name as well; a replicated (`R3`) push consumer, where the
+interest test runs on the consumer leader; a wildcard subscriber that arrives *after* an exact one has
+come and gone; whether a leafnode's or a gateway's propagated interest behaves as an exact subscriber;
+and MQTT and WebSocket subscribers, which register through the same sublist but by different paths.
+
+**Consequence.** Medium, and it is a design consequence rather than a data one. "Copy a stream with a
+consumer that delivers into a second stream" is a shape people reach for — it is the third option in
+question-bank row 114 — and it does not work server-side: a stream's subject filter is a wildcard
+subscription in every realistic case. The failure is silent, and the visible symptom, a consumer with
+`num_pending` climbing and `delivered` at zero, reads like a broken worker. No data-integrity or
+security effect: nothing is lost, nothing is delivered twice, and everything flows the moment an
+exact subscriber attaches.

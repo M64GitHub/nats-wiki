@@ -4,10 +4,10 @@ type: concept
 area: [jetstream]
 since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-08-31
+verified-on: 2026-09-04
 tags: [PubAck, Nats-Msg-Id, duplicate, duplicate_window, async-publish, atomic-batch, fast-ingest, AllowAtomicPublish, AllowBatchPublish, Nats-Batch-Id, Nats-Expected-Last-Subject-Sequence, exactly-once, persist_mode]
 aliases: [publish, PubAck, pub ack, exactly once, exactly-once, deduplication, dedup, Nats-Msg-Id, msg id, async publish, atomic batch, batch publish, fast ingest, publish acknowledgement]
-sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-stream-consumer-config, s-issue-8271-request-info-max-payload, s-nats-server-share-import-observed, s-gh-7577-core-nats-ordering, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-docs-resilient-clients-drain-and-shutdown, s-adr-22-publish-retries, s-docs-jetstream-where-next, s-nats-server-core-or-jetstream-observed]
+sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-stream-consumer-config, s-issue-8271-request-info-max-payload, s-nats-server-share-import-observed, s-gh-7577-core-nats-ordering, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-docs-resilient-clients-drain-and-shutdown, s-adr-22-publish-retries, s-docs-jetstream-where-next, s-nats-server-core-or-jetstream-observed, s-synadia-expected-sequence-headers, s-gh-3772-jetstream-as-an-event-store]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -314,9 +314,70 @@ older than the archive (source: [[s-relnotes-2.10]]).
   by the docs, unconfirmed against `nats-server` and unlocated in `inbox/config-keys-table.md`.
   **(unverified)**
 - **The ten-second atomic-batch stall timeout** — same status: stated by the docs only.
-- Whether `Nats-Expected-Last-Subject-Sequence` and its siblings (`Nats-Expected-Stream`,
-  `Nats-Expected-Last-Sequence`) have their own error codes on rejection.
-  `reference/jetstream/api/headers.md` is in `raw/` and has not been read.
+- ~~Whether `Nats-Expected-Last-Subject-Sequence` and its siblings have their own error codes on
+  rejection.~~ **Settled 2026-09-04** from `server/jetstream_errors_generated.go:849–896` at v2.14.6:
+  six codes for five headers — see *The five expectation headers* above and [[error-codes]].
+
+## The five expectation headers, and the one counter behind them
+
+A conditional publish is the server checking one claim about the stream before it stores anything. All
+five headers are in `server/stream.go:640–644` at v2.14.6:
+
+| header | the claim | since |
+|---|---|---|
+| `Nats-Expected-Stream` | this subject is captured by *that* stream | ≤ 2.10 |
+| `Nats-Expected-Last-Sequence` | the stream's last sequence is *n* | ≤ 2.10 |
+| `Nats-Expected-Last-Subject-Sequence` | the last sequence **for this subject** is *n* | ≤ 2.10 |
+| `Nats-Expected-Last-Subject-Sequence-Subject` | …but check that against this **wildcard** instead of the published subject | **2.11.0** (#5281) |
+| `Nats-Expected-Last-Msg-Id` | the last stored `Nats-Msg-Id` is *this* | ≤ 2.10 |
+
+`≤ 2.10` means present at **v2.10.29**, the oldest source tree this wiki holds; the release archive
+starts at 2.10.0 and does not introduce them, so they are older than it. No source here dates them
+further back, so no earlier version is claimed.
+
+**There is one sequence counter, filtered three ways.** The per-subject and per-pattern forms do not
+keep counters of their own: "The three header types don't create separate counters — they filter what
+they check against: the whole stream, a single subject, or a wildcard pattern… **the expected value is
+still a stream sequence number**, not an independent counter starting from zero" (source:
+[[s-synadia-expected-sequence-headers]]). Publishing to `events.order.1`, `events.order.2`,
+`events.order.1`, `events.order.2` in turn expects **0, 0, 1, 2** — the numbers jump because they are
+stream sequences seen through a per-subject filter.
+
+**The trap the per-subject form sets** is that subjects are exact: `events.order.1.created` and
+`events.order.1.shipped` have completely independent tracking. When one entity's events span several
+subjects — the event-sourcing case — the third header is what makes them share a sequence: send
+`Nats-Expected-Last-Subject-Sequence: 1` together with
+`Nats-Expected-Last-Subject-Sequence-Subject: events.order.1.*`. In nats.go's `jetstream` package the
+three are `WithExpectLastSequence`, `WithExpectLastSequencePerSubject` and
+`WithExpectLastSequenceForSubject(seq, pattern)`.
+
+**What this buys, and its limit.** "concurrent appends across subjects without contention,
+linearizability on a per-subject basis (entity event stream), while still gaining a total order of
+events across all subjects within a stream for consumption" — and the check itself is claimed to be
+free, because "subjects are indexed within a stream, so the OCC check does not add overhead" (source:
+[[s-gh-3772-jetstream-as-an-event-store]]). It is **detection, not prevention**: the loser of a race
+is rejected and must retry. Note the cost is not literally zero — the per-subject branch does a
+`store.LoadLastMsg` for the subject on every such publish (`server/stream.go:6455–6470`) — only that it
+is an indexed point read rather than a scan.
+
+### What a rejection tells you
+
+The codes are on [[error-codes]] — *The publish-expectation family*. The part that matters at the
+publisher: **`10071 wrong last sequence: {seq}` carries a different number depending on which header
+you sent.** The per-subject check answers with that subject's last sequence (`fseq`); the stream-wide
+check answers with `mset.lseq`. Retrying with the number from the error is correct either way, which
+is why clients can loop on it — but reading the number as "where the stream is" is only right for the
+global form.
+
+Two more worth knowing before designing a retry loop:
+
+- **`10193 missing sequence for expected last sequence per subject`** — the pattern header sent without
+  its companion. Surfaced as an error only since **2.12.0** (#7196); before that the combination failed
+  quietly.
+- **`10163 expected last sequence per subject temporarily unavailable`** is a **503**, not a 400. It is
+  not your sequence being wrong; it is the check being unavailable, so the correct response is to retry
+  unchanged rather than to re-read and correct.
+
 
 ## Version notes: the 2.14 line
 
@@ -439,4 +500,4 @@ of it.
 - [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] — the releases the two batch modes shipped
   in.
 - [[s-relnotes-2.14.0]] — the `Nats-Batch-Commit: eob` end-of-batch commit.
-- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-stream-consumer-config]] · [[s-issue-8271-request-info-max-payload]] · [[s-nats-server-share-import-observed]] · [[s-gh-7577-core-nats-ordering]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-adr-22-publish-retries]] · [[s-docs-jetstream-where-next]] · [[s-nats-server-core-or-jetstream-observed]]
+- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-stream-consumer-config]] · [[s-issue-8271-request-info-max-payload]] · [[s-nats-server-share-import-observed]] · [[s-gh-7577-core-nats-ordering]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-adr-22-publish-retries]] · [[s-docs-jetstream-where-next]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-synadia-expected-sequence-headers]] · [[s-gh-3772-jetstream-as-an-event-store]]

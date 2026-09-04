@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [permissions, allow, deny, default_permissions, allow_responses, queue-group, _INBOX, "$JS.API"]
 aliases: [permissions, authorization, allow list, deny list, publish permissions, subscribe permissions, default_permissions, allow_responses]
-sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-docs-core-nats-request-reply, s-nats-go-subscription, s-nats-server-client-errors, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-protocol-client, s-nats-server-wire-protocol, s-docs-protocols-internal, s-adr-32-service-api, s-docs-services-discovery-and-stats, s-docs-services-framework, s-nats-server-services-observed]
+sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-docs-core-nats-request-reply, s-nats-go-subscription, s-nats-server-client-errors, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-protocol-client, s-nats-server-wire-protocol, s-docs-protocols-internal, s-adr-32-service-api, s-docs-services-discovery-and-stats, s-docs-services-framework, s-nats-server-services-observed, s-synadia-subject-hierarchies]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -442,6 +442,33 @@ service request is indistinguishable from a timeout, which is why the log is the
 [[services-on-core-nats]] has the per-role configuration.
 
 
+## The subject hierarchy is the authorization model
+
+Worth saying at the top of any design discussion, because teams arriving from brokers with a separate
+ACL layer keep looking for one (source: [[s-synadia-subject-hierarchies]]):
+
+> "NATS permissions are expressed as subject patterns. Your subject hierarchy **is** your
+> authorization model — there isn't a separate ACL layer."
+
+So the token order chosen for routing is the token order you will be granting on, years later, and the
+two cannot be decided separately:
+
+- **namespace-first** (`orders.customer.created`) gives **team-aligned** permissions — the orders
+  service publishes on `orders.>` and nothing else;
+- **identifier-first** (`tenant-acme.orders.created`) gives **tenant-aligned** permissions — one
+  tenant's credentials publish on `tenant-acme.>` and the boundary is enforced by the server.
+
+A schema with no hierarchy (`order_created`, `payment_settled`) has no expressible permission short of
+enumerating every subject — which is the same reason it has no usable wildcards and no JetStream
+filters.
+
+**Where a prefix stops being enough.** For isolation where tenants must not even observe each other's
+traffic, the post's advice matches this wiki's: combine identifier-first subjects with **separate
+accounts** — "Accounts give you cryptographic isolation; the subject prefix gives you organizational
+clarity inside each account" ([[account]], [[operator-mode]]). A subject prefix is a permission you
+wrote and can get wrong; an account is a boundary the server cannot cross ([[cross-account-sharing]]).
+
+
 ## Related
 
 [[account]] · [[operator-mode]] · [[auth-callout]] · [[tls-in-nats]] · [[cross-account-sharing]] ·
@@ -457,4 +484,4 @@ service request is indistinguishable from a timeout, which is why the log is the
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-docs-auth-callout]] · [[s-docs-cross-account]] · [[s-docs-decentralized-auth]] ·
 [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-docs-core-nats-request-reply]] · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-docs-protocols-internal]] · [[s-adr-32-service-api]] · [[s-docs-services-discovery-and-stats]] · [[s-docs-services-framework]] · [[s-nats-server-services-observed]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-docs-core-nats-request-reply]] · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-docs-protocols-internal]] · [[s-adr-32-service-api]] · [[s-docs-services-discovery-and-stats]] · [[s-docs-services-framework]] · [[s-nats-server-services-observed]] · [[s-synadia-subject-hierarchies]]

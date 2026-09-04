@@ -4,10 +4,10 @@ type: reference
 area: [jetstream]
 since: [2.10]   # the tables carry the minor each field arrived in; 2.10 means present at the floor
 verified-against: nats-server 2.14.6
-verified-on: 2026-09-03
+verified-on: 2026-09-04
 tags: [stream-config, consumer-config, StreamConfig, ConsumerConfig, defaults, mutability, cli-flags]
 aliases: [StreamConfig, ConsumerConfig, stream config, consumer config, stream configuration, consumer configuration, stream fields, consumer fields]
-sources: [s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-jsm-go-config-schemas, s-nats-cli-help-0.4.0, s-docs-stream-config, s-docs-consumer-config, s-gh-3944-subjects-in-a-stream, s-adr-33-metadata, s-adr-34-multiple-filters, s-adr-9-idle-heartbeats, s-adr-42-priority-groups, s-adr-43-per-message-ttl, s-adr-51-message-scheduler, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-core-or-jetstream-observed]
+sources: [s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-jsm-go-config-schemas, s-nats-cli-help-0.4.0, s-docs-stream-config, s-docs-consumer-config, s-gh-3944-subjects-in-a-stream, s-adr-33-metadata, s-adr-34-multiple-filters, s-adr-9-idle-heartbeats, s-adr-42-priority-groups, s-adr-43-per-message-ttl, s-adr-51-message-scheduler, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-core-or-jetstream-observed, s-synadia-subject-hierarchies, s-synadia-expected-sequence-headers]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -151,6 +151,39 @@ map of every matching subject to its message count, paged with `offset` (100000 
 negative filter: "everything except X" is a `filter_subjects` list of the rest (gh#3944; source:
 [[s-gh-3944-subjects-in-a-stream]], [[s-nats-server-config-mutability-observed]] §5).
 
+### The page limit has a name, and a design consequence
+
+The 100,000 above is `const JSMaxSubjectDetails = 100_000` (`server/jetstream_api.go:435`, used at
+`:2040`, `:2043`, `:2058`). It is a **hard cap per request**, not a default you can raise — there is no
+config key for it.
+
+The consequence is a subject-design one: a stream whose subject space is unbounded (a correlation id
+or request id in a token) makes every subject-level view of it — `nats stream subjects`,
+`nats stream info --subjects`, anything built on `subjects_filter` — paginate through millions of
+one-message entries, which is to say unusable (source: [[s-synadia-subject-hierarchies]]). Entity ids
+are bounded and fine; per-message ids belong in a header ([[subjects-and-wildcards]]).
+
+## The publish-expectation headers, and what is mutable about them
+
+Not stream configuration at all — they are per-publish, which is why they are easy to miss when
+reading `StreamConfig`. All five are in `server/stream.go:640–644` at v2.14.6:
+`Nats-Expected-Stream`, `Nats-Expected-Last-Sequence`, `Nats-Expected-Last-Subject-Sequence`,
+`Nats-Expected-Last-Subject-Sequence-Subject` (**2.11.0**, #5281) and `Nats-Expected-Last-Msg-Id`.
+Nothing on the stream enables or disables them; any publisher may send them at any time, and a stream
+that has never seen one behaves identically to one that has.
+
+Two settings do interact with them:
+
+- **`duplicate_window`** governs `Nats-Msg-Id`, which is a different mechanism — deduplication, not a
+  precondition. A message rejected by an expectation is not stored and does not enter the duplicate
+  window ([[publishing]]).
+- **`allow_direct` / `mirror_direct`** decide how cheaply a publisher can *read* the sequence it is
+  about to assert, which is the loop an optimistic-concurrency writer actually runs
+  ([[direct-get]], source: [[s-synadia-expected-sequence-headers]]).
+
+The rejection codes are on [[error-codes]] — *The publish-expectation family*.
+
+
 ## Which clock stamps a message
 
 The **leader's**. `processJetStreamMsg` sets the timestamp with `time.Now().UnixNano()` on the
@@ -222,4 +255,4 @@ of these — [[error-codes]]. The design guidance is on [[core-or-jetstream]].
 [[s-docs-consumer-config]] · [[s-gh-3944-subjects-in-a-stream]] · [[s-adr-33-metadata]] ·
 [[s-adr-34-multiple-filters]] · [[s-adr-9-idle-heartbeats]] · [[s-adr-42-priority-groups]] ·
 [[s-adr-43-per-message-ttl]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.10]] ·
-[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-core-or-jetstream-observed]]
+[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-synadia-subject-hierarchies]] · [[s-synadia-expected-sequence-headers]]

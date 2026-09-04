@@ -19,7 +19,7 @@ those are suggestions — the point of the report is the finding, not the patch.
 |---|---|
 | `★` | a **confirmed factual error with real impact** — following the documentation produces a broken result, **silently**. If you triage on one thing, triage on this |
 | `where` | the doc path. For docs.nats.io prefix `https://docs.nats.io/` |
-| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Five rows (#7, #30, #31, #37, #90) are ADR errors rather than docs errors, three (#40, #89, #91) are **CLI** findings, one (#117) belongs in **`jsm.go`**'s schemas, one (#122) is a **client repository's README** (`nats.swift`), and one (#39) is a **published blog post** rather than a repository at all |
+| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Five rows (#7, #30, #31, #37, #90) are ADR errors rather than docs errors, three (#40, #89, #91) are **CLI** findings, one (#117) belongs in **`jsm.go`**'s schemas, one (#122) is a **client repository's README** (`nats.swift`), and two (#39, #123) are a **published blog post** rather than a repository at all |
 | `kind` | `wrong-value` and `missing` are defects; `enhancement` is correct-but-unhelpful |
 | `severity` | our estimate of consequence, not of effort |
 | **`upstream`** | where this was filed and what became of it. `not filed` means we have not sent it yet |
@@ -209,6 +209,8 @@ silently.
 | 120 | The stream configuration field **`no_ack` does not appear anywhere in the 861-page docs tree** — not in `reference/jetstream/api/stream/create.md`, not in the JetStream chapter, not once as `no_ack`, `NoAck` or `--no-ack` (two matches for the string exist and both are the unrelated consumer error name `JSConsumerAckFCRequiresNoAckWaitErr`). It is a `StreamConfig` field, it is what makes a stream stop replying, and the server hangs three hard subject rules off it at `server/stream.go:2170–2196`, each with its own rejection message. Its absence is why #119 has no page to be documented on | `reference/jetstream/api/stream/create.md`, `learn/jetstream/` (whole chapter) | nats-docs | missing | medium | not filed | wiki gives it its own section on `reference/stream-and-consumer-config` — *The three rules behind `no_ack`* — and the consequence on `operations/core-or-jetstream` |
 | 121 | `learn/resilient-clients` states two .NET defaults that **nats.net v3.0.0 changed seven weeks before this docs tree was fetched** (client released 2026-07-10; tree fetched 2026-08-31). `slow-consumers.md:18` "C# defaults to a **1,024**-message channel, and its two APIs differ on overflow: the low-level `NatsConnection` drops the newest queued message and raises a `MessageDropped` event, while the `NatsClient` wrapper **waits** instead" — against the v3.0.0 notes, "All entry points (`NatsConnection`, `NatsClient`, DI builders) now share the `NatsOpts` defaults: pending channel capacity **16384** (up from 1024) and `BoundedChannelFullMode.**DropNewest**`". `drain-and-shutdown.md:215` "C# is the exception: it has **no drain call on a single subscription**" — against "`INatsSub<T>.DrainAsync()` drains a single subscription without disposing the connection" (#1177, same release). Both statements were true of the v2 line; neither page carries a version, so a reader has no way to tell which line it is being told about | `learn/resilient-clients/slow-consumers.md` (line 18), `learn/resilient-clients/drain-and-shutdown.md` (line 215) | nats-docs | wrong-value | medium | not filed | wiki carries both, dated: `reference/client-defaults` gains *Three C# cells are out of date*, `entities/nats-net` gains *What bites you — what v3.0.0 changed under you* |
 | 122 | The `nats.swift` README says "JetStream, KV, Object Store, Service API are on the roadmap" (line 22, fetched 2026-08-31) while **the same repository's v0.4.0 release notes of 2024-10-31** say "This release introduces JetStream support, including: JetStream management API support (Streams and Consumers); Publishing messages to streams and getting/deleting individual messages; Pull consumer support with `fetch()`". `Sources/JetStream/` exists at tag v0.4.0 and on the default branch with `JetStreamContext.swift`, `Stream.swift`, `Consumer.swift` and `Consumer+Pull.swift`, so the release notes and the tree agree and the README is nearly two years stale. docs.nats.io itself makes no capability claim for Swift, and the ecosystem page delegates coverage to "each repo's README" — which is why a stale README propagates into architecture decisions: an evaluation that ruled Swift out for JetStream on the README's word ruled it out wrongly. KV, Object Store and the Service API do remain absent | `nats-io/nats.swift` `README.md` (line 22) | nats.swift | wrong-value | medium | not filed | wiki corrects the Facts table and the intro of `entities/nats-swift` and makes it the first item of that page's *What bites you* |
+| 123 | Synadia's *How to Design NATS Subject Hierarchies* (2026-06-17) explains why individual subscriptions can beat wildcards with a mechanism the server does not have: "Wildcards match via trie traversal; individual subscriptions [match] via hash lookup" and "individual subscriptions win when interest is narrow and stable, because **the server can match them with a direct hash lookup rather than traversing the trie**". There is no separate hash path for literal subscriptions. `Sublist.match` looks the **whole subject** up in `cache map[string]*SublistResult` and returns on a hit — for wildcard and literal subscriptions alike (`server/sublist.go:559–573`); on a miss `matchLevel` walks the trie once per token (`:771–796`), where the literal token **is** a map lookup on that level (`n = l.nodes[t]`) and `>` is a single pointer check (`l.fwc`), while `*` is the expensive case, recursing for the remainder at every position (`l.pwc`). The advice can therefore mislead in the direction that costs money: a reader who enumerates thousands of literal subscriptions to avoid "trie traversal" buys nothing and loses the wildcard ergonomics the same article recommends. The rest of the article's checkable claims are **correct** — the 32-token stack array, no hard token cap, the 100,000 subject-detail cap, and the `$JSC.` / `$NRG.` / `_R_.` / `_GR_.` prefixes | [synadia.com/blog/designing-nats-subject-hierarchies](https://www.synadia.com/blog/designing-nats-subject-hierarchies), *Performance: wildcards, cardinality…* | published blog post | wrong-value | low | not filed | wiki states the real mechanism on `concepts/subjects-and-wildcards` — *What a matcher actually does* |
+| 124 | The account-level JetStream limit **`max_consumers` is enforced per *stream*, not per account**, and the docs page that defines it says only "The maximum number of consumers allowed" — the same sentence shape as its sibling `max_streams`, which *is* per account. An operator reading the two pages side by side has no way to learn that a `max_consumers: 2` account can hold two consumers on every one of its streams. **Observed** on v2.14.6: with `TENANT { jetstream: { max_streams: 3, max_consumers: 2 } }`, `S1` took two consumers and then refused a third with `10026`; `S2` then took two more, for four in the account, and refused its third with the same code. `nats account info` renders it correctly — *"Consumers: Maximum 2 per stream"* — so the CLI knows what the docs do not say. The server counts the one stream's consumers: `maxc = selectedLimits.MaxConsumers … if maxc > 0 && mset.numLimitableConsumers() >= maxc` (`server/consumer.go:1130–1137`), where `numLimitableConsumers()` is `len(mset.consumers) - mset.sourcingConsumers` (`server/stream.go:8587`); the clustered path counts the same one stream's assignments (`server/jetstream_cluster.go:9587–9605`). A second, smaller gap sits on top: **the account limit and the per-stream `max_consumers` return the identical error** `10026 maximum consumers limit reached`, so the message does not say which of the two was hit | `reference/config/accounts/jetstream/max_consumers.md`, beside `.../max_streams.md` | nats-docs | missing | medium | not filed | wiki states the scope and the code on `operations/stream-topology-design` and `concepts/account` |
 
 ---
 
@@ -3612,6 +3614,8 @@ which case it is dropped. The `weight` reference page could carry the one-line e
 | 120 | `wiki/reference/stream-and-consumer-config.md` — *The three rules behind `no_ack`*; `wiki/operations/core-or-jetstream.md` — *The two ways to get it wrong* |
 | 121 | `wiki/reference/client-defaults.md` — *Three C# cells are out of date, and the client says so*; `wiki/entities/nats-net.md` — *What bites you — what v3.0.0 changed under you* |
 | 122 | `wiki/entities/nats-swift.md` — *Facts*, *What bites you* (first item) |
+| 123 | `wiki/concepts/subjects-and-wildcards.md` — *What a matcher actually does, so the wildcard question can be answered* |
+| 124 | `wiki/operations/stream-topology-design.md` — *Tenancy: what an account's limits actually cap*; `wiki/concepts/account.md` — the JetStream limits list |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
 
@@ -5363,3 +5367,174 @@ KV, Object Store and the Service API really are absent; only the JetStream claus
 **Suggested fix**: change the README's two sentences to "Core NATS and JetStream (streams, consumers,
 publish, pull `fetch()`); KV, Object Store and the Service API are on the roadmap." Adding a dated
 capability table would keep the next gap honest.
+
+## 123 · A blog post explains wildcard cost with a matching path the server does not have
+
+**The post** — Synadia, *How to Design NATS Subject Hierarchies (Patterns, Pitfalls & Best
+Practices)*, Andrew Connolly, 2026-06-17, section *Performance: wildcards, cardinality, and what NATS
+does under the hood* (`raw/synadia-blog/designing-nats-subject-hierarchies.txt`):
+
+> Wildcards match via trie traversal; individual subscriptions via hash lookup
+
+> Individual subscriptions win when interest is narrow and stable, because the server can match them
+> with a direct hash lookup rather than traversing the trie.
+
+**The server** — `nats-server` v2.14.6, `server/sublist.go`. There are two lookups, and neither is the
+one described.
+
+1. **A whole-subject cache, used by everything.** `Sublist.match` checks `s.cache[subject]` before it
+   does anything else and returns the cached result set on a hit — identically for a subject matched by
+   a literal subscription and one matched by `>`:
+
+```go
+559:	func (s *Sublist) match(subject string, doLock bool, doCopyOnCache bool) *SublistResult {
+560:		atomic.AddUint64(&s.matches, 1)
+561:		// Check cache first.
+…
+565:		r, ok := s.cache[subject]
+…
+570:		if ok {
+571:			atomic.AddUint64(&s.cacheHits, 1)
+572:			return r
+573:		}
+```
+
+2. **On a miss, one trie walk serves both.** The trie's every level is a map, so the literal token *is*
+   the hash lookup; `>` is a pointer check; `*` is the only form that costs extra, and it costs a
+   recursive call for the remainder of the subject at each position it appears:
+
+```go
+771:	func matchLevel(l *level, toks []string, results *SublistResult) {
+772:		var pwc, n *node
+773:		for i, t := range toks {
+…
+777:			if l.fwc != nil {
+778:				addNodeToResults(l.fwc, results)      // '>' — one pointer check
+779:			}
+780:			if pwc = l.pwc; pwc != nil {
+781:				matchLevel(pwc.next, toks[i+1:], results)   // '*' — recursion
+782:			}
+783:			n = l.nodes[t]                           // the literal token: a map lookup
+```
+
+with `type level struct { nodes map[string]*node; pwc, fwc *node }` (`sublist.go:96–99`).
+
+**Why it matters.** The article's own recommendation elsewhere is to prefer wildcards for large or
+dynamic subject spaces, which is right. This paragraph gives a reader a mechanical reason to do the
+opposite for "narrow, stable" interest — and acting on it means registering many literal subscriptions
+in place of one wildcard, which adds subscription state on the server and, per this same article's
+cardinality section, more cache entries — while saving a traversal that the cache had already made
+into a single map lookup. The claim is also the kind that propagates: it is the only public description
+of the sublist's cost model outside the source.
+
+**Not a defect in the rest of the article.** Four other checkable claims were read against v2.14.6 and
+all four hold: the matcher's `[32]string{}` stack array (`sublist.go:576`, `:662`, `:869`, `:1343`,
+`:1441`, `:1449`, `:1664`); "no hard cap" on token count, which agrees with #81 and #82; the
+subject-detail page cap (`JSMaxSubjectDetails = 100_000`, `jetstream_api.go:435`); and the four
+server-internal prefixes it adds to the docs' list — `$JSC.` (`jetstream_cluster.go:11545`), `$NRG.`
+(`raft.go:2360`), `_R_.` (`accounts.go:2450`) and `_GR_.` (`gateway.go:49`). This row is one paragraph,
+not a verdict on the piece.
+
+**Suggested fix**: replace the mechanism with the one that is there — "every publish is answered from a
+whole-subject cache after the first; on a cache miss the sublist walks a trie whose levels are maps, so
+a literal token is a map lookup and `>` is a pointer check, while `*` recurses for the rest of the
+subject. Prefer wildcards for open-ended subject spaces; the cost to watch is not traversal but a
+subject space so large that the cache never hits."
+
+## 124 · An account's `max_consumers` is per stream, and the page that defines it does not say so
+
+**The docs** — `reference/config/accounts/jetstream/max_consumers.md`, fetched 2026-08-31, the whole
+description:
+
+> The maximum number of consumers allowed.
+
+and its sibling, `reference/config/accounts/jetstream/max_streams.md`:
+
+> The maximum number of streams allowed.
+
+Two keys in the same block, described in the same shape, with no scope on either. The natural reading
+is that both count within the account. **Only `max_streams` does.**
+
+**Observed on the v2.14.6 binary** (`raw/nats-server-src/stream-topology-observed-v2.14.6.md`, run D,
+config `stream-topology-limits.conf`):
+
+```
+accounts {
+  TENANT {
+    users: [ { user: t, password: t } ]
+    jetstream: { max_mem: 16MB, max_file: 64MB, max_streams: 3, max_consumers: 2 }
+  }
+}
+```
+
+```
+--- consumer C1 on S1 ---   ok
+--- consumer C2 on S1 ---   ok
+--- consumer C3 on S1 ---   nats: error: Consumer creation failed: maximum consumers limit reached (10026)
+
+--- a consumer on S2, with the account's two already used on S1 ---
+X1   ok
+X2   ok
+X3   nats: error: Consumer creation failed: maximum consumers limit reached (10026)
+--- totals ---
+server consumers: 5
+                      Consumers: 4
+                            Consumers: Maximum 2 per stream
+```
+
+Four consumers live in an account whose `max_consumers` is `2`, and `nats account info` prints the
+correct scope — *"Consumers: Maximum 2 per stream"* — which the reference page never states.
+
+**The server** — `nats-server` v2.14.6. The account (tier) limit is compared against **one stream's**
+consumer count:
+
+```go
+1130:		maxc := cfg.MaxConsumers
+1131:		if maxc <= 0 || (selectedLimits.MaxConsumers > 0 && selectedLimits.MaxConsumers < maxc) {
+1132:			maxc = selectedLimits.MaxConsumers
+1133:		}
+1134:		if maxc > 0 && mset.numLimitableConsumers() >= maxc {
+1135:			mset.mu.Unlock()
+1136:			return nil, NewJSMaximumConsumersLimitError()
+1137:		}
+```
+
+(`server/consumer.go:1130–1137`; `cfg` is the *stream's* config, `selectedLimits` the account tier's,
+and the server takes whichever is smaller). `numLimitableConsumers` is that one stream's count:
+
+```go
+8587:	func (mset *stream) numLimitableConsumers() int {
+8588:		return len(mset.consumers) - mset.sourcingConsumers
+8589:	}
+```
+
+(`server/stream.go:8587–8589`.) The clustered path counts the same one stream's assignments —
+`for ca := range js.consumerAssignmentsOrInflightSeq(acc.Name, stream)`, with a separate
+`streamMaxc` / `tierMaxc` pair and the comment *"The stream limit caps every consumer of the stream.
+The account limit caps only the consumers of the selected tier"* (`server/jetstream_cluster.go:9587–9605`).
+So the behaviour is the same standalone and clustered, and deliberate.
+
+**The second half of the finding.** The account limit and the stream's own `max_consumers` return the
+**identical** error, so nothing in the failure says which one was hit:
+
+```
+account max_consumers (TENANT, limit 2)      -> {"error":{"code":400,"err_code":10026,"description":"maximum consumers limit reached"}}
+stream max_consumers  (FREE/PS, --max-consumers 1) -> {"error":{"code":400,"err_code":10026,"description":"maximum consumers limit reached"}}
+```
+
+`max_streams`, by contrast, has its own code (`10027 maximum number of streams reached`) because it
+has no per-stream twin.
+
+**Why it matters.** This is a capacity-planning key in a multi-tenant deployment, and the wrong
+reading is the *restrictive* one: an operator sizing a tenant at "200 consumers" writes
+`max_consumers: 200` expecting a ceiling on the account and gets 200 **per stream** — with
+`max_streams: 50` that is a ceiling of 10,000, fifty times what was intended. The mistake is silent
+until the tenant is large enough to matter, and `nats account info`'s correct rendering is the only
+public place the scope is stated.
+
+**Suggested fix**: give the two pages the scope they lack —
+`max_consumers`: "The maximum number of consumers allowed **on each stream** in the account. The
+lower of this and a stream's own `max_consumers` applies. Exceeding it returns
+`10026 maximum consumers limit reached`, the same error a stream's own `max_consumers` returns."
+`max_streams`: "The maximum number of streams allowed **in the account**. Exceeding it returns
+`10027 maximum number of streams reached`."

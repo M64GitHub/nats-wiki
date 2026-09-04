@@ -4,10 +4,10 @@ type: concept
 area: [core, jetstream]
 since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-09-03
+verified-on: 2026-09-04
 tags: [subjects, tokens, wildcards, "*", ">", reserved-prefixes, "$SYS", "_INBOX", max_subscription_tokens, max_sub_tokens, max_control_line, Invalid Subject, Invalid Publish Subject, pedantic, cardinality]
 aliases: [subject, subjects, wildcard, wildcards, tokens, subject naming, reserved prefixes, "$ prefix", "_INBOX prefix", max_subscription_tokens, max_sub_tokens, "Invalid Subject", "Invalid Publish Subject", subject length limit, subject token limit, "Permissions Violation for Subscription to, too many tokens"]
-sources: [s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-nats-cli-core-commands, s-gh-8333-high-cardinality-subjects, s-nats-server-stream-scale-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-publish-subscribe, s-gh-5172-mapping-in-config-or-stream, s-docs-core-nats-chapter, s-client-releases-and-issues]
+sources: [s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-nats-cli-core-commands, s-gh-8333-high-cardinality-subjects, s-nats-server-stream-scale-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-publish-subscribe, s-gh-5172-mapping-in-config-or-stream, s-docs-core-nats-chapter, s-client-releases-and-issues, s-synadia-subject-hierarchies, s-gh-4170-subject-indexing-internals]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -85,7 +85,9 @@ pending messages it can never deliver — `inbox/server-issues.md` SI-3
 ## Reserved prefixes
 
 The docs reserve six, and the server enforces **none of them for a plain client** (source:
-[[s-docs-core-nats-subjects-and-mapping]], [[s-nats-server-core-delivery]]):
+[[s-docs-core-nats-subjects-and-mapping]], [[s-nats-server-core-delivery]]). The last three rows are
+not in the docs' list at all; they come from Synadia's 2026-06-17 subject-design post and were read
+from the v2.14.6 source to check them (source: [[s-synadia-subject-hierarchies]]):
 
 | prefix | who uses it | on this wiki |
 |---|---|---|
@@ -95,6 +97,9 @@ The docs reserve six, and the server enforces **none of them for a plain client*
 | `$O` | Object Store (`$O.<bucket>.C.>`, `$O.<bucket>.M.>`) | [[object-store]] — and the leafnode deny list names `$OBJ.>` instead, SI-1 |
 | `$SRV` | the services framework's discovery subjects — a **client-library convention**; the string appears nowhere in `server/*.go` | step 6 of the client-side plan |
 | `_INBOX` | reply subjects clients generate (`_INBOX.<nuid>.<token>`); `--inbox-prefix` / `CustomInboxPrefix` rename it, and an allow-list needs `_INBOX.>` | [[nats-timeout]], [[subject-permissions]] |
+| `$JSC` | JetStream **cluster** internals — `$JSC.>`, `$JSC.SYNC`, `$JSC.R`, `$JSC.ACK.*`, `$JSC.SI.<…>`, `$JSC.CI.<…>` (`jetstream_cluster.go:11545–11582`) | [[meta-layer]] |
+| `$NRG` | Raft — see the paragraph below; the one `$` prefix the server actively refuses | [[raft-in-nats]] |
+| `_R_` / `_GR_` | server-generated reply subjects for routed (`accounts.go:2450`) and gateway (`gateway.go:49`) replies | [[gateway]] |
 
 The one `$` prefix the server does refuse is `$NRG.` — Raft traffic — from a client outside the system
 account, as a publish permission violation (`client.go:4373–4378`). Everything else under `$` is guarded
@@ -135,6 +140,71 @@ are on [[core-nats-delivery]] (source: [[s-docs-core-nats-publish-subscribe]]); 
 belongs in the account's `mappings` or in a stream's transform is the maintainer's rule quoted on
 [[subject-transforms]] — core mapping is account data, applied as a message is published; a partition
 for a stream goes in the stream (source: [[s-gh-5172-mapping-in-config-or-stream]]).
+
+
+## The 32-token cliff, and why "16 tokens" keeps being repeated
+
+Everybody repeats the number and nobody sources it. The docs' primer states "Limit to ~16 tokens and
+under 256 characters total" with no basis (#81); the accepted answer on
+[so#72585165](https://stackoverflow.com/questions/72585165) gives "a reasonable value of 16 tokens
+max"; and Synadia's own subject-design post repeats both figures. That post, alone among the three,
+is careful to say what they are — "There is **no hard cap** on token count, but practical guidance is
+≤16 tokens and ≤256 characters" — and it gives the mechanism nobody else does (source:
+[[s-synadia-subject-hierarchies]]):
+
+> The NATS server's subscription matcher uses a stack-allocated array sized for 32 tokens; subjects
+> beyond that spill to the heap. This is a soft performance cliff, not a hard limit.
+
+**Checked at v2.14.6, and it is right.** The sublist tokenizes into a `[32]string{}` on the stack at
+every matching path — `sublist.go:576` and `:662` (`match` and its no-lock twin), `:1343`
+(`subjectIsSubsetMatch`), `:1441`, `:1449`, `:1664`, and `var lnts [32]lnt` at `:869`. A subject with
+more than 32 tokens does not fail; `append` moves the slice to the heap and every match of that
+subject pays an allocation.
+
+So the honest form of the advice is: **the cliff is at 32, and 16 is half of it.** Neither is a limit,
+neither is checked, and nothing rejects a 40-token subject — `max_control_line` and, if you set it,
+`max_subscription_tokens` are still the only refusals (above).
+
+The 256 characters have no such backing. The nearest constant is `JSMaxNameLen = 255`, which bounds
+**stream and consumer names**, not subjects.
+
+## What a matcher actually does, so the wildcard question can be answered
+
+The same post says individual subscriptions beat wildcards for a narrow, fixed interest set "because
+the server can match them with a direct hash lookup rather than traversing the trie". There is no such
+separate path — recorded as docs issue **#123** — and the real shape is worth knowing, because it is
+what makes a wide `>` subscription cheap:
+
+- `Sublist.match(subject)` looks the **whole subject** up in `cache map[string]*SublistResult` and
+  returns on a hit, for literal and wildcard subscriptions alike (`sublist.go:559–573`). Every repeat
+  publish to a subject already seen is one map lookup, whatever is subscribed.
+- On a miss, `matchLevel` walks the trie once per token (`sublist.go:771–796`): the literal token *is*
+  a map lookup on that level (`n = l.nodes[t]`), `>` is a single pointer check (`l.fwc`), and `*` is
+  the expensive one — a **recursive call** for the remainder of the subject at every position it
+  appears (`l.pwc`).
+
+The design consequence is the opposite of the folklore: a deep tree with `>` at the end is cheap, and
+the thing that costs is `*` in the middle — and, far more than either, a subject space so large that
+the cache never hits because every subject is new (source: [[s-synadia-subject-hierarchies]]).
+
+## Cardinality: the mistake that has a name
+
+The single most common subject-design error, stated as such: encoding high-cardinality per-message
+data — a correlation id, a request id — into the subject (source: [[s-synadia-subject-hierarchies]]).
+`orders.customer.created.req-7f3a9b21-4c8e-11ee` makes every message a new cache entry and a new
+per-subject index entry, and it makes JetStream's own subject views unusable — `STREAM.INFO` returns
+at most **`JSMaxSubjectDetails = 100_000`** subject entries per request (`jetstream_api.go:435`).
+
+**Entity ids are the opposite case and are the point**: `customer-123.orders.created` is bounded by
+your customer count, and it is what buys per-entity replay — a filtered consumer over one subject, and
+optimistic concurrency per entity ([[publishing]]). The maintainer's frame is that the subject space
+*is* the query language: "Its mostly in how you want to define all possible sets within a stream and
+make sure they represent tokens in the subjects" (source: [[s-gh-4170-subject-indexing-internals]]) — and the cost of doing so is
+memory, stated in the same thread: "the subject addressing layer to a stream takes more memory the more
+unique subjects that you have".
+
+Put the correlation id in a header — but **never in `Nats-Msg-Id`**, which JetStream reads as the
+deduplication key, so reusing it silently drops "duplicates" ([[publishing]]).
 
 
 ## What configures it
@@ -183,4 +253,4 @@ subject.
 
 ## Sources
 
-[[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-gh-5097-subject-token-limit]] · [[s-gh-2855-publish-with-wildcards]] · [[s-nats-cli-core-commands]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-publish-subscribe]] · [[s-gh-5172-mapping-in-config-or-stream]] · [[s-docs-core-nats-chapter]] · [[s-client-releases-and-issues]]
+[[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-gh-5097-subject-token-limit]] · [[s-gh-2855-publish-with-wildcards]] · [[s-nats-cli-core-commands]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-publish-subscribe]] · [[s-gh-5172-mapping-in-config-or-stream]] · [[s-docs-core-nats-chapter]] · [[s-client-releases-and-issues]] · [[s-synadia-subject-hierarchies]] · [[s-gh-4170-subject-indexing-internals]]

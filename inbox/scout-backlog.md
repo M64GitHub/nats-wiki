@@ -203,4 +203,13 @@ thread this table already named for **row 133**, so step 7 starts from the raw c
 re-fetching. Row 134 stays `own`: the (a) sweep found no public form and this one did not either.
 The page rests instead on ADR-32, the four docs summaries and six passes of runs on 2.14.6.
 
+**(b) — G1 scouted 2026-09-04**: `inbox/scout-stream-and-subject-design-2026-09-04.md`, for rows 108, 109,
+110, 111, 114 and 144 (`subject-design`, `stream-topology-design`, a *Choosing retention* section, and row
+144). Seventeen candidates: the six bank-row threads promoted whole into `raw/gh-discussions/`, five more from
+the 484-thread comment cache, **`synadia.com/blog` read end to end for the first time (111 posts — eight for
+G1, one parked per later G-group, plus *Jepsen: NATS 2.12.1* for phase I)**, `natsbyexample.com` (the first
+source from that site here) and both NATS tags on Stack Exchange. No `own` to replace — all six rows already
+carried a URL. The scout's *seen and deliberately not in G1* table means **`synadia.com/blog` does not need
+re-scouting** for G2–G8; take the named post.
+
 The rest of (b) stays open — phase G runs it page by page.

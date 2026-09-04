@@ -990,11 +990,38 @@ dated to the release that introduced it.
   no external database, ever; replication is replicas, mirrors and sources. Row 143's thread.
 - [[s-gh-2760-one-connection-or-two]] — "start with one connection"; head-of-line blocking is on the
   subscription side, so split subscriptions, not publishing. Row 138's thread.
+- [[s-gh-6100-stream-per-subject-or-one]] — "It's rarely a good idea to have stream per subject";
+  each replicated stream carries its own Raft group, and different retention per subject is the one
+  stated reason to split. Row 108's thread.
+- [[s-gh-4170-subject-indexing-internals]] — indexed by sequence **and** by subject; per-subject state
+  costs memory as unique subjects grow; core ordering is per publishing *connection*. Asked for an
+  event-sourcing store, and its 2025 follow-up on sparse subjects is unanswered. Row 109's thread.
+- [[s-gh-3405-consumer-filtering-performance]] — "the sever doesn't do like a table scan"; a filtered
+  consumer is an indexed seek. The fact the one-big-stream design rests on, dated 2.9 and never
+  measured in public. Row 111's thread.
+- [[s-gh-4499-workqueue-fanout-retention]] — a fan-out built on WorkQueue hits `10100` on the *second*
+  consumer: "dont use WorkQueue … Use Interest or limits". How the retention choice is really met.
+  Row 110's thread.
+- [[s-gh-6571-source-mirror-or-one-stream]] — "It's not because a stream is larger that delivery of
+  messages to consumers takes longer": a second copy is not a performance tool, and per-subject index
+  memory is the one cost of a big stream. Row 114's thread.
+- [[s-gh-3772-jetstream-as-an-event-store]] — a subject per aggregate, `Nats-Expected-*` for optimistic
+  concurrency, a filtered replay that scans only that subject's block range — and no tiered storage.
+  Plus the Raft-asset ceiling ("100s of thousands") and "a Kafka *partition* is comparable to a NATS
+  stream". Row 144's thread, 10 upvotes.
 
 **Synadia blog (continued)**
 
 - [[s-synadia-jetstream-anti-patterns]] — the ~100k consumer and ~300 subject-filter thresholds,
   why `consumer info` is expensive, and republish / Direct Get as alternatives to consumers.
+- [[s-synadia-subject-hierarchies]] — the only article that is subject *design*: three patterns
+  (namespace-first, identifier-first, multi-dimensional) and how to pick; the 32-token stack array
+  behind the folklore "16 tokens"; four reserved prefixes the docs omit; the correlation-id mistake;
+  and a versioning stance that contradicts the accepted Stack Overflow answer. Four claims verified at
+  v2.14.6, one wrong (docs issue #123).
+- [[s-synadia-expected-sequence-headers]] — one stream counter filtered three ways, and the third
+  header (`Nats-Expected-Last-Subject-Sequence-Subject`, 2.11.0) that lets one entity's events span
+  several subjects. Reading it against the source settled the six rejection codes.
 - [[s-synadia-reliable-delivery-dlq]] — the dead-letter pattern assembled from the max-deliveries
   advisory, a direct get by sequence and a republish; how retention bounds the recovery window. **Two
   of its claims are wrong at 2.14.6** (docs issue #39).
