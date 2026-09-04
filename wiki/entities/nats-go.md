@@ -7,9 +7,9 @@ verified-against: nats.go v1.53.1
 verified-on: 2026-08-31
 tags: [client, tier-1, go, reference-implementation]
 aliases: [nats.go, "nats-io/nats.go", go client, golang client]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # nats.go
@@ -75,6 +75,40 @@ through the server's symptoms (sources: [[s-nats-go-kv-object-mirror]],
   mirror rules; which one an application uses changes nothing here.
 
 
+## What bites you — the connection
+
+Read from `nats.go` at **v1.53.1** (source: [[s-nats-go-connection]]) and measured on nats-server
+2.14.6 (source: [[s-nats-server-client-lifecycle-observed]]). Every default is in
+[[client-defaults]]; the mechanisms are on [[client-connection-lifecycle]].
+
+- **`MaxReconnect` is a budget per server, and spending it deletes the server.** The default is 60.
+  `selectNextServer` drops a server from the pool once `s.Reconnects >= MaxReconnect`
+  (`nats.go:2071–2091`), and an empty pool goes straight to `close(CLOSED)` — a connection that never
+  comes back, with unlimited retries never having been the default. Set `-1` on anything long-lived.
+- **`Drain()` returns immediately.** It starts a goroutine. A shutdown that exits on its return
+  abandons exactly the work the drain existed to save; wait on `ClosedHandler`. Measured with the
+  CLI's `nats reply`, which makes this mistake by design: **four of eight** in-flight requests were
+  answered and four were abandoned.
+- **A drain issued while the connection is RECONNECTING closes it instead** (`:6211–6215`,
+  `:6310–6314`), discarding the reconnect buffer. The documentation does not mention this.
+- **`ErrDrainTimeout` is delivered to the async error callback, not returned.** A service with no
+  callback never learns its shutdown was cut short and its remaining messages discarded.
+- **The publish flush inside a drain has its own hardcoded 5 s** (`:6291`), whatever `DrainTimeout`
+  says.
+- **`ErrReconnectBufExceeded`** (`nats: outbound buffer limit exceeded`) is what a publish returns
+  once 8 MB has accumulated during a reconnect. It is memory only — `Close()`, a kill, or a drain
+  during the outage all drop it.
+- **A custom reconnect delay replaces the jitter too** (`st = crd(wlf)`, `:3424–3427`), and the
+  callback's first call carries **1**, not 0, because the sweep counter is incremented first — a
+  delay table indexed from zero silently never uses its first entry.
+- **The keepalive is `pout > MaxPingsOut`, so the third interval, not the second**: six minutes at
+  the defaults, measured. And nats.go pings on the interval regardless of traffic — only a `PONG`
+  clears the count.
+- **An unset `AsyncErrorCB` does not silence errors.** nats.go installs `defaultErrHandler`, which
+  writes `<err> on connection [<cid>] for subscription on "<subject>"` to **stderr** (`:1979–1981`,
+  `:2006–2028`). The documentation says such reports are discarded; they are not (docs issue #92).
+
+
 ## Publish subject validation since v1.48.0
 
 Before **v1.48.0** (2025-12-17) the Go client wrote any subject it was given into the `PUB` line; the
@@ -93,4 +127,4 @@ the subject with `nats: invalid subject`. Rules on [[subjects-and-wildcards]].
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]]

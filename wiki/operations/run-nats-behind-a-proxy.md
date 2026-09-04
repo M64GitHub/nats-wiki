@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [websocket, nginx, ingress, proxy, advertise, handshake_timeout, ping_interval, kubernetes, no_tls]
 aliases: [websocket behind nginx, nats behind a proxy, wss ingress, websocket proxy, proxy_read_timeout]
-sources: [s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.12, s-relnotes-2.14, s-docs-resilient-clients-reconnection-and-events]
 created: 2026-09-01
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Run NATS WebSocket behind nginx or another proxy
@@ -234,6 +234,28 @@ tracking no longer leaks closed clients (#8307). **2.14.4**: `allow_non_tls` no 
 is required (#8420).
 
 
+## The client's keepalive is what the proxy timeouts must respect
+
+The two proxy timeouts above only matter because the client's own keepalive is slow. A NATS client
+pings on a **two-minute** interval and tolerates **two** outstanding pings, so it notices a wedged
+link on the **third** interval — about **six minutes** (Rust pings every minute, so about three)
+(source: [[s-docs-resilient-clients-reconnection-and-events]]; measured at exactly six minutes on
+2.14.6 in [[s-nats-server-client-lifecycle-observed]], and the mechanism is
+[[client-connection-lifecycle]]).
+
+That gives the rule for any idle timeout on the path:
+
+- **A proxy idle timeout below two minutes cuts a healthy idle connection** before the client's ping
+  ever refreshes it. This is the failure the `proxy_read_timeout` / `proxy_send_timeout` values above
+  exist to prevent.
+- **A proxy that drops the connection silently** — closing its side without an RST the client sees —
+  costs the client its full six-minute detection window on top of your timeout.
+- If you cannot raise the proxy's timeout, **lower the client's ping interval** instead so the link
+  is exercised inside it. That knob is the client's, not the server's; the server's own
+  `ping_interval` and `ping_max` govern the other direction, and the server enforces the same
+  third-interval rule (`-ERR 'Stale Connection'`, with nothing in its log).
+
+
 ## Related
 
 [[websocket]] · [[leafnode]] · [[tls-in-nats]] · [[reload-server-config]] ·
@@ -243,4 +265,4 @@ is required (#8420).
 
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-your-first-websocket-connection]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-resilient-clients-reconnection-and-events]]

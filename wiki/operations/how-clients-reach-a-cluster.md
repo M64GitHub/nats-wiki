@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [connect_urls, no_advertise, client_advertise, seed-urls, loadbalancer, kubernetes, discovery, reconnect]
 aliases: ["seed URLs", "server discovery", "connect_urls", "no_advertise", "client_advertise", "LoadBalancer vs seed URLs", "client connection URLs"]
-sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls, s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection]
+sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls, s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-nats-server-client-lifecycle-observed]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # How clients reach a cluster
@@ -193,6 +193,32 @@ and never picks 4222 — a bare host becomes `wss://host:443`, `ws://host` becom
 `nats://host:4222` keeps the port while losing the scheme, sending a WebSocket handshake to the plain
 client port. The failure looks like the server being down.
 
+## What the client does with the list
+
+Three facts from the client's end that decide whether the designs above work
+(source: [[s-docs-resilient-clients-connecting]]; the mechanisms are on
+[[client-connection-lifecycle]]).
+
+- **A one-URL client really does get failover from gossip — until it doesn't.** Measured on 2.14.6: a
+  publisher configured with a single URL survived that node being stopped and finished its run on a
+  peer it had never been told about (source: [[s-nats-server-client-lifecycle-observed]], run A2).
+  That is precisely the failover `no_advertise` removes, which is why design 2 below only works when
+  every client is configured with the VIP rather than with one node.
+- **Configured URLs are permanent; discovered ones are not.** The client keeps the URLs you gave it
+  for the life of the connection and may drop discovered ones when a later `INFO` no longer lists
+  them. Configure what the client must be able to reach.
+- **Not every client can opt out or report.** Go, Java, Rust and JavaScript have both an opt-out and
+  a discovered-servers event; **Python and C# have neither**. On those, discovery is not something
+  you can turn off from the client side — only from the server, with `no_advertise`.
+
+**Lame duck rewrites the same list.** A server entering lame duck sends its own clients an
+asynchronous `INFO` with `"ldm":true` and a `connect_urls` list with **its own address removed**, so
+a client reconnecting during the drain will not pick it; a client on a *peer* gets the same shortened
+list with no `ldm` key. Measured at **about a second** after the notice, with clients closed **10 s** later
+(source: [[s-nats-server-client-lifecycle-observed]], runs B3–B4). With `no_advertise` set the list is
+empty instead, which is the cost of design 2: the drain tells clients nothing about where to go.
+
+
 ## To verify
 
 - **`since:` is deliberately absent.** `client_advertise`, `no_advertise` and INFO-driven discovery are dated by no release body from v2.10.0 to v2.14.6 (the first body naming discovery at all is v2.14.0's `ignore_discovered_servers`), and the docs' generated config reference carries no *since* for them.
@@ -213,4 +239,4 @@ client port. The failure looks like the server being down.
 - `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md` — the `INFO` lines quoted
   above, observed on the v2.14.6 binary
 - [[s-docs-websocket-tls-and-proxies]]
-- [[s-docs-websocket-your-first-websocket-connection]]
+- [[s-docs-websocket-your-first-websocket-connection]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-nats-server-client-lifecycle-observed]]

@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [rolling-upgrade, lame-duck, SIGUSR2, meta-leader, downgrade, PodDisruptionBudget, ldm]
 aliases: [rolling upgrade, "upgrade NATS", "roll a cluster", lame duck, ldm, "upgrade nats-server"]
-sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview]
+sources: [s-docs-rolling-upgrades, s-nats-server-lame-duck, s-nats-server-signals, s-nats-helm-chart-values-2.14.6, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-nats-server-systemd-units, s-docs-scaling-and-peers, s-gh-4342-memory-stream-backup, s-issue-8322-dynamic-maxstore-shrinks, s-adr-40-nats-connection, s-gh-7463-jetstream-corruption, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-reconnection-and-events]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Upgrade a cluster
@@ -427,9 +427,13 @@ restarted, which is usually an upgrade (source: [[s-issue-8322-dynamic-maxstore-
 `max_file_store` to the volume** before the roll, and never write `max_file_store: 0` to mean "no
 limit" — it disables file storage. See [[jetstream-sizing]] and [[jetstream-out-of-disk]].
 
-**Clients can stay silent for about four minutes after a node dies.** A default client notices a
-server that stopped answering only after two missed pongs on a two-minute ping interval — roughly
-**four minutes** — unless the socket errors first (source: [[s-adr-40-nats-connection]]). That is why
+**Clients can stay silent for about six minutes after a node dies.** A default client notices a
+server that stopped answering only on the **third** unanswered ping of a two-minute interval —
+`pout++` then `pout > MaxPingsOut` with `MaxPingsOut = 2` — so **six minutes**, unless the socket
+errors first. Measured on 2.14.6 against a frozen server: nats.go printed `nats: stale connection` at
+exactly six minutes (source: [[s-nats-server-client-lifecycle-observed]], [[s-nats-go-connection]]).
+ADR-40 states the same rule as "two consecutive PONGs", which would be four minutes; the wiki carries
+the run, and the disagreement is docs issue #90 (source: [[s-adr-40-nats-connection]]). That is why
 the drain matters: lame-duck closes connections in a staggered way and the clients move immediately,
 where an abrupt kill leaves some of them waiting out that window before they even start reconnecting.
 Reconnect behaviour after that is bounded by client defaults you do not control, so a node that goes
@@ -448,6 +452,37 @@ follower that restarts **learns the leader from the next heartbeat** rather than
 rolling restart is the last node's.
 
 
+## What the drain looks like from the client's side
+
+The whole point of the lame-duck step is what connected applications experience while it runs. Three
+things happen, in this order (source: [[s-docs-resilient-clients-drain-and-shutdown]]; measured in
+[[s-nats-server-client-lifecycle-observed]], runs B1–B4; the mechanism is
+[[client-connection-lifecycle]]):
+
+1. **About a second after the notice** on 2.14.6 — the server transfers Raft leadership, waits a
+   second, shuts JetStream down, and *then* sends its own clients an asynchronous `INFO` with
+   **`"ldm":true`** and a `connect_urls` list with **its own address removed**
+   (`server.go:4463–4529`). Clients on the *peers* get the same shortened list without the `ldm` key.
+2. **`lame_duck_grace_period` (10 s by default) after that INFO** the server starts closing client
+   connections, spread over `lame_duck_duration` (2 m by default). Measured: 10.0 s from the INFO,
+   11.0 s from the `Entering lame duck mode` notice.
+3. Clients reconnect to a peer and re-send their subscriptions. At 89 msg/s through the whole
+   sequence, nothing was lost in either direction.
+
+**Only a client with the lame-duck callback wired uses step 1** (`LameDuckModeHandler` in Go,
+`lame_duck_mode_cb` in Python, the `LAME_DUCK` event in Java, `ldm` in JavaScript's status stream,
+`Event::LameDuckMode` in Rust, `LameDuckModeActivated` in C#; the `nats` CLI registers none, so it
+just gets disconnected at step 2). Everything else simply rides the ten seconds out — which is still
+far better than the six-minute keepalive window an abrupt kill can cost
+(source: [[s-docs-resilient-clients-reconnection-and-events]]).
+
+Two client-side settings decide whether the roll is survivable at all, and they are not yours:
+**`MaxReconnect`** — 60 per server by default in Go, Java and Python, 10 in JavaScript — and whether
+the application has a **closed observer** at all. A long roll that exhausts the budget leaves a
+CLOSED connection that never recovers. If you own the applications, `-1` before the roll; if you do
+not, keep the roll inside the budget. [[client-defaults]] has the numbers.
+
+
 ## Related
 
 [[install-nats-server]] · [[build-a-3-node-cluster]] · [[reload-server-config]] ·
@@ -463,4 +498,4 @@ rolling restart is the last node's.
 [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] · [[s-nats-server-systemd-units]] ·
 [[s-docs-scaling-and-peers]] · [[s-gh-4342-memory-stream-backup]] ·
 [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-adr-40-nats-connection]] ·
-[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]]
+[[s-gh-7463-jetstream-corruption]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-reconnection-and-events]]

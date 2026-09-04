@@ -4479,3 +4479,91 @@ entity pin is v1.53.1 — the extract must say which it quotes; the request/inbo
 (`NewRespInbox`, `createNewRequestAndSend`, `UseOldRequestStyle`, the 503 check) were read at v1.52.0 from
 the module cache and not quoted — add them to the v1.53.1 extract if [[request-reply]] is to cite the
 client rather than the docs for "no default timeout" and the mux.
+
+## 2026-09-04 — phase F step 3: resilient clients, part 1 — connecting, reconnecting, draining
+
+Operation: plan, `inbox/plan-the-client-side-2026-09-03.md` step 3 (*Operation: ingest*, six summaries —
+the plan's five plus a natscli extract of its own). **Sources into `raw/`**:
+`raw/nats-go-src/connection-v1.53.1.md` (26 verbatim ranges of `nats.go` at tag v1.53.1, fetched from
+`raw.githubusercontent.com` into `local/scratch/src/nats.go-v1.53.1/` — the const block,
+`GetDefaultOptions`, the seven `Status` values, `defaultErrHandler` and where it is installed,
+`selectNextServer`, `doReconnect`, the reconnect-buffer check, `processAuthError`, `processPingTimer`,
+`drainConnection`, `Drain`, `Flush`, `ForceReconnect`, `StatusChanged`, the pending defaults);
+`raw/nats-cli/reconnect-0.4.0.md` (natscli v0.4.0 from the Go module cache: `cli/util.go`'s `natsOpts()`,
+`internal/util/backoff.go`, `cli/reply_command.go`, `cli/rtt_command.go`);
+`raw/nats-server-src/client-lifecycle-observed-v2.14.6.md` with `client-lifecycle-run.sh`, `-run2.sh`,
+`-run3.sh`, `-stale-run.sh`, `client-lifecycle-raw-watch.py` and `client-lifecycle-stale-client.py` beside
+it. Three `raw/sources.md` rows extended. **Summaries** (6):
+[[s-docs-resilient-clients-connecting]], [[s-docs-resilient-clients-reconnection-and-events]] (with
+`where-next.md`'s checklist folded), [[s-docs-resilient-clients-drain-and-shutdown]],
+[[s-nats-go-connection]], [[s-nats-cli-reconnect]], [[s-nats-server-client-lifecycle-observed]].
+**Pages**: [[client-connection-lifecycle]] (concept — the state machine and every edge: connecting and
+discovery, reconnect and what the gap costs, the keepalive, events and readiness, drain and close, flush,
+lame duck, and what a JetStream client sees when a leader moves) and [[client-defaults]] (reference —
+three tables plus a measured one, each saying which level of evidence it rests on). **Ripples** (14):
+[[nats-go]] (*What bites you — the connection*), [[nats-cli]] (*What bites you — the connection the CLI
+opens is not the library's*), [[nats-c]] (*What the resilient-clients chapter says about this client*),
+[[how-clients-reach-a-cluster]] (*What the client does with the list*), [[core-nats-delivery]] (*The
+reconnect gap is at-most-once, measured*), [[nats-timeout]] (*A leadership move gives you no responders*),
+[[ack-and-redelivery]] (*What a leader move does to un-acked messages*), [[consumer]] (*What a client sees
+when the consumer leader moves*), [[upgrade-a-cluster]] (*What the drain looks like from the client's
+side*, plus the four-minute correction below), [[queue-groups]] (*Rotating one member out*),
+[[worker-pool]] (*Retiring a worker without losing its in-flight batch*), [[publishing]] (*Flush is a
+receipt from the server, not a `PubAck`*), [[defaults-and-limits]] (*Client-side defaults are a different
+table*), [[config-keys]] (*Three keys whose real effect is on the client*),
+[[run-nats-behind-a-proxy]] (*The client's keepalive is what the proxy timeouts must respect*),
+[[evict-a-sick-server]] (*Why kicking the clients is a step at all*), [[slow-consumer-detected]] (*Why
+`nats sub` will not show you a client-side drop*).
+
+**The wiki bug this step existed to fix.** [[upgrade-a-cluster]] said "clients can stay silent for about
+**four minutes** after a node dies", and [[s-adr-40-nats-connection]] said "~2 ping intervals". Both came
+from ADR-40, which says it three times (L178, L224, L337: "if two consecutive PONGs are missed, connection
+is marked as lost"). nats.go does `nc.pout++` and *then* `if nc.pout > nc.Opts.MaxPingsOut`
+(`nats.go:5899–5921`), so it is the **third** interval; `learn/resilient-clients/reconnection.md:325` says
+the same. **Run D3 settles it**: a `nats sub --trace` against a `SIGSTOP`ped 2.14.6 printed
+`>>> Disconnected due to: nats: stale connection` at **exactly six minutes** after the connect. Both pages
+now carry six, and the ADR's reading is docs issue #90 with `destination: ADR repo`.
+
+**What the runs settled beyond the docs** (five runs, four passes; A/B/C/E on `tools/lab/cluster.sh`, D on
+standalone servers): a **one-URL client has failover only because of gossip** — a publisher pinned to n1
+finished on n2 it had never been told about (A2), which is exactly what `no_advertise` removes; the
+**at-most-once reconnect gap measured at two rates** — 0 lost at 89 msg/s, **10 lost (43891–43900, one run,
+≈ 0.39 ms)** at 25 800 msg/s (A3), narrow because nats.go sleeps only after a whole sweep; **lame duck**
+sends the departing server's clients an `INFO` with `"ldm":true` and its own address **removed** from
+`connect_urls` **about a second after the notice** — `lameDuckMode` transfers Raft leadership, waits a
+second, shuts JetStream down and *then* calls `sendLDMToClients` (`server.go:4463–4529`) — while a client
+on a *peer* gets the same shortened list with **no `ldm` key** (B3, B4), and clients are closed **10.0 s
+after that INFO**, 11.0 s after the notice (B1, B3). The B3 bullet in the observed file first said "0.6 s
+after the signal", read off the client's clock alone; it was re-checked against the source and corrected
+in the same session, with the correction stated in the file and the transcripts left untouched. The same
+source explains the second pass's instant shutdown: with **no clients** left the server calls `Shutdown()`
+straight away (`server.go:4487–4494`); **a client that never sends a PING gets no
+lame-duck INFO at all** and is simply closed, because `sendAsyncInfoToClients` skips anything without
+`firstPongSent` (`route.go:1026–1028`; B5, found by a bug in the first raw client and kept); **`nats reply`
+Ctrl-C** answered **4 of 8** in-flight requests and abandoned four, exit 1 (C4); the **server's** stale rule
+is the same third-interval shape — `-ERR 'Stale Connection'` at t=12.19 s with `ping_interval: "5s"` and
+`ping_max: 2`, and **nothing in the server log** (D1); the CLI's backoff prints 640 ms, 800 ms, **2.15 s**,
+… and 2.15 s can only be `Duration(3)`, so **the table's first entry, 500 ms, is never used** (D3); a pull
+consumer across a **consumer-leader move** lost **one fetch of 120** with `no responders` in 17 ms (E8),
+and ten messages held `--no-ack` came back with **`tries: 2`** while `num_redelivered` still read 0 (E9).
+
+**Docs issues** #90 (ADR-40's stale rule off by one ping — ADR repo, with the run), #91 (natscli's backoff
+never reaches its own first step — `natscli`), #92 (`slow-consumers.md:100` "a connection with no async
+error callback discards these reports" — nats.go installs `defaultErrHandler`, which writes them to
+stderr), #93 (`connection-events.md:244` "the same authentication error twice" against
+`tls-and-auth.md:206`'s "the same **server** … twice in a row" — the source keys on `nc.current`), #94
+(nothing says a drain during an outage **closes** and drops the reconnect buffer), #95 (the CLI's
+`--timeout` shown as a drain-timeout stand-in is "time to wait on responses"). No server issue: everything
+surprising here was settled against the client source or the docs.
+
+**Bank**: rows 175–179 added (`own`; the 484-thread comment cache was searched first for each — *lost on
+reconnect*, *stale connection*, *ping* with *detect*, *drain* with *shutdown/SIGTERM/graceful/in-flight*,
+*lame duck* with *client/reconnect/connect_urls*, *max reconnect*, *readiness probe* — and every hit was
+the server's side of the question, so all five are posed) and answered on arrival — **147 / 179**, `own`
+24. No strike from any *Pages touched*. `since: [2.10]` on both new pages with the *present at 2.10*
+comment; `verified-against` names the authority each rests on (`nats.go v1.53.1, natscli 0.4.0,
+nats-server 2.14.6` on [[client-defaults]], which is why it joins the staleness report's *authority the
+tool cannot check* list, as [[nats-py]] already does). Lint: **385 pages** (377 → 385), drift 0, unlanded
+**0**, wanted 0, unverified 12, staleness 0 behind 2.14.6. **Deferred to step 4** as the plan places them:
+the `websocket` ripple (`wss://` is only named in `tls-and-auth.md`), the client-side slow consumer and the
+expired-credential `-ERR` strings, both of which need a program rather than the CLI.

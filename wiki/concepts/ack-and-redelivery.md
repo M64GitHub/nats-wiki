@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [ack, nak, term, ack_wait, max_deliver, max_ack_pending, backoff, advisories]
 aliases: [acknowledgement, acknowledgment, ack, nak, term, at-least-once, AckWait, MaxDeliver]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-6628-ackwait-vs-dupe-window, s-nats-server-nak-backoff-observed, s-synadia-reliable-delivery-dlq, s-gh-5631-nak-not-immediate, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.2, s-relnotes-2.14.1, s-relnotes-2.10, s-relnotes-2.14]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-acknowledgment, s-docs-pull-consumers, s-docs-consumer-config, s-nats-server-constants-2.14.6, s-docs-policies, s-docs-mqtt-qos-sessions-and-retained, s-docs-monitoring-advisories-and-events, s-docs-worker-pool, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-gh-6628-ackwait-vs-dupe-window, s-nats-server-nak-backoff-observed, s-synadia-reliable-delivery-dlq, s-gh-5631-nak-not-immediate, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.2, s-relnotes-2.14.1, s-relnotes-2.10, s-relnotes-2.14, s-nats-server-client-lifecycle-observed]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Ack and redelivery
@@ -495,6 +495,23 @@ failing later. See [[mqtt]].
 A change to either applies only to subscriptions created **after** it, which is the same
 create-time-only rule a consumer's `ack_wait` follows.
 
+## What a leader move does to un-acked messages
+
+A connection-level reconnect or drain does **not** ack anything: a consumer's position is this page's
+bookkeeping, not the connection's. Measured on 2.14.6 (source:
+[[s-nats-server-client-lifecycle-observed]], run E9): ten messages were fetched with `--no-ack`, then
+the consumer leader's node was stopped.
+
+- 35 seconds later — past the 30 s `ack_wait` — the **new** leader still reported `ack_pending 10`,
+  `ack_floor` unmoved, and `num_redelivered 0`.
+- The next fetch returned those same ten **stream** sequences with **`tries: 2`**, under new
+  *consumer* sequences, and then continued at `tries: 1`.
+
+Nothing was lost, the un-acked work came back as an ordinary redelivery, and `num_redelivered` had
+not yet counted it — so a dashboard reading that field just after a leader move under-reports.
+The client's side of the same event is on [[client-connection-lifecycle]].
+
+
 ## Related
 
 [[consumer]] · [[stream]] · [[retention-policies]] · [[worker-pool]] · [[advisories]] ·
@@ -506,4 +523,4 @@ create-time-only rule a consumer's `ack_wait` follows.
 [[s-docs-consumer-config]] · [[s-docs-policies]] · [[s-nats-server-constants-2.14.6]] ·
 [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-monitoring-advisories-and-events]] ·
-[[s-docs-worker-pool]] · [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-nats-server-nak-backoff-observed]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-5631-nak-not-immediate]] · [[s-docs-acknowledgment]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]] · [[s-relnotes-2.10]] · [[s-relnotes-2.14]]
+[[s-docs-worker-pool]] · [[s-gh-6350-exponential-backoff]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-nats-server-nak-backoff-observed]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-5631-nak-not-immediate]] · [[s-docs-acknowledgment]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.14.1]] · [[s-relnotes-2.10]] · [[s-relnotes-2.14]] · [[s-nats-server-client-lifecycle-observed]]

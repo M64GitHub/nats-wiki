@@ -7,9 +7,9 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports, s-nats-cli-core-commands, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-cli-request-reply-source, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-adr-47-request-many]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports, s-nats-cli-core-commands, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-cli-request-reply-source, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-adr-47-request-many, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # natscli (the nats CLI)
@@ -504,6 +504,43 @@ gap, `--wait-for-empty` as the sentinel, `nats sub --queue` — in [[s-docs-core
 the mechanics on [[request-reply]] and [[queue-groups]].
 
 
+## What bites you — the connection the CLI opens is not the library's
+
+Read from `natscli` at **v0.4.0** (source: [[s-nats-cli-reconnect]]) and measured on nats-server
+2.14.6 (source: [[s-nats-server-client-lifecycle-observed]]). The full comparison is in
+[[client-defaults]].
+
+- **The CLI reconnects forever and never aborts on a repeated auth error** — `MaxReconnects(-1)` and
+  `IgnoreAuthErrorAbort()` (`cli/util.go:246–247`). An application on the library defaults would
+  spend a 60-attempt budget per server and close, and would abort on the second identical auth
+  error. **A failover watched with `nats sub` is therefore not a witness for what your service will
+  do.**
+- **`--trace` is not optional when watching a client.** Only two of the eight `>>>` lines print
+  without it — the disconnect line and the closed line. `>>> Connected`, `>>> Reconnected`,
+  `>>> Discovered new servers`, `>>> Reconnect error` and `>>> Setting reconnect delay to …` are all
+  trace-gated (and the last is not in the documentation at all).
+- **A client-side slow consumer under `nats sub` is silent.** `nats.ErrorHandler(...)` is registered
+  twice (`:280` and `:288`), the second registration is trace-gated, and the later one wins — so
+  `>>> Unexpected NATS error` never prints without `--trace`. The CLI has replaced nats.go's
+  `defaultErrHandler`, which would have written it to stderr, with one that logs nothing.
+- **`nats reply` exits before its own drain finishes.** Ctrl-C runs `Drain()` then
+  `log.Fatalf("Exiting")` (`cli/reply_command.go:226–228`), and nats.go's `Drain()` returns as soon
+  as the background drain starts. Measured with a one-second handler and eight requests in flight:
+  **four answered, four abandoned**, and the process exited with code **1**. The documentation says
+  as much — it "shows where the drain belongs rather than a finished drain".
+- **A closed connection kills the process** one second later, through `log.Fatalf` in the
+  `ClosedHandler` (`:277–279`).
+- **The reconnect backoff is a 44-step table**, 500 ms to 20 s, saturating, each step jittered to
+  half-to-one-and-a-half times its value. Because nats.go increments its sweep counter before calling
+  the delay callback, the first wait actually used comes from the **750 ms** step — the table's
+  500 ms entry is never reached (measured; docs issue #91).
+- **`nats sub` on Ctrl-C just exits**, abandoning in-flight messages; only `nats reply` calls
+  `Drain()` at all. The CLI has no drain-timeout flag.
+- Useful when watching a failover: `nats sub … --trace`, `nats rtt` (five round trips per server),
+  and `nats server check connection` with `--connect-warn 500ms --connect-critical 1s --rtt-warn
+  500ms --rtt-critical 1s` and `--format nagios|json|prometheus|text`.
+
+
 ## Related
 
 [[nsc]] · [[nk]] · [[nats-box]] · [[nats-top]] · [[jsm-go]] · [[monitoring-endpoints]] ·
@@ -525,4 +562,4 @@ the mechanics on [[request-reply]] and [[queue-groups]].
 [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7684-certificate-expiry]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-natscli-auth-exports-imports]] · [[s-nats-cli-core-commands]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-cli-request-reply-source]] · [[s-nats-server-request-reply-observed]]
 - [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] · [[s-adr-47-request-many]] — the
-  gather flags as the docs and ADR-47 describe them, for the `nats request` section.
+  gather flags as the docs and ADR-47 describe them, for the `nats request` section. · [[s-nats-cli-reconnect]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]]

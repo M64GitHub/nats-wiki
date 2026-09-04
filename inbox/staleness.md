@@ -30,13 +30,14 @@ last true.
 
 _none._
 
-## Authority the tool cannot check (7)
+## Authority the tool cannot check (8)
 
 `verified-against` names something with no release feed here — a site capture, a date, a spec. Not
 stale, not verifiable mechanically; re-read them by hand when the thing they name changes.
 
 | page | type | verified against | verified on | claims | verified from |
 |---|---|---|---|---|---|
+| [[client-defaults]] | reference | `nats.go v1.53.1, natscli 0.4.0, nats-server 2.14.6` | 2026-09-04 | default, limit, config key, CLI flag | [[s-nats-go-connection]] · [[s-nats-cli-reconnect]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-server-client-lifecycle-observed]] |
 | [[nats-architecture-and-design]] | entity | `nats-architecture-and-design @ main, 2026-08-31` | 2026-08-31 | limit, config key | [[s-github-repo-facts]] · [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]] · [[s-adr-31-direct-get]] |
 | [[nats-helm-charts]] | entity | `nats-io/k8s chart nats-2.14.6` | 2026-08-31 | config key, CLI flag | [[s-nats-helm-chart-values-2.14.6]] · [[s-docs-rolling-upgrades]] · [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]] · [[s-docs-hardening]] · [[s-docs-config-management]] · [[s-docs-prometheus-and-dashboards]] · [[s-gh-7190-asymmetric-cluster]] |
 | [[nats-net]] | entity | `NATS .NET v3.2.0` | 2026-08-31 | limit, config key, error code | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-docs-core-nats-request-reply]] · [[s-adr-47-request-many]] |

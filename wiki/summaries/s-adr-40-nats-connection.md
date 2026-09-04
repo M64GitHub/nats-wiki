@@ -76,7 +76,7 @@ Disconnection is detected two ways: missing two consecutive `PONG`s, or an error
 | option | ADR default | why an operator cares |
 |---|---|---|
 | Ping interval | **2 minutes** | the upper bound on how long a client keeps writing into a dead socket |
-| Max pings out | **2** | so detection takes up to ~2 ping intervals, not one |
+| Max pings out | **2** | with the interval, this is the detection window — see *What the ADR gets wrong* for the number |
 | Connection timeout | **5s** | how long an initial connect can hang |
 | Retry on failed initial connect | **false** | a client that starts before the cluster does exits with an error |
 | Max reconnects | stated as `3 / none` | see *What the ADR gets wrong* |
@@ -109,6 +109,15 @@ once full.
 - **Server discovery is a TODO in an ADR marked *Implemented*.** Two `**TODO**` markers and the
   truncated sentence "**Note**: Server will send back the info only" sit in the section that decides
   whether clients can reach a cluster at all. Recorded as docs issue #31.
+- **The stale-connection rule is off by one ping.** ADR-40 L222–225: "If two consecutive PONGs are
+  missed, connection is marked as lost" — with a 2-minute interval that reads as four minutes.
+  nats.go does `pout++` and then tests `pout > MaxPingsOut` with `MaxPingsOut = 2`
+  (`nats.go:5899–5921`), so it is the **third** interval, and `learn/resilient-clients/reconnection.md:325`
+  agrees ("detection waits for the third unanswered ping, up to about six minutes"). Measured on
+  2.14.6 against a frozen server: **exactly six minutes**
+  ([[s-nats-server-client-lifecycle-observed]], run D3). Recorded as docs issue #90, destination the
+  ADR repo. This wiki carried the ADR's reading on [[upgrade-a-cluster]] until 2026-09-04; it now
+  carries the run.
 
 ## Practical takeaways
 
@@ -118,8 +127,9 @@ once full.
 - **Anywhere a client cannot route to what the server advertises — Kubernetes behind a LoadBalancer,
   NAT, a leaf on the far side of a firewall — the fix is `client_advertise` or
   `no_advertise`,** not client-side hacks. See [[how-clients-reach-a-cluster]].
-- **Expect ~4 minutes of silence before a client with default settings notices a dead server**
-  (2 minute ping interval x 2 missed pongs), unless the socket errors first.
+- **Expect ~6 minutes of silence before a client with default settings notices a dead server** — the
+  **third** unanswered ping of a 2-minute interval, not the second — unless the socket errors first.
+  The ADR's own wording says two; see *What the ADR gets wrong*.
 - **Reconnect storms are bounded by client defaults you do not control**; jitter and shuffling are
   specified, but a cluster that loses a node still sees every one of its clients arrive at the
   survivors at once.

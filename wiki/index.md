@@ -99,6 +99,12 @@ exists to answer live in `inbox/question-bank.md`.
   (a busy member kept its share, measured), uniform per member across a cluster, the publisher's own side
   across a leafnode — with the hub's split skewed 3 : 1 by a leaf's members (SI-8) — and an exclusion list
   across a gateway; `/subsz` shows one server's members only.
+- [[client-connection-lifecycle]] — what your application experiences while the cluster does something:
+  the state machine and its edges, discovery as the thing that actually gives a one-URL client failover,
+  the reconnect gap measured at two publish rates, `MaxReconnect` as a per-server budget that can end a
+  connection for good, the six-minute keepalive (the third ping, not the second — the ADR says
+  otherwise), drain's two phases and the three ways it bites, flush as a receipt, and the `ldm` INFO with
+  the departing server's own address removed.
 
 ## Internals
 
@@ -262,6 +268,10 @@ exists to answer live in `inbox/question-bank.md`.
   and the one flag that renames both; surveyor's 105 names and its `--prefix` that does nothing; which
   node's exporter to read (`num_pending` is 0 off the consumer leader); the series behind the alerts and
   what has none; the exact counters; `ha_assets`.
+- [[client-defaults]] — what each NATS client does when you configure nothing: connect timeout,
+  reconnect policy, buffers, keepalive, drain and flush. nats.go at v1.53.1 and the `nats` CLI at 0.4.0
+  read from source with file and line; every other client is the documentation's word, marked as such —
+  plus a table of what was measured on 2.14.6.
 
 ## Entities
 
@@ -582,6 +592,31 @@ exists to answer live in `inbox/question-bank.md`.
   `raw/nats-go-src/errors-v1.53.1.md` on [[nats-timeout]].
 - [[s-nats-go-relnotes-1.48.0]] — the release (2025-12-17) that added publish-subject validation to the Go
   client, dating the docs' "nats.go before v1.48.0" claim.
+
+**docs.nats.io — Resilient clients (learn)**
+
+- [[s-docs-resilient-clients-connecting]] — the chapter's state machine, the three connect-time options,
+  the randomised pool, discovery and its per-client opt-outs, the four-step handshake.
+- [[s-docs-resilient-clients-reconnection-and-events]] — backoff after a whole sweep, jitter, the
+  per-server `MaxReconnect`, the reconnect buffer, the third-ping keepalive, the six events and the
+  readiness rule.
+- [[s-docs-resilient-clients-drain-and-shutdown]] — close vs drain, the two phases and their timeouts,
+  per-subscription drain, flush as a server receipt, lame duck from the client's side.
+
+**The `nats.go` client and the `nats` CLI, at their pinned versions**
+
+- [[s-nats-go-connection]] — nats.go v1.53.1: every connection default in one const block, the drop rule
+  in `selectNextServer`, the sleep-per-sweep, the buffer check, `processPingTimer`, `processAuthError`,
+  `drainConnection` and the stderr handler an unset callback still gets.
+- [[s-nats-cli-reconnect]] — natscli 0.4.0: `MaxReconnects(-1)`, `IgnoreAuthErrorAbort()`, the 44-step
+  backoff table, which `>>>` lines need `--trace`, the twice-registered error handler, and `nats reply`'s
+  `Drain()` + `log.Fatalf`.
+
+**Runs on the server**
+
+- [[s-nats-server-client-lifecycle-observed]] — a node stopped, a node in lame duck with its `ldm` INFO,
+  `nats reply` drained under load, the stale link timed from both ends, and a pull consumer whose leader
+  moves. Every measured number on [[client-connection-lifecycle]] and [[client-defaults]].
 
 **The `jwt` library and `nsc`**
 
@@ -1038,11 +1073,11 @@ names now have pages — see the Entities section above. People: none yet.)*
 
 - `inbox/question-bank.md` — the questions this wiki must answer, with the page that answers each
 - `inbox/adr-toc.md` — one row per ADR of `nats-architecture-and-design`
-- `inbox/docs-issues.md` — **89** errors and gaps found in **public NATS documentation**, each verified
+- `inbox/docs-issues.md` — **95** errors and gaps found in **public NATS documentation**, each verified
   against the server at a release tag with file and line, kept so they can be sent to the maintainers.
   **None has been filed yet** — every row's `upstream` column reads `not filed`. Routed by a
-  `destination` column: 59 to `nats-docs`, 6 (#7, #30, #31, #37, #49, #51) to the ADR repo, 2 (#40, #89) to `natscli`,
-  1 (#39) to a published blog post.
+  `destination` column: 82 to `nats-docs`, 7 (#7, #30, #31, #37, #49, #51, #90) to the ADR repo, 3 (#40, #89, #91)
+  to `natscli`, and one each to `jsm.go`, `nats-surveyor` and a published blog post (#39).
 - `inbox/server-issues.md` — **8** findings about **`nats-server` itself**, kept separate because a
   server finding cannot be settled the way a docs finding can: there is no higher authority to check it
   against, so entries are observations and questions rather than verdicts. `SI-1` is the

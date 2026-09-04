@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [queue-group, --queue, load-balancing, random-selection, readiness, cluster, leafnode, gateway, geo-affinity, at-most-once, subsz, qgroup, NATS-RPLY-22]
 aliases: [queue group, queue groups, queue subscription, queue subscriber, queue subscribe, QueueSubscribe, --queue, qgroup, load balancing in core NATS, geo-affinity for queue groups, "which member gets the message"]
-sources: [s-docs-core-nats-queue-groups, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-nats-cli-request-reply-source, s-relnotes-2.10, s-docs-super-clusters, s-nats-server-core-delivery-observed]
+sources: [s-docs-core-nats-queue-groups, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-nats-cli-request-reply-source, s-relnotes-2.10, s-docs-super-clusters, s-nats-server-core-delivery-observed, s-docs-resilient-clients-drain-and-shutdown]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Queue groups
@@ -136,6 +136,25 @@ The `_sys_` group that also appears in `/subsz` belongs to the server's own dire
 - **No ordering across members.** Order per publisher connection holds for each member's slice, not
   across the group ([[core-nats-delivery]]).
 
+## Rotating one member out without dropping its work
+
+A queue group's whole point is that members come and go. Killing a member drops whatever the server
+already delivered into its buffer; a **per-subscription drain** does not. It sends an `UNSUB` so the
+server stops picking that member, lets the handler finish what it already holds, and leaves the
+connection and every other subscription alive (source:
+[[s-docs-resilient-clients-drain-and-shutdown]]).
+
+`Subscription.Drain()` in Go, `sub.drain()` in JavaScript and Python, `drain(Duration)` on Java's
+`Subscription` and `Dispatcher`, `Subscriber::drain()` in Rust. **C# has none** — disposing a
+subscription drops messages already on their way, and its only drain is the connection-level
+`DrainSubscriptionsOnDispose`, default `false`. The CLI cannot demonstrate it: `nats sub` holds one
+subscription and Ctrl-C just exits.
+
+A **connection** drain is the wrong tool for a rotation: it drains everything and then closes. And in
+Go it returns before it has finished — see [[client-connection-lifecycle]], where the cost of exiting
+on that return is measured. [[worker-pool]] is the durable alternative to the whole shape.
+
+
 ## Related
 
 [[core-nats-delivery]] · [[request-reply]] · [[worker-pool]] · [[slow-consumer-detected]] ·
@@ -154,4 +173,4 @@ The `_sys_` group that also appears in `/subsz` belongs to the server's own dire
 - [[s-nats-cli-request-reply-source]] — why a `nats reply` member serialises its requests.
 - [[s-relnotes-2.10]] — the 2.10.22 / 2.10.23 leafnode load-balancing lines.
 - [[s-docs-super-clusters]] — the docs' statement of geo-affinity.
-- [[s-nats-server-core-delivery-observed]] — the `qgroup` field in `/subsz` (run D).
+- [[s-nats-server-core-delivery-observed]] — the `qgroup` field in `/subsz` (run D). · [[s-docs-resilient-clients-drain-and-shutdown]]

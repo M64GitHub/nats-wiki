@@ -487,6 +487,11 @@ invented to justify one.
 | 173 | Does a queue group route around a busy or slow member — is the pick readiness-aware, round-robin or random? | core | own | measured | [[queue-groups]] — *The pick: random, not round-robin, not readiness-aware*, run C on 2.14.6: the busy member kept its share |
 | 174 | How does a queue group split its load across the servers of a cluster, across a leafnode and across a gateway — is the publisher's own server preferred? | core topology | own | measured topology | [[queue-groups]] · [[leafnode]] · [[gateway]] — uniform per member inside a cluster (run E), the publisher's side outright across a leafnode with the hub's own split skewed (run H, SI-8), an exclusion list across a gateway |
 | 171 | A message was published and never arrived — which tool shows why: a wire tap, `/subsz?test=`, `/connz?subs=true`, or `nats trace`, and what does each need? | core monitoring | own | gotcha runbook measured | [[core-nats-delivery]] · [[monitoring-endpoints]] — *Debugging delivery: the four surfaces*, each run on 2.14.6 |
+| 175 | What does a client actually do at connect time — how many servers does it try, in what order, and how long does each dial block? | core clients | own | design | [[client-connection-lifecycle]] — *Connecting*; [[client-defaults]] |
+| 176 | How does a client learn about the servers it was not configured with, and what makes that discovery stop working? | core topology clients | own | design | [[client-connection-lifecycle]] — *Connecting*; [[how-clients-reach-a-cluster]] — *What the client does with the list* |
+| 177 | A node is stopped or put into lame duck under load — what does a connected client see, and what is lost? | core topology clients | own | measured | [[client-connection-lifecycle]] — *Reconnecting*, *Lame duck, as the client sees it*; [[core-nats-delivery]] — *The reconnect gap is at-most-once, measured*; [[upgrade-a-cluster]] |
+| 178 | A server is up but not answering — how long before a client notices, and can I make that shorter? | core clients monitoring | own | measured gotcha | [[client-connection-lifecycle]] — *The keepalive*; [[client-defaults]]; [[run-nats-behind-a-proxy]] |
+| 179 | How do I stop a client without losing the work it is holding — and what does drain not cover? | core clients jetstream | own | design measured | [[client-connection-lifecycle]] — *Draining, and closing*; [[worker-pool]]; [[queue-groups]] |
 
 **Rows 108–137 were searched for their public form on 2026-09-03** (`inbox/scout-posed-rows-public-form-2026-09-03.md`, phase C step 2): every title, original post, comment and reply of the 484 `nats-io/nats-server` discussions, then the Stack Overflow tags. Twenty-one rows got a URL — a thread that asks the row's question with its trade-off, or one half of it (the scout file says which) — and the row text stayed. Nine (112, 116, 123, 127, 128, 131, 132, 133, 134) keep `own`: searched, not found, recorded in `inbox/scout-backlog.md` §5(a). Row 129's thread is row 57's — 129 is its design form.
 
@@ -523,3 +528,16 @@ chunked responses. All three answered on arrival by `concepts/request-reply` and
 written from the core-NATS chapter, ADR-4 and ADR-47, the server source at v2.14.6 and natscli 0.4.0, and
 eight runs in four passes (a standalone server, the lab, a hub with a leafnode). Rows 138 (gh#2760's chosen
 answer) and 150 (run G) were filled by the same step.
+
+**Rows 175–179 were added on 2026-09-04 from the client side** (`inbox/plan-the-client-side-2026-09-03.md`,
+phase F step 3): all five are posed. The discussions comment cache (`local/scratch/gh-index/`, all 484
+`nats-io/nats-server` threads with their comments and replies) was searched first for the public form of
+each — *lost/dropped/missing during a reconnect*, *stale connection*, *ping interval* with *detect*,
+*drain* with *shutdown / SIGTERM / graceful / in-flight*, *lame duck* with *client / reconnect /
+connect_urls*, *max reconnect*, *readiness or liveness probe* — and found only threads that touch the
+topic from the **server's** side: gh#6070 (lame duck under systemd, already row 93), gh#3778 (rolling a
+cluster), gh#4314 (how nodes work in a cluster), gh#17296's rebalancing advice. Nobody asks these in the
+form an application owner holds them, which is exactly the gap phase F exists to close. All five were
+answered on arrival by `concepts/client-connection-lifecycle` and `reference/client-defaults`, written
+from the `learn/resilient-clients` chapter, nats.go at v1.53.1, natscli at 0.4.0 and five runs in four
+passes on nats-server 2.14.6.

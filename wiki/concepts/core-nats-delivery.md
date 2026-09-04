@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [at-most-once, interest-graph, ordering, fire-and-forget, echo, NoEcho, max_payload, headers, no_header_support, wire-tap, subsz, nats-trace, reconnect, lame-duck, slow-consumer]
 aliases: [core NATS, at-most-once delivery, interest graph, fire and forget, core NATS ordering, message ordering in core NATS, echo, NoEcho, "Maximum Payload Violation", "nats: maximum payload exceeded", debugging delivery, why did my message not arrive]
-sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers]
+sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Core NATS delivery
@@ -160,6 +160,24 @@ Reload behaviour is from [[config-keys]]; the constants from [[defaults-and-limi
   needs no connection of its own (source: [[s-gh-2760-one-connection-or-two]]; the requester's side is
   on [[request-reply]]).
 
+## The reconnect gap is at-most-once, measured
+
+A subscriber whose server goes away loses whatever is published while it is between servers. Nothing
+in the client changes that — the reconnect buffer holds *outbound* publishes, and subscriptions are
+merely re-sent. Measured on 2.14.6 with a subscriber pinned to the node that was stopped
+(source: [[s-nats-server-client-lifecycle-observed]]):
+
+| publish rate | lost |
+|---|---|
+| 89 msg/s | **0** |
+| 25 800 msg/s | **10**, sequences 43891–43900, one contiguous run |
+
+The gap is about **0.39 ms** — narrow because nats.go sleeps only after a whole sweep of the server
+pool, so the first retry against a known peer is immediate. Read it as a *rate*, not a duration: the
+same outage loses nothing at a low rate and a burst at a high one, and neither outcome is a promise.
+[[client-connection-lifecycle]] has the mechanism and the rest of the fault edges.
+
+
 ## To verify
 
 - What a route or leafnode hop does to a publisher's order. gh#7577 is a single-server thread and the
@@ -192,4 +210,4 @@ Reload behaviour is from [[config-keys]]; the constants from [[defaults-and-limi
 - [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] — the request/reply and queue-group
   pages of the chapter, for the two pointer sentences above.
 - [[s-gh-2760-one-connection-or-two]] — one connection or two, the maintainers' rule.
-- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing.
+- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]]

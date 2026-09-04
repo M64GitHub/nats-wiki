@@ -7,9 +7,9 @@ verified-against: nats-server 2.14
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-queue-groups]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-queue-groups, s-nats-cli-reconnect]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # "Slow Consumer Detected" in the server log
@@ -280,6 +280,20 @@ subscription still alive — is a different symptom with a different page, writt
 [[core-nats-delivery]].
 
 
+## Why `nats sub` will not show you a client-side drop
+
+If you are reaching for the CLI to reproduce the client's half, it cannot: **the `nats` CLI does not
+print async errors unless you pass `--trace`.** `nats.ErrorHandler(...)` is registered twice in
+`cli/util.go` (`:280` and `:288`), the second registration is trace-gated, and the later one wins —
+so `>>> Unexpected NATS error` never appears without it (source: [[s-nats-cli-reconnect]]). In doing
+so the CLI has replaced nats.go's `defaultErrHandler`, which would have written the slow-consumer
+error to stderr.
+
+The same caveat applies to every other observation made with the CLI here: it sets
+`MaxReconnects(-1)` and `IgnoreAuthErrorAbort()`, so it reconnects forever and never gives up where
+an application on the library defaults would. [[client-defaults]] has the comparison.
+
+
 ## A queue member cut here leaves its group
 
 A member of a queue group "stops receiving messages only when its subscription or connection goes
@@ -300,4 +314,4 @@ that moment the member keeps its random share of the group's traffic however far
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-queue-groups]]
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-queue-groups]] · [[s-nats-cli-reconnect]]

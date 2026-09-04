@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Worker pool
@@ -193,6 +193,27 @@ pulls when it has capacity — which is why a slow worker here only slows itself
 side, including what a cluster and a leafnode do to the split, is on [[queue-groups]].
 
 
+## Retiring a worker without losing its in-flight batch
+
+The same rule applies whether the pool is a JetStream consumer or a core [[queue-groups|queue
+group]]: stop the server sending *this* worker new work, let it finish what it holds, then exit. That
+is a **per-subscription drain**, not a connection close (source:
+[[s-docs-resilient-clients-drain-and-shutdown]]).
+
+For a pull worker there are two halves, and only the first is the connection's business:
+
+- **the subscription** — drain it (`Subscription.Drain()` in Go, `sub.drain()` in Python and
+  JavaScript, `drain(Duration)` in Java, `Subscriber::drain()` in Rust; **C# has none**) so no new
+  fetch is issued and the buffered messages reach the handler;
+- **the acks** — a core drain "does not ack JetStream messages". Anything the worker holds un-acked
+  when it exits is redelivered to another worker after `ack_wait`, which is correct but is *at least
+  once*: the handler must be idempotent, exactly as [[ack-and-redelivery]] says.
+
+In Go, remember that a connection `Drain()` returns before the drain finishes; a worker that exits on
+that return abandons the batch it was draining. [[client-connection-lifecycle]] has the phases, the
+30 s `DrainTimeout` and the hardcoded 5 s publish flush inside it.
+
+
 ## Version notes
 
 Three 2.10 fixes on WorkQueue streams that a pool depends on (source: [[s-relnotes-2.10]]):
@@ -223,4 +244,4 @@ delivery — a level, not a rate, and the max-deliveries drop itself has no seri
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]]

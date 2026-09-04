@@ -7,9 +7,9 @@ verified-against: nats.c v3.13.0
 verified-on: 2026-08-31
 tags: [client, tier-1, c, ffi, embedded, libsodium, streaming]
 aliases: [nats.c, "nats-io/nats.c", c client]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-core-nats-subjects-and-mapping]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-core-nats-subjects-and-mapping, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # nats.c
@@ -57,10 +57,44 @@ options — TLS backend, static linking, libsodium — an integration concern ra
   the rule is on [[subjects-and-wildcards]].
 
 
+## What the resilient-clients chapter says about this client
+
+The C client is one of only two languages the chapter shows in code (the other is the `nats` CLI), so
+its call names are the ones stated most explicitly. All of the following is the documentation's word,
+carrying no version — the C source has not been read here (sources:
+[[s-docs-resilient-clients-connecting]], [[s-docs-resilient-clients-reconnection-and-events]],
+[[s-docs-resilient-clients-drain-and-shutdown]]). The mechanisms are on
+[[client-connection-lifecycle]]; the values per client are in [[client-defaults]].
+
+| what | the call |
+|---|---|
+| connection name, pool, dial timeout | `natsOptions_SetName`, `natsOptions_SetServers(opts, servers, 3)`, `natsOptions_SetTimeout(opts, 2000)` |
+| pool order | `natsOptions_SetNoRandomize(opts, true)` |
+| discovery | `natsOptions_SetDiscoveredServersCB`, `natsConnection_GetServers` |
+| reconnect | `natsOptions_SetMaxReconnect(opts, -1)`, `natsOptions_SetReconnectWait(opts, 2000)` |
+| events | `natsOptions_SetDisconnectedCB` / `ReconnectedCB` / `ClosedCB` / `LameDuckModeCB` |
+| state | `natsConnection_Status` → `NATS_CONN_STATUS_CONNECTED / RECONNECTING / CLOSED`, `natsConnection_IsClosed`, `natsConnection_GetLastError`, `natsConnection_GetRTT` (ns) |
+| drain | `natsConnection_Drain`, `natsConnection_DrainTimeout(conn, 10000)`, `natsSubscription_Drain`, `natsSubscription_WaitForDrainCompletion`, `natsSubscription_DrainCompletionStatus` |
+| flush | `natsConnection_FlushTimeout(conn, 5000)`, `natsConnection_Flush()` (10 s) |
+| pending limits | `natsSubscription_SetPendingLimits(sub, 10000, 8 * 1024 * 1024)`, `natsSubscription_GetDropped`, `natsOptions_SetErrorHandler` |
+
+Two behaviours worth calling out:
+
+- **`natsConnection_Drain` returns immediately**, exactly as in Go: the chapter's own C example loops
+  on `natsConnection_IsClosed(conn)` before exiting, because "exiting on `Drain()`'s return abandons
+  the work drain was meant to save". The drain timeout defaults to **30 s** and surfaces
+  `NATS_TIMEOUT`.
+- **The C client has no per-attempt reconnect-error callback** — the other clients' "reconnect error"
+  event has no C equivalent, so a long outage is quieter here than elsewhere.
+
+Status codes the chapter names: **`NATS_NO_SERVER`** ("no server in the pool answered; anything else
+is a rejected connect"), `NATS_DRAINING`, `NATS_CONNECTION_CLOSED`, `NATS_SLOW_CONSUMER`.
+
+
 ## Related
 
 [[nats-go]] · [[nats-streaming]] · [[nk]] · [[orbit]] · [[nats-server]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-core-nats-subjects-and-mapping]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]]

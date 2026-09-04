@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [PubAck, Nats-Msg-Id, duplicate, duplicate_window, async-publish, atomic-batch, fast-ingest, AllowAtomicPublish, AllowBatchPublish, Nats-Batch-Id, Nats-Expected-Last-Subject-Sequence, exactly-once, persist_mode]
 aliases: [publish, PubAck, pub ack, exactly once, exactly-once, deduplication, dedup, Nats-Msg-Id, msg id, async publish, atomic batch, batch publish, fast ingest, publish acknowledgement]
-sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-stream-consumer-config, s-issue-8271-request-info-max-payload, s-nats-server-share-import-observed, s-gh-7577-core-nats-ordering, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery]
+sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-stream-consumer-config, s-issue-8271-request-info-max-payload, s-nats-server-share-import-observed, s-gh-7577-core-nats-ordering, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-docs-resilient-clients-drain-and-shutdown]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Publishing to a stream
@@ -345,6 +345,30 @@ max_batch_timeout } }` ([[config-keys]]). `allow_atomic` (2.12.0), `allow_batche
 [[s-nats-server-stream-consumer-config]]).
 
 
+## Flush is a receipt from the server, not a `PubAck`
+
+A core publish gives you nothing back, so clients offer a **flush**: a `PING`, and the `PONG` that
+answers it. Because a server processes one connection's bytes in order, a returned `PONG` proves the
+server has **received** everything written before the `PING` (source:
+[[s-docs-resilient-clients-drain-and-shutdown]]).
+
+It is worth being exact about what that is and is not:
+
+| | flush | `PubAck` |
+|---|---|---|
+| proves the bytes reached the server | yes | yes |
+| proves a subscriber saw the message | **no** | no |
+| proves the message was **stored** | **no** | yes — that is the whole point |
+| costs | one round trip per flush | one per publish, or one per batch when async |
+
+So a flush is the confirmation for a **core** publish burst — "after a flush returns, the orders are
+on the server" — and it is *not* a substitute for a `PubAck` when the stream matters. Go's `Flush()`
+has a fixed ten-second timeout; **Rust's `flush()` resolves when the bytes reach the socket, without
+waiting for the PONG**, and **C# has no flush at all** (`PingAsync()` is the same round trip).
+[[client-defaults]] has the per-client column; [[client-connection-lifecycle]] has the drain that
+ends with this same flush.
+
+
 ## Core NATS order, for comparison
 
 Before a stream is involved, order is **per publisher connection, across every subject**: "for a single
@@ -380,4 +404,4 @@ source: [[s-nats-server-core-delivery]]).
 - [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] — the releases the two batch modes shipped
   in.
 - [[s-relnotes-2.14.0]] — the `Nats-Batch-Commit: eob` end-of-batch commit.
-- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-stream-consumer-config]] · [[s-issue-8271-request-info-max-payload]] · [[s-nats-server-share-import-observed]] · [[s-gh-7577-core-nats-ordering]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]]
+- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-stream-consumer-config]] · [[s-issue-8271-request-info-max-payload]] · [[s-nats-server-share-import-observed]] · [[s-gh-7577-core-nats-ordering]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-docs-resilient-clients-drain-and-shutdown]]

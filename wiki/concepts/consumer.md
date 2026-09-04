@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-cli-help-0.4.0, s-prometheus-nats-exporter-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-3857-consumer-pending-series, s-exporter-issue-218-num-pending-differs-per-node]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-cli-help-0.4.0, s-prometheus-nats-exporter-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-3857-consumer-pending-series, s-exporter-issue-218-num-pending-differs-per-node, s-nats-server-client-lifecycle-observed]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Consumer
@@ -626,6 +626,24 @@ report of the 0 / 8 / 0 readings is exporter issue #218,
 [[s-exporter-issue-218-num-pending-differs-per-node]]).
 
 
+## What a client sees when the consumer leader moves
+
+A consumer's leader can move without the application noticing much. Measured on 2.14.6 with a
+durable pull consumer on an R3 stream, fetching one message at a time while the consumer leader's
+node was stopped (source: [[s-nats-server-client-lifecycle-observed]], runs E8–E9):
+
+- **one fetch of 120 failed**, with `nats: no responders available for request`, in 17 ms — the
+  `$JS.API` request that landed in the leadership window. The next fetch succeeded. See
+  [[nats-timeout]] for why that is *no responders* and not a timeout;
+- messages already delivered and **un-acked** when the leader moved were redelivered on a later
+  fetch with `tries: 2`, under new consumer sequences — see [[ack-and-redelivery]];
+- `num_redelivered` still read **0** on the new leader 35 s after the move, before those
+  redeliveries were fetched.
+
+The connection's side of the same event — reconnect, drain, what the client prints — is on
+[[client-connection-lifecycle]].
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
@@ -647,4 +665,4 @@ report of the 0 / 8 / 0 readings is exporter issue #218,
 [[s-gh-4972-nak-with-delay-blocks]]
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-3857-consumer-pending-series]] · [[s-exporter-issue-218-num-pending-differs-per-node]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-3857-consumer-pending-series]] · [[s-exporter-issue-218-num-pending-differs-per-node]] · [[s-nats-server-client-lifecycle-observed]]

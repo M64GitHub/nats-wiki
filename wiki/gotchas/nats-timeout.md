@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [timeout, request-reply, no-responders, gomaxprocs, request_queue_limit, routes, kubernetes]
 aliases: ["nats: timeout", "Future cancelled, response not registered in time", "request timeout", "no responders available for request", "publish timeout"]
-sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply]
+sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply, s-nats-server-client-lifecycle-observed, s-nats-go-connection, s-docs-resilient-clients-reconnection-and-events]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # "nats: timeout"
@@ -243,6 +243,32 @@ on "…"` (`req_command.go:143–150`, source: [[s-nats-cli-request-reply-source
 check that scripts `nats request` has to read the output; `$?` cannot tell a timeout from a reply.
 
 
+## A leadership move gives you *no responders*, not a timeout — for one request
+
+When a stream's or consumer's leader moves, the `$JS.API` request that lands in the window gets
+**`nats: no responders available for request`**, because for a moment nobody is subscribed to answer
+it. Measured on 2.14.6: a pull consumer fetching one message at a time across its consumer leader's
+node being stopped lost **exactly one fetch of 120**, in **17 ms**, and the next one succeeded
+(source: [[s-nats-server-client-lifecycle-observed]], run E8).
+
+So the triage at the top of this page holds under leader movement too, and it points the right way:
+*no responders* arriving once and clearing itself is a leadership move, while *no responders* that
+persists is the permission, account or domain problem this page's causes describe.
+
+**The client's own timers can look like a timeout too.** Two are worth knowing when a report says
+"it hung":
+
+- **A wedged link takes six minutes to notice.** nats.go's keepalive is `pout > MaxPingsOut`, so the
+  **third** unanswered ping of a two-minute interval; measured at exactly six minutes against a
+  frozen server (source: [[s-nats-go-connection]], [[s-nats-server-client-lifecycle-observed]]). Until
+  then, requests on that connection simply time out on their own deadlines with the socket still open.
+- **The `nats` CLI never gives up.** It sets `MaxReconnects(-1)`, so a CLI command that appears to
+  hang during an outage is reconnecting, not failing. An application on the library defaults would
+  exhaust 60 attempts per server and close.
+
+Both are on [[client-connection-lifecycle]], with the per-client values in [[client-defaults]].
+
+
 ## Related
 
 [[stream-has-high-message-lag]] · [[slow-consumer-detected]] · [[build-a-3-node-cluster]] ·
@@ -259,4 +285,4 @@ check that scripts `nats request` has to read the output; `$?` cannot tell a tim
 - [[s-gh-7190-asymmetric-cluster]] — the same single-DNS-name route defect, independently reported.
 - [[s-docs-monitoring-endpoints]] — `slow_consumers` and `/connz?sort=pending`.
 - [[s-docs-forming-a-cluster]] — what the `Routes` column counts. ·
-[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]]
+[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-connection]] · [[s-docs-resilient-clients-reconnection-and-events]]

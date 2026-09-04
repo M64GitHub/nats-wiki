@@ -19,7 +19,7 @@ those are suggestions — the point of the report is the finding, not the patch.
 |---|---|
 | `★` | a **confirmed factual error with real impact** — following the documentation produces a broken result, **silently**. If you triage on one thing, triage on this |
 | `where` | the doc path. For docs.nats.io prefix `https://docs.nats.io/` |
-| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Four rows (#7, #30, #31, #37) are ADR errors rather than docs errors, two (#40, #89) are **CLI** findings, and one (#39) is a **published blog post** rather than a repository at all |
+| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Five rows (#7, #30, #31, #37, #90) are ADR errors rather than docs errors, three (#40, #89, #91) are **CLI** findings, and one (#39) is a **published blog post** rather than a repository at all |
 | `kind` | `wrong-value` and `missing` are defects; `enhancement` is correct-but-unhelpful |
 | `severity` | our estimate of consequence, not of effort |
 | **`upstream`** | where this was filed and what became of it. `not filed` means we have not sent it yet |
@@ -148,6 +148,12 @@ row.
 | 87 | `concepts/queue-groups.md:1528` "Use queue groups for operational work that needs to happen **exactly once**" against the same page's `:2131` "Core queue groups never redeliver — a message sent to a worker that crashes mid-processing is lost … Duplicates come only from publisher retries": a queue group is at-most-once, as the deep dive says (`learn/core-nats/queue-groups.md:230`) | `concepts/queue-groups.md` (lines 1528, 2131) | nats-docs | enhancement | low | not filed | wiki states at-most-once on `concepts/queue-groups` |
 | 88 | `learn/core-nats/queue-groups.md:218` "On a single server the selection is uniform-random across the available members; a cluster adds a locality preference, covered below" — the section below (`:259–263`) is about several clusters; inside one cluster there is no preference: a peer's members are expanded to their weight in the match list (`sublist.go:741–747`) and picked like local ones. Run on the three-node lab, 2.14.6: one member on the publisher's server and three on a peer received 90 / 97 / 106 / 107 of 400 publishes. The preferences the server does have are across a leafnode (a leaf member is only a fallback, `client.go:5547–5552`) and across a gateway (an exclusion list) | `learn/core-nats/queue-groups.md` (line 218) | nats-docs | enhancement | low | not filed | wiki states the cluster, leafnode and gateway rules with the runs on `concepts/queue-groups` |
 | 89 | `nats request` (natscli v0.4.0) exits 0 and prints nothing after `Sending request on "…"` when the request times out, exits 0 with `No responders are available` on a 503, and exits 0 on a reply — a script cannot tell a timeout from a served request by `$?` (`cli/req_command.go:143–150, 205`; run on 2.14.6). Second, `--replies N` ends on any reply with an empty body, `--wait-for-empty` or not (`:179–181`), and `--wait-for-empty` only sets `--replies` to 32767 (`:222–224`); the `--help` text describes neither. The docs' `learn/core-nats/request-reply.md:561` ("The CLI prints the line and exits cleanly") is right for no responders and silent on the timeout | `nats request` in natscli v0.4.0 (`cli/req_command.go`); `learn/core-nats/request-reply.md` (line 561), `scatter-gather.md` (line 621) | natscli | enhancement | low | not filed | wiki states the exit codes and the empty-reply rule on `concepts/request-reply` and `entities/nats-cli` |
+| 90 | ADR-40's stale-connection rule is off by one ping. L178 "Missing two consecutive PONGs from the Server", L224 "If two consecutive PONGs are missed, connection is marked as lost triggering reconnect attempt" and L337 "If two (configurable) consecutive `PONGs are missed" — with the ADR's own 2-minute default that reads as **4 minutes**. nats.go does `nc.pout++` and *then* `if nc.pout > nc.Opts.MaxPingsOut` with `DefaultMaxPingOut = 2` (`nats.go:5899–5921`, `:61` at v1.53.1), so the **third** interval closes it, and `learn/resilient-clients/reconnection.md:325` says so ("detection waits for the third unanswered ping, up to about six minutes"). Measured on 2.14.6 against a `SIGSTOP`ped server: **exactly 6 minutes**. The server enforces the same shape (`ping_interval: "5s"`, `ping_max: 2` → `-ERR 'Stale Connection'` at t=12.19 s) | `raw/adr/ADR-40.md` (lines 178, 224, 337) | ADR repo | wrong-value | medium | not filed | wiki carries the run; `client-connection-lifecycle`, `upgrade-a-cluster` and `s-adr-40-nats-connection` corrected 2026-09-04 |
+| 91 | The `nats` CLI's reconnect backoff never uses the first entry of its own table. `internal/util/backoff.go:31–38` starts at **500 ms**, and `learn/resilient-clients/reconnection.md:47` repeats it ("a delay callback whose wait starts at 500 ms"); but nats.go increments the sweep counter **before** calling the delay callback — `wlf++; st = crd(wlf)` (`nats.go:3424–3426`) — and `Duration(n)` indexes `Millis[n]`, so the first call is `Duration(1)` = 750 ms. Measured on 2.14.6: the printed delays were 640 ms, 800 ms, **2.15 s**, 1.979 s, 3.424 s, 1.873 s, and 2.15 s can only come from `Duration(3)` = 1500 ms jittered into [750, 2250] | natscli v0.4.0 `internal/util/backoff.go` (lines 31–48), `cli/util.go` (lines 248–256); `learn/resilient-clients/reconnection.md` (line 47) | natscli | enhancement | low | not filed | wiki states the measured first step on `reference/client-defaults` and `entities/nats-cli` |
+| 92 | `learn/resilient-clients/slow-consumers.md:100` "In Go a connection with no async error callback discards these reports, and dropped messages become invisible", repeated as `where-next.md:99` "a nil one drops every overflow message silently". nats.go **installs one**: `if nc.Opts.AsyncErrorCB == nil { nc.Opts.AsyncErrorCB = defaultErrHandler }` (`nats.go:1979–1981` at v1.53.1), and `defaultErrHandler` writes `<err> on connection [<cid>] for subscription on "<subject>"` to **`os.Stderr`** (`:2006–2028`). The advice (always set one) is right; the reason given for it is not — and the client that really is silent here is the `nats` CLI, which overrides the handler with a trace-gated one | `learn/resilient-clients/slow-consumers.md` (line 100), `where-next.md` (line 99) | nats-docs | wrong-value | medium | not filed | wiki states the stderr fallback on `entities/nats-go` and `reference/client-defaults` |
+| 93 | Two pages give the Go auth-error abort different scopes. `connection-events.md:244` "receiving the same authentication error twice aborts reconnecting"; `tls-and-auth.md:206` "nats.go closes the connection when **the same server** returns the same auth error twice in a row". The source keys on the *current server*: `if nc.current.lastErr == err && !nc.Opts.IgnoreAuthErrorAbort { nc.ar = true }` (`nats.go:4085–4089` at v1.53.1). The first page's wording is materially wrong for a pool: two auth errors from two different servers do not abort | `learn/resilient-clients/connection-events.md` (line 244) | nats-docs | wrong-value | low | not filed | wiki states the per-server rule on `client-connection-lifecycle` and `s-nats-go-connection` |
+| 94 | Nothing in the chapter says that a drain issued while the connection is down **closes it instead**. nats.go's `Drain()` returns `ErrConnectionReconnecting` after calling `nc.Close()` when the status is CONNECTING or RECONNECTING (`nats.go:6310–6314`), and `drainConnection` repeats the check (`:6211–6215`). The consequence is the one the same chapter warns about elsewhere: `Close()` "drops the reconnect buffer" (`drain-and-shutdown.md:12`), so a SIGTERM that lands during an outage discards the buffered publishes a drain was expected to flush | `learn/resilient-clients/drain-and-shutdown.md` (the *Drain finishes in-flight work* and *drain timeout* sections) | nats-docs | missing | medium | not filed | wiki states it on `client-connection-lifecycle` and `entities/nats-go` |
+| 95 | `learn/resilient-clients/drain-and-shutdown.md:146–168` uses the CLI's global `--timeout 30s` to stand in for a drain timeout and describes it as "a generous operation timeout so a slow handshake is not cut off mid-flush"; `nats --help` at 0.4.0 calls the same flag "Time to wait on responses from NATS" with a default of `5s`. The flag bounds waiting for a reply, not a handshake and not a flush, and the CLI has no drain-timeout flag at all — which the page does say two paragraphs earlier | `learn/resilient-clients/drain-and-shutdown.md` (lines 146, 168); `nats --help` at 0.4.0 | nats-docs | enhancement | low | not filed | wiki notes the CLI has no drain-timeout flag on `s-docs-resilient-clients-drain-and-shutdown` |
 | 84 | `learn/core-nats/subject-mapping.md:646` "list the source subject itself as a destination, which tells the server your weights are final and stops it topping them up. This works because the source here is a literal subject" and `:772` "This only works for a literal source like `orders.created`" — the restriction is not in the server. `AddWeightedMappings` skips the auto-added remainder whenever the source string is among the destinations, wildcard or not (`accounts.go:844–862`); run on 2.14.6, `"orders.loss.>": [ { destination: "orders.loss.>", weight: 50 } ]` passed `nats-server -t` and dropped 102 of 200 publishes. The server's own example config uses exactly that shape as "A chaos testing trick that introduces 50% artificial message loss" (quoted in gh#5172). `reference/config/mappings/weight.md` mentions "artifical message loss" without saying how it is configured | `learn/core-nats/subject-mapping.md` (lines 646, 772); `reference/config/mappings/weight.md` | nats-docs | wrong-value | low | not filed | wiki states the rule with the literal and the wildcard run on `concepts/subject-transforms` |
 
 ---
@@ -3519,6 +3525,12 @@ which case it is dropped. The `weight` reference page could carry the one-line e
 | 88 | `wiki/concepts/queue-groups.md` — *In a cluster*, *Across a leafnode*, *Across a gateway*; `wiki/concepts/gateway.md` — *Inside one cluster there is no affinity at all* |
 | 89 | `wiki/concepts/request-reply.md` — *The three outcomes*, the gather table; `wiki/entities/nats-cli.md` — *`nats request` and `nats reply`, as run on 0.4.0*; `wiki/summaries/s-nats-cli-request-reply-source.md` |
 | 84 | `wiki/concepts/subject-transforms.md` — *Account-level `mappings`*; `wiki/summaries/s-nats-server-core-delivery-observed.md` (F5, F8); `wiki/summaries/s-gh-5172-mapping-in-config-or-stream.md` |
+| 90 | `wiki/concepts/client-connection-lifecycle.md` — *The keepalive*; `wiki/operations/upgrade-a-cluster.md` — *Verify the drain*; `wiki/summaries/s-adr-40-nats-connection.md` — *What the ADR gets wrong*; `wiki/summaries/s-nats-server-client-lifecycle-observed.md` (D1, D3) |
+| 91 | `wiki/reference/client-defaults.md` — *`nats` CLI 0.4.0*; `wiki/entities/nats-cli.md` — *What bites you — the connection the CLI opens is not the library's*; `wiki/summaries/s-nats-cli-reconnect.md` |
+| 92 | `wiki/entities/nats-go.md` — *What bites you — the connection*; `wiki/reference/client-defaults.md` (the `AsyncErrorCB` row); `wiki/summaries/s-nats-go-connection.md` |
+| 93 | `wiki/concepts/client-connection-lifecycle.md` — *Events, and the readiness signal*; `wiki/summaries/s-nats-go-connection.md` |
+| 94 | `wiki/concepts/client-connection-lifecycle.md` — *Draining, and closing*; `wiki/entities/nats-go.md` — *What bites you — the connection* |
+| 95 | `wiki/summaries/s-docs-resilient-clients-drain-and-shutdown.md` — *The drain timeout* |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
 
@@ -3744,3 +3756,241 @@ success by exit status, and a responder whose legitimate answer is empty cuts ev
 **Suggested fix** (natscli): print `Request timed out` on the timeout path and exit non-zero for a timeout
 and for no responders (as `nats sub --wait` and `nats server check` do); document the empty-reply rule in
 `--replies`' help text.
+
+## 90 · ADR-40's stale-connection rule is one ping short
+
+**The ADR** (`raw/adr/ADR-40.md`, *Client Connection*, status *Implemented*) says it three times:
+
+```
+178:1. Missing two consecutive PONGs from the Server (number of missing PONGs can be
+179:   configured).
+…
+224:server, expecting PONG. If two consecutive PONGs are missed, connection is
+225:marked as lost triggering reconnect attempt.
+…
+337:If two (configurable) consecutive `PONGs are missed, the client should treat the
+338:connection as broken, and it should start reconnect attempts.
+```
+
+with `**default**: 2 minutes` for the interval (L220). Read literally that is **four minutes** to
+detect a wedged link, and that is how this wiki read it until 2026-09-04.
+
+**The client**, `nats.go` at v1.53.1:
+
+```go
+  5899	func (nc *Conn) processPingTimer() {
+  5906		// Check for violation
+  5907		nc.pout++
+  5908		if nc.pout > nc.Opts.MaxPingsOut {
+  5909			nc.mu.Unlock()
+  5910			if shouldClose := nc.processOpErr(ErrStaleConnection, false); shouldClose {
+```
+
+with `DefaultMaxPingOut = 2` (`:61`). The counter is incremented *before* the comparison and the
+test is strictly greater, so the timer fires three times before the connection is declared stale:
+**interval × (MaxPingsOut + 1) = 6 minutes**.
+
+**The sibling documentation agrees with the source, not with the ADR.**
+`learn/resilient-clients/reconnection.md:325`: "The client declares the link stale once the
+outstanding pings exceed `MaxPingsOut`, so with the defaults — a two-minute ping interval (one
+minute in Rust) and two allowed outstanding pings — detection waits for the **third** unanswered
+ping, up to about **six minutes** (three in Rust)."
+
+**Run** (2026-09-04, `raw/nats-server-src/client-lifecycle-observed-v2.14.6.md`, D3): a standalone
+`nats-server v2.14.6` on default settings, a `nats sub --trace` connected at 02:02:25, the server
+`SIGSTOP`ped at 02:02:28. The client printed
+
+```
+02:08:25 >>> Disconnected due to: nats: stale connection, will attempt reconnect
+```
+
+— **exactly six minutes** after the connect. The server enforces the same shape in the other
+direction (D1, with `ping_interval: "5s"` and `ping_max: 2`): `PING` at t=2.186 and t=7.187, then
+`-ERR 'Stale Connection'` at **t=12.189**, where the third `PING` would have gone — and **nothing in
+the server log** at default level.
+
+**Suggested fix**: L178 → "Missing `max_pings_out` consecutive PONGs, so the connection is declared
+lost on the *next* ping interval after that — with the defaults, the third"; L224 and L337 likewise,
+and state the resulting window (2 m × 3 = 6 m) since that number is what an operator sizes a rolling
+upgrade against.
+
+## 91 · The CLI's reconnect backoff never reaches the first entry of its own table
+
+**natscli v0.4.0** (`raw/nats-cli/reconnect-0.4.0.md`):
+
+```go
+   248		nats.CustomReconnectDelay(func(attempts int) time.Duration {
+   249			d := iu.DefaultBackoff.Duration(attempts)
+```
+
+```go
+    31	var DefaultBackoff = BackoffPolicy{
+    32		Millis: []int{
+    33			500, 750, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000,
+…
+    43	func (b BackoffPolicy) Duration(n int) time.Duration {
+…
+    48		return time.Duration(jitter(b.Millis[n])) * time.Millisecond
+```
+
+**The client**, `nats.go` at v1.53.1, increments the sweep counter before calling the callback:
+
+```go
+  3423			i = 0
+  3424			var st time.Duration
+  3425			if crd != nil {
+  3426				wlf++
+  3427				st = crd(wlf)
+```
+
+so the first call is `Duration(1)` = 750 ms and `Millis[0]` = 500 ms is unreachable.
+
+**Run** (2026-09-04, D3 transcript): the six delays printed under `--trace` were
+**640 ms, 800 ms, 2.15 s, 1.979 s, 3.424 s, 1.873 s**. `jitter()` returns `[0.5×, 1.5×)` of the
+step, so 2.15 s excludes `Duration(2)` = 1000 ms (max 1500 ms) and fits `Duration(3)` = 1500 ms
+(750–2250 ms); 3.424 s excludes `Duration(4)` = 2000 ms (max 3000 ms) and fits `Duration(5)` =
+2500 ms. The calls are therefore 1, 2, 3, 4, 5, 6 — not 0-based.
+
+The practical effect is one skipped step, not a defect an operator would notice; it is recorded
+because the documentation states the 500 ms figure as the CLI's first wait
+(`learn/resilient-clients/reconnection.md:47`) and this wiki quotes such numbers.
+
+**Suggested fix** (natscli): call `iu.DefaultBackoff.Duration(attempts - 1)`, or document that the
+callback is 1-based. The docs sentence then becomes true as written.
+
+## 92 · nats.go does not discard slow-consumer reports when you set no callback
+
+**The docs**, `learn/resilient-clients/slow-consumers.md:100`:
+
+> "In Go a connection with no async error callback **discards these reports, and dropped messages
+> become invisible**; Rust, JavaScript, and C# behave the same way unless you wire up their event
+> callback, status iterator, or logger."
+
+and `where-next.md:99`: "Always set the async-error callback and log the slow-consumer error loudly;
+**a nil one drops every overflow message silently**."
+
+**The client**, `nats.go` at v1.53.1, installs a handler when the caller sets none:
+
+```go
+  1978		// Set a default error handler that will print to stderr.
+  1979		if nc.Opts.AsyncErrorCB == nil {
+  1980			nc.Opts.AsyncErrorCB = defaultErrHandler
+  1981		}
+```
+
+```go
+  2006	func defaultErrHandler(nc *Conn, sub *Subscription, err error) {
+…
+  2024			errStr = fmt.Sprintf("%s on connection [%d] for subscription on %q\n", err.Error(), cid, subject)
+  2025		} else {
+  2026			errStr = fmt.Sprintf("%s on connection [%d]\n", err.Error(), cid)
+  2027		}
+  2028		os.Stderr.WriteString(errStr)
+```
+
+So in Go the report is **written to stderr**, not discarded. The messages themselves are of course
+still dropped — that part is right — but they are not invisible, and the advice's stated reason is
+wrong. (The `AsyncErrorCB` field can only be nil if a caller assigns nil *after* `Connect`; the
+option constructor path always ends at `defaultErrHandler`.)
+
+Worth noting for anyone reproducing this: the client that really is silent here is the **`nats`
+CLI**, which replaces the default handler with a trace-gated one — see #91's source file and
+`wiki/entities/nats-cli.md`.
+
+**Suggested fix**: "In Go, a connection with no async error callback still reports these — nats.go
+installs a default handler that writes them to stderr — which is enough to see a drop but not to
+alert on it; set your own. Rust, JavaScript and C# report nothing unless you wire up their event
+callback, status iterator, or logger."
+
+## 93 · "the same authentication error twice" — twice from *the same server*
+
+Two pages of one chapter give the same rule different scopes.
+
+**`learn/resilient-clients/connection-events.md:244`**:
+
+> "in Go, for example, receiving the same authentication error twice aborts reconnecting regardless
+> of the reconnect policy, unless you opt out with `IgnoreAuthErrorAbort`."
+
+**`learn/resilient-clients/tls-and-auth.md:206`**:
+
+> "nats.go closes the connection when **the same server** returns the same auth error twice in a
+> row; the `IgnoreAuthErrorAbort()` option opts out."
+
+**The client**, `nats.go` at v1.53.1, `processAuthError`:
+
+```go
+  4084		// We should give up if we tried twice on this server and got the
+  4085		// same error. This behavior can be modified using IgnoreAuthErrorAbort.
+  4086		if nc.current.lastErr == err && !nc.Opts.IgnoreAuthErrorAbort {
+  4087			nc.ar = true
+  4088		} else {
+  4089			nc.current.lastErr = err
+  4090		}
+```
+
+`nc.current` is the server being dialled, so the state is per server and is reset by dialling a
+different one. With a three-server pool, three different servers each returning one auth error do
+**not** abort; the same server returning it twice in a row does. The `tls-and-auth.md` sentence is
+exact; the `connection-events.md` one is not, and an operator reading only the events page will
+mis-predict when a credential problem ends in CLOSED.
+
+**Suggested fix**: `connection-events.md:244` → "receiving the same authentication error twice in a
+row **from the same server** aborts reconnecting …".
+
+## 94 · A drain issued while the connection is down closes it, and no page says so
+
+The chapter is careful about what `Close()` costs — "it stops delivering buffered inbound messages
+to your handlers and **drops the reconnect buffer**" (`drain-and-shutdown.md:12`) — and it teaches
+drain as the alternative. It never says that during an outage the two are the same call.
+
+**The client**, `nats.go` at v1.53.1:
+
+```go
+  6307	func (nc *Conn) Drain() error {
+…
+  6310		if nc.isConnecting() || nc.isReconnecting() {
+  6311			nc.mu.Unlock()
+  6312			nc.Close()
+  6313			return ErrConnectionReconnecting
+  6314		}
+```
+
+and `drainConnection` guards it again (`:6211–6215`, with the comment "Move to closed state").
+
+The operational shape is ordinary: a rolling deploy sends SIGTERM to a pod while its server is
+already gone, the shutdown handler calls `Drain()`, and the buffered publishes the reconnect buffer
+was holding are discarded rather than flushed on reconnect. The connection also never reaches
+DRAINING_SUBS, so a shutdown that waits on the drain's own phases waits for something that will not
+happen — it must wait on CLOSED, which the chapter does say.
+
+**Suggested fix**: in *Drain finishes in-flight work, then closes*, add: "Drain only applies to a
+connected client. If the connection is CONNECTING or RECONNECTING when you call it, the client
+closes instead and returns a reconnecting error (`ErrConnectionReconnecting` in nats.go) — which
+means the reconnect buffer is dropped, not flushed. A shutdown handler should therefore treat a
+drain during an outage as a close."
+
+## 95 · The CLI's `--timeout` is not a handshake or flush bound
+
+`learn/resilient-clients/drain-and-shutdown.md` illustrates the drain timeout with the CLI's global
+flag:
+
+```
+146:# --timeout bounds how long a single operation waits. The point this
+…
+152:# This publishes the canonical order event with a generous operation
+153:# timeout so a slow handshake is not cut off mid-flush.
+…
+168:  --timeout 30s
+```
+
+`nats --help` at 0.4.0 describes the same flag as **"Time to wait on responses from NATS"**, default
+**`5s`**. It bounds waiting for a reply — it is not a connect timeout, and a `nats pub` of a core
+message waits for no response at all, so the flag does nothing in the example shown.
+
+The page is honest two paragraphs earlier ("the CLI has no drain-timeout flag"), which is what makes
+the comment avoidable: the example demonstrates a flag that has no effect on the thing being taught.
+
+**Suggested fix**: keep the example but change the comment to say the CLI has no drain timeout and
+that `--timeout` is shown only because it is the nearest thing the CLI has — or drop the flag from
+the snippet and leave the C example to carry `natsConnection_DrainTimeout`.
+

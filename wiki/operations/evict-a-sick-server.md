@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [evict, sick-node, hardware-failure, kick, lame-duck, peer-remove, slow-consumer, system-requests, kubernetes]
 aliases: [remove a server from a cluster, kick clients off a server, evict a node, sick node, hardware failure]
-sources: [s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session, s-nats-server-jetstream-cluster, s-nats-server-lame-duck, s-docs-kubernetes, s-adr-61-meta-quorum-rescue, s-docs-scaling-and-peers, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-system-subjects, s-nats-server-system-subjects-observed]
+sources: [s-gh-6892-evict-a-sick-node, s-nats-server-kick-ldm-mqtt-session, s-nats-server-jetstream-cluster, s-nats-server-lame-duck, s-docs-kubernetes, s-adr-61-meta-quorum-rescue, s-docs-scaling-and-peers, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-resilient-clients-reconnection-and-events]
 created: 2026-09-01
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Evict a sick-but-not-dead server
@@ -203,6 +203,21 @@ runbook this page wants and 2.14 does not have; verified at the preview tag (sou
 [[s-relnotes-2.15-preview]]).
 
 
+## Why kicking the clients is a step at all
+
+A server that is up but not answering is the worst case for a client, because nothing about it looks
+like a disconnect. The socket is open, so the client keeps writing into it and only the keepalive
+finds the problem: **the third unanswered ping of a two-minute interval — about six minutes** (source:
+[[s-docs-resilient-clients-reconnection-and-events]]; measured at exactly six minutes on 2.14.6 in
+[[s-nats-server-client-lifecycle-observed]]). Until then the client is not reconnecting, is not
+reporting a fault, and is still "ready" to anything probing its connection state.
+
+That is the whole reason this runbook kicks connections by `cid` rather than waiting: the alternative
+is up to six minutes of clients writing into a server that will not answer. `nats server request
+connz` on the sick server tells you which they are, and [[client-connection-lifecycle]] has what each
+one does the moment it is cut — including the reconnect buffer it will flush on arrival at the peer.
+
+
 ## The request forms, in one place
 
 `KICK`, `LDM`, `RELOAD`, the fifteen `$SYS.REQ.SERVER.PING.<Z>` / `<id>.<Z>` monitoring requests
@@ -223,4 +238,4 @@ lame-duck drain with no clients on 2.14.6) — are tabled on [[system-subjects]]
 
 [[s-gh-6892-evict-a-sick-node]] · [[s-nats-server-kick-ldm-mqtt-session]] ·
 [[s-nats-server-jetstream-cluster]] · [[s-nats-server-lame-duck]] · [[s-docs-kubernetes]] ·
-[[s-adr-61-meta-quorum-rescue]] · [[s-docs-scaling-and-peers]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]]
+[[s-adr-61-meta-quorum-rescue]] · [[s-docs-scaling-and-peers]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-resilient-clients-reconnection-and-events]]
