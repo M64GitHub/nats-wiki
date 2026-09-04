@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6, nats.go v1.53.1, nats CLI 0.4.0, ADR-32 re
 verified-on: 2026-09-04
 tags: [services, micro, request-reply, queue-group, timeout, no-responders, scatter-gather, "$SRV", idempotency, drain, permissions]
 aliases: [service layer, services on core NATS, request-reply at scale, microservices on NATS, scatter-gather, "designing a service layer", RPC on NATS]
-sources: [s-adr-32-service-api, s-docs-services-framework, s-docs-services-discovery-and-stats, s-docs-services-scaling, s-nats-server-services-observed, s-gh-4984-micro-with-jetstream, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-nats-server-request-reply-observed]
+sources: [s-adr-32-service-api, s-docs-services-framework, s-docs-services-discovery-and-stats, s-docs-services-scaling, s-nats-server-services-observed, s-gh-4984-micro-with-jetstream, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-nats-server-request-reply-observed, s-nats-server-core-or-jetstream-observed]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -214,6 +214,25 @@ remote instance sits idle. See [[queue-groups]] and [[leafnode]].
   reaches whoever is connected at that instant and nothing else; an interest-retention stream reaches
   whoever is registered. See [[retention-policies]].
 
+## Keep a stream off the service's subjects
+
+A JetStream stream that captures a subject this pattern uses for request/reply **answers those
+requests itself**, with its `PubAck`, and gets there first. Observed on 2.14.6: with a responder on
+`svc.echo`, `nats request svc.echo ping` returned `pong` at 407 µs; after
+`nats stream add SVC --subjects 'svc.>'`, the same request returned `{"stream":"SVC","seq":1}` at
+277 µs and the responder's answer was discarded (source:
+[[s-nats-server-core-or-jetstream-observed]]).
+
+The server allows this without a word — it only refuses an acking stream on `>`, on the JetStream API
+subjects and on `$SYS.>`. So the rule is yours to keep: an event stream lists the event subjects
+(`orders.created`, `orders.shipped`), never the service tree (`orders.inventory.check`), never
+`$SRV.>` and never `_INBOX.>`. Check it with `nats stream subjects <name>`, and treat a service
+answering `{"stream":…}` as "someone widened a stream", not as a client bug.
+
+Where a service's work does need durability, the answer is a stream *behind* the endpoint, not over
+it — [[worker-pool]] and [[core-or-jetstream]].
+
+
 ## Verify it
 
 ```
@@ -237,4 +256,4 @@ misspelled endpoint comes back as no-responders rather than a timeout.
 [[s-adr-32-service-api]] · [[s-docs-services-framework]] · [[s-docs-services-discovery-and-stats]] ·
 [[s-docs-services-scaling]] · [[s-nats-server-services-observed]] ·
 [[s-gh-4984-micro-with-jetstream]] · [[s-docs-core-nats-request-reply]] ·
-[[s-docs-core-nats-queue-groups]] · [[s-nats-server-request-reply-observed]]
+[[s-docs-core-nats-queue-groups]] · [[s-nats-server-request-reply-observed]] · [[s-nats-server-core-or-jetstream-observed]]

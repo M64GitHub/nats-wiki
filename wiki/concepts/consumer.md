@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [consumer, pull, durable, max_ack_pending, deliver_policy]
 aliases: [consumers, ConsumerConfig, durable, pull consumer]
-sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-cli-help-0.4.0, s-prometheus-nats-exporter-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-3857-consumer-pending-series, s-exporter-issue-218-num-pending-differs-per-node, s-nats-server-client-lifecycle-observed]
+sources: [s-docs-delivery-and-acknowledgment, s-docs-pull-consumers, s-docs-policies, s-docs-consumer-config, s-docs-acknowledgment, s-docs-surviving-node-loss, s-relnotes-2.14.0, s-docs-upgrade-to-2.14, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-adr-60-reliable-sourcing, s-nats-server-filestore-layout, s-docs-retention-policies, s-docs-reading-back, s-docs-filtering, s-docs-monitoring-jetstream-health, s-adr-17-ordered-consumer, s-adr-42-priority-groups, s-adr-8-key-value-store, s-docs-worker-pool, s-gh-5044-restrict-durable-consumers, s-gh-6605-which-consumer-is-slow, s-gh-6628-ackwait-vs-dupe-window, s-gh-6350-exponential-backoff, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-gh-5631-nak-not-immediate, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-8417-kv-mirror-file-vs-memory, s-nats-server-mirror, s-nats-server-redelivery-observed, s-so-78603662-acked-but-redelivered, s-issue-6921-last-per-subject-acks, s-relnotes-2.11.5, s-relnotes-2.11.2, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-cli-help-0.4.0, s-prometheus-nats-exporter-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-3857-consumer-pending-series, s-exporter-issue-218-num-pending-differs-per-node, s-nats-server-client-lifecycle-observed, s-docs-concepts-jetstream, s-docs-jetstream-where-next]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -644,6 +644,25 @@ The connection's side of the same event — reconnect, drain, what the client pr
 [[client-connection-lifecycle]].
 
 
+## Why a consumer, rather than several subscribers
+
+The primer's answer is the one worth carrying into a design review: a consumer is "a server-side,
+stateful view of a stream — the server tracks how far a client has progressed, so applications don't
+have to", and several of them over one stream are **independent cursors over a single stored copy** —
+"one consumer catching up never moves another's position. The stream holds a single shared copy of
+every message and serves each consumer from where it left off" (source: [[s-docs-concepts-jetstream]]).
+
+In core NATS, "several readers" means several *live* subscribers, each getting its own copy at the
+instant of publish and nothing afterwards. In JetStream it means several positions over one copy, each
+free to be hours behind. A consumer can start "from the beginning of the stream, from the latest
+message, from a specific sequence number, or from a specific time" — [[core-or-jetstream]] is where
+that difference decides the flow.
+
+The chapter's own closing states the division of labour in three sentences: a stream is the log, a
+consumer is the position marker, an ack is the reader saying a message is handled — and "a stored
+message has not yet been processed" (source: [[s-docs-jetstream-where-next]]).
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[retention-policies]] · [[replicas]] · [[raft-in-nats]] ·
@@ -665,4 +684,4 @@ The connection's side of the same event — reconnect, drain, what the client pr
 [[s-gh-4972-nak-with-delay-blocks]]
 
 Run directly, not read: `raw/nats-server-src/priority-groups-observed-v2.14.6.md` — nats-server
-v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-3857-consumer-pending-series]] · [[s-exporter-issue-218-num-pending-differs-per-node]] · [[s-nats-server-client-lifecycle-observed]]
+v2.14.6 with nats CLI 0.4.0, 2026-09-01, behind `inbox/docs-issues.md` #37. · [[s-nats-server-nak-backoff-observed]] · [[s-gh-5631-nak-not-immediate]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-8417-kv-mirror-file-vs-memory]] · [[s-nats-server-mirror]] · [[s-nats-server-redelivery-observed]] · [[s-so-78603662-acked-but-redelivered]] · [[s-issue-6921-last-per-subject-acks]] · [[s-relnotes-2.11.5]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-3857-consumer-pending-series]] · [[s-exporter-issue-218-num-pending-differs-per-node]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-concepts-jetstream]] · [[s-docs-jetstream-where-next]]

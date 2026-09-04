@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [at-most-once, interest-graph, ordering, fire-and-forget, echo, NoEcho, max_payload, headers, no_header_support, wire-tap, subsz, nats-trace, reconnect, lame-duck, slow-consumer]
 aliases: [core NATS, at-most-once delivery, interest graph, fire and forget, core NATS ordering, message ordering in core NATS, echo, NoEcho, "Maximum Payload Violation", "nats: maximum payload exceeded", debugging delivery, why did my message not arrive]
-sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting, s-docs-protocol-client, s-nats-server-wire-protocol, s-gh-4984-micro-with-jetstream]
+sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting, s-docs-protocol-client, s-nats-server-wire-protocol, s-gh-4984-micro-with-jetstream, s-docs-concepts-jetstream, s-docs-core-nats-chapter, s-gh-2961-js-and-core-one-cluster, s-adr-22-publish-retries, s-nats-server-core-or-jetstream-observed]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -233,6 +233,42 @@ anything that must survive a handler dying needs a [[stream]] and a [[consumer]]
 setting. [[core-or-jetstream]] is the decision page and [[worker-pool]] the durable form.
 
 
+## Where this guarantee ends, and what is on the other side
+
+The docs put the boundary as a property of the message, not of the deployment: at-most-once is
+"exactly right when each message is superseded by the next one, such as a live price, a current
+temperature, or a cache invalidation", and "when you need messages to wait for a subscriber, survive a
+restart, or be replayed later, you add a stream" (source: [[s-docs-core-nats-chapter]]). What the
+stream adds is time: "core NATS already decouples publisher and subscriber from each other …
+JetStream extends that decoupling to time - the two no longer need to be online at the same moment"
+(source: [[s-docs-concepts-jetstream]]).
+
+**On the wire the two are one frame apart.** A raw client subscribed to `orders.>` while a core
+publish and a JetStream publish of the same payload went past:
+
+```
+<< MSG orders.created 1 4 | payload: core
+<< MSG orders.created 1 _INBOX.1txK6pvF28KZIqM5DTYvDe.jqAH1uoV 4 | payload: jets
+```
+
+A JetStream publish **is** a core publish with a reply subject — which is also how
+[[s-adr-22-publish-retries]] describes it ("a synchronous `Publish` request … internally uses a
+`Request`") and how the `nats` CLI implements it. Everything else follows: the `PubAck` is a reply, it
+costs a round trip, and its absence is the 503 no-responders of [[nats-timeout]]. Measured on 2.14.6,
+200,000 messages of 128 B on one server: 2,882,347 core publishes per second against 30,876
+synchronous JetStream publishes — and a core publish into a subject a stream captures is not slowed at
+all, 2,885,763/s, because it still waits for nothing (source:
+[[s-nats-server-core-or-jetstream-observed]]).
+
+**Both live in one cluster.** Asked in public whether the two need separate clusters, a maintainer's
+whole answer was "you can use both at the same time with the same cluster", and on the cost: "enabling
+jetstream will increase memory use on the server … But core nats performance will remain the same
+essentially" (source: [[s-gh-2961-js-and-core-one-cluster]]).
+
+[[core-or-jetstream]] is the decision, per subject, with the mixed design and the two ways it goes
+wrong.
+
+
 ## Related
 
 [[subjects-and-wildcards]] · [[publishing]] · [[nats-timeout]] · [[slow-consumer-detected]] ·
@@ -257,4 +293,4 @@ setting. [[core-or-jetstream]] is the decision page and [[worker-pool]] the dura
 - [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] — the request/reply and queue-group
   pages of the chapter, for the two pointer sentences above.
 - [[s-gh-2760-one-connection-or-two]] — one connection or two, the maintainers' rule.
-- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-gh-4984-micro-with-jetstream]]
+- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-gh-4984-micro-with-jetstream]] · [[s-docs-concepts-jetstream]] · [[s-docs-core-nats-chapter]] · [[s-gh-2961-js-and-core-one-cluster]] · [[s-adr-22-publish-retries]] · [[s-nats-server-core-or-jetstream-observed]]

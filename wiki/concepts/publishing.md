@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [PubAck, Nats-Msg-Id, duplicate, duplicate_window, async-publish, atomic-batch, fast-ingest, AllowAtomicPublish, AllowBatchPublish, Nats-Batch-Id, Nats-Expected-Last-Subject-Sequence, exactly-once, persist_mode]
 aliases: [publish, PubAck, pub ack, exactly once, exactly-once, deduplication, dedup, Nats-Msg-Id, msg id, async publish, atomic batch, batch publish, fast ingest, publish acknowledgement]
-sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-stream-consumer-config, s-issue-8271-request-info-max-payload, s-nats-server-share-import-observed, s-gh-7577-core-nats-ordering, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-docs-resilient-clients-drain-and-shutdown]
+sources: [s-docs-publishing, s-docs-advanced-publishing, s-nats-server-constants-2.14.6, s-adr-1-jetstream-json-api, s-docs-stream-config, s-relnotes-2.14.0, s-docs-upgrade-to-2.12, s-docs-upgrade-to-2.14, s-gh-6628-ackwait-vs-dupe-window, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-nats-server-mirror, s-nats-server-mirrors-observed, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-stream-consumer-config, s-issue-8271-request-info-max-payload, s-nats-server-share-import-observed, s-gh-7577-core-nats-ordering, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-docs-resilient-clients-drain-and-shutdown, s-adr-22-publish-retries, s-docs-jetstream-where-next, s-nats-server-core-or-jetstream-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -387,6 +387,41 @@ violation closes the connection rather than returning an error (`processHeaderPu
 source: [[s-nats-server-core-delivery]]).
 
 
+## Why a publish can 503, and what to do about each cause
+
+A JetStream publish is a core request, so "nobody is listening" is one of its outcomes. It has two
+causes that look identical on the client and want opposite responses.
+
+**A leadership blip — retry.** [[s-adr-22-publish-retries]] was written for exactly this: "when the
+NATS Server is running with JetStream on cluster mode, there can be occasional blips in leadership
+which can result in a number of `no responders available` errors during the election", answered with
+a 503 status "right away". The Go client's remedy, still the default at nats.go v1.53.1, is
+`DefaultPubRetryWait = 250ms` and `DefaultPubRetryAttempts = 2` — three sends in all — with
+`RetryAttempts(-1)` meaning "until the context deadline". When the retries run out the error changes
+from `no responders available for request` to **`nats: no response from stream`**, and that difference
+is how you tell a client that retried from one that did not.
+
+Measured on an R3 stream at 2.14.6: a stream-leader step-down cost a publisher **exactly one publish
+out of 312**, 32 ms after the step-down command, while a core publisher on the same server through the
+same seconds saw nothing. A **meta**-leader step-down in the same run cost nothing at all — publishes
+are served by the stream's leader, not the meta leader (source:
+[[s-nats-server-core-or-jetstream-observed]]).
+
+**No stream captures this subject — a design error.** Same error string, 24 ms, and retrying will
+never help. Check with `nats stream ls` and `nats stream subjects <name>` before reaching for a retry
+policy.
+
+**`nats pub -J` does neither.** natscli v0.4.0 issues a plain `nc.RequestMsg(msg, opts().Timeout)`
+(`cli/pub_command.go:279`) and never retries, and it prints `Published N bytes …` *before* the request
+is sent — so a failing JetStream publish from the CLI prints a success line followed by an error. Use
+it as a diagnostic, not as a model of what a client does.
+
+And whatever the mode, the `PubAck` means one thing only: "a stored message has not yet been
+processed" — wait for delivery and the consumer's ack before acting on a business outcome (source:
+[[s-docs-jetstream-where-next]]). [[core-or-jetstream]] is where to decide whether this flow needs any
+of it.
+
+
 ## Related
 
 [[stream]] · [[ack-and-redelivery]] · [[consumer]] · [[subject-transforms]] · [[error-codes]] ·
@@ -404,4 +439,4 @@ source: [[s-nats-server-core-delivery]]).
 - [[s-docs-upgrade-to-2.12]] · [[s-docs-upgrade-to-2.14]] — the releases the two batch modes shipped
   in.
 - [[s-relnotes-2.14.0]] — the `Nats-Batch-Commit: eob` end-of-batch commit.
-- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-stream-consumer-config]] · [[s-issue-8271-request-info-max-payload]] · [[s-nats-server-share-import-observed]] · [[s-gh-7577-core-nats-ordering]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-docs-resilient-clients-drain-and-shutdown]]
+- [[s-adr-1-jetstream-json-api]] — the `PubAck` as an API response. · [[s-gh-6628-ackwait-vs-dupe-window]] · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-mirror]] · [[s-nats-server-mirrors-observed]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-stream-consumer-config]] · [[s-issue-8271-request-info-max-payload]] · [[s-nats-server-share-import-observed]] · [[s-gh-7577-core-nats-ordering]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-adr-22-publish-retries]] · [[s-docs-jetstream-where-next]] · [[s-nats-server-core-or-jetstream-observed]]

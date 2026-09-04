@@ -76,6 +76,15 @@ server's own `-DV` trace of every route, gateway and leafnode verb. All four pag
 `reference/protocols/` were read; one row per page, plus two for `client.md`, which carries three
 separate tables.
 
+Rows **118–120** come from step 7 of the same plan (`operations/core-or-jetstream`, the durability
+decision per subject). Their authority is `server/stream.go:2170–2196` at v2.14.6 for the `no_ack`
+subject rules, `raw/jsm-go/stream_configuration-v0.4.1.json` for the field itself, and **runs A–H on
+the 2.14.6 binary** (`raw/nats-server-src/core-or-jetstream-observed-v2.14.6.md`) for everything
+behavioural — including run H, which is the documentation's own two chapters executed in the order the
+documentation teaches them. **#119 is ★**: following `learn/core-nats/request-reply.md` and then
+`learn/jetstream/your-first-stream.md` verbatim breaks the inventory service the first chapter built,
+silently.
+
 | # | issue | where | destination | kind | severity | upstream | status |
 |---|---|---|---|---|---|---|---|
 | 1 | Nak advisory subject is `MSG_NAK`; the server publishes `MSG_NAKED` | `reference/jetstream/advisory/nak.md` | nats-docs | wrong-value | ★ high | not filed | wiki uses the server value |
@@ -195,6 +204,9 @@ separate tables.
 | 115 | `learn/services/where-next.md:34` "A service is at-most-once request-reply: it stores nothing, and **when an instance stops, its in-flight work is gone**" — against `scaling.md:164` "Requests the instance already accepted keep processing in the background", `scaling.md:376` "A graceful `Stop()` that drains in-flight work and leaves the queue group, so the survivors absorb the load with nothing dropped", and this page's own `:46` "each `Stop()` drains in-flight requests". Observed on 2.14.6, both are true of different stops and the pages do not say which they mean: `Stop()` called two seconds into a five-second handler returned in **1.3 ms**, removed all fifteen subscriptions at once (endpoint and `$SRV` both answered `No responders` immediately), and the handler still replied at 5.001 s **because the process stayed alive**; a `kill -9` in the same place lost the work and the caller learned nothing but a timeout | `learn/services/where-next.md` (line 34) | nats-docs | inconsistent | medium | not filed | wiki separates the two on `concepts/services-framework` — *Stopping one* — and gives the shutdown order on `operations/services-on-core-nats` |
 | 116 | `ADR-32.md:78–81` "Note that this prefix needs to be overridable much in the way as we do for `$JS`, in order to enable targetting tools to work across accounts" — **stated as a requirement in 2022-11-23 and still not implemented, with nothing in the ADR saying so.** nats.go v1.53.1 declares `APIPrefix = "$SRV"` as a `const` (`micro/service.go:264–265`) with no configuration path; a grep of the docs mirror finds no mention of an override on any page. The ADR has had five revisions since, the most recent 2025-02-17, and none records the gap. A tool author reading the ADR will design for a configurable prefix that no client offers | `raw/adr/ADR-32.md` (lines 78–81) | ADR repo | enhancement | low | not filed | wiki says the prefix is fixed in practice on `concepts/services-framework` and `entities/nats-go` |
 | 117 | `reference/services/stats-response.md:51` "The time the service was **stated** in RFC3339 format" — the typo is not the docs page's, it is in the schema the page is generated from: `schemas/micro/v1/stats_response.json` at `nats-io/jsm.go` v0.4.1 carries the same string in the `started` field's `description` (mirrored as `raw/jsm-go/micro-stats_response-v0.4.1.json:52`). Fixing the docs page alone will regress at the next generation | `reference/services/stats-response.md` (line 51) | jsm.go | enhancement | low | not filed | wiki writes `started` correctly on `concepts/services-framework` and cites the schema |
+| 118 | `learn/jetstream/where-next.md:53` "Stay on plain pub-sub when the next message supersedes the last; reach for a stream only when a missed message has consequences" is filed under "**Your first stream** — see [Pitfalls](/learn/jetstream/your-first-stream.md#pitfalls)", and **that page's Pitfalls section does not contain it**: it has exactly two items, *Unlimited defaults grow forever* and *A stream name is permanent*. The chapter's own answer to "when do I actually need a stream" therefore exists in one gathered checklist bullet pointing at a page that never states it. `supersede` occurs **twice in the 861-page tree** — here and at `learn/core-nats.md:18` — so the rule is stated once per chapter and explained on neither | `learn/jetstream/where-next.md` (line 53), `learn/jetstream/your-first-stream.md` (Pitfalls) | nats-docs | missing | medium | not filed | wiki states the rule from both sides on `operations/core-or-jetstream` and quotes both lines |
+| 119 | ★ **Nothing in the docs warns that a stream capturing a subject already used for request/reply answers those requests itself** — and the docs' own continuous example does exactly that. `learn/core-nats/request-reply.md:8` builds "an **inventory** service that answers that question on the subject `orders.inventory.check`"; `learn/core-nats/where-next.md` says that service is "still as you left [it]" and sends the reader to the JetStream chapter, which "resumes the same Acme ORDERS story right where you are now"; `learn/jetstream/your-first-stream.md`'s first command is `nats stream add ORDERS --subjects "orders.>" --defaults`. Run in that order on 2.14.6 the inventory service stops working: `nats request orders.inventory.check` returns `{"stream":"ORDERS","seq":1}` instead of `in stock: 42`, because the stream's `PubAck` reaches the requester's inbox first (374 µs behind it when both are gathered), and `nats stream subjects ORDERS` then shows `orders.inventory.check  2`. The server allows it silently — `server/stream.go:2170–2196` only demands `no_ack` for `>`, `$JS.>`/`$JSC.>`/`$NRG.>` and `$SYS.>` | `learn/jetstream/your-first-stream.md` (Create the stream), `learn/core-nats/request-reply.md` (line 8), `learn/core-nats/where-next.md` | nats-docs | missing | high | not filed | wiki makes it the first of *The two ways to get it wrong* on `operations/core-or-jetstream`, with sections on `concepts/stream`, `concepts/request-reply`, `operations/services-on-core-nats` and `operations/worker-pool` |
+| 120 | The stream configuration field **`no_ack` does not appear anywhere in the 861-page docs tree** — not in `reference/jetstream/api/stream/create.md`, not in the JetStream chapter, not once as `no_ack`, `NoAck` or `--no-ack` (two matches for the string exist and both are the unrelated consumer error name `JSConsumerAckFCRequiresNoAckWaitErr`). It is a `StreamConfig` field, it is what makes a stream stop replying, and the server hangs three hard subject rules off it at `server/stream.go:2170–2196`, each with its own rejection message. Its absence is why #119 has no page to be documented on | `reference/jetstream/api/stream/create.md`, `learn/jetstream/` (whole chapter) | nats-docs | missing | medium | not filed | wiki gives it its own section on `reference/stream-and-consumer-config` — *The three rules behind `no_ack`* — and the consequence on `operations/core-or-jetstream` |
 
 ---
 
@@ -3593,6 +3605,9 @@ which case it is dropped. The `weight` reference page could carry the one-line e
 | 115 | `wiki/concepts/services-framework.md` — *Stopping one: `Stop()` drains, a signal does not*; `wiki/operations/services-on-core-nats.md` — *Drain on stop* |
 | 116 | `wiki/concepts/services-framework.md` — *Across a cluster, a leafnode and an account*; `wiki/entities/nats-go.md` — *What bites you — the `micro` package* |
 | 117 | `wiki/concepts/services-framework.md` — *The counters, and their units*; `raw/jsm-go/_provenance.md` |
+| 118 | `wiki/operations/core-or-jetstream.md` — *The problem*, *The decision*; `wiki/concepts/stream.md` — *Choosing the subject list*; `wiki/concepts/ack-and-redelivery.md` — *The two acks, in the docs' own words* |
+| 119 | `wiki/operations/core-or-jetstream.md` — *A stream laid over a request/reply subject answers the requests itself*; `wiki/concepts/stream.md` — *Choosing the subject list: what a stream quietly takes over*; `wiki/concepts/request-reply.md` — *A fourth outcome*; `wiki/operations/services-on-core-nats.md` — *Keep a stream off the service's subjects*; `wiki/operations/worker-pool.md` — *Why the stream goes behind the endpoint* |
+| 120 | `wiki/reference/stream-and-consumer-config.md` — *The three rules behind `no_ack`*; `wiki/operations/core-or-jetstream.md` — *The two ways to get it wrong* |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
 
@@ -5095,4 +5110,163 @@ Recorded not for the typo but for where it lives: a fix applied to the docs page
 away. `destination: jsm.go`.
 
 **Suggested fix**: "The time the service was started, in RFC3339 format", in the schema.
+
+
+## 118 · The rule the JetStream chapter turns on is filed under a page that does not state it
+
+`learn/jetstream/where-next.md` gathers every page's Pitfalls into one production checklist, grouped
+by page. Its first group is headed:
+
+> ### Your first stream — see [Pitfalls](/learn/jetstream/your-first-stream.md#pitfalls)
+
+and its first bullet (line 53) is:
+
+> Stay on plain pub-sub when the next message supersedes the last; reach for a stream only when a
+> missed message has consequences.
+
+`learn/jetstream/your-first-stream.md`'s Pitfalls section, in full, is two paragraphs — **Unlimited
+defaults grow forever** and **A stream name is permanent**. Neither is this rule, and the page's
+§*Why a stream* does not state it either ("Plain core NATS drops any of these messages the moment no
+service is listening. A **stream** saves them instead").
+
+A grep of the whole mirrored tree (861 pages, fetched 2026-08-31) for `supersede` returns **two**
+lines:
+
+```
+raw/nats-docs/learn/core-nats.md:18       … exactly right when each message is superseded by the next one …
+raw/nats-docs/learn/jetstream/where-next.md:53  Stay on plain pub-sub when the next message supersedes the last …
+```
+
+So the decision every reader arrives with — *do I need a stream for this?* — is answered once in each
+chapter, in a chapter index and in a checklist, and explained on no page at all. The checklist's
+back-link makes it look as though it is explained somewhere it is not.
+
+**Suggested fix**: state the rule in `your-first-stream.md#why-a-stream`, where the checklist already
+points, with the examples `learn/core-nats.md:18` gives (a live price, a current temperature, a cache
+invalidation) and their converse. The checklist bullet can then stay exactly as it is.
+
+## 119 · ★ A stream over a request/reply subject answers the requests — and the docs' own example does it
+
+**What the documentation teaches, in the order it teaches it.**
+
+`learn/core-nats/request-reply.md:8`:
+
+> This page builds an **inventory** service that answers that question on the subject
+> `orders.inventory.check`.
+
+`learn/core-nats/where-next.md`, at the end of that chapter:
+
+> Your local `nats-server`, the `notifications` and `analytics` subscribers, the regional analytics
+> and audit views, the **`inventory` service**, the `packers` queue group, and the `shipping.quote`
+> providers **are all still as you left them.**
+
+and, immediately after:
+
+> The most important link to follow is the [JetStream deep dive], which is what core NATS becomes when
+> a message needs to survive. **It resumes the same Acme ORDERS story right where you are now.**
+
+`learn/jetstream/your-first-stream.md`, the first command of that chapter:
+
+```
+nats stream add ORDERS --subjects "orders.>" --defaults
+```
+
+**What happens** (`raw/nats-server-src/core-or-jetstream-observed-v2.14.6.md`, run H, nats-server
+v2.14.6, nats CLI 0.4.0, both commands verbatim):
+
+```
+$ nats reply orders.inventory.check 'in stock: 42' &
+$ nats request orders.inventory.check '{"sku":"ord_8w2k"}'
+in stock: 42
+
+$ nats stream add ORDERS --subjects "orders.>" --defaults
+$ nats request orders.inventory.check '{"sku":"ord_8w2k"}'
+{"stream":"ORDERS","seq":1}
+```
+
+The responder is still alive and simply loses the race — gathering every reply instead of the first
+shows both, the stream's ack first and `in stock: 42` at 374 µs behind it. On the wire they are two
+indistinguishable `MSG` frames on one inbox (run D3):
+
+```
+<< MSG _INBOX.rawcoj.1 9 24 | payload: {"stream":"SVC","seq":3}
+<< MSG _INBOX.rawcoj.1 9 4  | payload: pong
+```
+
+And the stream is now storing the requests:
+
+```
+$ nats stream subjects ORDERS
+orders.inventory.check   2
+```
+
+**Why the server does not stop it.** `server/stream.go:2170–2196` at v2.14.6 refuses an acking stream
+on exactly three subject shapes and no others:
+
+```go
+if subj == fwcs {
+    if !cfg.NoAck { … "capturing all subjects requires no-ack to be true" }
+    if cfg.Replicas != 1 { … "capturing all subjects requires replicas of 1" }
+}
+if !cfg.NoAck {
+    for _, namespace := range []string{"$JS.>", "$JSC.>", "$NRG.>"} { … "subjects that overlap with jetstream api require no-ack to be true" }
+    if SubjectsCollide(subj, "$SYS.>") { … "subjects that overlap with system api require no-ack to be true" }
+}
+```
+
+`orders.>` is not one of them, so creation succeeds with no warning. The server protects itself and
+leaves the user's own request/reply subjects unprotected — which is reasonable, and is precisely why
+the documentation has to say so.
+
+This is marked ★ because the failure is **silent and produced by following the docs**: the stream
+creation succeeds, the service process keeps running and logs nothing, and the caller gets a
+well-formed JSON reply that is simply not the answer. In a real deployment the trigger is someone
+widening an existing stream's `--subjects` by one token.
+
+**Suggested fix**: three things, in decreasing order of value.
+
+1. A pitfall on `learn/jetstream/your-first-stream.md`: *a stream replies to everything it captures*.
+   Name `_INBOX.>`, `$SRV.>` and any request/reply verb as subjects to keep out of a stream's subject
+   list, and say that the server only enforces this for `>`, the JetStream API and `$SYS.>`.
+2. Change the running example so the two chapters do not collide — either narrow the stream to
+   `--subjects "orders.created,orders.shipped,orders.canceled"`, or move the responder to a subject
+   outside `orders.>`. Narrowing is probably better: it also demonstrates rule 1.
+3. Document `no_ack` (see #120), so the pitfall has somewhere to link.
+
+## 120 · `no_ack` is not documented anywhere
+
+`no_ack` is a `StreamConfig` field (`nats-io/jsm.go` v0.4.1 `schemas/jetstream/api/v1/stream_configuration.json:146`,
+mirrored as `raw/jsm-go/stream_configuration-v0.4.1.json`) and the `nats` CLI exposes it as
+`--no-ack`. A case-insensitive grep of the whole mirrored docs tree for `no_ack`, `NoAck` and
+`--no-ack` returns **two** lines, and both are the unrelated consumer error name
+`JSConsumerAckFCRequiresNoAckWaitErr` in `reference/jetstream/errors.md`. The field itself is
+described nowhere, including on `reference/jetstream/api/stream/create.md`, which is generated and
+otherwise exhaustive.
+
+That matters more than a missing row usually would, because three of the server's create-time subject
+rules exist only to force this flag on, each with its own rejection message
+(`server/stream.go:2170–2196` at v2.14.6):
+
+| subject | message | version |
+|---|---|---|
+| `>` | `capturing all subjects requires no-ack to be true` (`10052`), then `capturing all subjects requires replicas of 1` | 2.14.6, observed |
+| overlaps `$JS.>` / `$JSC.>` / `$NRG.>` (except `$JS.EVENT.>`) | `subjects that overlap with jetstream api require no-ack to be true` | 2.14.6, source |
+| overlaps `$SYS.>` (except `$SYS.ACCOUNT.>`) | `subjects that overlap with system api require no-ack to be true` | 2.14.6, source |
+
+Observed on the binary:
+
+```
+$ nats stream add EVERYTHING --subjects '>' --storage memory --retention limits --replicas 1 --defaults
+nats: error: could not create Stream: capturing all subjects requires no-ack to be true (10052)
+```
+
+An operator who meets that message has nowhere in the documentation to look up what it is asking for.
+The consequences are not obvious either: with `no_ack` set, a JetStream publish into the stream can
+never succeed — nothing answers, so it waits out the full client deadline and returns
+`nats: timeout` (3.042 s at `--timeout=3s`, observed).
+
+**Suggested fix**: a `no_ack` row on `reference/jetstream/api/stream/create.md` saying what it does
+(the stream stops replying, so there is no `PubAck` and a JetStream publish into it will time out) and
+listing the three subject shapes that require it; and a sentence in the JetStream chapter, most
+naturally beside the pitfall #119 asks for.
 

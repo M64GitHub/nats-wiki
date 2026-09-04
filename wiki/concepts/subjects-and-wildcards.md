@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [subjects, tokens, wildcards, "*", ">", reserved-prefixes, "$SYS", "_INBOX", max_subscription_tokens, max_sub_tokens, max_control_line, Invalid Subject, Invalid Publish Subject, pedantic, cardinality]
 aliases: [subject, subjects, wildcard, wildcards, tokens, subject naming, reserved prefixes, "$ prefix", "_INBOX prefix", max_subscription_tokens, max_sub_tokens, "Invalid Subject", "Invalid Publish Subject", subject length limit, subject token limit, "Permissions Violation for Subscription to, too many tokens"]
-sources: [s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-nats-cli-core-commands, s-gh-8333-high-cardinality-subjects, s-nats-server-stream-scale-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-publish-subscribe, s-gh-5172-mapping-in-config-or-stream]
+sources: [s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-nats-cli-core-commands, s-gh-8333-high-cardinality-subjects, s-nats-server-stream-scale-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-publish-subscribe, s-gh-5172-mapping-in-config-or-stream, s-docs-core-nats-chapter]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Subjects and wildcards
@@ -152,6 +152,22 @@ for a stream goes in the stream (source: [[s-gh-5172-mapping-in-config-or-stream
 - **The token limit is not a length limit.** `max_subscription_tokens: 3` still admits a three-token
   subject of 4,000 characters.
 
+## The subject space is designed once, and durability is chosen per subject afterwards
+
+The docs' running example makes the point without saying it: the core chapter builds the whole Acme
+`orders.>` world — `orders.created`, `orders.shipped`, `orders.canceled`, an `orders.inventory.check`
+responder, a `packers` queue group — "before it adds any persistence", and the JetStream chapter then
+picks up the **identical subjects** and adds `nats stream add ORDERS --subjects "orders.>"` (source:
+[[s-docs-core-nats-chapter]]).
+
+So subject design comes first and is independent of the choice: name the things that happen, group
+them by what they act on, and decide afterwards which of them a stream should capture. The one thing
+that decision does impose back on the naming is separation — an event subject a stream may capture
+should not sit under the same wildcard as a request/reply verb, because a stream that captures a
+request subject answers it. [[core-or-jetstream]] is that decision; [[stream]] is what it does to a
+subject.
+
+
 ## Related
 
 [[core-nats-delivery]] · [[subject-transforms]] · [[subject-permissions]] · [[key-value]] ·
@@ -172,4 +188,4 @@ for a stream goes in the stream (source: [[s-gh-5172-mapping-in-config-or-stream
 - [[s-nats-cli-core-commands]] — the CLI's own subject check and flags.
 - [[s-gh-8333-high-cardinality-subjects]] — the per-million memory figure.
 - [[s-nats-server-stream-scale-observed]] — the 380 B measurement and the `*`-inside-a-token trap.
-- [[s-nats-go-relnotes-1.48.0]] — the release that added the Go client's publish-subject check. · [[s-docs-core-nats-publish-subscribe]] · [[s-gh-5172-mapping-in-config-or-stream]]
+- [[s-nats-go-relnotes-1.48.0]] — the release that added the Go client's publish-subject check. · [[s-docs-core-nats-publish-subscribe]] · [[s-gh-5172-mapping-in-config-or-stream]] · [[s-docs-core-nats-chapter]]

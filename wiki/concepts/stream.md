@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [stream, storage, limits, discard, persist_mode]
 aliases: [streams, StreamConfig, stream config]
-sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed]
+sources: [s-nats-server-snapshot-restore, s-docs-stream-config, s-docs-policies, s-docs-retention-policies, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-synadia-jetstream-memory-patterns, s-docs-upgrade-to-2.12, s-relnotes-2.14.0, s-nats-server-constants-2.14.6, s-adr-35-filestore-compression, s-docs-delivery-and-acknowledgment, s-nats-server-filestore-layout, s-docs-publishing, s-docs-advanced-publishing, s-docs-shaping-the-stream, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-reading-back, s-docs-kv-history-and-revisions, s-adr-1-jetstream-json-api, s-adr-10-extended-purge, s-adr-20-object-store, s-adr-43-per-message-ttl, s-adr-8-key-value-store, s-docs-accounts-and-multitenancy, s-docs-disaster-recovery, s-docs-get-direct, s-docs-mirrors-and-sources, s-docs-mirrors-as-dr, s-docs-sizing-and-resources, s-docs-stream-backup-restore, s-docs-upgrade-to-2.14, s-gh-5924-filestore-dirs-vanished, s-issue-4281-insufficient-storage, s-synadia-jetstream-anti-patterns, s-adr-51-message-scheduler, s-docs-jetstream-headers, s-nats-server-message-schedules-observed, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-nats-server-filestore-recovery, s-gh-8333-high-cardinality-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-docs-concepts-jetstream, s-docs-core-nats-chapter, s-docs-jetstream-where-next, s-nats-server-core-or-jetstream-observed, s-gh-3507-no-external-store]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Stream
@@ -508,6 +508,61 @@ From the seven release bodies (source: [[s-relnotes-2.14]]):
   (source: [[s-relnotes-2.15-preview]]).
 
 
+## Choosing the subject list: what a stream quietly takes over
+
+A stream captures by subject, and the publisher is never told one exists — "when a publisher sends a
+message to a matching subject, the server appends it to the stream and assigns it a sequence number"
+(source: [[s-docs-concepts-jetstream]]). That is what makes a stream easy to add under a running flow,
+and it is also how a subject list widened by one token takes over traffic nobody meant to store.
+
+**A stream that captures a request/reply subject answers the requests itself.** With a responder on
+`svc.echo`, `nats request svc.echo ping` returns `pong`. Create `SVC` on `svc.>` and the same request
+returns `{"stream":"SVC","seq":1}` — the stream's `PubAck`, delivered to the requester's inbox as an
+ordinary `MSG`, and it arrives **first** (277 µs against the responder's 407 µs). A client that takes
+one reply takes the ack; the responder's answer is discarded. Meanwhile the stream stores every
+request with its payload (source: [[s-nats-server-core-or-jetstream-observed]], runs D1–D4).
+
+The server refuses exactly three shapes of this and nothing else — `server/stream.go:2170–2196` at
+2.14.6 requires `no_ack` for a stream on `>` (plus `replicas: 1`), for one overlapping
+`$JS.>` / `$JSC.>` / `$NRG.>` (exception `$JS.EVENT.>`), and for one overlapping `$SYS.>` (exception
+`$SYS.ACCOUNT.>`):
+
+```
+nats: error: could not create Stream: capturing all subjects requires no-ack to be true (10052)
+```
+
+`svc.>` is not one of those, so nothing warns you. List a stream's subjects explicitly rather than
+sweeping a whole tree, keep request/reply verbs and `_INBOX.>` out of them, and check
+`nats stream subjects <name>` after any change.
+
+**And do not build a stream on `>`.** The only one the server accepts — `--no-ack --replicas 1` — held
+twelve subjects and 41 messages after six ordinary commands, including every reply inbox,
+`$SRV.PING.DEMO` and `$JS.API.STREAM.INFO.<itself>`: two `nats stream subjects` calls a moment apart
+took that last count from 3 to 6, so reading the stream writes to it. A JetStream publish into it can
+never succeed either, because a `no_ack` stream never answers (`nats: timeout` at the full deadline).
+
+The rule for whether the flow wants a stream at all is one line: "stay on plain pub-sub when the next
+message supersedes the last; reach for a stream only when a missed message has consequences" (source:
+[[s-docs-jetstream-where-next]], and the same rule from the core side in
+[[s-docs-core-nats-chapter]]). [[core-or-jetstream]] is that decision worked through per subject.
+
+
+## Two storage backends, and there is no third
+
+`memory` or `file`. Asked in public whether JetStream would support an external database the way NATS
+Streaming did — the asker had been running it on Postgres and replicating the database himself — the
+chosen answer was: "**No, we will support memory and file based for the store level.** We can
+replicate in either store and each store can also have digital twins or source mux/demux streams"
+(source: [[s-gh-3507-no-external-store]], @derekcollison, 2022-09-28; still true at 2.14.6, where
+`storage` takes exactly those two values — [[stream-and-consumer-config]]).
+
+Durability is therefore bought inside NATS and nowhere else: `--replicas` for a quorum
+([[replicas]]), a mirror or a source for a second copy ([[mirrors-and-sources]]), a snapshot for an
+offline one ([[backup-and-restore-jetstream]]). A design that assumed the data would also be sitting
+in a database the rest of the estate can query needs [[direct-get]] or a republish into something
+else — [[subject-transforms]] — not a storage option.
+
+
 ## Related
 
 [[consumer]] · [[retention-policies]] · [[replicas]] · [[stream-placement]] · [[raft-in-nats]] ·
@@ -539,4 +594,4 @@ From the seven release bodies (source: [[s-relnotes-2.14]]):
 [[s-issue-4281-insufficient-storage]] · [[s-synadia-jetstream-anti-patterns]]
 
 Version attribution for the behaviour flags: [[nats-server-2.11]], [[nats-server-2.12]],
-[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]]
+[[nats-server-2.14]]. · [[s-adr-51-message-scheduler]] · [[s-docs-jetstream-headers]] · [[s-nats-server-message-schedules-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-nats-server-filestore-recovery]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-docs-concepts-jetstream]] · [[s-docs-core-nats-chapter]] · [[s-docs-jetstream-where-next]] · [[s-nats-server-core-or-jetstream-observed]] · [[s-gh-3507-no-external-store]]

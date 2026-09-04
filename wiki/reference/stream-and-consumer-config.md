@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [stream-config, consumer-config, StreamConfig, ConsumerConfig, defaults, mutability, cli-flags]
 aliases: [StreamConfig, ConsumerConfig, stream config, consumer config, stream configuration, consumer configuration, stream fields, consumer fields]
-sources: [s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-jsm-go-config-schemas, s-nats-cli-help-0.4.0, s-docs-stream-config, s-docs-consumer-config, s-gh-3944-subjects-in-a-stream, s-adr-33-metadata, s-adr-34-multiple-filters, s-adr-9-idle-heartbeats, s-adr-42-priority-groups, s-adr-43-per-message-ttl, s-adr-51-message-scheduler, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-jsm-go-config-schemas, s-nats-cli-help-0.4.0, s-docs-stream-config, s-docs-consumer-config, s-gh-3944-subjects-in-a-stream, s-adr-33-metadata, s-adr-34-multiple-filters, s-adr-9-idle-heartbeats, s-adr-42-priority-groups, s-adr-43-per-message-ttl, s-adr-51-message-scheduler, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-core-or-jetstream-observed]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Stream and consumer configuration
@@ -186,6 +186,28 @@ leader with a skewed clock ages messages by its own time; see [[stream]].
   (source: [[s-relnotes-2.12]]). **2.14.0**: `allow_batched`, the `flow_control` ack policy, cron
   schedules (source: [[s-relnotes-2.14]]).
 
+## The three rules behind `no_ack`
+
+`no_ack` looks like a minor flag in the table above; it is the switch on three hard subject rules the
+server enforces at create time (`server/stream.go:2170–2196` at 2.14.6, observed in
+[[s-nats-server-core-or-jetstream-observed]]):
+
+| subject | rejected with | unless |
+|---|---|---|
+| `>` | `capturing all subjects requires no-ack to be true` (`10052`) — and then `capturing all subjects requires replicas of 1` | `no_ack: true` **and** `replicas: 1` |
+| overlaps `$JS.>`, `$JSC.>` or `$NRG.>` | `subjects that overlap with jetstream api require no-ack to be true` | `no_ack: true`; `$JS.EVENT.>` is exempt |
+| overlaps `$SYS.>` | `subjects that overlap with system api require no-ack to be true` | `no_ack: true`; `$SYS.ACCOUNT.>` is exempt |
+
+The reason is that an acking stream **replies** to everything it captures, so a stream over a
+request/reply subject answers those requests with its own `PubAck`. The server blocks exactly the
+three cases where that would break itself, and allows every other one silently — an ordinary
+`svc.>` is not checked. Setting `no_ack` also means a JetStream publish into that stream can never
+succeed: nothing answers, so the publish waits out its full deadline and returns `nats: timeout`.
+
+`10052` is `JSStreamInvalidConfigF`, whose description is `{err}`, so the numeric code identifies none
+of these — [[error-codes]]. The design guidance is on [[core-or-jetstream]].
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[defaults-and-limits]] · [[config-keys]] · [[js-api-subjects]] ·
@@ -200,4 +222,4 @@ leader with a skewed clock ages messages by its own time; see [[stream]].
 [[s-docs-consumer-config]] · [[s-gh-3944-subjects-in-a-stream]] · [[s-adr-33-metadata]] ·
 [[s-adr-34-multiple-filters]] · [[s-adr-9-idle-heartbeats]] · [[s-adr-42-priority-groups]] ·
 [[s-adr-43-per-message-ttl]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.10]] ·
-[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-core-or-jetstream-observed]]

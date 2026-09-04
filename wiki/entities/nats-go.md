@@ -7,7 +7,7 @@ verified-against: nats.go v1.53.1
 verified-on: 2026-08-31
 tags: [client, tier-1, go, reference-implementation]
 aliases: [nats.go, "nats-io/nats.go", go client, golang client]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-subscription, s-nats-server-client-faults-observed, s-adr-32-service-api, s-nats-server-services-observed]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-subscription, s-nats-server-client-faults-observed, s-adr-32-service-api, s-nats-server-services-observed, s-adr-22-publish-retries]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -174,6 +174,27 @@ server then reads the space as the reply boundary — subject `orders.us`, reply
 the subject with `nats: invalid subject`. Rules on [[subjects-and-wildcards]].
 
 
+## The publish retry, at v1.53.1
+
+[[s-adr-22-publish-retries]] specified back-off on a `no responders` publish in 2022, and the defaults
+it names are still the defaults in **both** of the client's JetStream APIs — `js.go:233,236` and
+`jetstream/publish.go:157,160`:
+
+```go
+DefaultPubRetryWait     = 250 * time.Millisecond
+DefaultPubRetryAttempts = 2
+```
+
+Three sends in total. The loop fires only on `ErrNoResponders`; `RetryAttempts(-1)` is the
+`o.retryAttempts < 0` branch and means "retry until the context deadline"; and when the attempts run
+out the caller's error changes to **`ErrNoStreamResponse`** (`nats: no response from stream`). That
+last detail is operationally useful: the string in the log says whether the client retried.
+
+Two things follow for an operator. A polyglot estate has one retry policy per client library, not one
+overall — check each. And `nats` CLI 0.4.0 does **not** go through this path at all, so its behaviour
+is not evidence about the Go client's ([[nats-cli]]).
+
+
 ## Related
 
 [[orbit]] · [[jsm-go]] · [[nats-cli]] · [[ordered-consumer]] · [[nats-js]] · [[nats-rs]] ·
@@ -181,4 +202,4 @@ the subject with `nats: invalid subject`. Rules on [[subjects-and-wildcards]].
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-go-subscription]] · [[s-nats-server-client-faults-observed]] · [[s-adr-32-service-api]] · [[s-nats-server-services-observed]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-go-subscription]] · [[s-nats-server-client-faults-observed]] · [[s-adr-32-service-api]] · [[s-nats-server-services-observed]] · [[s-adr-22-publish-retries]]

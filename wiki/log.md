@@ -4832,3 +4832,96 @@ Lint: **405 pages** (397 → 405), drift 0, unlanded **0**, unverified 12, stale
 Wanted is **1** again and deliberately: [[core-or-jetstream]], which step 7 writes for row 133 —
 `core-nats-delivery` and `services-on-core-nats` both stop at the durability boundary and hand the
 decision to it.
+
+## 2026-09-04 — phase F step 7: `core-or-jetstream`, the durability decision per subject
+
+*Operation: plan* — step 7 of nine of `inbox/plan-the-client-side-2026-09-03.md`, which closes
+megaplan group **G7** and writes the wiki's last registered wanted page.
+
+**Scout first.** `inbox/scout-core-or-jetstream-2026-09-04.md`, ten candidates. The comment cache
+(`local/scratch/gh-index/threads-2026-09-03.md`, all 484 threads with every comment and reply) was
+searched again with different terms — `core (nats )?(vs|or) jetstream`, `when (to|should i) use
+jetstream`, `do i need jetstream`, `without jetstream`, and every thread whose comments contain
+"core NATS" — plus the Stack Exchange API, `natsbyexample.com`'s index (11 categories, no comparison
+example) and the docs tree. The 5(a) sweep's verdict stands: **row 133 is asked in halves, never
+whole**, so it keeps `own`. The halves that are public became rows of their own.
+
+**Seven summaries, not the planned four**, and the reason is that the scout found no thread to build
+on: `s-docs-concepts-jetstream` (the primer's statement of the boundary — "JetStream extends that
+decoupling to time"), `s-docs-core-nats-chapter` (the docs' clearest form of the rule, with examples:
+at-most-once is right "when each message is superseded by the next one, such as a live price, a
+current temperature, or a cache invalidation"), `s-docs-jetstream-where-next` (the same rule from the
+JetStream side, plus the two acks), `s-gh-2961-js-and-core-one-cluster` (the only public maintainer
+statement on the mixed deployment), `s-adr-22-publish-retries` (the ADR that says a JetStream publish
+*is* a core request), `s-nats-server-core-or-jetstream-observed` (the runs), and
+`s-gh-3507-no-external-store` — the last one a **repair**: the scout said "cite, do not re-ingest",
+but bank row 143 was marked answered by `stream` and `nats-streaming` and **neither page stated the
+fact**, so citing it would have been citing nothing.
+
+**One page.** `operations/core-or-jetstream` (`kind: pattern`, **row 133**): a nine-row decision table
+taken per subject; what actually differs on the wire; the cost as four measured ratios; the mixed
+design (one cluster, one subject tree, an unchanged publisher); the configuration; the trade-offs; when
+not to; and *The two ways to get it wrong*.
+
+**Runs A–H in eight passes** (`raw/nats-server-src/core-or-jetstream-observed-v2.14.6.md`, nine
+scripts, the step-3 raw client unchanged; run G on `tools/lab/cluster.sh up 3`). **What they settled:**
+
+- **A JetStream publish is a core publish with a reply subject** — `MSG orders.created 1 4` against
+  `MSG orders.created 1 _INBOX.… 4`, same verb, same payload — and once stored the two messages are
+  *indistinguishable*: `stream get --json` shows no header and no marker on either.
+- **The cost, as ratios on one laptop**: core 2,882,347 msgs/s · JetStream synchronous **30,876**
+  (~93×) · asynchronous 366,110 (~7.9×) · asynchronous into a memory stream 591,419 · and a core
+  publish into a subject a stream *does* capture, **2,885,763 — unslowed**, because it waits for
+  nothing and is told nothing.
+- **The core publisher loses nothing**: 100,000 publishes at 2.7 M msgs/s into a file stream stored
+  100,000, `slow_consumers 0`, no log line.
+- **A stream laid over a request/reply subject answers the requests itself.** With a responder on
+  `svc.echo`, adding a stream on `svc.>` made `nats request` return `{"stream":"SVC","seq":1}` at
+  277 µs while the responder's `pong` came second at 451 µs; on the wire, two indistinguishable `MSG`
+  frames on one inbox, and the stream stored every request. The server refuses exactly three shapes of
+  this — `>`, `$JS.>`/`$JSC.>`/`$NRG.>`, `$SYS.>`, each only by demanding `no_ack`
+  (`server/stream.go:2170–2196`) — and allows every ordinary subject silently.
+- **The documentation's own example does this to itself** (run H, both chapters' commands verbatim):
+  after `nats stream add ORDERS --subjects "orders.>" --defaults`, the core chapter's inventory service
+  on `orders.inventory.check` answers `{"stream":"ORDERS","seq":1}` instead of `in stock: 42`, and
+  `nats stream subjects ORDERS` shows the stream recording the requests.
+- **A `>` stream needs `no_ack` *and* R1**, and the one the server accepts swallowed twelve subjects
+  and 41 messages from six commands — every `_INBOX.…`, `$SRV.PING.DEMO`, and
+  `$JS.API.STREAM.INFO.<itself>`, which went from 3 to 6 between two `nats stream subjects` calls:
+  reading it writes to it. A JetStream publish into it can never succeed (`nats: timeout` at the full
+  deadline).
+- **A stream-leader step-down costs an R3 JetStream publisher exactly one publish** — one 503 in 312,
+  32 ms after the command — while the core publisher beside it saw nothing and a **meta**-leader
+  step-down cost nothing at all. ADR-22's motivation, measured.
+- **`nats pub -J` never retries.** natscli v0.4.0 `cli/pub_command.go:279` is a plain
+  `nc.RequestMsg`, so ADR-22's back-off is skipped and the error is `no responders available for
+  request`, not `no response from stream`; and `:277` prints `Published …` *before* the request is
+  sent. ADR-22's own defaults do hold in nats.go v1.53.1, in both APIs
+  (`raw/nats-go-src/jetstream-publish-v1.53.1.md`, new).
+
+**Fifteen ripples**, unlanded 25 → 0: [[core-nats-delivery]] — *Where this guarantee ends*;
+[[publishing]] — *Why a publish can 503, and what to do about each cause*; [[stream]] — *Choosing the
+subject list* and *Two storage backends, and there is no third*; [[consumer]] — *Why a consumer,
+rather than several subscribers*; [[ack-and-redelivery]] — *The two acks, in the docs' own words*;
+[[request-reply]] — *A fourth outcome*; [[nats-timeout]] — the two causes of a publish-time 503;
+[[nats-cli]] — *`nats pub -J` is a diagnostic, not a resilient publisher*; [[nats-go]] — *The publish
+retry, at v1.53.1*; [[jetstream-sizing]] — what enabling JetStream costs a mixed cluster;
+[[stream-and-consumer-config]] — *The three rules behind `no_ack`*; [[services-on-core-nats]] — *Keep a
+stream off the service's subjects*; [[worker-pool]] — *Why the stream goes behind the endpoint*;
+[[subjects-and-wildcards]] — subject design comes first; [[choosing-a-topology]] — core and JetStream
+are not two topologies; [[nats-streaming]] — the migration loses the pluggable store.
+
+**Docs issues #118–#120**, one of them ★. **#119 ★**: nothing in the tree warns that a stream
+capturing a request/reply subject answers those requests, and the docs' own continuous Acme example
+walks into it — run H is the two chapters executed in the order they are taught, and the inventory
+service stops working. #118: the rule the JetStream chapter turns on is a checklist bullet filed under
+a Pitfalls section that does not contain it, and `supersede` occurs **twice in 861 pages**. #120: the
+stream field `no_ack` appears **nowhere** in the docs tree, though three server-side subject rules
+exist only to force it on. No server issue — every surprise was settled against the source or the run.
+
+**Bank**: row **133** filled (`own` kept: searched twice, in two different ways, and the design
+question is not asked in public), rows **194–197** added and answered, and row **143** re-pointed at
+pages that now state its answer. **167 / 197**, `own` 39. `inbox/adr-toc.md` row 22 links its summary.
+
+Lint: **413 pages** (405 → 413), drift 0, unlanded **0**, wanted **0**, unverified 12, staleness 0
+behind 2.14.6.

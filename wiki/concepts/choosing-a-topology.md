@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [topology, route, gateway, leafnode, supercluster, multi-region, decision, quorum]
 aliases: [which topology, cluster vs gateway vs leafnode, leafnode or gateway, topology decision, super-cluster or leafnode]
-sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-4823-leafnode-supercluster-duplicates, s-nats-server-jetstream-cluster, s-relnotes-2.10]
+sources: [s-docs-putting-it-together, s-docs-super-clusters, s-docs-leaf-nodes, s-docs-jetstream-in-a-cluster, s-gh-6328-jetstream-behind-gateways, s-gh-7438-multi-region-availability, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-4823-leafnode-supercluster-duplicates, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-gh-2961-js-and-core-one-cluster]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Choosing a topology
@@ -155,6 +155,19 @@ question-bank row **Q103**.
 the 2.10 release bodies patch routes, gateways and leafnodes from v2.10.12 on and none records the arrival, which is
 older than the archive (source: [[s-relnotes-2.10]]).
 
+## Core NATS and JetStream are not two topologies
+
+They are one. Asked in public whether using both means deploying two clusters, a maintainer's whole
+answer was "you can use both at the same time with the same cluster"; the cost named was memory on
+the servers, with "core nats performance will remain the same essentially" (source:
+[[s-gh-2961-js-and-core-one-cluster]]).
+
+So the topology decisions on this page — cluster, supercluster, leafnodes — are taken once for the
+deployment, and the durability decision is taken per subject inside it ([[core-or-jetstream]]). What
+*is* a topology question is where the JetStream half runs: which servers enable it, and where a
+stream's replicas land — [[stream-placement]] and [[multi-region-jetstream]].
+
+
 ## Related
 
 [[leafnode]] · [[gateway]] · [[jetstream-domain]] · [[multi-region-jetstream]] ·
@@ -167,7 +180,7 @@ older than the archive (source: [[s-relnotes-2.10]]).
 [[s-docs-jetstream-in-a-cluster]] · [[s-gh-6328-jetstream-behind-gateways]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-nats-server-topology]] ·
 [[s-gh-7494-supercluster-degradation]] ·
-[[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]]
+[[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-gh-2961-js-and-core-one-cluster]]
 
 ## To verify
 

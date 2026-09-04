@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [sizing, disk, memory, max_file_store, account-limits, file-descriptors]
 aliases: [sizing, capacity planning, how much disk, how much RAM]
-sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks, s-gh-8333-high-cardinality-subjects, s-gh-5202-max-unique-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-nats-server-filestore-recovery, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-gh-8001-jetstream-startup-slow-50m, s-relnotes-2.10, s-relnotes-2.12, s-relnotes-2.14, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets]
+sources: [s-issue-8322-dynamic-maxstore-shrinks, s-issue-4281-insufficient-storage, s-nats-server-jetstream-resources, s-nats-server-systemd-units, s-docs-sizing-and-resources, s-synadia-jetstream-memory-patterns, s-docs-connection-limits-config, s-docs-surviving-node-loss, s-docs-replication-and-r3, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-nats-server-constants-2.14.6, s-docs-monitoring-endpoints, s-adr-35-filestore-compression, s-nats-server-filestore-layout, s-nats-helm-chart-values-2.14.6, s-gh-7749-hostpath-jetstream, s-k8s-760-jetstream-pvc-per-replica, s-docs-shaping-the-stream, s-nats-server-object-store-observed, s-docs-object-store-chunking, s-docs-monitoring-profiling, s-gh-7483-varz-cpu-in-containers, s-nats-server-monitoring-observed, s-docs-hardening, s-gh-5924-filestore-dirs-vanished, s-gh-6490-high-message-lag, s-gh-4972-nak-with-delay-blocks, s-gh-8333-high-cardinality-subjects, s-gh-5202-max-unique-subjects, s-synadia-how-many-subjects, s-nats-server-stream-scale-observed, s-nats-server-filestore-recovery, s-gh-7147-one-billion-cap, s-gh-7032-max-msgs-known-good, s-gh-8001-jetstream-startup-slow-50m, s-relnotes-2.10, s-relnotes-2.12, s-relnotes-2.14, s-gh-5128-ha-assets, s-nats-server-traffic-counters-and-ha-assets, s-gh-2961-js-and-core-one-cluster, s-nats-server-core-or-jetstream-observed]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # JetStream sizing
@@ -768,6 +768,33 @@ mirrors, and R1 consumers a client can recreate from a stored sequence
 ([[jetstream-slows-as-consumers-grow]]).
 
 
+## What enabling JetStream costs a cluster that also carries core NATS
+
+The only public maintainer statement on the mixed deployment is two sentences, and both matter for
+sizing: "you can use both at the same time with the same cluster", and "enabling jetstream will
+increase memory use on the server - and using it again also will increase memory use. **But core nats
+performance will remain the same essentially**" (source: [[s-gh-2961-js-and-core-one-cluster]]). No
+figure is given; the memory arithmetic on this page is the wiki's, not theirs.
+
+The publisher-side cost is separable from the server-side one and is much easier to measure. On one
+laptop, one client, 128-byte messages, 200,000 each, same server (source:
+[[s-nats-server-core-or-jetstream-observed]]):
+
+| publish | rate | avg |
+|---|---:|---:|
+| core | 2,882,347 msgs/s | 0.29 µs |
+| JetStream, synchronous | 30,876 msgs/s | 32.33 µs |
+| JetStream, asynchronous | 366,110 msgs/s | 1,364.92 µs |
+| JetStream, asynchronous, memory stream | 591,419 msgs/s | 844.53 µs |
+| core, into a subject a stream captures | 2,885,763 msgs/s | 0.30 µs |
+
+These are **ratios on one machine, not capacities**: about 93× for the synchronous round trip, about
+8× for the asynchronous window, and nothing at all for a core publisher whose subject a stream
+happens to capture — it waits for nothing, so it pays nothing and learns nothing. Use them to rank
+options during design; use the rest of this page to size the deployment. Which flows should be durable
+at all is [[core-or-jetstream]].
+
+
 ## Related
 
 [[replicas]] · [[stream]] · [[consumer]] · [[raft-in-nats]] · [[filestore-layout]] ·
@@ -788,4 +815,4 @@ mirrors, and R1 consumers a client can recreate from a stored sequence
 [[s-nats-server-object-store-observed]] · [[s-docs-object-store-chunking]] ·
 [[s-docs-monitoring-profiling]] · [[s-gh-7483-varz-cpu-in-containers]] ·
 [[s-nats-server-monitoring-observed]] · [[s-docs-hardening]] ·
-[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-gh-5202-max-unique-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-server-filestore-recovery]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]]
+[[s-gh-5924-filestore-dirs-vanished]] · [[s-gh-6490-high-message-lag]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-gh-5202-max-unique-subjects]] · [[s-synadia-how-many-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-server-filestore-recovery]] · [[s-gh-7147-one-billion-cap]] · [[s-gh-7032-max-msgs-known-good]] · [[s-gh-8001-jetstream-startup-slow-50m]] · [[s-relnotes-2.10]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-gh-5128-ha-assets]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-2961-js-and-core-one-cluster]] · [[s-nats-server-core-or-jetstream-observed]]

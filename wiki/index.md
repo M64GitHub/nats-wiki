@@ -168,6 +168,10 @@ exists to answer live in `inbox/question-bank.md`.
 
 **Patterns**
 
+- [[core-or-jetstream]] — the durability decision, per subject rather than per system: the rule the
+  docs state ("does the next message supersede this one?"), what the two publishes look like on the
+  wire and what each costs, the mixed design under an unchanged publisher, and the two ways it goes
+  wrong — a stream over a request/reply subject answering the requests itself, and a stream on `>`.
 - [[worker-pool]] — many processes on one consumer: demand-based distribution, `max_ack_pending` as a
   *shared* ceiling, and why this is not a queue group.
 - [[services-on-core-nats]] — designing a request/reply service layer with no broker state: sizing the
@@ -387,6 +391,12 @@ exists to answer live in `inbox/question-bank.md`.
   (10099 / 10100), Interest filling the disk.
 - [[s-docs-publishing]] — the `PubAck`'s three fields, why a timeout means "unknown" and
   `no responders` means "nothing stored", and the two-minute duplicate window stated in prose.
+- [[s-docs-concepts-jetstream]] — the primer's statement of the boundary: at-most-once against
+  at-least-once, "JetStream extends that decoupling to time", stream · consumer · client, and
+  independent cursors over one stored copy.
+- [[s-docs-jetstream-where-next]] — the chapter's recap and its whole production checklist: stream ·
+  consumer · ack, "a stored message has not yet been processed", and the one line that says when to
+  reach for a stream — filed under a Pitfalls section that does not contain it (docs issue #118).
 - [[s-docs-advanced-publishing]] — async, atomic batch and fast ingest: the `Nats-Batch-*` headers,
   the ten-second stall that abandons a batch silently, the `gap: ok` mode that loses data by design,
   and the `persist_mode: async` incompatibility.
@@ -470,6 +480,9 @@ exists to answer live in `inbox/question-bank.md`.
   `Stop()` really drains.
 - [[s-docs-core-nats-queue-groups]] — the random pick, coexistence, one subject per group, the typo, and the
   "a cluster adds a locality preference" sentence the lab contradicts; `concepts/queue-groups.md` folded.
+- [[s-docs-core-nats-chapter]] — the chapter index: "core NATS is ephemeral", and the docs' clearest
+  statement of the rule — at-most-once is right "when each message is superseded by the next one",
+  a stream is for "wait for a subscriber, survive a restart, or be replayed later".
 
 **docs.nats.io — Clustering (learn)**
 
@@ -623,6 +636,11 @@ exists to answer live in `inbox/question-bank.md`.
   bodies, a service error and a 503 side by side on the wire, a blocked endpoint that does not block its
   siblings, a blocked instance that times out four of eight callers, what `Stop()` removes, and a
   leafnode that carries discovery but keeps the queue group local.
+- [[s-nats-server-core-or-jetstream-observed]] — seven passes on 2.14.6: a JetStream publish is a core
+  publish with a reply subject, the four `nats bench` ratios (93× for the round trip, nothing for a
+  core publish into a captured subject), **a stream over a request/reply subject answering the requests
+  with its own `PubAck`**, the `no_ack` rules at `stream.go:2170–2196`, a `>` stream that grows when you
+  look at it, and a leader step-down costing an R3 publisher exactly one 503.
 - [[s-nats-server-request-reply-observed]] — eight runs in four passes: the 503 with `Nats-Subject`, the
   CLI's silent timeout at exit 0, a busy member keeping 8 of 20, a quarter each across the lab's nodes, the
   503 across an import, and a leaf's members skewing the hub's split 3 : 1.
@@ -735,6 +753,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-adr-32-service-api]] — the Service API spec, revisions 1–6 (2022-11-23 → 2025-02-17): the name and
   SemVer rules, the `$SRV` verb tree, the three response types, the three-level queue group with default
   `q`, immutable metadata, drain on stop — and the overridable prefix nats.go never implemented.
+- [[s-adr-22-publish-retries]] — the ADR that says a JetStream publish *is* a core request: the 503 on a
+  leadership blip, `250ms` × 2 by default, `RetryAttempts(-1)`, and `nats: no response from stream` as
+  the exhausted error — all still true at nats.go v1.53.1, and none of it done by `nats pub -J`.
 - [[s-adr-4-message-headers]] — the header wire format: `NATS/1.0`, `HDR_LEN` through the blank line, case
   preserving, one value per line; no version — that comes from the source at v2.2.0.
 - [[s-adr-47-request-many]] — *Partially Implemented*: the four stop conditions of a many-reply request and
@@ -952,6 +973,11 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-gh-4984-micro-with-jetstream]] — can a services handler ack and nak? "Roughly planned … no
   immediate plans" in 2024, "Still not on the immediate roadmap" in 2025 — the public statement of where
   core NATS request/reply stops.
+- [[s-gh-2961-js-and-core-one-cluster]] — "You can use both at the same time with the same cluster",
+  and what it costs: memory up, "core nats performance will remain the same essentially". The only
+  public maintainer statement on the mixed deployment.
+- [[s-gh-3507-no-external-store]] — "No, we will support memory and file based for the store level" —
+  no external database, ever; replication is replicas, mirrors and sources. Row 143's thread.
 - [[s-gh-2760-one-connection-or-two]] — "start with one connection"; head-of-line blocking is on the
   subscription side, so split subscriptions, not publishing. Row 138's thread.
 
@@ -1134,10 +1160,8 @@ the gap is recorded under `## To verify` on the `key-value` page.
 
 Reference: *(every reference table is written — see the Reference section above)*
 
-Patterns: [[core-or-jetstream]] — linked from `core-nats-delivery` and `services-on-core-nats`, both of
-which stop at the point where a design needs durability and hand the decision on. The page is step 7 of the
-client-side plan (bank row 133, which closes megaplan group G7). `services-on-core-nats` was written
-2026-09-04 and is in the Operations section above.
+Patterns: *(none — `core-or-jetstream` was written 2026-09-04 for bank row 133, closing megaplan
+group G7, and is in the Operations section above with `services-on-core-nats`.)*
 
 Entities: *(all the repos, clients, tools, releases, products and organisations the ecosystem page
 names now have pages — see the Entities section above. People: none yet.)*

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [timeout, request-reply, no-responders, gomaxprocs, request_queue_limit, routes, kubernetes]
 aliases: ["nats: timeout", "Future cancelled, response not registered in time", "request timeout", "no responders available for request", "publish timeout"]
-sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply, s-nats-server-client-lifecycle-observed, s-nats-go-connection, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-services-discovery-and-stats, s-nats-server-services-observed]
+sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply, s-nats-server-client-lifecycle-observed, s-nats-go-connection, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-services-discovery-and-stats, s-nats-server-services-observed, s-adr-22-publish-retries, s-nats-server-core-or-jetstream-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -314,6 +314,29 @@ while the server logged `Publish Violation - Subject "orders.echo"`. When a requ
 service looks healthy, read the server log before anything else.
 
 
+## On a JetStream publish, `no responders` has two causes and one of them is not a fault
+
+Both print the same line and one is a design error:
+
+| cause | how to confirm | what to do |
+|---|---|---|
+| **no stream captures the subject** | `nats stream ls`, then `nats stream subjects <name>`; the failure is immediate — 24 ms in the run below | fix the subject list, or the publish. Retrying never helps. |
+| **a leadership blip** during an election | it clears by itself; `nats stream info` shows a new leader | retry with backoff — this is what [[s-adr-22-publish-retries]] specifies |
+
+Measured on an R3 stream at 2.14.6: a stream-leader step-down cost a publisher **exactly one publish
+out of 312**, as `nats: no responders available for request` 32 ms after the step-down; the core
+publisher beside it saw nothing, and a **meta**-leader step-down cost nothing at all (source:
+[[s-nats-server-core-or-jetstream-observed]]).
+
+A client that retried and gave up says something different: nats.go turns an exhausted
+`ErrNoResponders` into **`nats: no response from stream`**. If you see that string, the client already
+tried 250 ms apart, twice, by default. If you see `no responders available for request`, it did not —
+which is always the case for `nats pub -J`, whose publish is a plain `nc.RequestMsg` with no retry.
+
+And a plain **timeout** on a JetStream publish is not "not stored": the server may have stored the
+message and lost the ack on the way back. Retry it with a stable `Nats-Msg-Id` — [[publishing]].
+
+
 ## Related
 
 [[stream-has-high-message-lag]] · [[slow-consumer-detected]] · [[build-a-3-node-cluster]] ·
@@ -330,4 +353,4 @@ service looks healthy, read the server log before anything else.
 - [[s-gh-7190-asymmetric-cluster]] — the same single-DNS-name route defect, independently reported.
 - [[s-docs-monitoring-endpoints]] — `slow_consumers` and `/connz?sort=pending`.
 - [[s-docs-forming-a-cluster]] — what the `Routes` column counts. ·
-[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-connection]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-services-discovery-and-stats]] · [[s-nats-server-services-observed]]
+[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-connection]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-services-discovery-and-stats]] · [[s-nats-server-services-observed]] · [[s-adr-22-publish-retries]] · [[s-nats-server-core-or-jetstream-observed]]

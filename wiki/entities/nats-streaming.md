@@ -8,9 +8,9 @@ verified-against: nats-streaming-server v0.25.6
 verified-on: 2026-08-31
 tags: [repo, deprecated, archived, stan, nats-streaming, jetstream-replacement]
 aliases: [stan, nats-streaming, nats streaming, "nats-io/nats-streaming-server", nats-streaming-server]
-sources: [s-github-repo-facts]
+sources: [s-github-repo-facts, s-gh-3507-no-external-store]
 created: 2026-08-31
-updated: 2026-08-31
+updated: 2026-09-04
 ---
 
 # NATS Streaming (STAN) — deprecated
@@ -45,10 +45,25 @@ lands on the replacement instead of on a 2019 tutorial.
   `stan.Connect`, channels, or a separate streaming binary is about this system and does not apply to
   JetStream.
 
+## What the migration loses that is easy to miss: the pluggable store
+
+NATS Streaming's store was pluggable — people ran it on SQL, and replicated the database themselves.
+JetStream's is not. Asked directly whether Postgres would be supported, the chosen answer was "no, we
+will support memory and file based for the store level. We can replicate in either store and each
+store can also have digital twins or source mux/demux streams" (source:
+[[s-gh-3507-no-external-store]], @derekcollison, 2022-09-28), and that is still the whole list at
+2.14.6.
+
+So a migration that was relying on the database for replication, backup or for letting the rest of the
+estate query the messages has to replace all three with NATS mechanisms: [[replicas]] for the quorum,
+[[mirrors-and-sources]] for a second copy, [[backup-and-restore-jetstream]] for an offline one, and a
+republish or [[direct-get]] for the query path.
+
+
 ## Related
 
 [[stream]] · [[consumer]] · [[nats-server]] · [[nats-c]] · [[retention-policies]]
 
 ## Sources
 
-[[s-github-repo-facts]]
+[[s-github-repo-facts]] · [[s-gh-3507-no-external-store]]

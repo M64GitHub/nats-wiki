@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-services-scaling, s-gh-4984-micro-with-jetstream, s-nats-server-services-observed]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-services-scaling, s-gh-4984-micro-with-jetstream, s-nats-server-services-observed, s-nats-server-core-or-jetstream-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -281,6 +281,22 @@ time; four callers timed out (source: [[s-nats-server-services-observed]]). A qu
 giving up.
 
 
+## Why the stream goes behind the endpoint, not over it
+
+The tempting shortcut when a request/reply service needs durability is to put a stream over the
+service's own subjects and let it record the traffic. It does not work, and it breaks the service:
+an acking stream **replies** to everything it captures, so the caller receives `{"stream":"…",
+"seq":N}` instead of the handler's answer, and it arrives first — 277 µs against 407 µs in the run
+(source: [[s-nats-server-core-or-jetstream-observed]]). The server permits this silently for any
+ordinary subject.
+
+The working shape is the one this page describes: the caller's request goes to a **core** subject, the
+handler publishes the work into a stream and reads it back through this pool, and the answer — if a
+caller is still waiting for one — goes back on the reply subject the request carried. Streams and
+service subjects stay disjoint. [[core-or-jetstream]] is the decision, [[services-on-core-nats]] the
+synchronous half.
+
+
 ## Related
 
 [[consumer]] · [[ack-and-redelivery]] · [[stream]] · [[retention-policies]] · [[priority-groups]] ·
@@ -289,4 +305,4 @@ giving up.
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-services-scaling]] · [[s-gh-4984-micro-with-jetstream]] · [[s-nats-server-services-observed]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-services-scaling]] · [[s-gh-4984-micro-with-jetstream]] · [[s-nats-server-services-observed]] · [[s-nats-server-core-or-jetstream-observed]]

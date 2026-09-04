@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [request-reply, inbox, _INBOX, inbox-prefix, timeout, no-responders, 503, Nats-Subject, scatter-gather, request-many, replies, reply-timeout, wait-for-empty, NATS-RPLY-22, service-import, head-of-line]
 aliases: [request/reply, request reply, request-response, inbox, _INBOX, reply subject, reply inbox, "no responders", "No responders are available", "NATS/1.0 503", "nats: no responders available for request", scatter-gather, scatter gather, request many, RequestMany, requestMany, RequestManyAsync, --replies, --inbox-prefix, CustomInboxPrefix, "nats request", "nats reply"]
-sources: [s-docs-core-nats-request-reply, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-adr-4-message-headers, s-adr-47-request-many, s-relnotes-2.2.0, s-gh-2760-one-connection-or-two, s-docs-core-nats-queue-groups, s-nats-cli-core-commands, s-relnotes-2.12, s-relnotes-2.10, s-nats-server-core-delivery, s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription, s-adr-32-service-api, s-docs-services-framework, s-nats-server-services-observed]
+sources: [s-docs-core-nats-request-reply, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-adr-4-message-headers, s-adr-47-request-many, s-relnotes-2.2.0, s-gh-2760-one-connection-or-two, s-docs-core-nats-queue-groups, s-nats-cli-core-commands, s-relnotes-2.12, s-relnotes-2.10, s-nats-server-core-delivery, s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription, s-adr-32-service-api, s-docs-services-framework, s-nats-server-services-observed, s-nats-server-core-or-jetstream-observed]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -253,6 +253,31 @@ from a fire-and-forget publish. And a request already accepted by a handler that
 no-responders answer at all; the caller only ever sees its own timeout.
 
 
+## A fourth outcome: a stream answers instead of your responder
+
+If a JetStream stream captures the subject a request goes to, the **stream** replies — with its
+`PubAck`, on the requester's inbox, as an ordinary message, and it usually gets there first. Observed
+on 2.14.6 with a `nats reply svc.echo 'pong'` responder running:
+
+```
+$ nats request svc.echo ping                 # no stream
+pong
+$ nats stream add SVC --subjects 'svc.>' …   # then the same request
+05:56:38 Received with rtt 276.917µs
+{"stream":"SVC","seq":1}
+```
+
+Gathering every reply instead of the first shows both, stream first: `{"stream":"SVC","seq":2}` at
+335 µs, `pong` at 451 µs. On the wire it is two `MSG` frames on one inbox — 24 bytes then 4 — with no
+header, no status and nothing else to tell them apart, so a client that takes one reply takes the ack
+(source: [[s-nats-server-core-or-jetstream-observed]]).
+
+The server only refuses this for `>`, `$JS.>`/`$JSC.>`/`$NRG.>` and `$SYS.>`, and only by demanding
+`no_ack`; an ordinary subject like `svc.>` is allowed silently. If a working service suddenly answers
+`{"stream":…}`, look at what someone added to a stream's `--subjects`. Keeping request/reply verbs out
+of an event stream's subject list is a design rule, not a preference — [[core-or-jetstream]].
+
+
 ## Related
 
 [[core-nats-delivery]] · [[queue-groups]] · [[nats-timeout]] · [[subject-permissions]] ·
@@ -277,4 +302,4 @@ no-responders answer at all; the caller only ever sees its own timeout.
 - [[s-relnotes-2.12]] — `Nats-Subject` on the 503 (#5250).
 - [[s-relnotes-2.10]] — no responders over a service import (2.10.26, #6532).
 - [[s-nats-server-core-delivery]] — the `CONNECT` check that closes a connection asking for
-  `no_responders` without headers. · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-nats-go-subscription]] · [[s-adr-32-service-api]] · [[s-docs-services-framework]] · [[s-nats-server-services-observed]]
+  `no_responders` without headers. · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-nats-go-subscription]] · [[s-adr-32-service-api]] · [[s-docs-services-framework]] · [[s-nats-server-services-observed]] · [[s-nats-server-core-or-jetstream-observed]]

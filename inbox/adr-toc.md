@@ -29,7 +29,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 19 | ADR-19.md | API prefixes for materialized JetStream views | Partially Implemented | clients jetstream kv objectstore | jetstream, client, kv, objectstore | partial |  |
 | 20 | ADR-20.md | JetStream based Object Stores | Implemented | clients jetstream objectstore | jetstream, client, objectstore, spec | implemented | [[s-adr-20-object-store]] |
 | 21 | ADR-21.md | NATS Configuration Contexts | Partially Implemented | clients | client | partial |  |
-| 22 | ADR-22.md | JetStream Publish Retries on No Responders | Partially Implemented | clients jetstream | jetstream, client | partial |  |
+| 22 | ADR-22.md | JetStream Publish Retries on No Responders | Partially Implemented | clients jetstream | jetstream, client | partial | [[s-adr-22-publish-retries]] |
 | 26 | ADR-26.md | NATS Authorization Callouts | Implemented | core | server | ★ implemented |  |
 | 28 | ADR-28.md | JetStream RePublish | Implemented | core jetstream | jetstream, server | ★ implemented |  |
 | 30 | ADR-30.md | Subject Transform | Implemented | core | server | ★ implemented |  |

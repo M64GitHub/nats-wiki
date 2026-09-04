@@ -7,7 +7,7 @@ verified-against: natscli v0.4.0
 verified-on: 2026-08-31
 tags: [tool, cli, nats, contexts, check, bench, auth]
 aliases: [natscli, nats, nats cli, "nats-io/natscli"]
-sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports, s-nats-cli-core-commands, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-cli-request-reply-source, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-adr-47-request-many, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-faults-observed, s-adr-32-service-api, s-docs-services-discovery-and-stats, s-docs-services-framework, s-nats-server-services-observed]
+sources: [s-natscli-backup-restore, s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-prometheus-and-dashboards, s-natscli-account-tls, s-docs-authentication-basics, s-docs-operator-mode, s-docs-decentralized-auth, s-natscli-stream-external, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-docs-publishing, s-docs-altering-stream-state, s-docs-subject-mapping, s-docs-kv-ttl-and-limits, s-docs-kv-your-first-bucket, s-docs-accounts-and-multitenancy, s-docs-authorization, s-docs-config-and-jwt-backup, s-docs-forming-a-cluster, s-docs-kubernetes, s-docs-single-server, s-docs-stream-backup-restore, s-docs-your-first-cluster, s-gh-6605-which-consumer-is-slow, s-gh-7684-certificate-expiry, s-gh-7854-jwt-push-timeout, s-nats-server-snapshot-restore, s-nats-server-mirrors-observed, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-system-subjects-observed, s-nats-cli-help-0.4.0, s-natscli-auth-exports-imports, s-nats-cli-core-commands, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-cli-request-reply-source, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-adr-47-request-many, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-faults-observed, s-adr-32-service-api, s-docs-services-discovery-and-stats, s-docs-services-framework, s-nats-server-services-observed, s-adr-22-publish-retries, s-nats-server-core-or-jetstream-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -608,6 +608,33 @@ bridge for them. For the bodies without the wrapper: `nats request '$SRV.INFO' '
 (`--replies=0` waits out `--timeout` and prints every reply).
 
 
+## What bites you — `nats pub -J` is a diagnostic, not a resilient publisher
+
+Read at **natscli v0.4.0**, `cli/pub_command.go:253–290` (`raw/nats-go-src/jetstream-publish-v1.53.1.md`):
+
+- **It does not use `js.Publish`.** The whole JetStream path is `resp, err := nc.RequestMsg(msg,
+  opts().Timeout)` followed by `jsm.ParsePubAck(resp)` — a plain core request. So none of
+  [[s-adr-22-publish-retries]]'s back-off runs: no `RetryWait`, no `RetryAttempts`, no retry at all.
+  On a stream-leader step-down the CLI failed in 14 ms including process start, where a retrying
+  client would have taken at least 500 ms (source: [[s-nats-server-core-or-jetstream-observed]]).
+- **The error string tells you which you have.** `nats: no responders available for request` is a
+  client that did not retry; `nats: no response from stream` is nats.go after exhausting its retries.
+- **It prints `Published N bytes …` before it sends the request** (`:277` precedes `:279`), so a
+  failing JetStream publish prints a success line and then an error:
+
+  ```
+  05:54:00 Published 4 bytes to "nostream.x"
+  nats: error: nats: no responders available for request
+  ```
+
+- Consequence for benchmarking and for runbooks: `nats pub -J` measures one round trip with no
+  resilience. It is the right tool for "is this subject captured by a stream" and the wrong one for
+  "would my application have survived this election".
+
+`nats bench pub` versus `nats bench js pub sync|async` is the honest comparison, and it is on
+[[core-or-jetstream]].
+
+
 ## Related
 
 [[nsc]] · [[nk]] · [[nats-box]] · [[nats-top]] · [[jsm-go]] · [[monitoring-endpoints]] ·
@@ -629,4 +656,4 @@ bridge for them. For the bodies without the wrapper: `nats request '$SRV.INFO' '
 [[s-gh-6605-which-consumer-is-slow]] · [[s-gh-7684-certificate-expiry]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-nats-server-snapshot-restore]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-cli-help-0.4.0]] · [[s-natscli-auth-exports-imports]] · [[s-nats-cli-core-commands]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-cli-request-reply-source]] · [[s-nats-server-request-reply-observed]]
 - [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] · [[s-adr-47-request-many]] — the
-  gather flags as the docs and ADR-47 describe them, for the `nats request` section. · [[s-nats-cli-reconnect]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-faults-observed]] · [[s-adr-32-service-api]] · [[s-docs-services-discovery-and-stats]] · [[s-docs-services-framework]] · [[s-nats-server-services-observed]]
+  gather flags as the docs and ADR-47 describe them, for the `nats request` section. · [[s-nats-cli-reconnect]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-faults-observed]] · [[s-adr-32-service-api]] · [[s-docs-services-discovery-and-stats]] · [[s-docs-services-framework]] · [[s-nats-server-services-observed]] · [[s-adr-22-publish-retries]] · [[s-nats-server-core-or-jetstream-observed]]
