@@ -1,5 +1,26 @@
 # Plan — the client side: what a client sees (proposed 2026-09-03)
 
+**Result (2026-09-04, all nine steps done over 2026-09-03 → 2026-09-04, ten sessions — the read that wrote the plan, then one per step).** The unread half of the docs is read and
+the wiki now owns core NATS. **Twelve pages**: concepts `core-nats-delivery` (row 25),
+`subjects-and-wildcards`, `request-reply`, `queue-groups`, `client-connection-lifecycle`,
+`services-framework`; reference `client-defaults`, `wire-protocol`; gotchas `slow-consumer-in-the-client`,
+`connection-closed-after-auth-error`; patterns `services-on-core-nats` (row 134) and `core-or-jetstream`
+(row 133, closing megaplan **G7**) — each in the index, each with `since:` and a `verified-against`
+naming its authority (nats-server 2.14.6, nats.go v1.53.1, natscli 0.4.0, ADR-32 rev 6). **51
+summaries**, **113 ripples**, **twelve `## What bites you` sections** (one per client entity; `nats-go`
+has five). Docs coverage **complete on all seven trees**: `learn/core-nats` 11/11,
+`learn/resilient-clients` 8/8, `learn/services` 6/6, `reference/protocols` 4/4, `reference/services`
+3/3, `concepts` 11/11 (nine folded, two prior), `reference/config/mappings` 4/4. Every behavioural
+claim was **run on the 2.14.6 binary** — eight observed files in `raw/nats-server-src/` with their
+scripts, plus source extracts at nats.go v1.53.1, natscli 0.4.0, jwt v2.8.2 and nats-pure.rb v2.5.0.
+Docs issues **#81–#122** (42, six ★), server issues **SI-7, SI-8**; the ADR-40 four-minute reading
+corrected on `upgrade-a-cluster` and `s-adr-40-nats-connection`. Bank 131 / 165 → **169 / 197** (rows
+25, 133, 134, 87, 138, 143, 148, 150, 156 filled; 169–197 added and answered); open rows 34 → **28**,
+open `own` 13 → **3**. Lint: 345 → **417 pages**, wanted **0**, drift 0, unlanded **0**, unverified 12
+(one under a `## To verify`), staleness 0 behind 2.14.6. **Next:** megaplan phase G, starting with
+**G1 — stream and subject design** (`inbox/plan-stream-and-subject-design-<DATE>.md`), rows 108, 109,
+110, 111, 114 and the new 144, resting on `subjects-and-wildcards` and `stream` from this phase.
+
 Say **`start the plan inbox/plan-the-client-side-2026-09-03.md`** to work this file — name it
 explicitly, a bare `start the plan` takes the newest `inbox/plan-*.md`. `CLAUDE.md` → *Operation:
 plan* says how: one step at a time, `status:` rewritten in place, `wiki/log.md` appended, lint run,
@@ -559,7 +580,7 @@ learns across gateways; else `no-public-answer` after a cache grep), 138 (if ste
 a `defaults-and-limits` row), 87 (the Orbit module per language — re-check against the READMEs).
 Index (the entity lines gain the section's hook), log, lint.
 
-## Step 9 — close · status: open
+## Step 9 — close · status: done 2026-09-04 — no source, no page: the measurement. `concepts/security.md` and `concepts/topologies.md` **read and folded** (the last two of the eleven; neither carries a surplus sentence — every claim is already on `subject-permissions`, `tls-in-nats`, `operator-mode`, `auth-callout`, `choosing-a-topology`, `build-a-3-node-cluster`, `gateway`, `leafnode`), which makes the coverage line honest: `learn/core-nats` 11/11, `learn/resilient-clients` 8/8, `learn/services` 6/6, `reference/protocols` 4/4, `reference/services` 3/3, `concepts` 11/11 (nine folded, two prior), `reference/config/mappings` 4/4. Every *done when* clause measured and written into `wiki/log.md` with the before/after table: rows **25, 133, 134** filled; **twelve** `## What bites you` sections across the twelve client entities; the twelve pages in the index with `since:` and an authority-naming `verified-against`; the ADR-40 correction on `upgrade-a-cluster` and `s-adr-40-nats-connection` in place; all 42 phase issues **#81–#122** carrying a *Where the wiki records* row (checked by script — every detail section 4–122 has one); `python3 tools/lint.py` **417 pages, 0 · 0, wanted 0**, unverified 12; `check-staleness.py` **0 behind 2.14.6** (15 *authority unknown* — the client pins are outside the six versioned things the script tracks, by design). `local/scratch/` pruned: the four `digest-*.md`, `releases/` (raw copies confirmed: 12 release files + the Ruby source, with their `raw/sources.md` row) and the throwaway extract generators deleted; the sources at their tags and every run transcript kept as the unedited originals. Result line written; phase F marked **done** in `local/megaplan.md`, with G1 proposed as phase G's first plan
 
 Measure every *done when* clause and write the numbers: the bank cells (25, 133, 134, and every row the
 new pages name), the twelve `## What bites you` sections, the coverage line in the log (the seven

@@ -5002,3 +5002,80 @@ surprise here is a client's, and a client has a maintainer to ask.
 
 Lint: **417 pages** (413 → 417), drift 0, unlanded **0**, wanted **0**, unverified 12, staleness 0
 behind 2.14.6.
+
+## 2026-09-04 — phase F step 9: close — the client side, measured
+
+**Operation: plan**, step 9 of `inbox/plan-the-client-side-2026-09-03.md`, and the close of megaplan
+phase F. No new source, no new page: the step is the measurement of the phase's *done when*, the two
+`concepts/` primers still unfolded, and the bookkeeping.
+
+**The two primers, read and folded.** `concepts/security.md` (116 lines) and `concepts/topologies.md`
+(117 lines) were the last two of the eleven `concepts/` pages. Both are the deep dives' shorter form
+and **neither carries a surplus sentence**: security's three pillars are on [[subject-permissions]]
+(its L48 "an allow list closes off the rest" and "deny takes precedence over allow" are already rules
+1 and 2 there), [[tls-in-nats]] (L59 `verify_and_map` mapping the certificate's SAN or DN, L63
+encryption at rest with AES or ChaCha20-Poly1305), [[operator-mode]] (L21's operator → account → user
+chain) and [[auth-callout]] (L22); topologies' five shapes are on [[choosing-a-topology]], [[build-a-3-node-cluster]],
+[[gateway]] (L46's geo-affinity, which the page states precisely — and which docs issue **#88** records
+as false *inside one cluster*, where this page does not claim it) and [[leafnode]] (L109's "the cluster
+sees one leaf connection", already at `leafnode.md:407` as a client connect event on the bound
+account). Nothing carried, nothing added to a page; recorded here so the fold is traceable rather than
+implied.
+
+**Docs coverage, the seven trees this phase owed** — the *done when* clause, now measurable:
+
+| tree | files | read | how |
+|---|---|---|---|
+| `learn/core-nats` | 11 + index | **11/11** | steps 1–2, four summaries |
+| `learn/resilient-clients` | 8 + index | **8/8** | steps 3–4, five summaries |
+| `learn/services` | 6 + index | **6/6** | step 6, three summaries + ADR-32 |
+| `reference/protocols` | 4 + index | **4/4** | step 5, two summaries |
+| `reference/services` | 3 + index | **3/3** | step 6, folded into [[s-docs-services-discovery-and-stats]] |
+| `concepts` | 11 | **11/11** | nine folded (`subjects`, `pub-sub-basics`, `what-is-nats`, `intro` in step 1; `request-reply`, `queue-groups` in step 2; `jetstream` as [[s-docs-concepts-jetstream]] in step 7; `security`, `topologies` here), two prior ([[s-docs-ecosystem]], [[s-docs-getting-started]]) |
+| `reference/config/mappings` | 3 + index | **4/4** | step 1, folded into [[s-docs-core-nats-subjects-and-mapping]] |
+
+**The phase's twelve pages**, each in `wiki/index.md`, each carrying `since:` and a `verified-against`
+naming the authority it rests on (nats-server 2.14.6, nats.go v1.53.1, natscli 0.4.0, ADR-32 rev 6):
+concepts [[core-nats-delivery]], [[subjects-and-wildcards]], [[request-reply]], [[queue-groups]],
+[[client-connection-lifecycle]], [[services-framework]]; reference [[client-defaults]],
+[[wire-protocol]]; gotchas [[slow-consumer-in-the-client]], [[connection-closed-after-auth-error]];
+patterns [[services-on-core-nats]] (row 134) and [[core-or-jetstream]] (row 133, which closes megaplan
+G7). All twelve client entities carry `## What bites you`; [[nats-go]] carries five such sections,
+[[nats-java]] and [[nats-net]] two.
+
+**Before and after** — phase F, 2026-09-03 → 2026-09-04, eight working steps:
+
+| measure | before (phase E close) | after |
+|---|---|---|
+| pages | 345 | **417** |
+| — of which summaries | 228 | **287** (+59: **51** from this phase's eight steps, 8 from the 2026-09-03 interlude ingest that also added [[service-import-request-info]], #79–#80 and SI-6) |
+| — reader pages added | — | **13** (12 this phase, 1 the interlude) |
+| question-bank rows · answered | 165 · 131 | **197 · 169** |
+| open rows · open `own` | 34 · 13 | **28 · 3** |
+| wanted pages | 0 | **0** (two registered and closed on the way: `services-on-core-nats`, `core-or-jetstream`) |
+| `(unverified)` markers | 11 | **12** (the one added in step 1 sits under a `## To verify`) |
+| citation drift · unlanded ripples | 0 · 0 | **0 · 0** |
+| staleness behind 2.14.6 | 0 | **0** |
+| docs issues | 78 | **122** (#79–#80 from the 2026-09-03 interlude ingest, **#81–#122** from this phase — six ★) |
+| server issues | 5 | **8** (SI-6 interlude, SI-7 step 1, SI-8 step 2) |
+
+`check-staleness.py` reports 0 behind and **15 authority unknown** — the client authorities (nats.go
+v1.53.1, natscli 0.4.0, ADR-32 rev 6) are outside the six versioned things the script tracks, so a
+page pinned to a client release is invisible to it by design, not overdue. Every one of those pins is
+re-checked by hand when the pin moves.
+
+**What the phase settled that no page had before.** Core NATS had no owner page at all: at-most-once
+and its ordering rule (per publisher connection, across every subject), the 503 and its `Nats-Subject`
+header, queue-group selection (random over the members, not readiness-aware), the reconnect buffer and
+what the gap costs, the `-ERR` inventory as **60** call sites with which strings leave a connection
+usable, the services framework as a pure client convention over ten subscriptions per instance, and the
+durability boundary — including that **a stream laid over a request/reply subject answers the requests
+itself**, which the docs' own Acme example walks into (#119 ★). Forty-two docs issues came out of it,
+and every behavioural claim on the twelve pages was run on the 2.14.6 binary and recorded in
+`raw/nats-server-src/*-observed-v2.14.6.md` with its scripts beside it.
+
+**Bank**: no cell earned by this step — it creates no page. 169 / 197 stands.
+
+Lint: **417 pages**, drift 0, unlanded **0**, wanted **0**, unverified 12, staleness 0 behind 2.14.6.
+**Phase F is done.** Next: megaplan phase G, starting with G1 (stream and subject design), whose
+foundation is [[subjects-and-wildcards]] from step 1.
