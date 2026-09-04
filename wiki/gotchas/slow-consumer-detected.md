@@ -3,11 +3,11 @@ title: "Slow Consumer Detected in the server log"
 type: gotcha
 area: [monitoring, core]
 since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
-verified-against: nats-server 2.14
+verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [slow-consumer, write_deadline, nats-top, unresolved]
 aliases: ["Slow Consumer Detected", "WriteDeadline exceeded", "slow consumer"]
-sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-queue-groups, s-nats-cli-reconnect]
+sources: [s-gh-6605-which-consumer-is-slow, s-docs-connection-limits-config, s-docs-monitoring-endpoints, s-nats-server-constants-2.14.6, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-gh-5859-unexpected-nats-timeout, s-gh-6892-evict-a-sick-node, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-server-system-subjects, s-prometheus-nats-exporter-metrics-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-queue-groups, s-nats-cli-reconnect, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-nats-go-subscription, s-docs-resilient-clients-slow-consumers-and-request-reply]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -268,6 +268,40 @@ diffing the default reports at v2.10.29 and v2.11.17 (source: [[s-relnotes-2.11]
 [[s-relnotes-2.12]]). An operator on 2.11.11 or later may set them.
 
 
+## Two branches, two log lines, and no `-ERR` on either
+
+The server cuts a slow consumer from **two** different places, and the log line tells you which
+(source: [[s-nats-server-client-errors]], both run on 2.14.6 in
+[[s-nats-server-client-faults-observed]]):
+
+| branch | trigger | log line | `/connz` reason |
+|---|---|---|---|
+| write deadline | the server could not finish a write within `write_deadline` | `Slow Consumer Detected: WriteDeadline of 100ms exceeded with 2 chunks of 4029 total bytes.` — `Detected` the first time, **`State`** on repeats | `Slow Consumer (Write Deadline)` |
+| pending bytes | outbound queued for the connection passed `max_pending` | `Slow Consumer Detected: MaxPending of 1048576 Exceeded` | `Slow Consumer (Pending Bytes)` |
+
+The `Detected` / `State` distinction is worth knowing: `handleWriteTimeout` prints `State` once the
+connection is already flagged, so a burst of `State` lines is one connection failing repeatedly, not
+many connections failing once.
+
+**Neither branch sends the client anything.** `markConnAsClosed` sets `skipFlushOnClose` for
+`SlowConsumerPendingBytes` and `SlowConsumerWriteDeadline` (as it does for `ReadError`, `WriteError`
+and `TLSHandshakeError`), so the pending output — and any `-ERR` — is discarded rather than flushed.
+Measured: a subscriber that stopped reading drained **556,002 bytes and then read EOF**, with no
+error string at all. This matters for triage: **the client cannot tell you it was cut as a slow
+consumer**, so the diagnosis has to come from the server's log or from
+`curl -s 'http://127.0.0.1:8222/connz?state=closed'`.
+
+`reference/system/errors.md` lists `Slow Consumer Detected`, `Consumer Is Slow` and
+`Write Deadline Exceeded` among the errors "the NATS server can return to clients". The first is a
+log line, and the other two do not exist in the server source at v2.14.6 — see the sweep in
+[[s-docs-system-errors]] (docs issue #100).
+
+Before the cut there is backpressure: `queueOutbound` opens a **stall gate** once the connection's
+pending output passes **75 % of `max_pending`** (`c.out.pb > c.out.mp/4*3`), which slows the
+*producers* rather than the slow reader. A connection sitting near that line is the warning the
+counter does not give you.
+
+
 ## The client-side sibling
 
 The core-NATS chapter states the server's half in one sentence — past its pending threshold the server
@@ -275,9 +309,20 @@ The core-NATS chapter states the server's half in one sentence — past its pend
 lives in the client: process messages fast enough, or hand them to a worker"
 (`learn/core-nats/publish-subscribe.md:576`; source: [[s-docs-core-nats-publish-subscribe]]). The other
 half — a client's own pending limits, which drop messages *before* the server ever notices, with the
-subscription still alive — is a different symptom with a different page, written in step 4 of
-`inbox/plan-the-client-side-2026-09-03.md`; what a core publish promises in the first place is on
+subscription still alive — is a different symptom with its own page:
+[[slow-consumer-in-the-client]]. What a core publish promises in the first place is on
 [[core-nats-delivery]].
+
+The two are cleanly separable from either end, and a run on 2.14.6 shows how
+(source: [[s-nats-server-client-faults-observed]]):
+
+| | client-side | server-side (this page) |
+|---|---|---|
+| what is lost | individual messages, from **one subscription's** buffer | the **whole connection** |
+| the connection | stays CONNECTED | closed |
+| the client sees | `nats: slow consumer, messages dropped` on the async callback, or on stderr | a read error / EOF, then its reconnect loop |
+| the server sees | **nothing** — `slow_consumers` stayed **0** through four client-side runs | `Slow Consumer Detected: …` and a `/connz` close reason |
+| the fix | pending limits, a worker pool, a queue group, or a stream | read the socket faster, or spread the load |
 
 
 ## Why `nats sub` will not show you a client-side drop
@@ -314,4 +359,4 @@ that moment the member keeps its random share of the group's traffic however far
 
 [[s-gh-6605-which-consumer-is-slow]] · [[s-docs-connection-limits-config]] ·
 [[s-docs-monitoring-endpoints]] · [[s-nats-server-constants-2.14.6]] · [[s-nats-server-topology]] ·
-[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-queue-groups]] · [[s-nats-cli-reconnect]]
+[[s-gh-7494-supercluster-degradation]] · [[s-gh-5859-unexpected-nats-timeout]] · [[s-gh-6892-evict-a-sick-node]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-server-system-subjects]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-queue-groups]] · [[s-nats-cli-reconnect]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-system-errors]] · [[s-nats-go-subscription]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]]

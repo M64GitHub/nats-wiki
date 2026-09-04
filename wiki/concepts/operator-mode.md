@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [operator, jwt, nkeys, ed25519, signing-keys, scoped, revocation, bearer, resolver, creds]
 aliases: [decentralized auth, decentralized authentication, jwt auth, operator, trust chain, nkeys, scoped signing key, resolver]
-sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-docs-authentication-basics, s-docs-authorization, s-docs-cross-account, s-gh-5941-restrict-leafnode-subjects, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.11, s-jwt-imports-exports-activation, s-nsc-imports-exports-activation]
+sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-docs-authentication-basics, s-docs-authorization, s-docs-cross-account, s-gh-5941-restrict-leafnode-subjects, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.11, s-jwt-imports-exports-activation, s-nsc-imports-exports-activation, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-resilient-clients-tls-and-auth, s-nats-go-subscription]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Operator mode
@@ -146,6 +146,49 @@ and the user must be marked (`--bearer` on `user add`). Marking only the user st
 `Authorization Violation`. It exists "for browser and websocket clients that have nowhere safe to keep
 a seed, and it reduces the credential to a single document that must never leak".
 
+### What expiry looks like on the wire, and when
+
+The page above says a lapsed client "gets plain `Authorization Violation`". That is true of a
+*connect* with an already-expired JWT; a credential that lapses **under a live connection** gets a
+different, more useful string. The server arms a timer at the JWT's expiry (`setExpiration` →
+`time.AfterFunc(d, c.authExpired)`) and, when it fires, sends the connected client
+(source: [[s-nats-server-client-errors]], measured in
+[[s-nats-server-client-faults-observed]] B1/B5):
+
+```
+-ERR 'User Authentication Expired'
+```
+
+and closes with the reason `Authentication Expired` — visible on `/connz?state=closed`. When it is
+the **account** JWT that lapses, the string is `-ERR 'Account Authentication Expired'` and the
+account's `expiredTimeout` walks *every* client in the account and closes them all at once. A
+revoked user gets `-ERR 'User Authentication Revoked'` and the reason `Revocation`.
+
+The boundary between the two answers is one second wide, and it is worth knowing because it decides
+how many reconnects a client gets. `jwt/v2` checks `now > Expires` at **one-second resolution**, so a
+CONNECT arriving inside the expiry second is *accepted* — `setExpiration` computes a zero-length
+timer and fires it immediately, producing `User Authentication Expired` again. From the next second
+the JWT fails validation and the answer becomes `Authorization Violation`
+(source: [[s-nats-server-client-errors]]).
+
+That matters because nats.go, nats.js, nats.java and nats.net abort reconnecting when **the same
+error arrives from the same server twice in a row** (source: [[s-nats-go-subscription]]). Measured
+against a JWT that lapsed under load: **CLOSED 0.51 s after expiry at `ReconnectWait 500ms`, 4.12 s
+at the default 2 s** — one attempt in the first case, two in the second, because the error changed
+in between (B3, B6). The retry window the chapter describes is therefore one or two attempts wide;
+it is not somewhere a rotation can be slotted in. Plan a credential callback or a longer expiry
+instead — [[connection-closed-after-auth-error]].
+
+Two operational corollaries:
+
+- **The `nats` CLI will not tell you.** It sets `IgnoreAuthErrorAbort` and unlimited reconnects, so
+  it retries forever; in 45 s over an expired credential it printed two lines while the server
+  rejected it eleven times (B2). "The CLI still works" is not evidence the credential is valid.
+- **`Authorization Violation` is deliberately uninformative.** `authViolation` sends that one string
+  "regardless of the authErr override" (`client.go:2529–2530`); the real reason is in the server's
+  debug log and in `/connz`'s close reason, not on the wire.
+
+
 ## Limits and failure modes
 
 - **Losing the operator seed is unrecoverable.** It is the only thing that can sign an account. Back
@@ -275,4 +318,4 @@ a JWT.
 [[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] ·
 [[s-docs-mqtt-auth-and-clustering]] · [[s-docs-websocket-browsers-and-origins]] ·
 [[s-docs-authentication-basics]] · [[s-docs-authorization]] · [[s-docs-cross-account]] ·
-[[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.11]] · [[s-jwt-imports-exports-activation]] · [[s-nsc-imports-exports-activation]]
+[[s-gh-5941-restrict-leafnode-subjects]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.11]] · [[s-jwt-imports-exports-activation]] · [[s-nsc-imports-exports-activation]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-go-subscription]]

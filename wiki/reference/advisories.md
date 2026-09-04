@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-advisories-and-metrics, s-docs-jetstream-advisories-reference, s-prometheus-nats-exporter-metrics-observed, s-gh-6182-what-to-alert-on]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-advisories-and-metrics, s-docs-jetstream-advisories-reference, s-prometheus-nats-exporter-metrics-observed, s-gh-6182-what-to-alert-on, s-docs-system-errors]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Advisories and system events
@@ -202,6 +202,17 @@ never learn that order `987` stopped being delivered" — and there is **no dead
 `max_deliver` advisory "is the only built-in signal that this happened" (source:
 [[s-docs-monitoring-advisories-and-events]]). The message itself stays in the stream under its
 retention policy; what stops is delivery to that consumer.
+
+### A second documented error list, and how far it can be trusted
+
+Advisories are events. The docs also carry two lists of the `-ERR` **protocol** strings a connection
+can be sent — `reference/system/errors.md` and `reference/protocols/client.md` — which are a
+different surface entirely and are not published as events. This wiki swept the first of them
+against the server at v2.14.6; the material and the counts live on [[error-codes]], not here
+(source: [[s-docs-system-errors]]). The one part of that page worth using unreservedly is its
+*Connection Close Reasons* table, which matches the server's `ClosedState` enum exactly and is what
+`/connz?state=closed` reports — see [[monitoring-endpoints]].
+
 
 ## The schema types
 
@@ -406,4 +417,4 @@ service-latency metric's real subject and every body are on [[system-subjects]] 
 [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
 [[s-docs-advanced-publishing]] ·
-[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-advisories-and-metrics]] · [[s-docs-jetstream-advisories-reference]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-gh-6182-what-to-alert-on]]
+[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-advisories-and-metrics]] · [[s-docs-jetstream-advisories-reference]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-gh-6182-what-to-alert-on]] · [[s-docs-system-errors]]

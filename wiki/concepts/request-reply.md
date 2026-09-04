@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [request-reply, inbox, _INBOX, inbox-prefix, timeout, no-responders, 503, Nats-Subject, scatter-gather, request-many, replies, reply-timeout, wait-for-empty, NATS-RPLY-22, service-import, head-of-line]
 aliases: [request/reply, request reply, request-response, inbox, _INBOX, reply subject, reply inbox, "no responders", "No responders are available", "NATS/1.0 503", "nats: no responders available for request", scatter-gather, scatter gather, request many, RequestMany, requestMany, RequestManyAsync, --replies, --inbox-prefix, CustomInboxPrefix, "nats request", "nats reply"]
-sources: [s-docs-core-nats-request-reply, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-adr-4-message-headers, s-adr-47-request-many, s-relnotes-2.2.0, s-gh-2760-one-connection-or-two, s-docs-core-nats-queue-groups, s-nats-cli-core-commands, s-relnotes-2.12, s-relnotes-2.10, s-nats-server-core-delivery]
+sources: [s-docs-core-nats-request-reply, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-adr-4-message-headers, s-adr-47-request-many, s-relnotes-2.2.0, s-gh-2760-one-connection-or-two, s-docs-core-nats-queue-groups, s-nats-cli-core-commands, s-relnotes-2.12, s-relnotes-2.10, s-nats-server-core-delivery, s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Request-reply
@@ -192,6 +192,45 @@ Server defaults from [[defaults-and-limits]].
 - **Replies are at-most-once** and share `max_payload`; a reply the responder cannot deliver (a
   disconnected requester, a too-large body) is gone, and the responder is not told.
 
+## Retrying: a different policy per outcome, and why the request must be idempotent
+
+The three outcomes are only useful if the caller acts differently on each
+(source: [[s-docs-resilient-clients-slow-consumers-and-request-reply]]).
+
+| outcome | what it means | retry policy |
+|---|---|---|
+| a reply | done | — |
+| **timeout** | a responder took the message and did not answer in time | a **short, fast** retry — it may answer on the second try |
+| **no responders (503)** | nothing was subscribed at all | **exponential backoff** — the responder is probably starting up |
+
+A blind "retry on any error" is wrong in both directions: it wastes the fast-retry opportunity on a
+slow responder, and it floods a subject nobody is listening on. Either way the loop must be
+**bounded** — five attempts is the documentation's default — with **jitter**, so a fleet of
+requesters does not retry in lockstep and overwhelm the responder the instant it returns.
+
+Set the timeout from measurement: **two or three times the responder's p99**. A timeout below the
+real latency turns every busy moment into a retry of an answer that was already on its way back.
+
+**A retry is a duplicate request**, and that is the part that corrupts state. If the first attempt
+reached the responder and only the *reply* was lost, the retry asks the same question again — two
+stock reservations, two charges. The fix is on both ends and costs nothing on the wire: key every
+request by an id the payload already carries, and have the responder return its cached answer for an
+id it has already handled.
+
+**A request in flight when the connection drops is lost outright** — NATS does not persist it. The
+inbox subscription is re-established automatically on reconnect (see [[client-connection-lifecycle]]),
+so a retry after the link returns works normally; because the retry is idempotent, replaying it is
+safe even if the original had reached the responder before the drop. If the answer must survive the
+drop without a retry, the request does not belong on core NATS — see [[core-nats-delivery]] and
+[[stream]].
+
+In nats.go the 503 becomes an error rather than a message: `Request` inspects the reply itself —
+an empty body carrying the no-responders status header — and returns `ErrNoResponders`
+(`nats: no responders available for request`) instead of the `*Msg`
+(source: [[s-nats-go-subscription]]). A client that reads the reply body directly will therefore
+never see the 503; it is only visible on the wire or through the error.
+
+
 ## Related
 
 [[core-nats-delivery]] · [[queue-groups]] · [[nats-timeout]] · [[subject-permissions]] ·
@@ -216,4 +255,4 @@ Server defaults from [[defaults-and-limits]].
 - [[s-relnotes-2.12]] — `Nats-Subject` on the 503 (#5250).
 - [[s-relnotes-2.10]] — no responders over a service import (2.10.26, #6532).
 - [[s-nats-server-core-delivery]] — the `CONNECT` check that closes a connection asking for
-  `no_responders` without headers.
+  `no_responders` without headers. · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-nats-go-subscription]]

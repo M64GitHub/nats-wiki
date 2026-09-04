@@ -30,18 +30,20 @@ last true.
 
 _none._
 
-## Authority the tool cannot check (8)
+## Authority the tool cannot check (10)
 
 `verified-against` names something with no release feed here — a site capture, a date, a spec. Not
 stale, not verifiable mechanically; re-read them by hand when the thing they name changes.
 
 | page | type | verified against | verified on | claims | verified from |
 |---|---|---|---|---|---|
-| [[client-defaults]] | reference | `nats.go v1.53.1, natscli 0.4.0, nats-server 2.14.6` | 2026-09-04 | default, limit, config key, CLI flag | [[s-nats-go-connection]] · [[s-nats-cli-reconnect]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-server-client-lifecycle-observed]] |
+| [[client-defaults]] | reference | `nats.go v1.53.1, natscli 0.4.0, nats-server 2.14.6` | 2026-09-04 | default, limit, config key, CLI flag | [[s-nats-go-connection]] · [[s-nats-cli-reconnect]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-subscription]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-faults-observed]] |
+| [[connection-closed-after-auth-error]] | gotcha | `nats-server 2.14.6, nats.go v1.53.1, nats CLI 0.4.0` | 2026-09-04 | limit, config key, CLI flag | [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-system-errors]] · [[s-nats-go-connection]] |
 | [[nats-architecture-and-design]] | entity | `nats-architecture-and-design @ main, 2026-08-31` | 2026-08-31 | limit, config key | [[s-github-repo-facts]] · [[s-adr-1-jetstream-json-api]] · [[s-adr-7-server-error-codes]] · [[s-adr-31-direct-get]] |
 | [[nats-helm-charts]] | entity | `nats-io/k8s chart nats-2.14.6` | 2026-08-31 | config key, CLI flag | [[s-nats-helm-chart-values-2.14.6]] · [[s-docs-rolling-upgrades]] · [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-kubernetes]] · [[s-docs-hardening]] · [[s-docs-config-management]] · [[s-docs-prometheus-and-dashboards]] · [[s-gh-7190-asymmetric-cluster]] |
 | [[nats-net]] | entity | `NATS .NET v3.2.0` | 2026-08-31 | limit, config key, error code | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-docs-core-nats-request-reply]] · [[s-adr-47-request-many]] |
 | [[nats-py]] | entity | `nats.py v2.15.0 · PyPI nats-py 2.15.0 / nats-core 0.2.0` | 2026-08-31 | config key | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-gh-4535-unauthenticated-connections]] · [[s-docs-getting-started]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] |
 | [[orbit]] | entity | `synadia-io/orbit.* as of 2026-08-31` | 2026-08-31 | config key | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-advanced-publishing]] · [[s-docs-get-direct]] · [[s-adr-47-request-many]] · [[s-docs-core-nats-request-reply]] |
+| [[slow-consumer-in-the-client]] | gotcha | `nats-server 2.14.6, nats.go v1.53.1, nats CLI 0.4.0` | 2026-09-04 | limit, config key, CLI flag | [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-system-errors]] · [[s-nats-go-connection]] · [[s-nats-cli-reconnect]] |
 | [[synadia]] | entity | `synadia.com site chrome captured 2026-08-31` | 2026-08-31 | limit, config key | [[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-synadia-jetstream-anti-patterns]] · [[s-synadia-jetstream-memory-patterns]] · [[s-cncf-nats-project]] · [[s-nats-server-readme]] · [[s-synadia-how-many-subjects]] |
 | [[synadia-products]] | entity | `synadia.com site navigation captured 2026-08-31` | 2026-08-31 | subject | [[s-github-repo-facts]] · [[s-synadia-jetstream-anti-patterns]] · [[s-gh-5606-cross-account-jetstream]] |

@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, mtls, verify, verify_and_map, handshake_first, tls_timeout, encryption-at-rest, prev_key, tls_cert_not_after]
 aliases: [tls, mtls, mutual tls, verify_and_map, handshake_first, encryption at rest, tls block, certificates]
-sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-errors, s-nats-server-client-faults-observed]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # TLS in NATS
@@ -149,6 +149,36 @@ fails with `wrong version number`**, because the first bytes are the `INFO` line
 "That error doesn't mean TLS is broken." With `handshake_first` on it works; otherwise use
 `gnutls-cli --starttls --port 4222 <host>` and press Ctrl-D after the `INFO`, or read
 `tls_cert_not_after` from `/varz` — see [[rotate-tls-certificates]].
+
+#### The mismatch matrix, measured
+
+Both mismatches have a distinct signature, and the two fallback forms have none — they simply work.
+Timed on 2.14.6 with `nats` CLI 0.4.0, one `nats pub` per cell
+(source: [[s-nats-server-client-faults-observed]], run C):
+
+| server `tls { … }` | a plain client | a `--tlsfirst` client | startup `[WRN]` | `openssl s_client` |
+|---|---|---|---|---|
+| no `handshake_first` | works, 0.028 s | **fails in 25 ms**: `nats: tls error: tls: first record does not look like a TLS handshake` | no | `wrong version number` |
+| `handshake_first: true` | **fails in 2.055 s**: `read tcp …: i/o timeout` | works, 0.035 s | **yes** | clean |
+| `handshake_first: "auto"` | works, **0.093 s** | works, 0.037 s | no | clean |
+| `handshake_first: "300ms"` | works, **0.359 s** | works, 0.027 s | no | — |
+
+Three things follow for an operator.
+
+- The two failures look nothing alike. A **client** that opted in too early fails **immediately** on
+  a TLS record error; a **client** that has not opted in yet hangs to its own connect timeout — 2 s
+  in most clients — and reports an I/O timeout. The docs describe the second and say the first is a
+  TLS handshake failure, which it is (source: [[s-docs-resilient-clients-tls-and-auth]]).
+- The **fallback delay is visible in the connect time**: 0.093 s against a 0.028 s baseline for
+  `"auto"`, 0.359 s for `"300ms"`. Every plain client pays it on every connect, so a long custom
+  delay is a real cost on a reconnect storm; 50 ms is not.
+- **The startup warning is not printed for `"auto"` or a duration.** It is gated on
+  `opts.TLSHandshakeFirst && opts.TLSHandshakeFirstFallback == 0` (`server.go:2805–2812`, source:
+  [[s-nats-server-client-errors]]) — so the absence of the warning is a positive signal that the
+  fallback is armed, and its presence means clients that have not opted in are locked out now.
+
+`openssl s_client` also starts working under `"auto"`, not only under a bare `true`.
+
 
 ### Encryption at rest
 
@@ -326,4 +356,4 @@ OCSP fixes along the line: staple resumption for gateways after a certificate re
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
 [[s-natscli-account-tls]] · [[s-adr-35-filestore-compression]] ·
-[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]]

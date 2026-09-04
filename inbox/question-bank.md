@@ -492,6 +492,9 @@ invented to justify one.
 | 177 | A node is stopped or put into lame duck under load — what does a connected client see, and what is lost? | core topology clients | own | measured | [[client-connection-lifecycle]] — *Reconnecting*, *Lame duck, as the client sees it*; [[core-nats-delivery]] — *The reconnect gap is at-most-once, measured*; [[upgrade-a-cluster]] |
 | 178 | A server is up but not answering — how long before a client notices, and can I make that shorter? | core clients monitoring | own | measured gotcha | [[client-connection-lifecycle]] — *The keepalive*; [[client-defaults]]; [[run-nats-behind-a-proxy]] |
 | 179 | How do I stop a client without losing the work it is holding — and what does drain not cover? | core clients jetstream | own | design measured | [[client-connection-lifecycle]] — *Draining, and closing*; [[worker-pool]]; [[queue-groups]] |
+| 180 | My application is losing messages while the connection stays up and the server logs nothing — where did they go, and how do I bound it? | core clients | own | gotcha measured | [[slow-consumer-in-the-client]]; [[client-defaults]] — *Pending limits*; [[slow-consumer-detected]] — *The client-side sibling* |
+| 181 | A credential expired or was rejected — how long does the client keep trying, what closes it, and how much of a window is there to rotate into? | security clients | own | gotcha measured | [[connection-closed-after-auth-error]]; [[operator-mode]] — *What expiry looks like on the wire, and when*; [[client-defaults]] — *The auth-error abort, per client* |
+| 182 | The server closed a connection and the client only saw EOF — how do I find out why? | core monitoring clients | own | gotcha | [[monitoring-endpoints]] — *`/connz?state=closed`*; [[error-codes]] — *The other error list*; [[slow-consumer-detected]] |
 
 **Rows 108–137 were searched for their public form on 2026-09-03** (`inbox/scout-posed-rows-public-form-2026-09-03.md`, phase C step 2): every title, original post, comment and reply of the 484 `nats-io/nats-server` discussions, then the Stack Overflow tags. Twenty-one rows got a URL — a thread that asks the row's question with its trade-off, or one half of it (the scout file says which) — and the row text stayed. Nine (112, 116, 123, 127, 128, 131, 132, 133, 134) keep `own`: searched, not found, recorded in `inbox/scout-backlog.md` §5(a). Row 129's thread is row 57's — 129 is its design form.
 
@@ -541,3 +544,16 @@ form an application owner holds them, which is exactly the gap phase F exists to
 answered on arrival by `concepts/client-connection-lifecycle` and `reference/client-defaults`, written
 from the `learn/resilient-clients` chapter, nats.go at v1.53.1, natscli at 0.4.0 and five runs in four
 passes on nats-server 2.14.6.
+
+**Rows 180–182 were added on 2026-09-04 from the client side** (`inbox/plan-the-client-side-2026-09-03.md`,
+phase F step 4): all three are posed. The discussions comment cache (`local/scratch/gh-index/`) was
+searched first — *slow consumer*, *messages dropped*, *pending limits*, *authentication expired*,
+*authorization violation*, *auth error*, *creds* with *expire*, *IgnoreAuthErrorAbort* — and every
+"slow consumer" hit is the **server's** version of the failure (gh#4975 on route slow consumers,
+gh#3571's `WriteDeadline`, a `nats top` thread showing two slow consumers with `Pending: 0`), not the
+client's own buffer; on the auth side the cache holds one line, a leafnode `Authorization Violation`
+in an unrelated thread. Nobody asks these in the form an application owner holds them. All three were
+answered on arrival by `gotchas/slow-consumer-in-the-client`, `gotchas/connection-closed-after-auth-error`
+and the ripples onto `reference/monitoring-endpoints` and `reference/error-codes`, written from the
+`learn/resilient-clients` chapter, `reference/system/errors.md` swept against the server, nats.go at
+v1.53.1, and runs A–C on nats-server 2.14.6.

@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -152,6 +152,22 @@ nothing is logged. `nats consumer info` is the only place it shows: `Outstanding
 maximum with `Unprocessed Messages` above zero.
 
 
+## Why the pool exists at all: the buffer is not a queue
+
+The alternative to a pool is one subscriber with a bigger in-memory buffer, and it does not work.
+The client's pending buffer is sized to absorb a *burst*, not a backlog — "Too tight and you drop
+messages during traffic that the handler could have caught up on; too loose and you waste memory
+holding a backlog the handler will never catch up on"
+(source: [[s-docs-resilient-clients-slow-consumers-and-request-reply]]). A handler slower than the
+arrival rate fills any buffer eventually, and on core NATS the overflow is *dropped*, silently
+unless a callback is wired — [[slow-consumer-in-the-client]].
+
+The two ways out are the two pages: spread the rate across members
+([[queue-groups]] on core NATS, this page's pull consumer on JetStream), or move the work out of the
+handler. What a pool adds over a plain queue group is that the backlog lives in the **stream**, with
+redelivery, rather than in a process's memory, where it is lost on restart.
+
+
 ## When *not* to use it
 
 - **When order matters.** A pool processes messages concurrently; the consumer's order is not the
@@ -244,4 +260,4 @@ delivery — a level, not a rate, and the max-deliveries drop itself has no seri
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]]

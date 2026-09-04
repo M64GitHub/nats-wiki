@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [websocket, ws, wss, no_tls, allowed_origins, same_origin, jwt_cookie, compress, LEAFNODE_WS, advertise]
 aliases: [WebSocket, websocket, "websocket {}", ws, wss, browser client, allowed_origins]
-sources: [s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-docs-websocket-your-first-websocket-connection, s-docs-websocket-browsers-and-origins, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-nats-server-mqtt-websocket-observed, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-resilient-clients-tls-and-auth]
 created: 2026-09-01
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # WebSocket
@@ -196,6 +196,27 @@ Two WebSocket-only remote settings: `ws_compression` and `ws_no_masking` (aliase
 intermediary caches, "a concern that doesn't apply to a server-to-server link". Both are requests —
 the hub decides, and the link works either way.
 
+## `wss://` is the scheme, and it is the only encrypted form
+
+The client-side chapter names it in one line — where the client reaches the server over WebSocket,
+"`wss://` is the encrypted equivalent" of the `tls://` scheme
+(source: [[s-docs-resilient-clients-tls-and-auth]]). It is worth stating plainly because the
+listener's own rules make the choice less free than it looks:
+
+- The listener is either `no_tls: true` (plaintext, `ws://`) or has a `tls {}` block (`wss://`).
+  There is no per-connection negotiation as there is on the client port, and no `handshake_first`
+  question: a WebSocket connection is TLS from the first byte or not at all.
+- `handshake_first` and `--tlsfirst` therefore do not apply here. A client that reaches the server
+  over `wss://` gets the TLS-first behaviour by construction; see [[tls-in-nats]] for the client-port
+  version of the same question.
+- When TLS is terminated at an ingress, the client still dials `wss://` while the listener itself is
+  the `no_tls` case above. The encryption then ends at the proxy, so the hop behind it has to be a
+  trusted network — see *Behind a proxy* and [[run-nats-behind-a-proxy]].
+
+Everything else on the connection — creds, the nonce signature, the auth-error abort — is identical
+to a TCP client; the transport is the only difference. [[client-connection-lifecycle]].
+
+
 ## Version notes: the 2.11 line
 
 - **2.11.0**: WebSocket custom response headers (#5230) (source: [[s-relnotes-2.11]]).
@@ -252,4 +273,4 @@ reallocating into larger buffers (#8518).
 
 [[s-docs-websocket-your-first-websocket-connection]] · [[s-docs-websocket-browsers-and-origins]] ·
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
-[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-nats-server-mqtt-websocket-observed]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-resilient-clients-tls-and-auth]]

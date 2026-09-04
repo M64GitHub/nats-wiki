@@ -208,6 +208,11 @@ exists to answer live in `inbox/question-bank.md`.
   confirmed fix**; the thread is unanswered.
 - [[nats-timeout]] — the client's own error, which the server never sends and never logs. Including
   the API queue that drops every pending request without a reply.
+- [[slow-consumer-in-the-client]] — `nats: slow consumer, messages dropped`: the client's own
+  pending buffer overflowing, connection intact, server counter at zero. The Go default is two
+  numbers, and the callback fires per transition rather than per drop.
+- [[connection-closed-after-auth-error]] — CLOSED within seconds of a JWT lapsing, while the `nats`
+  CLI on the same credentials appears fine. The abort rule, and how wide the retry window really is.
 - [[duplicate-messages-across-a-leafnode]] — a window of sequences replayed, not one message. A leaf
   bridging into a supercluster twice, and why `deny_imports` "fixing" it is the diagnosis.
 - [[supercluster-slows-when-a-remote-subscriber-joins]] — 80,000 msg/s becomes 2,000 in the *local*
@@ -466,6 +471,8 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-docs-system-monitor-reference]] — the system monitor tree read whole: 15 generated endpoint pages,
   three of which (`statsz`, `idz`, `profilez`) are not HTTP endpoints at all, and `max_connections`
   annotated as a duration.
+- [[s-docs-system-errors]] — the docs' second `-ERR` list, swept row by row against the server: 70
+  identifier rows and 37 close reasons accurate, 11 of 22 claimed wire errors not sent at all.
 - [[s-docs-system-advisories-and-metrics]] — the three system events and the latency metric as the docs
   give them: a `CONNECTIONS` subject that does not exist, a "limits reached" trigger that is a 30 s
   heartbeat, and a latency subject the server never uses.
@@ -584,6 +591,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-request-reply-observed]] — eight runs in four passes: the 503 with `Nats-Subject`, the
   CLI's silent timeout at exit 0, a busy member keeping 8 of 20, a quarter each across the lab's nodes, the
   503 across an import, and a leaf's members skewing the hub's split 3 : 1.
+- [[s-nats-server-client-errors]] — every `-ERR` a client can be sent (58 call sites), the 37
+  `ClosedState` reasons `/connz` reports, both server-side slow-consumer branches and why neither
+  sends anything, the zero-length expiry timer, and `handshake_first`'s five accepted values.
 
 **The `nats.go` client source**
 
@@ -602,6 +612,11 @@ exists to answer live in `inbox/question-bank.md`.
   readiness rule.
 - [[s-docs-resilient-clients-drain-and-shutdown]] — close vs drain, the two phases and their timeouts,
   per-subscription drain, flush as a server receipt, lame duck from the client's side.
+- [[s-docs-resilient-clients-slow-consumers-and-request-reply]] — the pending buffer and its
+  per-client divergence, the slow-consumer signal, the two things that share the name, and
+  retry-per-outcome with idempotency.
+- [[s-docs-resilient-clients-tls-and-auth]] — consuming a `.creds` file, the CA and the two handshake
+  orders, and the only place the docs put the per-client auth-error abort rules side by side.
 
 **The `nats.go` client and the `nats` CLI, at their pinned versions**
 
@@ -611,12 +626,19 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-cli-reconnect]] — natscli 0.4.0: `MaxReconnects(-1)`, `IgnoreAuthErrorAbort()`, the 44-step
   backoff table, which `>>>` lines need `--trace`, the twice-registered error handler, and `nats reply`'s
   `Drain()` + `log.Fatalf`.
+- [[s-nats-go-subscription]] — nats.go v1.53.1: the pending defaults that differ by subscription type,
+  `SetPendingLimits`' two rules, the one-shot overflow transition, `processErr`'s three fates, the
+  abort rule, and that `UserCredentials` re-reads the file every attempt.
 
 **Runs on the server**
 
 - [[s-nats-server-client-lifecycle-observed]] — a node stopped, a node in lame duck with its `ldm` INFO,
   `nats reply` drained under load, the stale link timed from both ends, and a pull consumer whose leader
   moves. Every measured number on [[client-connection-lifecycle]] and [[client-defaults]].
+- [[s-nats-server-client-faults-observed]] — the three client faults on 2.14.6: a client-side slow
+  consumer under `SetPendingLimits` against both of the server's own branches, a user and an account
+  JWT expiring under a live connection on the wire and through three clients, and the four settings of
+  `handshake_first` timed.
 
 **The `jwt` library and `nsc`**
 

@@ -58,6 +58,15 @@ v2.14.6 binary**, not only read from the source at that tag; the configs and out
 the client repository at its current release plus the package registry, not the server — stated per
 row.
 
+Rows 81–101 were found while working `inbox/plan-the-client-side-2026-09-03.md` — the unread half of
+the docs, read for what a *client* experiences. Rows 96–101 come from its step 4 (slow consumers,
+request-reply resilience, TLS and auth) and rest on three authorities together: `nats-server` v2.14.6
+read at the tag (`raw/nats-server-src/client-errors-v2.14.6.md`), **nats.go v1.53.1**
+(`raw/nats-go-src/subscription-v1.53.1.md`) for every Go claim, and runs A–C on the 2.14.6 binary
+(`raw/nats-server-src/client-faults-observed-v2.14.6.md`) for everything behavioural. Row 100 is a
+**sweep**: all 129 rows of `reference/system/errors.md` checked against the 58 `-ERR` call sites in
+the server, with the counts of what held and what did not stated in the entry.
+
 | # | issue | where | destination | kind | severity | upstream | status |
 |---|---|---|---|---|---|---|---|
 | 1 | Nak advisory subject is `MSG_NAK`; the server publishes `MSG_NAKED` | `reference/jetstream/advisory/nak.md` | nats-docs | wrong-value | ★ high | not filed | wiki uses the server value |
@@ -155,6 +164,12 @@ row.
 | 94 | Nothing in the chapter says that a drain issued while the connection is down **closes it instead**. nats.go's `Drain()` returns `ErrConnectionReconnecting` after calling `nc.Close()` when the status is CONNECTING or RECONNECTING (`nats.go:6310–6314`), and `drainConnection` repeats the check (`:6211–6215`). The consequence is the one the same chapter warns about elsewhere: `Close()` "drops the reconnect buffer" (`drain-and-shutdown.md:12`), so a SIGTERM that lands during an outage discards the buffered publishes a drain was expected to flush | `learn/resilient-clients/drain-and-shutdown.md` (the *Drain finishes in-flight work* and *drain timeout* sections) | nats-docs | missing | medium | not filed | wiki states it on `client-connection-lifecycle` and `entities/nats-go` |
 | 95 | `learn/resilient-clients/drain-and-shutdown.md:146–168` uses the CLI's global `--timeout 30s` to stand in for a drain timeout and describes it as "a generous operation timeout so a slow handshake is not cut off mid-flush"; `nats --help` at 0.4.0 calls the same flag "Time to wait on responses from NATS" with a default of `5s`. The flag bounds waiting for a reply, not a handshake and not a flush, and the CLI has no drain-timeout flag at all — which the page does say two paragraphs earlier | `learn/resilient-clients/drain-and-shutdown.md` (lines 146, 168); `nats --help` at 0.4.0 | nats-docs | enhancement | low | not filed | wiki notes the CLI has no drain-timeout flag on `s-docs-resilient-clients-drain-and-shutdown` |
 | 84 | `learn/core-nats/subject-mapping.md:646` "list the source subject itself as a destination, which tells the server your weights are final and stops it topping them up. This works because the source here is a literal subject" and `:772` "This only works for a literal source like `orders.created`" — the restriction is not in the server. `AddWeightedMappings` skips the auto-added remainder whenever the source string is among the destinations, wildcard or not (`accounts.go:844–862`); run on 2.14.6, `"orders.loss.>": [ { destination: "orders.loss.>", weight: 50 } ]` passed `nats-server -t` and dropped 102 of 200 publishes. The server's own example config uses exactly that shape as "A chaos testing trick that introduces 50% artificial message loss" (quoted in gh#5172). `reference/config/mappings/weight.md` mentions "artifical message loss" without saying how it is configured | `learn/core-nats/subject-mapping.md` (lines 646, 772); `reference/config/mappings/weight.md` | nats-docs | wrong-value | low | not filed | wiki states the rule with the literal and the wildcard run on `concepts/subject-transforms` |
+| 96 | The animation caption on `learn/resilient-clients/slow-consumers.md:102` says "the buffer fills to its limit, the next message cannot be buffered and is dropped, and **the server raises a SlowConsumer error back to that subscriber**", and lists a `server → warehouse (subject: dropped)` step. The local slow consumer is entirely client-side: the drop happens in the client's own `processMsg` and the error is raised by the client, not by the server (`nats.go:4005–4029` at v1.53.1). Run on 2.14.6: four client-side overflow scenes dropping 4,889 / 4,888 / 3,938 messages left `/varz` `slow_consumers` at **0** and `slow_consumer_stats` all-zero, and no `-ERR` reached the client. The page's own *Two different "slow consumers"* section, twelve lines later, states the correct model | `learn/resilient-clients/slow-consumers.md` (line 102, and the flow list at 104–106) | nats-docs | wrong-value | medium | not filed | wiki states the client-only model on `gotchas/slow-consumer-in-the-client` and the comparison table on `gotchas/slow-consumer-detected` |
+| 97 | `learn/resilient-clients/request-reply-resilience.md:154` dates the no-responders signal as "The no-responders signal needs a server new enough to send the 503 and a client that advertised support for it during the connect handshake. Both have been the default for years; you get it for free on any current setup." No version is given, here or anywhere in the chapter, and "for years" is the only dating the docs offer for a wire feature a client must opt into in `CONNECT`. It arrived in **nats-server 2.2.0** (`client.go` and `server.go` at v2.1.9 vs v2.2.0; `raw/nats-server-src/headers-arrival-v2.2.0.md`) together with headers, which is the constraint that matters: `no_responders` is refused without `headers` (`client.go:2462–2467` at v2.14.6) | `learn/resilient-clients/request-reply-resilience.md` (line 154) | nats-docs | enhancement | low | not filed | wiki dates it on `concepts/request-reply` and `concepts/core-nats-delivery` |
+| 98 | `learn/resilient-clients/tls-and-auth.md:100` presents `handshake_first` as a two-sided flag day — "Both sides must opt in: a `--tlsfirst` client fails its TLS handshake against a server that still sends the plaintext `INFO`, and a client expecting `INFO` gets nothing from a handshake-first server until the attempt fails with a timeout or EOF error" — and never mentions the fallback forms. `handshake_first` also accepts `"auto"` / `"auto_fallback"` (a 50 ms fallback to the plaintext `INFO`) and any duration (`opts.go:5309–5333`, `const.go:114` at v2.14.6), which is precisely the migration path the sentence says does not exist; the sibling `learn/security/encryption.md:281` documents it. Run on 2.14.6: against `handshake_first: true` a plain `nats pub` failed in **2.055 s** with `read tcp …: i/o timeout`, but against `"auto"` it **succeeded in 0.093 s** and against `"300ms"` in **0.359 s**, and `--tlsfirst` worked against all three | `learn/resilient-clients/tls-and-auth.md` (line 100) | nats-docs | missing | medium | not filed | wiki states the matrix on `concepts/tls-in-nats` — *The mismatch matrix, measured* |
+| 99 | `learn/resilient-clients/tls-and-auth.md:220` describes credential expiry as "the server sends `-ERR 'User Authentication Expired'` and closes the connection. The client then tries to reconnect, and **the server rejects each attempt with an authorization violation**". Two gaps. (a) The **account** JWT produces a different string, `-ERR 'Account Authentication Expired'` (`client.go:2505–2508`), and closes *every* connection in the account at once (`accounts.go:3272–3284`); the chapter never mentions it, and neither does `learn/security/`. (b) "each attempt" is wrong for the first one: `jwt/v2` checks `now > Expires` at one-second resolution (`claims.go:287` at v2.8.2), so a reconnect inside the expiry second is accepted and immediately expired by a zero-length timer (`client.go:1344–1353`, `:5980–5985`), returning `User Authentication Expired` again. Measured on 2.14.6: at `ReconnectWait 500ms` the first reconnect got `User Authentication Expired` and nats.go aborted after **one** attempt; at the library default of 2 s the first reconnect got `Authorization Violation` and it aborted after **two** | `learn/resilient-clients/tls-and-auth.md` (line 220) | nats-docs | missing | medium | not filed | wiki states both on `gotchas/connection-closed-after-auth-error` and `concepts/operator-mode` |
+| 100 | `reference/system/errors.md:4` claims to document "**all** non-JetStream errors that the NATS server can return to clients, routes, gateways, and leafnode connections". Swept row by row against nats-server v2.14.6: of its **129** rows, the **70** that name a Go identifier from `server/errors.go` are accurate (one cosmetic difference) and the **37** *Connection Close Reasons* rows match the `ClosedState` enum exactly — but **11 of the 22** rows presenting a literal string as an error returned to clients are not sent as `-ERR` at that tag. Eight appear nowhere in `server/*.go` (`Maximum Clients Exceeded`, `Parser Error`, `TLS Handshake Error`, `Route Authorization Violation`, `Consumer Is Slow`, `Write Deadline Exceeded`, and two whose real text differs: `Connection Throttling Is Active` vs `Connection throttling is active. Please try again later.` at `server.go:3503`, `Connection to Gateway Rejected` vs `Connection to gateway %q rejected` at `gateway.go:1015`); three exist only as a log line or a monitoring reason (`Slow Consumer Detected` — `c.Noticef` at `client.go:2613`, never on the wire; `Protocol Violation` and `Duplicate Route` — `ClosedState.String()` in `monitor.go`). The authority is the 58 `sendErr` / `sendErrAndDebug` / `sendErrAndErr` call sites, the only paths that write `errProto = "-ERR '%s'"`. The sibling list at `reference/protocols/client.md:419–435` disagrees with this one on five further strings | `reference/system/errors.md` (lines 32, 33, 46, 47, 78, 127, 157, 158, 164, 165, 166) | nats-docs | wrong-value | ★ medium | not filed | wiki states the sweep on `reference/error-codes` and the no-`-ERR` consequence on `gotchas/slow-consumer-detected` |
+| 101 | `learn/resilient-clients/slow-consumers.md:16` and `:124`, and `where-next.md:95`, give the Go pending-buffer default as one pair — "500,000 messages and 64 MB in the Go client". nats.go sets the **message** limit from the subscription type at subscribe time: `sub.pMsgsLimit = cap(ch)` for a channel-backed or synchronous subscription and `DefaultSubPendingMsgsLimit` only for an async one (`nats.go:5048–5054` at v1.53.1), so a `SubscribeSync` starts at `DefaultMaxChanLen` = **65,536**, not 500,000. Read off a running client on 2.14.6: `msgs=500000 bytes=67108864` for `Subscribe`, `msgs=65536 bytes=67108864` for `SubscribeSync`. The page also does not state that `SetPendingLimits(0, …)` returns `ErrInvalidArg` and that a negative limit means unlimited, both of which its own advice ("set limits sized to your own workload") depends on | `learn/resilient-clients/slow-consumers.md` (lines 16, 124), `where-next.md` (line 95) | nats-docs | wrong-value | low | not filed | wiki states both defaults on `reference/client-defaults` and `gotchas/slow-consumer-in-the-client` |
 
 ---
 
@@ -3531,6 +3546,12 @@ which case it is dropped. The `weight` reference page could carry the one-line e
 | 93 | `wiki/concepts/client-connection-lifecycle.md` — *Events, and the readiness signal*; `wiki/summaries/s-nats-go-connection.md` |
 | 94 | `wiki/concepts/client-connection-lifecycle.md` — *Draining, and closing*; `wiki/entities/nats-go.md` — *What bites you — the connection* |
 | 95 | `wiki/summaries/s-docs-resilient-clients-drain-and-shutdown.md` — *The drain timeout* |
+| 96 | `wiki/gotchas/slow-consumer-in-the-client.md` — *Symptom*, *Quick triage*; `wiki/gotchas/slow-consumer-detected.md` — *The client-side sibling* |
+| 97 | `wiki/concepts/request-reply.md` — *Retrying: a different policy per outcome*; `wiki/summaries/s-docs-resilient-clients-slow-consumers-and-request-reply.md` |
+| 98 | `wiki/concepts/tls-in-nats.md` — *The mismatch matrix, measured*; `wiki/summaries/s-nats-server-client-faults-observed.md` (run C) |
+| 99 | `wiki/gotchas/connection-closed-after-auth-error.md` — *Symptom*, cause 1; `wiki/concepts/operator-mode.md` — *What expiry looks like on the wire, and when* |
+| 100 | `wiki/reference/error-codes.md` — *The other error list*; `wiki/gotchas/slow-consumer-detected.md` — *Two branches, two log lines, and no `-ERR` on either*; `wiki/summaries/s-docs-system-errors.md` |
+| 101 | `wiki/reference/client-defaults.md` — *Pending limits: the Go default is two numbers, not one*; `wiki/gotchas/slow-consumer-in-the-client.md` — cause 2 |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
 
@@ -3994,3 +4015,285 @@ the comment avoidable: the example demonstrates a flag that has no effect on the
 that `--timeout` is shown only because it is the nearest thing the CLI has — or drop the flag from
 the snippet and leave the C example to carry `natsConnection_DrainTimeout`.
 
+## 96 · "the server raises a SlowConsumer error back to that subscriber" — it does not
+
+`learn/resilient-clients/slow-consumers.md:102`, the caption of the *Slow consumer* animation:
+
+> the buffer fills to its limit, the next message cannot be buffered and is dropped, and **the
+> server raises a SlowConsumer error back to that subscriber**.
+
+with the flow drawn as `order-svc → server (subject: ORDERS)`, `server → warehouse (subject:
+dropped)`, `server → warehouse` (`:104–106`).
+
+The server is not involved. The drop happens inside the client, in `processMsg`'s `slowConsumer:`
+path, and the error is raised there:
+
+```go
+slowConsumer:
+	sub.dropped++
+	sc := !sub.sc
+	sub.sc = true
+	…
+	nc.err = ErrSlowConsumer
+	if asyncErrorCB := nc.Opts.AsyncErrorCB; asyncErrorCB != nil {
+		nc.ach.push(func() { asyncErrorCB(nc, sub, ErrSlowConsumer) })
+	}
+```
+
+— `nats.go:4005–4029` at v1.53.1. Nothing is sent to the server, and the server sends nothing back:
+there is no `-ERR` for a slow consumer in either direction at v2.14.6 (see #100).
+
+**Run on 2.14.6** (`raw/nats-server-src/client-faults-observed-v2.14.6.md`, runs A1–A4): four
+client-side overflow scenes dropping 4,889, 4,888 and 3,938 messages left the server's
+`/varz` at
+
+```
+{'slow_consumers': 0, 'slow_consumer_stats': {'clients': 0, 'routes': 0, 'gateways': 0, 'leafs': 0}}
+```
+
+The page's own *Two different "slow consumers"* section (`:110–116`) states the correct model twelve
+lines further down, which is what makes the caption confusing rather than merely loose: a reader who
+takes the animation at its word will go looking for the drop on the server and will not find it.
+
+**Suggested fix**: reword the caption to say the client drops the message and raises the error, and
+drop the `server → warehouse (subject: dropped)` step from the flow — the server delivered that
+message successfully; it was discarded after arrival.
+
+## 97 · The no-responders signal is dated "for years"
+
+`learn/resilient-clients/request-reply-resilience.md:154`:
+
+> The no-responders signal needs a server new enough to send the 503 and a client that advertised
+> support for it during the connect handshake. Both have been the default for years; you get it for
+> free on any current setup.
+
+No version appears here or anywhere in the chapter — which is by design for the concept material
+(`where-next.md:20`), but this sentence is specifically *about* a version boundary, and it is the
+only dating the docs give for a wire feature a client must opt into in `CONNECT`.
+
+It arrived in **nats-server 2.2.0**, with headers: neither `no_responders` nor the header machinery
+exists in `client.go`/`server.go` at v2.1.9 and both are present at v2.2.0
+(`raw/nats-server-src/headers-arrival-v2.2.0.md`). The dependency is the operational part: a
+connection that asks for `no_responders` without `headers` is **closed**, not degraded —
+
+```go
+		misMatch := c.opts.NoResponders && !c.headers
+		…
+		if misMatch {
+			c.sendErr(ErrNoRespondersRequiresHeaders.Error())
+			c.closeConnection(NoRespondersRequiresHeaders)
+```
+
+`client.go:2459–2468` at v2.14.6.
+
+**Suggested fix**: "since nats-server 2.2.0, together with headers — a client that requests
+`no_responders` without header support is rejected."
+
+## 98 · `handshake_first` has a migration mode, and the client chapter says it does not
+
+`learn/resilient-clients/tls-and-auth.md:100`:
+
+> Both sides must opt in: a `--tlsfirst` client fails its TLS handshake against a server that still
+> sends the plaintext `INFO`, and a client expecting `INFO` gets nothing from a handshake-first
+> server until the attempt fails with a timeout or EOF error.
+
+Correct for `handshake_first: true`, and the paragraph stops there. The key also accepts
+`"auto"` / `"auto_fallback"` — fall back to the plaintext `INFO` if no TLS bytes arrive within
+**50 ms** — and any duration:
+
+```go
+			case "handshake_first", "first", "immediate":
+				…
+				case "auto", "auto_fallback":
+					tc.HandshakeFirst = true
+					tc.FallbackDelay = DEFAULT_TLS_HANDSHAKE_FIRST_FALLBACK_DELAY
+				default:
+					// Check to see if this is a duration.
+					if dur, err := time.ParseDuration(mv); err == nil {
+						tc.HandshakeFirst = true
+						tc.FallbackDelay = dur
+```
+
+`opts.go:5309–5333`, with `DEFAULT_TLS_HANDSHAKE_FIRST_FALLBACK_DELAY = 50 * time.Millisecond`
+(`const.go:114`), at v2.14.6. `learn/security/encryption.md:281` documents it; the client-side
+chapter, which is where a reader goes to find out whether their client will break, does not.
+
+**Run on 2.14.6**, one `nats pub` per cell, timed
+(`raw/nats-server-src/client-faults-observed-v2.14.6.md`, run C):
+
+| server `tls { … }` | plain client | `--tlsfirst` client | startup `[WRN]` |
+|---|---|---|---|
+| no `handshake_first` | works, 0.028 s | fails in **25 ms**, `tls: first record does not look like a TLS handshake` | no |
+| `handshake_first: true` | fails in **2.055 s**, `read tcp …: i/o timeout` | works, 0.035 s | yes |
+| `handshake_first: "auto"` | **works, 0.093 s** | works, 0.037 s | no |
+| `handshake_first: "300ms"` | **works, 0.359 s** | works, 0.027 s | no |
+
+Two details the timings settle. The `--tlsfirst`-too-early failure is **immediate**, not a timeout,
+so the two mismatches are distinguishable in a log. And the startup warning
+`Clients that are not using "TLS Handshake First" option will fail to connect` is **not** printed
+under `"auto"` or a duration — it is gated on `opts.TLSHandshakeFirst &&
+opts.TLSHandshakeFirstFallback == 0` (`server.go:2805–2812`), which makes its absence a usable
+signal that the fallback is armed.
+
+**Suggested fix**: after the "both sides must opt in" sentence, add that `handshake_first` accepts
+`"auto"` (50 ms) or a duration, which lets both kinds of client connect during a migration, and
+link `learn/security/encryption.md`.
+
+## 99 · Account expiry is unmentioned, and "each attempt" is wrong for the first one
+
+`learn/resilient-clients/tls-and-auth.md:220`:
+
+> The server arms a timer at the JWT's expiry time; when it fires, the server sends `-ERR 'User
+> Authentication Expired'` and closes the connection. The client then tries to reconnect, and the
+> server rejects **each attempt** with an authorization violation.
+
+**(a) The account JWT is a fourth string nothing in the docs mentions.** `Account.expiredTimeout`
+walks every client of the account and calls `accountAuthExpired()`, which sends
+`-ERR 'Account Authentication Expired'` (`accounts.go:3272–3284`, `client.go:2505–2508` at v2.14.6).
+Observed on the wire with an account JWT valid for 25 s and a non-expiring user JWT:
+
+```
+t+ 25.00s  << -ERR 'Account Authentication Expired'
+t+ 25.00s  socket ended: EOF
+```
+
+The consequence is larger than the user case: **one account JWT lapsing closes every connection in
+that account at once**. `reference/system/errors.md` lists the string; no `learn/` page does.
+
+**(b) The first reconnect does not always get an authorization violation.** `jwt/v2`'s expiry check
+is `if c.Expires > 0 && now > c.Expires` at one-second resolution (`claims.go:287` at v2.8.2), so a
+CONNECT arriving inside the expiry second still validates. The server then computes a **zero-length**
+expiration timer and fires it at once:
+
+```go
+	expiresAt := time.Duration(0)
+	tn := time.Now().Unix()
+	if claims.Expires > tn {
+		expiresAt = time.Duration(claims.Expires-tn) * time.Second
+	}
+	…
+		c.setExpirationTimer(expiresAt)
+```
+
+`client.go:1344–1353`, with `c.atmr = time.AfterFunc(d, c.authExpired)` (`:5981`). So that attempt
+gets `User Authentication Expired` again, not `Authorization Violation`.
+
+That is not a pedantic distinction, because nats.go's abort keys on *the same error twice from the
+same server*. Measured on 2.14.6 with nats.go v1.53.1
+(`raw/nats-server-src/client-faults-observed-v2.14.6.md`, B3 and B6):
+
+| `ReconnectWait` | first reconnect's `-ERR` | attempts before CLOSED | expiry → CLOSED |
+|---|---|---|---|
+| 500 ms | `User Authentication Expired` | **1** | 0.51 s |
+| 2 s (the nats.go default) | `Authorization Violation` | **2** | 4.12 s |
+
+**Suggested fix**: mention `-ERR 'Account Authentication Expired'` and that it closes every
+connection in the account; and soften "each attempt" to "subsequent attempts", noting that a
+reconnect within a second of the expiry may repeat the expiry error instead.
+
+## 100 · `reference/system/errors.md` claims completeness; half its wire-error rows are not wire errors ★
+
+The page opens (`:4`):
+
+> This page documents **all** non-JetStream errors that the NATS server can return to clients,
+> routes, gateways, and leafnode connections.
+
+An `-ERR` reaches a connection through exactly three functions — `sendErr`, `sendErrAndDebug`,
+`sendErrAndErr` — all of which write `errProto = "-ERR '%s'" + _CRLF_` (`client.go:94`) and none of
+which does anything for a non-client kind. Sweeping those three across
+`nats-server` v2.14.6's `server/*.go` (tests excluded) gives **58 call sites**, which is the
+authority the table below is checked against. The full generated list is in
+`raw/nats-server-src/client-errors-v2.14.6.md`.
+
+Sweeping all **129** rows of the page against it:
+
+| kind of row | rows | wrong |
+|---|---|---|
+| names a Go identifier from `server/errors.go` | 70 | **0** |
+| a `ClosedState` name, in *Connection Close Reasons* | 37 | **0** |
+| a literal string presented as an error returned to clients | 22 | **11** |
+
+The 70 identifier rows are accurate; the only difference across all of them is cosmetic
+(`ErrMappingDestinationNotSupportedForImport`'s title adds backticks and a capital). The 37 close
+reasons match the `ClosedState` enum (`client.go:190–228`) exactly, in the enum's own order. The
+eleven that do not hold:
+
+| row | the page's constant | the server at v2.14.6 |
+|---|---|---|
+| `:32` | `Connection Throttling Is Active` | `Connection throttling is active. Please try again later.` (`server.go:3503`) |
+| `:33` | `Maximum Clients Exceeded` | **absent**; the string is `maximum connections exceeded` (`ErrTooManyConnections`), already row `:30` |
+| `:46` | `Protocol Violation` | only `ClosedState.String()` (`monitor.go:2639`) |
+| `:47` | `Parser Error` | **absent**; the parser sends `Unknown Protocol Operation` (`parser.go:1253`) or the parse error's own text |
+| `:78` | `TLS Handshake Error` | **absent** as an `-ERR`; `TLSHandshakeError` is a close reason, and that path skips the flush |
+| `:127` | `Connection to Gateway Rejected` | `Connection to gateway %q rejected` (`gateway.go:1015`) |
+| `:157` | `Route Authorization Violation` | **absent**; a route gets `Authorization Violation` or a formatted rejection text (`route.go:3038–3040`, `:3073–3075`) |
+| `:158` | `Duplicate Route` | only `ClosedState.String()` (`monitor.go:2655`) |
+| `:164` | `Slow Consumer Detected` | a **log line** (`c.Noticef`, `client.go:2613`); never on the wire |
+| `:165` | `Consumer Is Slow` | **absent** from the source |
+| `:166` | `Write Deadline Exceeded` | **absent**; the log line is `Slow Consumer %s: WriteDeadline of %v exceeded with %d chunks of %d total bytes.` |
+
+The *Slow Consumer and Flow Control* section is the one worth fixing first, because all three of its
+rows are wrong in the same direction and they are the ones an operator reaches for. Nothing is sent
+at all: `markConnAsClosed` sets `skipFlushOnClose` for `SlowConsumerPendingBytes` and
+`SlowConsumerWriteDeadline` (`client.go:2022–2025`), so the pending output is discarded rather than
+flushed. **Observed on 2.14.6** (`client-faults-observed-v2.14.6.md`, A6): a subscriber that stopped
+reading its socket drained `556002 bytes` and then read EOF, with no error string, while the server
+logged `Slow Consumer Detected: MaxPending of 1048576 Exceeded` and `/connz?state=closed` recorded
+`Slow Consumer (Pending Bytes)`.
+
+**Diffed against the sibling list.** `reference/protocols/client.md:419–435` gives fifteen `-ERR`
+strings, and the two pages disagree on five: `Unknown Protocol Operation`,
+`Attempted To Connect To Route Port`, `Authorization Timeout`, `Invalid Client Protocol` and
+`Slow Consumer` appear only there — and `Authorization Timeout` is not a server string either (the
+literal is `Authentication Timeout`, `client.go:2496`). The payload error is spelled two ways across
+the four `reference/protocols/` pages (`Maximum Payload Violation` / `Maximum Payload Exceeded`)
+where the server has one literal (`client.go:2554`). The wrong *defaults* on that page's table are a
+separate finding, recorded with the wire-protocol read.
+
+**Suggested fix**: split the page explicitly into "strings the server sends as `-ERR`" and
+"connection close reasons", generate the first from the `sendErr` call sites rather than by hand,
+and delete the eleven rows above (or move `Slow Consumer Detected` into a note saying it is a
+server-log line and that the client is closed without an error).
+
+## 101 · The Go pending-buffer default is two numbers, not one
+
+`learn/resilient-clients/slow-consumers.md:16`:
+
+> By default the pending buffer has generous built-in limits: 500,000 messages and 64 MB in the Go
+> client
+
+repeated at `:124` and in the checklist at `where-next.md:95`. nats.go sets the **message** limit
+from the subscription type, at subscribe time:
+
+```go
+	// Set pending limits.
+	if ch != nil {
+		sub.pMsgsLimit = cap(ch)
+	} else {
+		sub.pMsgsLimit = DefaultSubPendingMsgsLimit
+	}
+	sub.pBytesLimit = DefaultSubPendingBytesLimit
+```
+
+`nats.go:5048–5054` at v1.53.1. A `SubscribeSync` or `ChanSubscribe` is channel-backed, so its
+message limit is `DefaultMaxChanLen` = **65,536** (`:59`), not `DefaultSubPendingMsgsLimit` =
+500,000 (`:5765`). Read off a running client on 2.14.6
+(`client-faults-observed-v2.14.6.md`, A1 and A4):
+
+```
+pending limits at subscribe time (the defaults): msgs=500000 bytes=67108864     # Subscribe
+pending limits at subscribe time (the defaults): msgs=65536 bytes=67108864      # SubscribeSync
+```
+
+The gap is a factor of 7.6, and it lands on the subscription style most likely to be doing slow
+per-message work.
+
+The same page's advice — "set limits sized to your own workload" — also depends on two rules it does
+not state, both of which `SetPendingLimits`' own doc comment gives: **zero is not allowed** and **a
+negative value means unlimited** (`nats.go:5788–5807`). Measured: `SetPendingLimits(0, -1)` and
+`SetPendingLimits(-1, 0)` both return `nats: invalid argument`; `SetPendingLimits(100, -1)` succeeds
+and reads back as `msgs=100 bytes=-1`.
+
+**Suggested fix**: say "500,000 messages for an asynchronous subscription, 65,536 for a synchronous
+or channel-backed one, 64 MB either way", and add one sentence that zero is rejected and a negative
+limit means unlimited.

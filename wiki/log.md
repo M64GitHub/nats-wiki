@@ -4567,3 +4567,84 @@ tool cannot check* list, as [[nats-py]] already does). Lint: **385 pages** (377 
 **0**, wanted 0, unverified 12, staleness 0 behind 2.14.6. **Deferred to step 4** as the plan places them:
 the `websocket` ripple (`wss://` is only named in `tls-and-auth.md`), the client-side slow consumer and the
 expired-credential `-ERR` strings, both of which need a program rather than the CLI.
+
+## 2026-09-04 — phase F step 4: resilient clients, part 2 — slow consumers, request-reply resilience, TLS and auth
+
+Operation: plan, `inbox/plan-the-client-side-2026-09-03.md` step 4 (*Operation: ingest*, six summaries —
+the plan's four plus one for each of the two new extracts, because both are cited directly by the gotcha
+pages). **Sources into `raw/`**: `raw/nats-go-src/subscription-v1.53.1.md` (21 further verbatim ranges of
+`nats.go` at v1.53.1 from the same cached file — the pending defaults and where they are applied,
+`PendingLimits` / `SetPendingLimits` / `Pending` / `Dropped`, the overflow path, `NextMsg`'s validity
+check, `processTransientError`, `processAuthError`, `checkAuthError`, `processErr`, `UserCredentials`,
+`userFromFile`, `connectProto`, `Request`); `raw/nats-server-src/client-errors-v2.14.6.md` (a **generated**
+table of all **58** client-protocol `-ERR` call sites at v2.14.6 plus 15 ranges — `ClosedState`'s 37
+values, `errProto`, the `sendErr` family and the four credential paths, both server-side slow-consumer
+branches with `markConnAsClosed`'s skip-flush rule, `setExpiration` and its zero-length timer, the
+account's `expiredTimeout`, `handshake_first`'s parser and the startup warning's gate);
+`raw/nats-server-src/client-faults-observed-v2.14.6.md` with `client-faults-runA.sh`, `-runA2.sh`,
+`-runB.sh`, `-runB2.sh`, `-runC.sh`, `client-faults-deadsub.py` and four Go programs
+(`client-faults-slowsub.go`, `-mintjwt.go`, `-rawcreds.go`, `-authclient.go`). Two `raw/sources.md` rows
+extended.
+
+**Summaries** (6): [[s-docs-resilient-clients-slow-consumers-and-request-reply]],
+[[s-docs-resilient-clients-tls-and-auth]], [[s-docs-system-errors]], [[s-nats-go-subscription]],
+[[s-nats-server-client-errors]], [[s-nats-server-client-faults-observed]]. **Pages** (2):
+[[slow-consumer-in-the-client]] and [[connection-closed-after-auth-error]], the two gotchas the plan
+names. **Ripples** (19 pages): [[client-defaults]] (pending limits, the per-client auth-abort table),
+[[client-connection-lifecycle]] (the three faults that do not disconnect you, and where credentials enter
+the handshake), [[slow-consumer-detected]] (the client-side comparison table, the two branches, and no
+`-ERR` on either), [[tls-in-nats]] (the measured mismatch matrix), [[operator-mode]] (what expiry looks
+like on the wire, and when), [[subject-permissions]] (a violation is transient, and per subscription),
+[[request-reply]] (retry per outcome, idempotency, the in-flight request lost on a drop), [[nats-timeout]]
+(there is no default request timeout), [[monitoring-endpoints]] (`/connz?state=closed` and the 37 reasons),
+[[error-codes]] (the `-ERR` surface has no codes at all), [[advisories]] (a pointer to the sweep),
+[[defaults-and-limits]] (the 75 % stall gate and the two cut thresholds), [[queue-groups]] and
+[[worker-pool]] (why a bigger buffer is not the answer), [[nats-go]] and [[nats-cli]] (*what bites you*),
+[[rotate-tls-certificates]] and [[set-up-operator-mode]] (the credential rotation that pairs with them),
+and [[websocket]] — the `wss://` line deferred from step 3. Unlanded ripples went 42 → **0** in the pass.
+
+**Runs** (five passes on standalone servers, all on 2.14.6; the CLI can neither set pending limits nor
+mint a JWT with a chosen expiry, and no `nsc` was installed, so `client-faults-mintjwt.go` builds the
+operator/account/user chain with `nats-io/jwt` v2.8.2 and `nkeys` v0.4.16 — the libraries the server
+itself verifies against). **What they settled**: the client-side slow consumer is entirely client-side —
+4,889 of 5,000 dropped with the subscription still valid, the connection **CONNECTED** throughout and
+`/varz` `slow_consumers` still **0** (A1), which makes `slow-consumers.md:102`'s "the server raises a
+SlowConsumer error back to that subscriber" wrong (docs issue #96); with **no** callback set nats.go wrote
+**12 stderr lines**, and with one set it fired **13 times for 4,888 drops** and stderr stayed empty (A1,
+A2) — the callback is per *transition* and the transition re-arms on the next message that fits;
+`SetPendingLimits(0, …)` is `ErrInvalidArg` and a negative limit is unlimited (A3); a **sync** subscription
+starts at **65,536**, not 500,000, because the limit comes from the channel's capacity (A4, docs issue
+#101); the server's two branches produce **different log lines and different close reasons** —
+`WriteDeadline of 100ms exceeded with 2 chunks of 4029 total bytes` → `Slow Consumer (Write Deadline)`
+(A5) and `MaxPending of 1048576 Exceeded` → `Slow Consumer (Pending Bytes)` (A6) — and **neither sends the
+client anything**: the cut subscriber drained **556,002 bytes and then read EOF** (A6). On the auth side,
+the wire carries `-ERR 'User Authentication Expired'` at the JWT's second (B1) and
+`-ERR 'Account Authentication Expired'` when the **account** JWT lapses (B5, docs issue #99); the `nats`
+CLI printed **two lines in 45 s while the server rejected it eleven times** (B2); and nats.go closed after
+**one** reconnect at `ReconnectWait 500ms` but **two** at its own default of 2 s (B3, B6) — because
+`jwt/v2` checks `now > Expires` at one-second resolution, so a reconnect inside the expiry second is
+accepted and expired at once by `setExpiration`'s zero-length timer, repeating the same error, while a
+second later the answer becomes `Authorization Violation`. With `IgnoreAuthErrorAbort` the same credential
+gave **46 rejected attempts in 45 s** (B4). On TLS, `--tlsfirst` against a plain server fails in **25 ms**
+(a TLS record error, not a timeout), a plain client against `handshake_first: true` fails in **2.055 s**,
+and against `"auto"` and `"300ms"` it **succeeds** in 0.093 s and 0.359 s — the fallback delay visible in
+the connect time — with the startup warning printed only for the bare `true` (C1–C4, docs issue #98).
+
+**Docs issues** #96 (the animation caption puts the local slow consumer on the server), #97 (no-responders
+dated "for years" — it is 2.2.0, and it requires `headers` or the connection is closed), #98
+(`handshake_first`'s `"auto"` and duration forms omitted from the client chapter, with the timings), #99
+(account expiry unmentioned, and "each attempt" wrong for the first one), **#100 ★** — the **sweep** of
+`reference/system/errors.md`: all 129 rows checked against the 58 `-ERR` call sites, the **70** identifier
+rows and **37** close-reason rows accurate, **11 of 22** claimed wire errors not sent at all (eight absent
+from the source, three log lines or monitoring reasons) — and #101 (the Go pending default is two numbers).
+No server issue: everything surprising was settled against the server source or the client source.
+
+**Bank**: rows 180–182 added (`own`, and answered on arrival) — the comment cache was searched first for
+*slow consumer*, *messages dropped*, *pending limits*, *authentication expired*, *authorization
+violation*, *auth error*, *creds* + *expire* and *IgnoreAuthErrorAbort*, and every "slow consumer" hit is
+the **server's** version of the failure while the auth side has one incidental leafnode line. **150 / 182**,
+`own` 27. No strike from any *Pages touched*. `since: [2.10]` on both new pages with the *present at 2.10*
+comment; both carry `verified-against: nats-server 2.14.6, nats.go v1.53.1, nats CLI 0.4.0`, so they join
+the staleness report's *authority the tool cannot check* list. [[slow-consumer-detected]]'s
+`verified-against` moved from `2.14` to `2.14.6`, the tag its constants were read at. Lint: **393 pages**
+(385 → 393), drift 0, unlanded **0**, wanted 0, unverified 12, staleness 0 behind 2.14.6.

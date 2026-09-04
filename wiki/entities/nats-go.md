@@ -7,7 +7,7 @@ verified-against: nats.go v1.53.1
 verified-on: 2026-08-31
 tags: [client, tier-1, go, reference-implementation]
 aliases: [nats.go, "nats-io/nats.go", go client, golang client]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-subscription, s-nats-server-client-faults-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -109,6 +109,35 @@ Read from `nats.go` at **v1.53.1** (source: [[s-nats-go-connection]]) and measur
   `:2006–2028`). The documentation says such reports are discarded; they are not (docs issue #92).
 
 
+## What bites you — the subscription
+
+Four things about the pending buffer and the error paths that are not what the documentation leads
+you to expect, all read at **v1.53.1** and run on nats-server 2.14.6
+(source: [[s-nats-go-subscription]], [[s-nats-server-client-faults-observed]]).
+
+- **The pending default is two numbers, not one.** An async `Subscribe` starts at
+  `DefaultSubPendingMsgsLimit` = **500,000** messages; a `SubscribeSync` or `ChanSubscribe` starts at
+  the channel's capacity, `DefaultMaxChanLen` = **65,536**. Both are 64 MB on bytes. The docs quote
+  only the first. Print `sub.PendingLimits()` after subscribing rather than assuming.
+- **`SetPendingLimits(0, …)` is an error, not "unlimited".** Zero in either argument returns
+  `nats: invalid argument`; **negative** means unlimited. `SetPendingLimits(200, -1)` is the idiom.
+- **The async error callback fires per *transition*, not per drop — and the transition re-arms.**
+  `sub.sc` is cleared by the next message that fits, so a sustained overflow fires repeatedly:
+  **13 callbacks for 4,888 dropped messages** in one run. Alert on the rate; read `Dropped()` for the
+  loss. A *sync* subscriber is told twice — `NextMsg` returns `ErrSlowConsumer` **as well as** the
+  connection callback firing.
+- **An unrecognised `-ERR` closes the connection.** `processErr` handles the stale-connection and
+  connection-limit strings by reconnecting, permissions and max-subscriptions transiently, and the
+  four auth strings through `processAuthError` — **everything else** falls to
+  `nc.close(CLOSED, true, nil)`.
+
+And one that is documented but easy to under-read: `UserCredentials(path)` stores **callbacks**, not
+a parsed file, and `userFromFile` does `os.ReadFile` inside one of them — so the `.creds` file is
+re-read on **every** connect and reconnect attempt. Rotation by temp-file-and-rename is safe;
+rotation by in-place write has a window in which the client reads a partial file, fails to parse it,
+and retries. See [[connection-closed-after-auth-error]].
+
+
 ## Publish subject validation since v1.48.0
 
 Before **v1.48.0** (2025-12-17) the Go client wrote any subject it was given into the `PUB` line; the
@@ -127,4 +156,4 @@ the subject with `nats: invalid subject`. Rules on [[subjects-and-wildcards]].
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-go-subscription]] · [[s-nats-server-client-faults-observed]]

@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, certificates, rotation, expiry, tls_cert_not_after, nats-account-tls, reload, SIGHUP]
 aliases: [certificate rotation, cert rotation, certificate expiry, tls renewal, rotate certs]
-sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units, s-docs-hardening, s-nats-server-tls-reload, s-docs-security-checklist]
+sources: [s-docs-encryption-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-auth-and-tls, s-docs-config-management, s-nats-server-systemd-units, s-docs-hardening, s-nats-server-tls-reload, s-docs-security-checklist, s-docs-resilient-clients-tls-and-auth]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Rotate TLS certificates
@@ -286,6 +286,27 @@ Both of this page's open questions were answered on the v2.14.6 binary on 2026-0
   `insecure` — which the generated reference says reload without effect on 2.11/2.12 and which were
   **not** tested here. `cert_file`, `key_file` and `ca_file` were, and all three reload.
 
+## The other rotation on the same connection: credentials
+
+A TLS certificate and a `.creds` file are rotated on the same connections and fail in similar ways,
+but the mechanics are not the same and the runbooks should not be confused.
+
+- A **server certificate** is reloaded in place with `nats-server --signal reload`; live connections
+  keep the session they negotiated and pick the new certificate up at their next handshake (above).
+- A **client credential** is not reloaded at all. "A live connection keeps the identity it
+  authenticated with, so overwriting the `.creds` file on disk changes nothing on the wire while the
+  link stays up" (source: [[s-docs-resilient-clients-tls-and-auth]]). The change takes effect only
+  at the next connection cycle — and only in the clients that re-read the file (nats.go, nats.java,
+  nats.py); nats.js, nats.rs and nats.net load it once and need a credential callback.
+
+Two rules carry over from this page to that one. **Write the new file to a temporary path in the
+same directory and rename it into place**, so a reconnect landing mid-rotation reads either the old
+file or the new one rather than a partial one. And **rotate before the deadline, not on failure**:
+an expired credential closes the connection in seconds in four of six clients, and the retry window
+is one or two attempts wide — [[connection-closed-after-auth-error]] has the measured timings, and
+[[operator-mode]] the issuing side.
+
+
 ## Related
 
 [[tls-in-nats]] · [[reload-server-config]] · [[monitoring-endpoints]] · [[upgrade-a-cluster]] ·
@@ -297,4 +318,4 @@ Both of this page's open questions were answered on the v2.14.6 binary on 2026-0
 [[s-docs-encryption-and-tls]] · [[s-gh-7684-certificate-expiry]] · [[s-natscli-account-tls]] ·
 [[s-nats-server-auth-and-tls]] · [[s-docs-config-management]] · [[s-docs-hardening]] ·
 [[s-nats-server-systemd-units]] · [[s-nats-server-tls-reload]] ·
-[[s-docs-security-checklist]]
+[[s-docs-security-checklist]] · [[s-docs-resilient-clients-tls-and-auth]]

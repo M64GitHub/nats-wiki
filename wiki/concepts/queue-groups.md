@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [queue-group, --queue, load-balancing, random-selection, readiness, cluster, leafnode, gateway, geo-affinity, at-most-once, subsz, qgroup, NATS-RPLY-22]
 aliases: [queue group, queue groups, queue subscription, queue subscriber, queue subscribe, QueueSubscribe, --queue, qgroup, load balancing in core NATS, geo-affinity for queue groups, "which member gets the message"]
-sources: [s-docs-core-nats-queue-groups, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-nats-cli-request-reply-source, s-relnotes-2.10, s-docs-super-clusters, s-nats-server-core-delivery-observed, s-docs-resilient-clients-drain-and-shutdown]
+sources: [s-docs-core-nats-queue-groups, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-nats-cli-request-reply-source, s-relnotes-2.10, s-docs-super-clusters, s-nats-server-core-delivery-observed, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -155,6 +155,22 @@ Go it returns before it has finished — see [[client-connection-lifecycle]], wh
 on that return is measured. [[worker-pool]] is the durable alternative to the whole shape.
 
 
+## The answer to "my subscriber can't keep up"
+
+When one subscriber cannot drain a subject's rate, the reflex is to enlarge its client-side pending
+buffer. That buys time and nothing else: the buffer bounds a *burst*, and a sustained excess fills
+any size of it. "When one subscriber genuinely can't keep up with a subject's rate, the real answer
+is usually not a bigger buffer but more subscribers sharing the load"
+(source: [[s-docs-resilient-clients-slow-consumers-and-request-reply]]).
+
+A queue group is that answer for core NATS: each member handles roughly its share of the rate — the
+server picks uniformly among ready members, so the share is `1/n` in expectation — and the buffer
+then only has to absorb a burst of `1/n` the size. Pending limits still belong on every member; they
+protect each one individually, and they are what tells you when the pool itself is too small.
+[[slow-consumer-in-the-client]] has the symptom and the sizing; [[worker-pool]] is the JetStream
+equivalent, where the bound is `max_ack_pending` rather than a buffer.
+
+
 ## Related
 
 [[core-nats-delivery]] · [[request-reply]] · [[worker-pool]] · [[slow-consumer-detected]] ·
@@ -173,4 +189,4 @@ on that return is measured. [[worker-pool]] is the durable alternative to the wh
 - [[s-nats-cli-request-reply-source]] — why a `nats reply` member serialises its requests.
 - [[s-relnotes-2.10]] — the 2.10.22 / 2.10.23 leafnode load-balancing lines.
 - [[s-docs-super-clusters]] — the docs' statement of geo-affinity.
-- [[s-nats-server-core-delivery-observed]] — the `qgroup` field in `/subsz` (run D). · [[s-docs-resilient-clients-drain-and-shutdown]]
+- [[s-nats-server-core-delivery-observed]] — the `qgroup` field in `/subsz` (run D). · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]]

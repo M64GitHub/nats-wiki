@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-prometheus-nats-exporter-collector, s-prometheus-nats-exporter-metrics-observed, s-nats-surveyor-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-2818-counters-exact-or-sampled, s-gh-6182-what-to-alert-on, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-nats-server-request-reply-observed]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-prometheus-nats-exporter-collector, s-prometheus-nats-exporter-metrics-observed, s-nats-surveyor-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-2818-counters-exact-or-sampled, s-gh-6182-what-to-alert-on, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-nats-server-request-reply-observed, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Monitoring endpoints
@@ -677,6 +677,54 @@ subscriptions**: with one member on n1 and one on n2, n1's `/subsz` showed only 
 subscriptions` with a system-account user; the pick itself is on [[queue-groups]].
 
 
+## `/connz?state=closed` — the reason a connection went away
+
+`slow_consumers` on `/varz` says *how many*; `/connz?state=closed` says **which, and why**, for the
+connections the server still remembers:
+
+```
+curl -s 'http://127.0.0.1:8222/connz?state=closed' | jq '.connections[] | {name, reason, stop}'
+[{"name":"deadsub","reason":"Slow Consumer (Pending Bytes)"},
+ {"name":"order-svc","reason":"Authentication Expired"}]
+```
+
+`reason` is the string form of the server's `ClosedState`, a **37-value enum**
+(`client.go:190–228`; source: [[s-nats-server-client-errors]]). The documented list in
+`reference/system/errors.md`'s *Connection Close Reasons* table matches the enum exactly — all 37
+rows, in the enum's own order — and is the one table on that page the sweep found nothing wrong with
+(source: [[s-docs-system-errors]]).
+
+This endpoint is the only place several failures are legible at all, because the server closes those
+connections **without sending anything**: `markConnAsClosed` sets `skipFlushOnClose` for
+`ReadError`, `WriteError`, `SlowConsumerPendingBytes`, `SlowConsumerWriteDeadline` and
+`TLSHandshakeError`, so no `-ERR` is flushed. Measured: a cut slow consumer read 556,002 bytes and
+then EOF, with no error string (source: [[s-nats-server-client-faults-observed]], A6).
+
+The reasons worth alerting on, and what each means:
+
+| `reason` | what happened |
+|---|---|
+| `Slow Consumer (Write Deadline)` | the server could not finish a write within `write_deadline` |
+| `Slow Consumer (Pending Bytes)` | outbound queued for the connection passed `max_pending` |
+| `Authentication Expired` | a user or account JWT lapsed — on a **live** connection, not at connect |
+| `Authentication Failure` | credentials rejected at connect (`AuthenticationViolation`) |
+| `Revocation` | the user's key is in the account's revocation list |
+| `Stale Connection` | the keepalive budget ran out — see [[client-connection-lifecycle]] |
+| `Maximum Payload Exceeded`, `Maximum Control Line Exceeded` | a client exceeded a protocol limit |
+
+`Authentication Expired` and `Authentication Failure` are worth separating in an alert: the wire
+string is `Authorization Violation` for **every** rejection other than the four credential paths, so
+this field carries information the client never receives
+(source: [[s-nats-server-client-errors]]).
+
+The history is a ring buffer of **`max_closed_clients`** entries, default **10,000**
+(`DEFAULT_MAX_CLOSED_CLIENTS`, `const.go:191–192`; `newClosedRingBuffer(opts.MaxClosedClients)`,
+`server.go:889`), and one page of `/connz` returns **1,024** connections by default
+(`DefaultConnListSize`, `monitor.go:169–170`) — raise it with `&limit=`. On a busy server 10,000
+closes is not long, so this is a signal to scrape on an interval, not an archive to search after the
+fact.
+
+
 ## Related
 
 [[slow-consumer-detected]] · [[raft-in-nats]] · [[jetstream-sizing]] · [[js-api]] ·
@@ -691,4 +739,4 @@ subscriptions` with a system-account user; the pick itself is on [[queue-groups]
 [[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-nats-server-monitoring-observed]] · [[s-gh-7362-routez-connz-rtt]] ·
 [[s-gh-7483-varz-cpu-in-containers]] · [[s-docs-monitoring-profiling]] ·
-[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-monitor-reference]] · [[s-prometheus-nats-exporter-collector]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-surveyor-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-2818-counters-exact-or-sampled]] · [[s-gh-6182-what-to-alert-on]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-server-request-reply-observed]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-monitor-reference]] · [[s-prometheus-nats-exporter-collector]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-surveyor-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-2818-counters-exact-or-sampled]] · [[s-gh-6182-what-to-alert-on]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-server-request-reply-observed]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-system-errors]]

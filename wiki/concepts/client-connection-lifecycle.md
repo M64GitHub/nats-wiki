@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-04
 tags: [connection, state-machine, reconnect, backoff, jitter, MaxReconnect, reconnect-buffer, ErrReconnectBufExceeded, keepalive, ping, MaxPingsOut, stale-connection, drain, DrainTimeout, flush, lame-duck, ldm, discovery, connect_urls, readiness, force-reconnect]
 aliases: [connection lifecycle, client reconnect, reconnect, reconnection, reconnect buffer, drain, "Drain()", DRAINING_SUBS, DRAINING_PUBS, "stale connection", "nats: stale connection", "Stale Connection", keepalive, ping interval, MaxPingsOut, RECONNECTING, ClosedHandler, lame duck client, ldm, "connection events", readiness probe, ForceReconnect, flush, RTT]
-sources: [s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-connection, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-adr-40-nats-connection, s-docs-core-nats-publish-subscribe]
+sources: [s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-connection, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-adr-40-nats-connection, s-docs-core-nats-publish-subscribe, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -253,6 +253,52 @@ Messages already delivered and un-acked when the leader moved were **not** lost:
 leader still showed `ack_pending 10`, and the next fetch returned those stream sequences with
 `tries: 2` (run E9).
 
+## The two faults that do not disconnect you, and the one that ends the connection
+
+The reconnect loop above handles faults that come from outside: a node stops, a link goes stale, a
+server enters lame duck. Three more arrive on a *healthy* connection, and each takes a different
+path through the client.
+
+**A subscription's pending buffer overflows.** Nothing about the connection changes: the arriving
+message is dropped, the subscription stays valid, the status stays CONNECTED, and the async error
+callback gets `ErrSlowConsumer` — once per transition into the state, and the state clears on the
+next message that fits (source: [[s-nats-go-subscription]]). The server is not involved and never
+learns of it. Full page: [[slow-consumer-in-the-client]].
+
+**The server refuses a subject.** A permissions violation is *transient* in nats.go: it goes through
+`processTransientError`, which fires the callback and records the failure on the matching
+subscription, leaving the connection up (source: [[s-nats-go-subscription]]). See
+[[subject-permissions]].
+
+**A credential expires or is rejected.** This is the one failure the reconnect loop deliberately
+stops retrying. `processErr` recognises four auth strings — `authorization violation`,
+`user authentication expired`, `user authentication revoked`, `account authentication expired` —
+and hands them to `processAuthError`, which aborts when **the same error arrives from the same
+server twice in a row**, unless `IgnoreAuthErrorAbort` is set. The abort ignores the retry budget:
+unlimited reconnects do not override it (source: [[s-docs-resilient-clients-tls-and-auth]]).
+CLOSED is then terminal — only the closed handler can tell the application. Full page:
+[[connection-closed-after-auth-error]].
+
+Everything `processErr` does **not** recognise closes the connection outright
+(source: [[s-nats-go-subscription]]), which is worth knowing before adding a custom `-ERR` on the
+server side.
+
+## Where credentials enter the handshake
+
+`UserCredentials(path)` is not a parsed file held in memory: it stores two callbacks, and the JWT
+one calls `os.ReadFile` (source: [[s-nats-go-subscription]]). `connectProto` runs both on **every**
+connect and reconnect attempt, signing the *current* `INFO`'s nonce — so a rotated file on disk is
+picked up at the next connection cycle with no code, and a half-written file at that instant fails
+before any `CONNECT` is sent. nats.java and nats.py behave the same way; nats.js, nats.rs and
+nats.net load once and need a credential callback for a rotation to reach a reconnect at all
+(source: [[s-docs-resilient-clients-tls-and-auth]]). See [[operator-mode]] for where the file comes
+from.
+
+The same function decides one more thing: `no_responders` is sent only when the server's `INFO`
+advertised `headers`, because both fields come from the same value (source:
+[[s-nats-go-subscription]]). See [[request-reply]].
+
+
 ## Related
 
 [[core-nats-delivery]] · [[client-defaults]] · [[how-clients-reach-a-cluster]] ·
@@ -273,4 +319,4 @@ leader still showed `ack_pending 10`, and the next fetch returned those stream s
 - [[s-nats-server-client-lifecycle-observed]] — the runs on 2.14.6 behind every measured number.
 - [[s-adr-40-nats-connection]] — ADR-40, and the keepalive disagreement it is one side of.
 - [[s-docs-core-nats-publish-subscribe]] — the at-most-once promise the reconnect gap is an instance
-  of.
+  of. · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]]

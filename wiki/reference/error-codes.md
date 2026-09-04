@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-system-errors, s-nats-server-client-errors]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # JetStream error codes
@@ -270,6 +270,41 @@ NATS Error Code: 10059
   verifies that every `error_code` and `constant` is unique. That file — not this page and not the
   docs — is the authority.
 
+## The other error list: `-ERR` strings, which have no codes at all
+
+Everything above is JetStream's numbered API errors. Core NATS has a second, unrelated error surface
+with **no numbers**: the `-ERR '<text>'` protocol line the server sends a connection. The two do not
+overlap, and only the JetStream one is under the SemVer rule.
+
+`-ERR` reaches a client through exactly three functions — `sendErr`, `sendErrAndDebug`,
+`sendErrAndErr` — all writing `errProto = "-ERR '%s'"` and all skipped for non-client connection
+kinds. Sweeping those across the server at v2.14.6 gives **58 call sites**, which is the complete
+list of strings a connection can receive (source: [[s-nats-server-client-errors]]). The strings
+themselves carry no version guarantee and no code, so **matching on `-ERR` text is exactly the
+fragility this page warns against for `description`** — with no numeric alternative to fall back on.
+Where a decision has to be made from one, prefer the server's close reason on
+`/connz?state=closed`, which is an enum (see [[monitoring-endpoints]]).
+
+Two documented lists exist, `reference/system/errors.md` and `reference/protocols/client.md`, and
+they disagree with each other and with the server. The sweep in [[s-docs-system-errors]]: of 129
+rows on the first page, the **70** `Err*` identifier rows and the **37** connection-close-reason
+rows are accurate, while **11 of the 22** strings it presents as errors the server returns to
+clients are not sent as `-ERR` at v2.14.6 — eight are absent from the source entirely, three exist
+only as a log line or a monitoring reason. Recorded as docs issue #100.
+
+Four `-ERR` strings are worth knowing by name because clients branch on them
+(source: [[s-nats-server-client-errors]]):
+
+| string | when |
+|---|---|
+| `Authorization Violation` | **every** rejection except the three below — deliberately uninformative |
+| `User Authentication Expired` | a user JWT lapsed under a live connection |
+| `Account Authentication Expired` | an account JWT lapsed — closes every connection in the account |
+| `User Authentication Revoked` | the user's key is in the account's revocation list |
+
+See [[connection-closed-after-auth-error]] for what each does to a client.
+
+
 ## Why the full table is not copied here
 
 222 rows of generated content would be a verbatim copy of a docs page that is itself generated from
@@ -347,4 +382,4 @@ summaries that put them there — [[s-adr-43-per-message-ttl]] (`10052`, `10165`
 [[s-docs-stream-backup-restore]] (`10064`) · [[s-gh-7982-no-suitable-peers]] (`10005`) ·
 [[s-issue-4281-insufficient-storage]] (`10028`, `10047`) · [[s-nats-server-snapshot-restore]]
 (`10060`, `10064`, `10130`) · [[s-docs-advanced-publishing]] (the eleven `JSAtomicPublish*` and
-`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-system-errors]] · [[s-nats-server-client-errors]]

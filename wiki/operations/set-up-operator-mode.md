@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [operator, jwt, nats-auth, nsc, resolver, account-push, creds, scoped-signing-key]
 aliases: [operator mode setup, jwt setup, nsc setup, nats auth setup, account resolver setup]
-sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist]
+sources: [s-docs-operator-mode, s-docs-decentralized-auth, s-gh-7854-jwt-push-timeout, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-resilient-clients-tls-and-auth]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Set up operator mode
@@ -296,6 +296,32 @@ Operator mode is a whole-server switch, not a per-account one: a server config e
   add "a set of objects to monitor for expiration". A lapsed client's real reason, `claim is expired`,
   appears only in the **debug** log.
 
+## What the client does with the `.creds` file you hand it
+
+The file is the whole identity: "a user JWT that names the `order-svc` user, and an nkey seed, a
+private key the client uses to sign a challenge". No client parses values out of it — you give it a
+path, and it reads both itself (source: [[s-docs-resilient-clients-tls-and-auth]]). There is no
+`--user` and no `--password` to go with it, and the file must be treated as a secret: anyone holding
+it can connect as that user.
+
+Two things about the *consuming* side change how you should issue and distribute it.
+
+- **Whether a rotation reaches a running client depends on the client.** nats.go, nats.java and
+  nats.py re-read the file on every connect and reconnect attempt, so replacing it on disk is
+  enough. nats.js, nats.rs and nats.net load it once at connect; for them a rotation only lands
+  through a credential callback (`authenticator`, `ConnectOptions::with_auth_callback`,
+  `NatsAuthOpts.AuthCredCallback`). If you distribute creds by writing files, ask which clients are
+  on the other end.
+- **An expiry you set here is a hard stop, not a nudge.** When the JWT lapses the server closes the
+  connection and most clients then refuse to keep retrying — [[connection-closed-after-auth-error]]
+  has the wire strings and the measured timings. Either issue non-expiring user JWTs and rely on
+  revocation, or pair a short expiry with a credential callback that mints the next one.
+
+For distributing the file itself, the safe shape is the same as for certificates: write to a
+temporary path in the same directory and rename it into place, so no reader ever sees a partial
+file. See [[rotate-tls-certificates]].
+
+
 ## Related
 
 [[operator-mode]] · [[account]] · [[subject-permissions]] · [[backup-and-restore-identity]] ·
@@ -305,4 +331,4 @@ Operator mode is a whole-server switch, not a per-account one: a server config e
 ## Sources
 
 [[s-docs-operator-mode]] · [[s-docs-decentralized-auth]] · [[s-gh-7854-jwt-push-timeout]] ·
-[[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]]
+[[s-nats-server-auth-and-tls]] · [[s-docs-security-checklist]] · [[s-docs-resilient-clients-tls-and-auth]]

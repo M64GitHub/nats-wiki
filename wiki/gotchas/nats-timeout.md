@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [timeout, request-reply, no-responders, gomaxprocs, request_queue_limit, routes, kubernetes]
 aliases: ["nats: timeout", "Future cancelled, response not registered in time", "request timeout", "no responders available for request", "publish timeout"]
-sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply, s-nats-server-client-lifecycle-observed, s-nats-go-connection, s-docs-resilient-clients-reconnection-and-events]
+sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply, s-nats-server-client-lifecycle-observed, s-nats-go-connection, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-slow-consumers-and-request-reply]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -269,6 +269,20 @@ persists is the permission, account or domain problem this page's causes describ
 Both are on [[client-connection-lifecycle]], with the per-client values in [[client-defaults]].
 
 
+## There is no default request timeout to fall back on
+
+A `request()` blocks until *something* bounds it, and what bounds it differs by client: some take
+the deadline on the call, others take it once on the connection
+(source: [[s-docs-resilient-clients-slow-consumers-and-request-reply]]). There is no server-side
+ceiling on a core request — the server delivers it and forgets it. So "the request hung" is almost
+always a caller that passed no deadline, not a server that failed to answer.
+
+Set it from the responder's measured p99 × 2–3. Below that, ordinary load looks like a fault, the
+caller retries answers that were already coming back, and the extra requests make the responder
+slower still. The per-outcome retry policy — fast retry on a timeout, backoff on a 503 — is on
+[[request-reply]], and the reason a retry needs an idempotency key is there too.
+
+
 ## Related
 
 [[stream-has-high-message-lag]] · [[slow-consumer-detected]] · [[build-a-3-node-cluster]] ·
@@ -285,4 +299,4 @@ Both are on [[client-connection-lifecycle]], with the per-client values in [[cli
 - [[s-gh-7190-asymmetric-cluster]] — the same single-DNS-name route defect, independently reported.
 - [[s-docs-monitoring-endpoints]] — `slow_consumers` and `/connz?sort=pending`.
 - [[s-docs-forming-a-cluster]] — what the `Routes` column counts. ·
-[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-connection]] · [[s-docs-resilient-clients-reconnection-and-events]]
+[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-connection]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]]
