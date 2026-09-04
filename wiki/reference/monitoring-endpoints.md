@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [monitoring, varz, jsz, healthz, connz, routez, raftz, http_port]
 aliases: [/varz, /jsz, /healthz, /connz, /routez, /raftz, monitoring port, http_port]
-sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-prometheus-nats-exporter-collector, s-prometheus-nats-exporter-metrics-observed, s-nats-surveyor-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-2818-counters-exact-or-sampled, s-gh-6182-what-to-alert-on, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-nats-server-request-reply-observed, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-docs-protocol-client, s-nats-server-wire-protocol]
+sources: [s-nats-server-jetstream-resources, s-issue-4281-insufficient-storage, s-docs-monitoring-endpoints, s-docs-hardening, s-nats-server-constants-2.14.6, s-relnotes-2.14.0, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-natscli-account-tls, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-adr-59-sourcing-and-mirroring, s-nats-server-filestore-layout, s-docs-accounts-and-multitenancy, s-docs-encryption-and-tls, s-docs-kubernetes, s-docs-mirrors-as-dr, s-docs-prometheus-and-dashboards, s-docs-single-server, s-gh-5243-kv-watchers-at-scale, s-gh-6605-which-consumer-is-slow, s-gh-7190-asymmetric-cluster, s-nats-server-tls-reload, s-docs-mqtt-auth-and-clustering, s-nats-server-mqtt-websocket-observed, s-nats-server-monitoring-observed, s-gh-7362-routez-connz-rtt, s-gh-7483-varz-cpu-in-containers, s-docs-monitoring-profiling, s-docs-monitoring-advisories-and-events, s-docs-monitoring-jetstream-health, s-nats-server-jetstream-cluster, s-nats-server-raftz, s-docs-monitor-raftz, s-nats-server-meta-layer-rerun-observed, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-prometheus-nats-exporter-collector, s-prometheus-nats-exporter-metrics-observed, s-nats-surveyor-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-2818-counters-exact-or-sampled, s-gh-6182-what-to-alert-on, s-docs-core-nats-publish-subscribe, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-nats-server-request-reply-observed, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-docs-protocol-client, s-nats-server-wire-protocol, s-nats-server-services-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -480,6 +480,29 @@ absence of; the subjects, bodies and the observed cadence are on [[system-subjec
 [[s-nats-server-system-subjects]], [[s-nats-server-system-subjects-observed]]).
 
 
+## What a services instance adds to `/subsz`
+
+A [[services-framework]] instance is invisible to `/varz` and `/jsz` — it is an ordinary client — but
+it is very visible in `/subsz`. Each instance makes **ten** subscriptions for one endpoint, and one
+more per further endpoint (source: [[s-nats-server-services-observed]]):
+
+```
+$SRV.PING     $SRV.PING.<name>     $SRV.PING.<name>.<id>
+$SRV.INFO     $SRV.INFO.<name>     $SRV.INFO.<name>.<id>
+$SRV.STATS    $SRV.STATS.<name>    $SRV.STATS.<name>.<id>
+<group>.<endpoint>                                          qgroup: q
+```
+
+The nine `$SRV` entries carry **no** `qgroup`; only the endpoint subscriptions do, which is the whole
+reason discovery is a broadcast and work is not. `/subsz?subs=1&acc=$G` is therefore the way to count
+running instances from the server side, and to see which endpoints joined which queue group — an
+endpoint whose queue group was disabled shows an empty one.
+
+One limit: with a service running on a **leaf node**, the hub's `/subsz?subs=1&acc=$G` counted the
+leaf-origin subscriptions but returned no `subscriptions_list` entries for them. Leaf-origin interest
+is counted, not itemised, so a remote service's subjects cannot be enumerated from the hub's port.
+
+
 ## What is deliberately not here
 
 **Response fields.** Each endpoint's response schema runs to dozens of fields and is generated; the
@@ -756,4 +779,4 @@ check; the listener kinds it distinguishes are on [[wire-protocol]].
 [[s-docs-mqtt-auth-and-clustering]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-nats-server-monitoring-observed]] · [[s-gh-7362-routez-connz-rtt]] ·
 [[s-gh-7483-varz-cpu-in-containers]] · [[s-docs-monitoring-profiling]] ·
-[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-monitor-reference]] · [[s-prometheus-nats-exporter-collector]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-surveyor-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-2818-counters-exact-or-sampled]] · [[s-gh-6182-what-to-alert-on]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-server-request-reply-observed]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-system-errors]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]
+[[s-docs-monitoring-advisories-and-events]] · [[s-docs-monitoring-jetstream-health]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-raftz]] · [[s-docs-monitor-raftz]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-monitor-reference]] · [[s-prometheus-nats-exporter-collector]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-surveyor-metrics-observed]] · [[s-nats-server-traffic-counters-and-ha-assets]] · [[s-gh-2818-counters-exact-or-sampled]] · [[s-gh-6182-what-to-alert-on]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-server-request-reply-observed]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-system-errors]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-nats-server-services-observed]]

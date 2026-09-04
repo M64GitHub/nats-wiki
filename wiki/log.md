@@ -4733,3 +4733,102 @@ any *Pages touched*. `since: [2.10]` on the new page with the *present at 2.10* 
 Lint: **397 pages** (393 → 397), drift 0, unlanded **0**, unverified 12, staleness 0 behind 2.14.6.
 Wanted is **1**: `services-on-core-nats`, registered deliberately in `wiki/index.md` because
 [[wire-protocol]]'s `$SRV.` prefix row points at it and step 6 writes it.
+
+## 2026-09-04 — phase F step 6: the services framework
+
+*Operation: ingest*, step 6 of `inbox/plan-the-client-side-2026-09-03.md`. The last unread docs
+chapter, and the one whose subject tree an operator has to secure and monitor without any server
+feature to hang it on.
+
+**The frame.** `$SRV` appears nowhere in `nats-server`'s source. There is no registry, no discovery
+handler and no reserved prefix; a "service" is a convention in the client libraries, specified by
+ADR-32 and implemented per language. Everything an operator can see, permit or scrape is therefore an
+ordinary subject, which is what the two new pages are about.
+
+**Cache first**: the three `io.nats.micro.v1.*_response` JSON schemas from `nats-io/jsm.go` v0.4.1
+into `raw/jsm-go/`, beside the two JetStream configuration schemas already there. They are the only
+public place the `endpoints[]` item fields can be read — the docs' renderer collapsed them (#108).
+
+**Six passes on 2.14.6** (`raw/nats-server-src/services-observed-v2.14.6.md`, eight scripts, a
+six-endpoint nats.go v1.53.1 service, the step-5 raw client and a subscription dumper, all copied in
+beside it). What they settled:
+
+- **Ten subscriptions per instance** — three verbs × three levels, all *plain*, plus one queue
+  subscription per endpoint. That is why discovery is a broadcast and work is not.
+- **The `$SRV` bodies**: `ping_response` is five fields and nothing else; `stats_response` carries
+  `started` in UTC, integer-nanosecond `processing_time`, `last_error` as `""` when there has been
+  none, and the `StatsHandler`'s `data`. `last_error` is formatted `"<code>:<description>"`.
+- **A service error and a 503 side by side on the wire** — `HMSG … 92 109` with two headers and a
+  body against `HMSG … 55 55` with `NATS/1.0 503`, `Nats-Subject:` and nothing. Both are delivered
+  replies; only the headers tell them apart.
+- **★ A blocked endpoint does not block its siblings** (`check` in 327 µs while `slow` was 3 s into a
+  block), because nats.go gives each endpoint its own `QueueSubscribe` and dispatcher.
+- **★ A blocked instance keeps its share.** Two instances, 3 s handlers, eight simultaneous requests:
+  all delivered at once, split 3 / 5 at random, worked through serially, **four of eight callers
+  timed out** while replies arrived at 20.09 s, 23.09 s and 26.09 s into dead inboxes. This is the
+  sizing fact of the whole ingest.
+- **`Stop()` removes all fifteen subscriptions at once and returns in 1.3 ms**, leaving the in-flight
+  handler to finish — it replied at 5.001 s because the process stayed alive. `kill -9` in the same
+  place loses the work and the caller sees only a timeout, never no-responders.
+- **The server does not reserve `$SRV`**: `nats pub '$SRV.PING' hello` → `Published 5 bytes`, and a
+  plain subscriber on `$SRV.>` saw another caller's discovery request with its inbox. Permissions are
+  the only isolation, and discovery and invocation separate cleanly — with the refusal invisible to
+  the client and visible only as `Publish Violation` in the server log.
+- **★ `$SRV` and endpoint subjects cross a leafnode with no configuration**, but the queue group keeps
+  to the local member: 8 of 8 from the hub to the hub instance, 8 of 8 from the leaf to the leaf
+  instance, while discovery listed both from either side. An instance at the edge serves the edge and
+  adds nothing to the hub.
+- Also: `nats service info` shows one instance when several run; `nats service serve` never calls
+  `Stop()`; an endpoint subject is an ordinary subscription, so a publish with no reply still runs the
+  handler; and nats.go's `APIPrefix` is a `const`, so ADR-32's overridable prefix does not exist.
+
+**Six summaries**, not five: `s-adr-32-service-api`, `s-docs-services-framework`,
+`s-docs-services-discovery-and-stats`, `s-docs-services-scaling`, `s-nats-server-services-observed`,
+plus `s-gh-4984-micro-with-jetstream` — the (b) scout of the comment cache found only two `micro` hits
+in 484 threads, and that one is the public statement of where the pattern stops, so it was fetched
+whole into `raw/gh-discussions/` and summarised rather than merely cited.
+
+**Two pages.** `concepts/services-framework` — the subjects, the verbs, the counters and their units,
+the two error headers against the 503, the queue-group rules, what `Stop()` drains, permissions, and
+the leafnode result. `operations/services-on-core-nats` (`kind: pattern`, **row 134**) — the design
+decisions: sizing the caller's timeout from the queue rather than the handler, no-responders as the
+deploy check, scatter-gather only outside a queue group, permissions per role, drain-then-wait, and
+five conditions under which the pattern is the wrong one.
+
+**Twelve ripples**, unlanded 33 → 0: [[queue-groups]] — *The services framework's queue groups*;
+[[request-reply]] — *A service error is a third outcome*; [[system-subjects]] — *`$SRV` — the one
+reserved prefix the server does not own* (and its `$SRV.` row, which said "(step 6)", now points at
+the page); [[nats-timeout]] — *A fourth outcome when the responder is a service*; [[worker-pool]] —
+*The core-NATS sibling, and where the line falls*; [[leafnode]] — *Where that leaves a service at the
+edge*; [[subject-permissions]] — *`$SRV.>` is an ordinary permission*; [[nats-cli]] — the six
+`nats service` subcommands and the three that bite; [[nats-go]] — *What bites you — the `micro`
+package*; [[advisories]] and [[metrics]] — the two "service" mechanisms separated; [[core-nats-delivery]]
+— the at-most-once boundary asked in public; [[monitoring-endpoints]] — what an instance adds to
+`/subsz`; [[client-connection-lifecycle]] — draining a service is two steps; [[slow-consumer-in-the-client]]
+— a blocked handler is the same shape, but the callers give up first.
+
+**Docs issues #108–#117**, ten from one chapter, two of them ★. **#113 ★** is the `$SRV` reservation:
+two pages say the server reserves the prefix, the server reserves nothing, and an operator who
+believes them never writes the one permission that protects it. **#114 ★** is
+`scaling.md:272`, wrong in both directions at once — too pessimistic within an instance, far too
+optimistic across them; it shares its second half with **#86**, whose detail section gained the harder
+eight-request run. The rest: #108 the collapsed schema objects, #109 nine hand-offs to a configuration
+reference that was never written, #110 a cross-reference to an option the target page never names,
+#111 three chapters promised `$SRV` coverage that contain none, #112 the reference overview's six
+invented capabilities and its backwards account of discovery, #115 "in-flight work is gone" against
+"`Stop()` drains" on the same chapter, #116 ADR-32's overridable prefix (destination **ADR repo**),
+#117 a typo whose home is the jsm.go schema, not the docs page (destination **jsm.go**). No server
+issue: everything surprising was settled against the source or the run.
+
+**Bank**: row **134** filled — the last of the three the phase promised that step 6 owed — and rows
+**188–193** added and answered (what an instance puts on the server, the blocked-instance timeout
+question, telling the three reply outcomes apart, who may see `$SRV`, services across a leafnode, and
+gh#4984's acking handler). **162 / 193**, `own` 37. `inbox/adr-toc.md`: row 32 links its summary and
+row **3** gets a recorded decision (*skip for now* — service latency is a server export feature this
+wiki already covers from the source). Docs coverage: `learn/services` **6/6** and
+`reference/services` **3/3**, both now read end to end.
+
+Lint: **405 pages** (397 → 405), drift 0, unlanded **0**, unverified 12, staleness 0 behind 2.14.6.
+Wanted is **1** again and deliberately: [[core-or-jetstream]], which step 7 writes for row 133 —
+`core-nats-delivery` and `services-on-core-nats` both stop at the durability boundary and hand the
+decision to it.

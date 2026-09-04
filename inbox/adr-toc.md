@@ -11,7 +11,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 |---|---|---|---|---|---|---|---|
 | 1 | ADR-1.md | JetStream JSON API Design | Implemented | clients core jetstream | jetstream, client, server | ★ implemented | [[s-adr-1-jetstream-json-api]] |
 | 2 | ADR-2.md | NATS Typed Messages | Implemented | clients core jetstream | jetstream, server, client | ★ implemented |  |
-| 3 | ADR-3.md | NATS Service Latency Distributed Tracing Interoperability | Approved | core monitoring | observability, server | approved |  |
+| 3 | ADR-3.md | NATS Service Latency Distributed Tracing Interoperability | Approved | core monitoring | observability, server | approved | *skip for now: service latency is a server export feature, already covered by `reference/advisories` and `reference/system-subjects` from the server source; ingest only if a page needs the tracing interop schema* |
 | 4 | ADR-4.md | NATS Message Headers | Implemented | clients core | server, client | ★ implemented | [[s-adr-4-message-headers]] |
 | 5 | ADR-5.md | Lame Duck Notification | Partially Implemented | clients core | server, client | ★ partial |  |
 | 6 | ADR-6.md | Naming Rules | Approved | clients core | server, client | approved |  |
@@ -34,7 +34,7 @@ column. `status` and `tags` are the ADR's own metadata, `area` is this wiki's fa
 | 28 | ADR-28.md | JetStream RePublish | Implemented | core jetstream | jetstream, server | ★ implemented |  |
 | 30 | ADR-30.md | Subject Transform | Implemented | core | server | ★ implemented |  |
 | 31 | ADR-31.md | JetStream Direct Get | Implemented | clients core jetstream | jetstream, client, server, 2.11 | ★ implemented 2.11 | [[s-adr-31-direct-get]] |
-| 32 | ADR-32.md | Service API | Implemented | clients | client, spec | implemented |  |
+| 32 | ADR-32.md | Service API | Implemented | clients | client, spec | implemented | [[s-adr-32-service-api]] |
 | 33 | ADR-33.md | Metadata for Stream and Consumer | Approved | clients core jetstream | jetstream, client, server | approved | [[s-adr-33-metadata]] |
 | 34 | ADR-34.md | JetStream Consumers Multiple Filters | Approved | clients core jetstream | jetstream, client, server | approved | [[s-adr-34-multiple-filters]] |
 | 35 | ADR-35.md | JetStream Filestore Compression | Implemented | clients core jetstream | jetstream, client, server | ★ implemented | [[s-adr-35-filestore-compression]] |

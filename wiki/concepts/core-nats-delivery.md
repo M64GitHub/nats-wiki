@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [at-most-once, interest-graph, ordering, fire-and-forget, echo, NoEcho, max_payload, headers, no_header_support, wire-tap, subsz, nats-trace, reconnect, lame-duck, slow-consumer]
 aliases: [core NATS, at-most-once delivery, interest graph, fire and forget, core NATS ordering, message ordering in core NATS, echo, NoEcho, "Maximum Payload Violation", "nats: maximum payload exceeded", debugging delivery, why did my message not arrive]
-sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting, s-docs-protocol-client, s-nats-server-wire-protocol]
+sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting, s-docs-protocol-client, s-nats-server-wire-protocol, s-gh-4984-micro-with-jetstream]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -218,6 +218,21 @@ queue delivery gains a `|` and the queue names. That is where [[queue-groups]] a
 the story up.
 
 
+## The at-most-once boundary, asked in public
+
+The clearest public statement of where this page's guarantee stops is a thread about the
+[[services-framework]]: can a service handler ack and nak so a failed request is redelivered? The
+answer, from a maintainer in 2024 and again in 2025, is that it is "roughly planned for a future
+itteration … No immediate plans" and then "Still not on the immediate roadmap" (source:
+[[s-gh-4984-micro-with-jetstream]]). A third commenter describes the bridge people build instead:
+publish into a stream, carry the caller's reply subject in a header, and answer from a separate
+subscriber.
+
+That is the whole choice in one thread. Core NATS delivery has no acknowledgement to build on, so
+anything that must survive a handler dying needs a [[stream]] and a [[consumer]] beside it — not a
+setting. [[core-or-jetstream]] is the decision page and [[worker-pool]] the durable form.
+
+
 ## Related
 
 [[subjects-and-wildcards]] · [[publishing]] · [[nats-timeout]] · [[slow-consumer-detected]] ·
@@ -242,4 +257,4 @@ the story up.
 - [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] — the request/reply and queue-group
   pages of the chapter, for the two pointer sentences above.
 - [[s-gh-2760-one-connection-or-two]] — one connection or two, the maintainers' rule.
-- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]
+- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-gh-4984-micro-with-jetstream]]

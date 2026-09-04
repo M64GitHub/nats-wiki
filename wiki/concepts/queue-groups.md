@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [queue-group, --queue, load-balancing, random-selection, readiness, cluster, leafnode, gateway, geo-affinity, at-most-once, subsz, qgroup, NATS-RPLY-22]
 aliases: [queue group, queue groups, queue subscription, queue subscriber, queue subscribe, QueueSubscribe, --queue, qgroup, load balancing in core NATS, geo-affinity for queue groups, "which member gets the message"]
-sources: [s-docs-core-nats-queue-groups, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-nats-cli-request-reply-source, s-relnotes-2.10, s-docs-super-clusters, s-nats-server-core-delivery-observed, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply]
+sources: [s-docs-core-nats-queue-groups, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-nats-cli-request-reply-source, s-relnotes-2.10, s-docs-super-clusters, s-nats-server-core-delivery-observed, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply, s-adr-32-service-api, s-docs-services-framework, s-docs-services-scaling, s-nats-server-services-observed]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -171,6 +171,34 @@ protect each one individually, and they are what tells you when the pool itself 
 equivalent, where the bound is `max_ack_pending` rather than a buffer.
 
 
+## The services framework's queue groups
+
+The [[services-framework]] is the largest single user of queue groups in NATS, and it makes three
+choices an operator meets in the wild (source: [[s-adr-32-service-api]],
+[[s-docs-services-framework]]):
+
+- **Every endpoint joins one, and the default name is `q`** — shared by every instance of a service,
+  which is why starting a second copy load-balances it with no configuration.
+- **The name is resolved at three levels**, each overriding the one above: the service's default, a
+  group's override for its endpoints, an endpoint's own override. Unset falls back to `q`.
+- **A disabled queue group is a plain subscription**, so every instance answers every request. One
+  request to such an endpoint on two instances returned two replies (source:
+  [[s-nats-server-services-observed]]).
+
+Two measured facts here bear directly on *The pick* above, because the services documentation states
+both the other way round (docs issues #86 and #114). Two instances, handlers blocking three seconds,
+eight simultaneous requests: every request was delivered **at once**, the split was 3 / 5 at random,
+each instance worked through its own share one at a time, and **four of the eight callers timed out**
+while their replies arrived at 20 s, 23 s and 26 s (source: [[s-nats-server-services-observed]],
+run C7). A blocked member is not skipped and its work is not stolen — its share simply queues behind
+the block. The sizing consequence is on [[services-on-core-nats]].
+
+Within one process the picture is better than the docs suggest: in nats.go each endpoint is its own
+queue subscription with its own dispatcher, so a blocked endpoint does not block its siblings —
+`check` answered in 327 µs while `slow` was three seconds into a block on the same connection
+(source: [[s-nats-server-services-observed]], run C5).
+
+
 ## Related
 
 [[core-nats-delivery]] · [[request-reply]] · [[worker-pool]] · [[slow-consumer-detected]] ·
@@ -189,4 +217,4 @@ equivalent, where the bound is `max_ack_pending` rather than a buffer.
 - [[s-nats-cli-request-reply-source]] — why a `nats reply` member serialises its requests.
 - [[s-relnotes-2.10]] — the 2.10.22 / 2.10.23 leafnode load-balancing lines.
 - [[s-docs-super-clusters]] — the docs' statement of geo-affinity.
-- [[s-nats-server-core-delivery-observed]] — the `qgroup` field in `/subsz` (run D). · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]]
+- [[s-nats-server-core-delivery-observed]] — the `qgroup` field in `/subsz` (run D). · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-adr-32-service-api]] · [[s-docs-services-framework]] · [[s-docs-services-scaling]] · [[s-nats-server-services-observed]]

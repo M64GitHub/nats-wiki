@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [system-account, "$SYS", "$SYS.REQ", events, monitoring, acl]
 aliases: ["$SYS", "$SYS.REQ", "$SYS.REQ.SERVER", system subjects, system account subjects, system events, system requests]
-sources: [s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-docs-system-advisories-and-metrics, s-docs-jetstream-api-index, s-docs-jetstream-advisories-reference, s-gh-5768-track-connected-clients, s-gh-5902-leafnode-connect-events, s-nats-server-kick-ldm-mqtt-session, s-nats-server-auth-and-tls, s-gh-7854-jwt-push-timeout, s-docs-accounts-and-multitenancy, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-surveyor-metrics-observed, s-docs-protocols-internal, s-nats-server-wire-protocol]
+sources: [s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-docs-system-advisories-and-metrics, s-docs-jetstream-api-index, s-docs-jetstream-advisories-reference, s-gh-5768-track-connected-clients, s-gh-5902-leafnode-connect-events, s-nats-server-kick-ldm-mqtt-session, s-nats-server-auth-and-tls, s-gh-7854-jwt-push-timeout, s-docs-accounts-and-multitenancy, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-surveyor-metrics-observed, s-docs-protocols-internal, s-nats-server-wire-protocol, s-adr-32-service-api, s-docs-services-discovery-and-stats, s-nats-server-services-observed]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -239,7 +239,7 @@ does not cover, and two of them are not subjects an application ever publishes t
 | `_INBOX.` | the client library's reply subjects | [[request-reply]] |
 | `$SYS.` | the system account | this page |
 | `$JS.` | the JetStream API and ack subjects | [[js-api-subjects]] |
-| `$SRV.` | the services framework's discovery, stats and info | (step 6) |
+| `$SRV.` | the services framework's discovery, stats and info | [[services-framework]] |
 | `$LDS.<nuid>` | leafnode loop detection, one per account | [[leafnode]] |
 | `_GR_.<cluster hash>.<server hash>.` | a reply mapped across a gateway | [[gateway]] |
 | `$GR.` | the **old** gateway reply prefix (`oldGWReplyPrefix`, `gateway.go:43`) | — |
@@ -264,6 +264,39 @@ the account named, and a gateway sends the same list account-prefixed. The verb 
 [[wire-protocol]].
 
 
+## `$SRV` — the one reserved prefix the server does not own
+
+`$SRV.` is in the table above for a reason that separates it from every other row: **no part of
+`nats-server` implements it.** The string appears nowhere in the server's source, there is no handler,
+no registry and no permission special case. It is a convention among the client libraries, defined by
+ADR-32 (source: [[s-adr-32-service-api]], [[s-nats-server-services-observed]]).
+
+The tree is three verbs at three levels, and every instance of a service subscribes to all nine
+(source: [[s-docs-services-discovery-and-stats]]):
+
+| subject | who answers |
+|---|---|
+| `$SRV.PING`, `$SRV.INFO`, `$SRV.STATS` | every service instance in the account |
+| `$SRV.<VERB>.<name>` | every instance of that service |
+| `$SRV.<VERB>.<name>.<id>` | that one instance |
+
+All nine are **plain** subscriptions with no queue group, which is why a discovery request is a
+broadcast: collect replies by deadline (`nats request '$SRV.INFO' '' --replies=0`), never by taking
+the first. The replies are `io.nats.micro.v1.{ping,info,stats}_response`; [[services-framework]] has
+their fields.
+
+Two consequences for an operator. Because the server enforces nothing, **an ordinary client may
+publish to `$SRV`** — observed, `Published 5 bytes to "$SRV.PING"` — and an ordinary subscriber on
+`$SRV.>` sees every discovery request with its reply inbox. And because it is an ordinary subject
+tree, it crosses a leafnode with no configuration: a service on a leaf was listed, pinged and called
+from the hub (source: [[s-nats-server-services-observed]]). Restricting who may publish `$SRV.>` is
+the only control there is; see [[subject-permissions]].
+
+**Service latency is not part of this tree.** The `io.nats.server.metric.v1.service_latency` advisory
+above is a server feature of a cross-account service export with `latency {}` configured, and has
+nothing to do with the framework's own counters.
+
+
 ## Related
 
 [[monitoring-endpoints]] · [[advisories]] · [[js-api-subjects]] · [[account]] ·
@@ -277,4 +310,4 @@ the account named, and a gateway sends the same list account-prefixed. The verb 
 [[s-gh-5768-track-connected-clients]] · [[s-gh-5902-leafnode-connect-events]] ·
 [[s-nats-server-kick-ldm-mqtt-session]] · [[s-nats-server-auth-and-tls]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-docs-accounts-and-multitenancy]] · [[s-relnotes-2.10]] ·
-[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-surveyor-metrics-observed]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
+[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-surveyor-metrics-observed]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]] · [[s-adr-32-service-api]] · [[s-docs-services-discovery-and-stats]] · [[s-nats-server-services-observed]]

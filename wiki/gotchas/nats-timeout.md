@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [timeout, request-reply, no-responders, gomaxprocs, request_queue_limit, routes, kubernetes]
 aliases: ["nats: timeout", "Future cancelled, response not registered in time", "request timeout", "no responders available for request", "publish timeout"]
-sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply, s-nats-server-client-lifecycle-observed, s-nats-go-connection, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-slow-consumers-and-request-reply]
+sources: [s-gh-5859-unexpected-nats-timeout, s-nats-server-jetstream-log-warnings, s-gh-7190-asymmetric-cluster, s-docs-monitoring-endpoints, s-docs-forming-a-cluster, s-gh-6490-high-message-lag, s-nats-server-jetstream-cluster, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-docs-core-nats-request-reply, s-nats-server-client-lifecycle-observed, s-nats-go-connection, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-services-discovery-and-stats, s-nats-server-services-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -283,6 +283,37 @@ slower still. The per-outcome retry policy — fast retry on a timeout, backoff 
 [[request-reply]], and the reason a retry needs an idempotency key is there too.
 
 
+## A fourth outcome when the responder is a service
+
+If the responder is a [[services-framework]] service, there is one more thing a reply can be, and it
+is neither a timeout nor a 503: a **service error**. The handler answered, and it answered with a
+rejection carried in two headers (source: [[s-docs-services-discovery-and-stats]]):
+
+```
+Nats-Service-Error: order total must be positive
+Nats-Service-Error-Code: 400
+```
+
+`nats request` prints them above the body, so in CLI triage they are visible. In application code they
+are easy to miss — "the caller's `Request` returns a message with no transport error", so a rejection
+reads as a success and the `num_errors` climbing in `nats service stats` is invisible to the caller.
+Add it to the triage table at the top of this page:
+
+| what you see | what happened |
+|---|---|
+| `nats: timeout` | nobody answered in time — busy, or the handler died mid-request |
+| `no responders are available` | nothing was subscribed at all |
+| a reply with `Nats-Service-Error-Code` | a handler answered and rejected the request |
+
+Two service-specific causes of the plain timeout are worth knowing (source:
+[[s-nats-server-services-observed]]). **A busy instance is not skipped**: the server picks a
+queue-group member at random and a blocked member queues its share behind the block — in one run four
+of eight callers timed out while replies arrived at 20 s, 23 s and 26 s. And **a permissions refusal
+looks exactly like a timeout**: a client denied publish on the endpoint subject saw nothing at all,
+while the server logged `Publish Violation - Subject "orders.echo"`. When a request times out and the
+service looks healthy, read the server log before anything else.
+
+
 ## Related
 
 [[stream-has-high-message-lag]] · [[slow-consumer-detected]] · [[build-a-3-node-cluster]] ·
@@ -299,4 +330,4 @@ slower still. The per-outcome retry policy — fast retry on a timeout, backoff 
 - [[s-gh-7190-asymmetric-cluster]] — the same single-DNS-name route defect, independently reported.
 - [[s-docs-monitoring-endpoints]] — `slow_consumers` and `/connz?sort=pending`.
 - [[s-docs-forming-a-cluster]] — what the `Routes` column counts. ·
-[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-connection]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]]
+[[s-gh-6490-high-message-lag]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-request-reply-observed]] · [[s-nats-cli-request-reply-source]] · [[s-docs-core-nats-request-reply]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-connection]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-services-discovery-and-stats]] · [[s-nats-server-services-observed]]

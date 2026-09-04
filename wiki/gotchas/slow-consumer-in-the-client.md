@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6, nats.go v1.53.1, nats CLI 0.4.0
 verified-on: 2026-09-04
 tags: [slow-consumer, pending-limits, SetPendingLimits, Dropped, async-error-callback, ErrSlowConsumer]
 aliases: ["ErrSlowConsumer", "slow consumer, messages dropped", "client-side slow consumer", "SubscriptionSlowConsumer", "MessageDropped"]
-sources: [s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-nats-go-connection, s-nats-cli-reconnect, s-docs-protocol-client]
+sources: [s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-nats-go-connection, s-nats-cli-reconnect, s-docs-protocol-client, s-docs-services-scaling]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -190,6 +190,20 @@ are listed on [[wire-protocol]], and telling them apart means reading the server
 `/connz?state=closed`, not the socket.
 
 
+## A blocked service handler is the same shape
+
+A [[services-framework]] endpoint is an ordinary subscription with an ordinary pending buffer, so a
+handler that blocks builds the same backlog this page describes — the server keeps delivering that
+member's share of the queue group and the messages sit in the subscription's buffer until the handler
+returns (source: [[s-docs-services-scaling]]).
+
+In practice the callers give up long before any pending limit is reached: in one run with two
+instances, three-second handlers and eight simultaneous requests, four of eight callers timed out
+while the backlog was five messages deep — nowhere near a slow-consumer condition. So the symptom of
+an overloaded service is **caller timeouts**, not the drops on this page, and the counters here will
+not show it. [[services-on-core-nats]] has the sizing arithmetic.
+
+
 ## Related
 
 - [[slow-consumer-detected]] — the server's version of this failure, which closes the connection
@@ -206,4 +220,4 @@ are listed on [[wire-protocol]], and telling them apart means reading the server
 - [[s-nats-server-client-errors]] — that the server sends nothing on either slow-consumer branch
 - [[s-nats-server-client-faults-observed]] — runs A1–A6 on nats-server 2.14.6
 - [[s-docs-system-errors]] — the documented error tables, swept
-- [[s-nats-cli-reconnect]] — why a plain `nats sub` prints nothing when it drops messages · [[s-docs-protocol-client]]
+- [[s-nats-cli-reconnect]] — why a plain `nats sub` prints nothing when it drops messages · [[s-docs-protocol-client]] · [[s-docs-services-scaling]]

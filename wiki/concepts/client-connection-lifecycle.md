@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-04
 tags: [connection, state-machine, reconnect, backoff, jitter, MaxReconnect, reconnect-buffer, ErrReconnectBufExceeded, keepalive, ping, MaxPingsOut, stale-connection, drain, DrainTimeout, flush, lame-duck, ldm, discovery, connect_urls, readiness, force-reconnect]
 aliases: [connection lifecycle, client reconnect, reconnect, reconnection, reconnect buffer, drain, "Drain()", DRAINING_SUBS, DRAINING_PUBS, "stale connection", "nats: stale connection", "Stale Connection", keepalive, ping interval, MaxPingsOut, RECONNECTING, ClosedHandler, lame duck client, ldm, "connection events", readiness probe, ForceReconnect, flush, RTT]
-sources: [s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-connection, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-adr-40-nats-connection, s-docs-core-nats-publish-subscribe, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-docs-protocol-client, s-nats-server-wire-protocol]
+sources: [s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-connection, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-adr-40-nats-connection, s-docs-core-nats-publish-subscribe, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-docs-protocol-client, s-nats-server-wire-protocol, s-docs-services-scaling]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -339,6 +339,19 @@ read them — observed (source: [[s-docs-protocol-client]]). Every library sends
 explicitly; the CLI's own line is on [[wire-protocol]].
 
 
+## Draining a service is two steps, not one
+
+A [[services-framework]] service adds a drain of its own above the connection drain this page
+describes, and they are not interchangeable. `Stop()` drains the endpoint subscriptions and the `$SRV`
+discovery subscriptions, so the server routes no new requests to this instance; it returns before
+in-flight handlers finish. The connection drain is what waits for them (source:
+[[s-docs-services-scaling]]).
+
+So a graceful shutdown is: `Stop()`, then drain or wait on the framework's done callback, then close.
+The docs' scaling page says it plainly — "don't exit the process the moment it returns". Skipping the
+second step drops exactly the work the first step was protecting; see [[services-on-core-nats]].
+
+
 ## Related
 
 [[core-nats-delivery]] · [[client-defaults]] · [[how-clients-reach-a-cluster]] ·
@@ -359,4 +372,4 @@ explicitly; the CLI's own line is on [[wire-protocol]].
 - [[s-nats-server-client-lifecycle-observed]] — the runs on 2.14.6 behind every measured number.
 - [[s-adr-40-nats-connection]] — ADR-40, and the keepalive disagreement it is one side of.
 - [[s-docs-core-nats-publish-subscribe]] — the at-most-once promise the reconnect gap is an instance
-  of. · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]
+  of. · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-docs-services-scaling]]

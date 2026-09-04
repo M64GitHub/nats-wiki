@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed, s-nats-server-service-imports, s-ghsa-2026-08-request-info-spoofing, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-protocols-internal, s-nats-server-wire-protocol]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed, s-nats-server-service-imports, s-ghsa-2026-08-request-info-spoofing, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-protocols-internal, s-nats-server-wire-protocol, s-nats-server-services-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -433,6 +433,25 @@ share on top of its own. The full rule set is on [[queue-groups]]; the docs' que
 clusters and says nothing about a leafnode (source: [[s-docs-core-nats-queue-groups]]).
 
 
+### Where that leaves a service at the edge
+
+The [[services-framework]] inherits this rule whole, and the effect surprises people planning capacity
+across an edge. `$SRV` discovery and endpoint subjects are ordinary subjects, so both cross a leafnode
+with no configuration: a service running only on the leaf was listed, pinged and called from the hub
+(source: [[s-nats-server-services-observed]], run E1). But with one instance on each side sharing the
+default queue group `q`, **8 of 8 requests from the hub went to the hub instance and 8 of 8 from the
+leaf to the leaf instance**, while discovery listed both from either side (run E2).
+
+So an instance at the edge serves the edge's callers and adds nothing to the hub's throughput — and if
+the local instance is the slow one, its callers queue behind it while a healthy remote instance sits
+idle. Placement is the decision, not the queue group. [[services-on-core-nats]] has the sizing.
+
+One monitoring caveat from the same run: with a service only on the leaf, the hub's
+`/subsz?subs=1&acc=$G` counted the subscriptions but returned no `subscriptions_list` entries for
+them (run E3). Leaf-origin interest is counted, not itemised, so you cannot enumerate a remote
+service's subjects from the hub's monitoring port.
+
+
 ## What a leafnode connection puts on the wire
 
 A leafnode connection is bound to **one account** at CONNECT time, so — unlike a route or a gateway —
@@ -504,7 +523,7 @@ leafnode port that requires credentials the same client gets `Authorization Viol
 [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-websocket-leaf-nodes-over-websocket]] ·
 [[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-5902-leafnode-connect-events]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-server-service-imports]] · [[s-ghsa-2026-08-request-info-spoofing]] · [[s-nats-server-request-reply]] · [[s-nats-server-request-reply-observed]]
-- [[s-docs-core-nats-queue-groups]] — silent on leafnodes; cited for that. · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
+- [[s-docs-core-nats-queue-groups]] — silent on leafnodes; cited for that. · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]] · [[s-nats-server-services-observed]]
 
 ## To verify
 

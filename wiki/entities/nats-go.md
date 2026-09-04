@@ -7,7 +7,7 @@ verified-against: nats.go v1.53.1
 verified-on: 2026-08-31
 tags: [client, tier-1, go, reference-implementation]
 aliases: [nats.go, "nats-io/nats.go", go client, golang client]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-subscription, s-nats-server-client-faults-observed]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-subscription, s-nats-server-client-faults-observed, s-adr-32-service-api, s-nats-server-services-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -138,6 +138,31 @@ rotation by in-place write has a window in which the client reads a partial file
 and retries. See [[connection-closed-after-auth-error]].
 
 
+## What bites you — the `micro` package
+
+nats.go ships the [[services-framework]] as the `micro` package. Three of its properties are worth
+knowing before you design around them, all read at **v1.53.1** (source:
+[[s-nats-server-services-observed]]):
+
+- **Each endpoint is its own subscription with its own dispatcher.** `addEndpoint` calls
+  `QueueSubscribe` (or `Subscribe` when the queue group is disabled) per endpoint,
+  `micro/service.go:448–464`. So a blocked handler blocks **that endpoint only** — measured, `check`
+  answered in 327 µs while `slow` was three seconds into a block on the same connection. The docs say
+  a blocked handler stops the instance answering anything (docs issue #114); for nats.go that is
+  wrong, and other clients may genuinely differ.
+- **`Stop()` drains everything at once and returns immediately.** It drains each endpoint
+  subscription, then the nine `$SRV` subscriptions, and returned in 1.3 ms in a run where a handler
+  was two seconds into a five-second block. The handler still finished and replied — but only because
+  the process stayed alive. Exiting when `Stop()` returns drops the work.
+- **The `$SRV` prefix is a `const`.** `APIPrefix = "$SRV"` at `micro/service.go:264–265`, with no
+  configuration path. ADR-32 asks for it to be overridable "in order to enable targetting tools to
+  work across accounts" (source: [[s-adr-32-service-api]]); three years on, in Go it is not.
+
+`DefaultQueueGroup = "q"` is a `const` in the same block, and the name and version regexes
+(`^[A-Za-z0-9\-_]+$` and the official SemVer expression) are enforced at `AddService`, so an invalid
+name fails the call and the service never starts.
+
+
 ## Publish subject validation since v1.48.0
 
 Before **v1.48.0** (2025-12-17) the Go client wrote any subject it was given into the `PUB` line; the
@@ -156,4 +181,4 @@ the subject with `nats: invalid subject`. Rules on [[subjects-and-wildcards]].
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-go-subscription]] · [[s-nats-server-client-faults-observed]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-go-subscription]] · [[s-nats-server-client-faults-observed]] · [[s-adr-32-service-api]] · [[s-nats-server-services-observed]]

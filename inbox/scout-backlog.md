@@ -191,4 +191,16 @@ search again without a new source:**
 | 133 | core vs JetStream, when to use / need JetStream, persistence on core, pub/sub or request/reply with a stream; SO "core jetstream", "jetstream or core", "persistence" | gh#4984 (8 upvotes) asks for micro *plus* JetStream — a feature request, not a choice; so#74129868 asks whether JetStream can be the source of truth |
 | 134 | request/reply at scale, RPC, scatter-gather, no-responders, service layer / mesh, queue-group load balancing, timeouts; SO "request reply timeout", "queue group", "no responders", "scatter" | gh#2758 (cancelling slow responders), gh#4911 (routing by id ranges), gh#4761 (no-responders across accounts), so#67502707 (the exception) — pieces, no design question |
 
-(b) stays open — phase G runs it page by page.
+**(b) — one page done 2026-09-04**: `services-on-core-nats` (row 134), written for step 6 of
+`inbox/plan-the-client-side-2026-09-03.md`. Scouted the comment cache
+(`local/scratch/gh-index/threads-2026-09-03.md`) for `nats micro`, "micro framework", "service
+framework" and `$SRV`: **two hits in 484 threads**, one of them a passing mention. The other,
+**gh#4984** (*Nats micro with Jetstream*, 8 upvotes, no chosen answer), is not row 134's design
+question but is the public statement of where the pattern stops — a maintainer twice saying an acking
+handler is "not on the immediate roadmap". It was fetched whole into `raw/gh-discussions/gh-4984.md`,
+summarised as `s-gh-4984-micro-with-jetstream`, and became **bank row 193**; it is also the nearest
+thread this table already named for **row 133**, so step 7 starts from the raw copy rather than
+re-fetching. Row 134 stays `own`: the (a) sweep found no public form and this one did not either.
+The page rests instead on ADR-32, the four docs summaries and six passes of runs on 2.14.6.
+
+The rest of (b) stays open — phase G runs it page by page.

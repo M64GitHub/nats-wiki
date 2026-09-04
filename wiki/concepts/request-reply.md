@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [request-reply, inbox, _INBOX, inbox-prefix, timeout, no-responders, 503, Nats-Subject, scatter-gather, request-many, replies, reply-timeout, wait-for-empty, NATS-RPLY-22, service-import, head-of-line]
 aliases: [request/reply, request reply, request-response, inbox, _INBOX, reply subject, reply inbox, "no responders", "No responders are available", "NATS/1.0 503", "nats: no responders available for request", scatter-gather, scatter gather, request many, RequestMany, requestMany, RequestManyAsync, --replies, --inbox-prefix, CustomInboxPrefix, "nats request", "nats reply"]
-sources: [s-docs-core-nats-request-reply, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-adr-4-message-headers, s-adr-47-request-many, s-relnotes-2.2.0, s-gh-2760-one-connection-or-two, s-docs-core-nats-queue-groups, s-nats-cli-core-commands, s-relnotes-2.12, s-relnotes-2.10, s-nats-server-core-delivery, s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription]
+sources: [s-docs-core-nats-request-reply, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-nats-cli-request-reply-source, s-adr-4-message-headers, s-adr-47-request-many, s-relnotes-2.2.0, s-gh-2760-one-connection-or-two, s-docs-core-nats-queue-groups, s-nats-cli-core-commands, s-relnotes-2.12, s-relnotes-2.10, s-nats-server-core-delivery, s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription, s-adr-32-service-api, s-docs-services-framework, s-nats-server-services-observed]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -231,6 +231,28 @@ an empty body carrying the no-responders status header — and returns `ErrNoRes
 never see the 503; it is only visible on the wire or through the error.
 
 
+## A service error is a third outcome
+
+The [[services-framework]] adds one reply shape to the two this page describes. A handler that rejects
+a request answers normally but sets two headers, `Nats-Service-Error` (a description) and
+`Nats-Service-Error-Code` (a value "always safe to parse as a number"); ADR-32 makes checking them a
+*must* for callers (source: [[s-adr-32-service-api]]). On the wire the three outcomes are:
+
+```
+handled        MSG or HMSG with the handler's body
+rejected       HMSG … NATS/1.0 + Nats-Service-Error + Nats-Service-Error-Code, then the body
+no responders  HMSG … NATS/1.0 503 + Nats-Subject: <subject>, empty body
+```
+
+Only the last comes from the server. A caller that asks "did a message come back" reads a rejection as
+a success (source: [[s-nats-server-services-observed]], run C3). [[nats-timeout]] triages the three.
+
+Two smaller facts from the same runs. A service endpoint is an ordinary subscription: a publish with
+no reply subject still runs the handler, and the reply goes nowhere — nothing distinguishes a request
+from a fire-and-forget publish. And a request already accepted by a handler that then dies gets no
+no-responders answer at all; the caller only ever sees its own timeout.
+
+
 ## Related
 
 [[core-nats-delivery]] · [[queue-groups]] · [[nats-timeout]] · [[subject-permissions]] ·
@@ -255,4 +277,4 @@ never see the 503; it is only visible on the wire or through the error.
 - [[s-relnotes-2.12]] — `Nats-Subject` on the 503 (#5250).
 - [[s-relnotes-2.10]] — no responders over a service import (2.10.26, #6532).
 - [[s-nats-server-core-delivery]] — the `CONNECT` check that closes a connection asking for
-  `no_responders` without headers. · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-nats-go-subscription]]
+  `no_responders` without headers. · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-nats-go-subscription]] · [[s-adr-32-service-api]] · [[s-docs-services-framework]] · [[s-nats-server-services-observed]]

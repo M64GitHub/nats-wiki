@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [metrics, prometheus, exporter, surveyor, gnatsd, jetstream_, nats_, num_pending, ha_assets, alerting, time-series]
 aliases: [prometheus metrics, metric names, exporter metrics, surveyor metrics, nats_consumer_num_pending, gnatsd_varz, jetstream_consumer_num_pending, series names]
-sources: [s-prometheus-nats-exporter-collector, s-prometheus-nats-exporter-metrics-observed, s-nats-surveyor-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-2818-counters-exact-or-sampled, s-gh-3857-consumer-pending-series, s-gh-6182-what-to-alert-on, s-gh-5128-ha-assets, s-exporter-issue-218-num-pending-differs-per-node, s-docs-prometheus-and-dashboards, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14]
+sources: [s-prometheus-nats-exporter-collector, s-prometheus-nats-exporter-metrics-observed, s-nats-surveyor-metrics-observed, s-nats-server-traffic-counters-and-ha-assets, s-gh-2818-counters-exact-or-sampled, s-gh-3857-consumer-pending-series, s-gh-6182-what-to-alert-on, s-gh-5128-ha-assets, s-exporter-issue-218-num-pending-differs-per-node, s-docs-prometheus-and-dashboards, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-services-discovery-and-stats]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Metrics
@@ -310,6 +310,18 @@ is on [[jetstream-sizing]] and [[jetstream-slows-as-consumers-grow]].
 - **nats-surveyor v0.9.11** (2026-07-23): stream and consumer metrics "since v0.9.1" (its README);
   `--prefix` unimplemented; the `raftz` label shift.
 
+## The services framework's counters are not here
+
+Nothing in this table comes from a [[services-framework]] service. Its five per-endpoint counters —
+`num_requests`, `num_errors`, `last_error`, `processing_time`, `average_processing_time` — live in
+each instance and are readable only by asking `$SRV.STATS`, per instance, gathered by deadline. There
+is no exporter collector for them and no Prometheus bridge in the NATS tree; `nats service stats
+<name> --json` is the scrape surface, and summing across instance ids is the reader's job because the
+server keeps no aggregate (source: [[s-docs-services-discovery-and-stats]]).
+
+The `service_latency` series is the separate, server-side mechanism — see [[advisories]].
+
+
 ## Related
 
 [[monitoring-endpoints]] · [[advisories]] · [[system-subjects]] · [[prometheus-nats-exporter]] ·
@@ -324,4 +336,4 @@ is on [[jetstream-sizing]] and [[jetstream-slows-as-consumers-grow]].
 [[s-gh-2818-counters-exact-or-sampled]] · [[s-gh-3857-consumer-pending-series]] ·
 [[s-gh-6182-what-to-alert-on]] · [[s-gh-5128-ha-assets]] ·
 [[s-exporter-issue-218-num-pending-differs-per-node]] · [[s-docs-prometheus-and-dashboards]] ·
-[[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]]
+[[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-services-discovery-and-stats]]

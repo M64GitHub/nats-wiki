@@ -86,6 +86,10 @@ exists to answer live in `inbox/question-bank.md`.
   on by default, `max_payload` counted over header plus body and a violation that **closes the connection**,
   and the four surfaces that show why a message never arrived — a wire tap, `/subsz?test=`, `/connz`,
   `nats trace` — each run on 2.14.6.
+- [[services-framework]] — a "service" is a client-library convention, not a server feature: the
+  `{group}.{endpoint}` subject rule, the nine `$SRV` subscriptions every instance makes, the three
+  response types and the five per-endpoint counters in nanoseconds, the two error headers against the
+  503, what `Stop()` drains, and why `$SRV` is not reserved by the server at all.
 - [[subjects-and-wildcards]] — the three rules the server enforces on a subject (no empty token, no
   whitespace, `>` last) and everything it does not: no length or token limit (`max_control_line` and the
   restart-only `max_subscription_tokens` are the real bounds), `$` prefixes nobody checks, a publish to a
@@ -166,6 +170,10 @@ exists to answer live in `inbox/question-bank.md`.
 
 - [[worker-pool]] — many processes on one consumer: demand-based distribution, `max_ack_pending` as a
   *shared* ceiling, and why this is not a queue group.
+- [[services-on-core-nats]] — designing a request/reply service layer with no broker state: sizing the
+  caller's timeout from the queue rather than the handler, no-responders as the deploy check, scatter-
+  gather only outside a queue group, permissions per role, drain on stop, and where the design stops
+  and needs a stream.
 - [[dead-letter-queue]] — there is no DLQ, deliberately: capture the max-deliveries advisory,
   direct-get the original by sequence, republish. The advisory carries no payload and never will, and
   with nobody fetching nothing is ever dead-lettered.
@@ -451,6 +459,15 @@ exists to answer live in `inbox/question-bank.md`.
   debugging tools; the `concepts/` primers folded.
 - [[s-docs-core-nats-request-reply]] — the inbox mux, the three outcomes with each client's name, the CLI's
   gather flags and the `nats reply` queue-group trap; `concepts/request-reply.md` folded.
+- [[s-docs-services-framework]] — the Services chapter's four narrative pages: what the framework adds to
+  a plain responder, the `{group}.{endpoint}` rule, the three-level queue group, and the immutability of
+  endpoints and metadata. Unversioned by design, so every date comes from ADR-32.
+- [[s-docs-services-discovery-and-stats]] — the wire surface: the three `$SRV` verbs at three levels,
+  broadcast semantics, the five per-endpoint counters in nanoseconds, the two error headers, and the
+  `io.nats.micro.v1.*` schemas read from `raw/jsm-go/` because the docs' renderer collapsed them.
+- [[s-docs-services-scaling]] — the operator page of the chapter, and this ingest's richest source of docs
+  issues: two behavioural claims about a busy queue-group member that the runs contradict, plus what
+  `Stop()` really drains.
 - [[s-docs-core-nats-queue-groups]] — the random pick, coexistence, one subject per group, the typo, and the
   "a cluster adds a locality preference" sentence the lab contradicts; `concepts/queue-groups.md` folded.
 
@@ -602,6 +619,10 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-request-reply]] — the four conditions of the 503 and its bytes, `processMsgResults`' random
   start index and the leaf fallback, the sublist's weight expansion, `RS+ … <weight>`, the gateway
   exclusion, at v2.14.6 with lines.
+- [[s-nats-server-services-observed]] — six passes on 2.14.6: ten subscriptions per instance, the `$SRV`
+  bodies, a service error and a 503 side by side on the wire, a blocked endpoint that does not block its
+  siblings, a blocked instance that times out four of eight callers, what `Stop()` removes, and a
+  leafnode that carries discovery but keeps the queue group local.
 - [[s-nats-server-request-reply-observed]] — eight runs in four passes: the 503 with `Nats-Subject`, the
   CLI's silent timeout at exit 0, a busy member keeping 8 of 20, a quarter each across the lab's nodes, the
   503 across an import, and a leaf's members skewing the hub's split 3 : 1.
@@ -711,6 +732,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-adr-33-metadata]] — `metadata` on streams and consumers: 128 KB, `_nats` reserved.
 - [[s-adr-34-multiple-filters]] — `filter_subjects`: no overlaps (10136), not both forms (10134), a buffer
   per subject on the server.
+- [[s-adr-32-service-api]] — the Service API spec, revisions 1–6 (2022-11-23 → 2025-02-17): the name and
+  SemVer rules, the `$SRV` verb tree, the three response types, the three-level queue group with default
+  `q`, immutable metadata, drain on stop — and the overridable prefix nats.go never implemented.
 - [[s-adr-4-message-headers]] — the header wire format: `NATS/1.0`, `HDR_LEN` through the blank line, case
   preserving, one value per line; no version — that comes from the source at v2.2.0.
 - [[s-adr-47-request-many]] — *Partially Implemented*: the four stop conditions of a many-reply request and
@@ -925,6 +949,9 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-gh-5172-mapping-in-config-or-stream]] — the maintainer's placement rule: partition for a stream in the
   stream config, not the server config; and the server's example config using a wildcard source as its own
   destination for loss testing.
+- [[s-gh-4984-micro-with-jetstream]] — can a services handler ack and nak? "Roughly planned … no
+  immediate plans" in 2024, "Still not on the immediate roadmap" in 2025 — the public statement of where
+  core NATS request/reply stops.
 - [[s-gh-2760-one-connection-or-two]] — "start with one connection"; head-of-line blocking is on the
   subscription side, so split subscriptions, not publishing. Row 138's thread.
 
@@ -1107,9 +1134,10 @@ the gap is recorded under `## To verify` on the `key-value` page.
 
 Reference: *(every reference table is written — see the Reference section above)*
 
-Patterns: [[services-on-core-nats]] — linked from the `$SRV.` prefix row of `wire-protocol`, which names
-the framework's discovery, stats and info subjects. The page that explains the pattern is step 6 of the
-client-side plan (bank row 134).
+Patterns: [[core-or-jetstream]] — linked from `core-nats-delivery` and `services-on-core-nats`, both of
+which stop at the point where a design needs durability and hand the decision on. The page is step 7 of the
+client-side plan (bank row 133, which closes megaplan group G7). `services-on-core-nats` was written
+2026-09-04 and is in the Operations section above.
 
 Entities: *(all the repos, clients, tools, releases, products and organisations the ecosystem page
 names now have pages — see the Entities section above. People: none yet.)*

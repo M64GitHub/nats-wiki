@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [advisories, events, "$JS.EVENT.ADVISORY", "$SYS", monitoring]
 aliases: [advisories, "$JS.EVENT.ADVISORY", system events, jetstream advisories]
-sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-advisories-and-metrics, s-docs-jetstream-advisories-reference, s-prometheus-nats-exporter-metrics-observed, s-gh-6182-what-to-alert-on, s-docs-system-errors]
+sources: [s-nats-server-jetstream-resources, s-nats-server-jetstream-log-warnings, s-nats-server-constants-2.14.6, s-adr-42-priority-groups, s-docs-acknowledgment, s-docs-monitoring-endpoints, s-adr-61-meta-quorum-rescue, s-docs-accounts-and-multitenancy, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-nats-server-monitoring-observed, s-docs-monitoring-advisories-and-events, s-synadia-reliable-delivery-dlq, s-gh-4994-scale-to-zero-dlq, s-gh-7590-dlq-payload-loss, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-advisories-and-metrics, s-docs-jetstream-advisories-reference, s-prometheus-nats-exporter-metrics-observed, s-gh-6182-what-to-alert-on, s-docs-system-errors, s-docs-services-discovery-and-stats]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -409,6 +409,22 @@ service-latency metric's real subject and every body are on [[system-subjects]] 
 [[jetstream-sizing]] · [[jetstream-out-of-disk]] · [[js-api-subjects]] · [[error-codes]] ·
 [[malformed-or-corrupt-message]] · [[nats-timeout]] · [[stream-has-high-message-lag]]
 
+## Service latency is not the services framework's counters
+
+Two things carry the word "service" and they are unrelated. The
+`io.nats.server.metric.v1.service_latency` advisory above is a **server** feature: a cross-account
+service export with `latency { subject: … }` configured makes the server measure and publish the round
+trip. The [[services-framework]]'s `num_requests`, `num_errors` and `processing_time` are **client**
+counters, kept by the library in each instance and read by asking `$SRV.STATS`; nothing publishes them
+and no exporter scrapes them.
+
+The docs conflate the two: the observability page tells you the service-latency schema "lives in
+Reference" next to the framework's counters, and no such schema is there (source:
+[[s-docs-services-discovery-and-stats]]; docs issue #111). If you want per-request latency for a
+service inside one account, the framework's `average_processing_time` is what exists, and it measures
+handler time only — not queueing, not the network.
+
+
 ## Sources
 
 [[s-nats-server-constants-2.14.6]] · [[s-adr-42-priority-groups]] · [[s-docs-acknowledgment]] ·
@@ -417,4 +433,4 @@ service-latency metric's real subject and every body are on [[system-subjects]] 
 [[s-adr-61-meta-quorum-rescue]] ·
 [[s-docs-accounts-and-multitenancy]] · [[s-nats-server-snapshot-restore]] ·
 [[s-docs-advanced-publishing]] ·
-[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-advisories-and-metrics]] · [[s-docs-jetstream-advisories-reference]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-gh-6182-what-to-alert-on]] · [[s-docs-system-errors]]
+[[s-nats-server-monitoring-observed]] · [[s-docs-monitoring-advisories-and-events]] · [[s-synadia-reliable-delivery-dlq]] · [[s-gh-4994-scale-to-zero-dlq]] · [[s-gh-7590-dlq-payload-loss]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-nats-server-system-subjects]] · [[s-nats-server-system-subjects-observed]] · [[s-docs-system-advisories-and-metrics]] · [[s-docs-jetstream-advisories-reference]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-gh-6182-what-to-alert-on]] · [[s-docs-system-errors]] · [[s-docs-services-discovery-and-stats]]

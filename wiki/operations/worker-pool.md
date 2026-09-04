@@ -8,7 +8,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [worker-pool, max_ack_pending, ack_wait, scaling, queue-group, redelivery, idempotency]
 aliases: [worker pool, worker-pool, shared consumer, competing consumers]
-sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply]
+sources: [s-docs-worker-pool, s-docs-pull-consumers, s-docs-acknowledgment, s-docs-filtering, s-gh-4972-nak-with-delay-blocks, s-nats-server-nak-backoff-observed, s-relnotes-2.10, s-prometheus-nats-exporter-metrics-observed, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-resilient-clients-drain-and-shutdown, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-services-scaling, s-gh-4984-micro-with-jetstream, s-nats-server-services-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -252,6 +252,35 @@ delivery — a level, not a rate, and the max-deliveries drop itself has no seri
 [[s-prometheus-nats-exporter-metrics-observed]]).
 
 
+## The core-NATS sibling, and where the line falls
+
+The same shape without a stream is a [[services-framework]] service: instances of one handler sharing
+a queue group, scaled by starting copies. [[services-on-core-nats]] is that pattern. The line between
+them is not throughput or taste, it is **acknowledgement**:
+
+| | a service on core NATS | a worker pool on a consumer |
+|---|---|---|
+| a worker dies mid-work | the request is gone, the caller sees a timeout | the message is redelivered after `ack_wait` |
+| backpressure | none — a busy member queues its share | `max_ack_pending` |
+| retries, backoff, dead letter | none | [[ack-and-redelivery]], [[dead-letter-queue]] |
+| the caller waits | yes, synchronously | no |
+
+The framework will not close that gap. Asked in public whether a micro handler could ack and nak
+against JetStream, a maintainer answered "roughly planned for a future itteration … No immediate
+plans" in 2024 and, to a direct follow-up fifteen months later, "Not yet no … Still not on the
+immediate roadmap" — with per-message TTLs named as the piece that had been missing (source:
+[[s-gh-4984-micro-with-jetstream]]). A commenter in the same thread describes the usual bridge:
+publish into a stream, carry the caller's reply subject in a header, answer from a separate
+subscriber.
+
+One measurement from the core-NATS side sharpens *Why the pool exists at all* above. With two
+instances whose handlers block three seconds and eight simultaneous requests, every request was
+delivered immediately, split 3 / 5 at random, and each instance worked through its own queue one at a
+time; four callers timed out (source: [[s-nats-server-services-observed]]). A queue group has no
+`max_ack_pending` and no depth you can read — the only signal that the fleet is saturated is callers
+giving up.
+
+
 ## Related
 
 [[consumer]] · [[ack-and-redelivery]] · [[stream]] · [[retention-policies]] · [[priority-groups]] ·
@@ -260,4 +289,4 @@ delivery — a level, not a rate, and the max-deliveries drop itself has no seri
 ## Sources
 
 [[s-docs-worker-pool]] · [[s-docs-pull-consumers]] · [[s-docs-acknowledgment]] ·
-[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]]
+[[s-docs-filtering]] · [[s-gh-4972-nak-with-delay-blocks]] · [[s-nats-server-nak-backoff-observed]] · [[s-relnotes-2.10]] · [[s-prometheus-nats-exporter-metrics-observed]] · [[s-nats-server-request-reply-observed]] · [[s-docs-core-nats-queue-groups]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-services-scaling]] · [[s-gh-4984-micro-with-jetstream]] · [[s-nats-server-services-observed]]

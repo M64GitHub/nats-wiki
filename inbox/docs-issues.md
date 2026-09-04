@@ -185,6 +185,16 @@ separate tables.
 | 105 | `reference/protocols/leafnode.md` — **four verb forms the parser rejects or does not have.** (a) `LS+ <subject> <queue_group>` (`:112`): `processLeafSub` accepts **1 or 3** arguments and nothing else (`leafnode.go:2926–2941`); a two-token `LS+` returns `processLeafSub Parse Error`. (b) `LS+ <subject> <queue_group> <weight> <origin_cluster>` (`:142`) and `LS- … <origin_cluster>` (`:181`): the origin cluster is the **first** token, and it is a **route** protocol form, not a leafnode one (`route.go:1729–1740`) — observed as `LS+ LEAF1 $G edge.ping` on a route while the leaf's own frame is `LS+ edge.ping`. (c) `LMSG <subject> … <header_size> <total_size>` (`:217`): a leaf's header messages are **`HMSG`** (`parser.go:381–385`), and a three-token `LMSG` is parsed as *subject, reply, size* (`leafnode.go:3241–3245`) — observed `HMSG edge.ping 22 33` and `HMSG edge.work | W 18 31`. (d) **`LDS` is listed as a message type** (`:17`, "Sent By: Hub Server"); there is no such operation — `$LDS.<nuid>` is a subject carried by an ordinary `LS+` (`leafnode.go:59`, observed). **Three CONNECT field names are wrong** (`:75–89`): the compression field is `compress_mode` — the old `compression` tag "has never been used" (`leafnode.go:2189–2193`) — `hub` is `is_hub`, `proto` is `protocol`; `deny_pub` and `isolate` are real and undocumented. `proto` in the leafnode **INFO** is **3**, not the "1 for current leafnode protocol" of `:36`, and `client_id` is the connection id, not "Client ID for compression negotiation" (`:50`). **Four of the six "common errors" do not exist** (`:392–397`): no `Loop Detected`, no `Leafnode Not Allowed`, no `Maximum Payload Exceeded` (the literal is `Maximum Payload Violation`, `client.go:2554`) and no bare `Permissions Violation` (the leaf forms name the subject, `leafnode.go:3488`, `:3491`). The **compression list** (`:291–296`) has six of the server's eight names, omitting `s2_best` and `not supported` and all the aliases (`server.go:444–452`). The "30-second reconnection delay" (`:275`, `:353`) is **three** constants of that value plus a fourth of 5 s (`leafnode.go:48–67`) | `reference/protocols/leafnode.md` (lines 17, 36, 50, 75–89, 112, 142, 181, 217, 275, 291–296, 353, 392–397) | nats-docs | wrong-value | ★ medium | not filed | wiki gives the observed verb forms on `reference/wire-protocol` and the delays and field names on `concepts/leafnode` |
 | 106 | `reference/protocols/gateway.md` — **the interest-mode section describes pre-2.9 behaviour.** `:251–270` presents optimistic mode as the initial state and "too many `RS-` messages" as the trigger for interest-only. Since **v2.9.0** a server sets `info.GatewayIOM = true` unconditionally outside tests — "this server will switch all accounts to InterestOnly mode when accepting an inbound or when a new account is fetched" (`gateway.go:552–558`) — so between two 2.9+ servers the optimistic path is never entered and the threshold (`defaultGatewayMaxRUnsubBeforeSwitch = 1000`, `gateway.go:41`, which the page describes without naming) is never reached. **Observed**: `"gateway_iom":true` on a 2.14.6 gateway listener's INFO, a field the page does not list. Also on that page: `gateway_url` is given as `nats-gw://<hostname>:<port>` (`:50`) and observed as a bare `192.168.178.61:17222`; the gateway `CONNECT` is said to carry `lang` and `version` (`:83–84`) and carries neither; the `RMSG` syntax (`:204`) omits the `+` reply indicator and the `| <queue…>` list that a queue delivery uses — observed `RMSG $G x.svc + _GR_.DdEU99.DSpI1m._INBOX.… NATS-RPLY-22 3`; and two of the four "common errors" (`:298–299`) — `Invalid Account`, `Gateway Protocol Error` — appear nowhere in `gateway.go`, while the four rejections it does send are on no page. The mapped-reply prefix the page never mentions is `_GR_.<6-char cluster hash>.<6-char server hash>.` (`gateway.go:47–52`); `$GR.` is `oldGWReplyPrefix` | `reference/protocols/gateway.md` (lines 50, 83–84, 204, 251–270, 298–299) | nats-docs | wrong-value | medium | not filed | wiki states interest-only-by-default on `concepts/gateway` and the frames on `reference/wire-protocol` |
 | 107 | `reference/protocols/route.md` — **the CONNECT table lists the two fields whose absence is the protocol's own client/route discriminator.** `:73–74` gives `lang` ("The implementation language of the server (go)") and `version`; a route sends neither, and `processRouteConnect` rejects any CONNECT that has `lang` with `-ERR 'attempted to connect to route port'` — "Client provide Lang in the CONNECT protocol while ROUTEs don't" (`route.go:3022–3028`). Observed, a real route CONNECT: `{"echo":true,"verbose":false,"pedantic":false,"tls_required":false,"headers":true,"name":"<server id>","cluster":"HUBC","lnoc":true}` — `name` is the remote's **server ID**, not the "Generated Server Name" of `:72`, and `cluster`, `lnoc`, `lnocu` and `cluster_dynamic` are undocumented. The `INFO` field list (`:37–46`) omits nine fields a 2.14.6 route listener sends (`server_name`, `proto`, `headers`, `jetstream`, `nonce`, `cluster`, `domain`, `compression`, `lnoc`, `lnocu`, `route_pool_size`, `gateway_url`, `leafnode_urls`) and its account of `ip` (`:25`) reads as if the listener's own greeting carries one — it does not; that field is added to a **forwarded** peer INFO (observed). The `RMSG` syntax (`:133`) omits the `| <queue…>` form (observed `RMSG $G work.a | WORKERS 6`), and the page has no `LS+` / `LS-` rows at all, though a route carries leaf-origin subscriptions with them | `reference/protocols/route.md` (lines 25, 37–46, 72–74, 133) | nats-docs | wrong-value | medium | not filed | wiki gives the route field tables and the origin-cluster form on `reference/wire-protocol`, and the `nc` check on `operations/build-a-3-node-cluster` |
+| 108 | `reference/services/{ping,info,stats}-response.md` — **the three schema pages render `endpoints` and `metadata` as collapsed placeholders, so the fields they hold are documented nowhere.** The pages show `▶metadataoneOf` (`info:47`, `stats:47`, `ping:47`) and `▶endpointsobject\[]` (`info:53`, `stats:55`) with only a one-line description and no expansion. Those collapsed objects hold every per-endpoint field a caller parses: `name`, `subject`, `queue_group`, `metadata` in the INFO response, and additionally `num_requests`, `num_errors`, `last_error`, `processing_time`, `average_processing_time` and `data` in the STATS response, together with their `required` lists — read from the source schemas at `nats-io/jsm.go` v0.4.1, mirrored as `raw/jsm-go/micro-*-v0.4.1.json`. The observability page lists five of them in prose (`observability.md:14–20`); the reference pages, which the chapter calls "versioned and exhaustive", list none | `reference/services/info-response.md` (47, 53), `stats-response.md` (47, 55), `ping-response.md` (47) | nats-docs | missing | high | not filed | wiki gives the fields and units on `concepts/services-framework`, cited to the schemas in `raw/jsm-go/` |
+| 109 | **Nine hand-offs to a services configuration reference that does not exist.** `your-first-service.md:122` "The full set of service configuration fields and their valid ranges is documented in Reference", `:337`; `endpoints-and-groups.md:294` "The full set of endpoint and group options is documented in Reference", `:527`; `scaling.md:264` "the full set of service lifecycle and queue-group fields in Reference", `:390`; `where-next.md:24` "The exact config fields, their valid ranges, and the wire format of the discovery verbs live in **Reference**, which is versioned and exhaustive", `:26`, `:93`. `reference/services/` holds three response-schema pages and nothing else (`ls`: `info-response.md`, `ping-response.md`, `stats-response.md`), and `reference/services.md` is a 51-line overview with no field. The configuration fields, their types and their valid ranges are documented publicly **only** in `raw/adr/ADR-32.md` | `learn/services/your-first-service.md` (122, 337), `endpoints-and-groups.md` (294, 527), `scaling.md` (264, 390), `where-next.md` (24, 26, 93) | nats-docs | missing | high | not filed | wiki writes the rules onto `concepts/services-framework` from ADR-32 and says the reference page does not exist |
+| 110 | `learn/services/scaling.md:158` "You met `WithEndpointQueueGroupDisabled` on [endpoints and groups]" — **that page never names the option.** A grep of the whole docs mirror finds `WithEndpointQueueGroupDisabled` on this one line and nowhere else; `endpoints-and-groups.md:311` says only "You control this with one option". A reader following the cross-reference to learn the option's name finds no name | `learn/services/scaling.md` (line 158) | nats-docs | missing | low | not filed | wiki names the option and its effect on `concepts/services-framework` and `entities/nats-go` |
+| 111 | **Three chapters are promised `$SRV` coverage and none of them has any.** `where-next.md:38` "The Security deep dive covers subject isolation for `$SRV` subjects, account access control, and cross-account service placement"; `:42` "The Topologies deep dive covers … how `$SRV` and service subjects propagate across leaf nodes and gateways"; `:40` and `observability.md:403` "The service-latency advisory schema itself lives in Reference". A grep for `SRV` over the whole 861-page mirror returns the eleven services pages, `concepts/subjects.md`, `learn/core-nats/subjects-and-wildcards.md` and the site index — **nothing under `learn/security/`, `learn/topologies/` or `learn/monitoring/`**, and no service-latency schema under `reference/services/`. The observability page also never says that service latency is a **server** feature of a cross-account export with `latency {}` configured, unrelated to the framework's counters | `learn/services/where-next.md` (38, 40, 42), `observability.md` (403) | nats-docs | missing | medium | not filed | wiki answers all three: permissions on `concepts/subject-permissions`, the leafnode behaviour measured on `concepts/leafnode`, and the latency distinction on `reference/advisories` |
+| 112 | `reference/services.md` — **the overview lists six capabilities the schemas do not have, and states discovery backwards.** `:47` "Discovery - Services announce themselves on startup": they do not — "A service doesn't publish to `$SRV` itself; it subscribes there and replies to your requests" (`discovery.md:18`), and ADR-32 (L75–76) says the framework "will automatically create a subscription to handle discovery and monitoring requests". Discovery is pull, and a service that nobody asks is invisible. Also invented: "Resource utilization" and "Request counts **and rates**" (`:38–41`) — the stats schema has five counters and no rate and no resource field; "Service availability status · Response time measurement" (`:30–31`) — the ping response carries `type/name/id/version/metadata` only, and RTT is measured by the caller; "Versioning - API version management support" (`:50`) — a SemVer string, nothing more; "Observability - Structured logging and metrics" (`:51`) — the framework has no logging component and emits no metrics. The page never names the `$SRV` subject tree at all (grep: no `SRV` in the file) | `reference/services.md` (lines 30–31, 38–41, 47, 50–51) | nats-docs | wrong-value | medium | not filed | wiki states pull discovery and the real field set on `concepts/services-framework` |
+| 113 | ★ **`$SRV` is documented as reserved by the server; the server reserves nothing.** `concepts/subjects.md:1080–1086` lists `$SRV` under "Subjects starting with `$` are reserved for system use" beside `$SYS` and `$JS`, and `learn/services/discovery.md:469` says "`$SRV` is a reserved subject prefix … The framework owns the entire `$SRV` tree". The string `$SRV` appears **nowhere in `nats-server`'s source**: no handler, no permission special case, no reservation. Observed on 2.14.6: an ordinary client's `nats pub '$SRV.PING' hello` returned `Published 5 bytes to "$SRV.PING"`, and an ordinary subscriber on `$SRV.>` received another caller's discovery request with its reply inbox. The reservation is a convention among client libraries (ADR-32 L351–353, "reserved for internal handlers"). An operator who reads these pages as they are written will not write the subject permission that is the *only* thing protecting the tree | `concepts/subjects.md` (1080–1086), `learn/services/discovery.md` (469) | nats-docs | wrong-value | high | not filed | wiki states it on `reference/system-subjects` — *`$SRV` — the one reserved prefix the server does not own* — and gives the permissions on `concepts/subject-permissions` |
+| 114 | ★ `learn/services/scaling.md:272` "**Handlers run synchronously on the service's connection.** While one handler blocks … that instance answers no other request." Both halves are wrong for nats.go, in opposite directions. *Within* an instance the claim is too pessimistic: each endpoint is its own `QueueSubscribe` with its own dispatcher (`nats.go@v1.53.1/micro/service.go:448–464`), so a block is per endpoint — observed, `check` answered in **327 µs** and `vip` in **508 µs** while `slow` was three seconds into a block on the same connection. *Across* instances it is far too optimistic, which is the dangerous half and the same claim as #86: two instances with three-second handlers and eight simultaneous requests — every request delivered at once, split **3 / 5** at random, each instance working through its own share one at a time, and **four of the eight callers timed out** while their replies arrived at 20.09 s, 23.09 s and 26.09 s into inboxes nobody was listening on. An architect who sizes a fleet on this sentence sizes it for the wrong failure | `learn/services/scaling.md` (line 272) | nats-docs | wrong-value | high | not filed | wiki measures both on `concepts/services-framework` and turns them into timeout arithmetic on `operations/services-on-core-nats`; see also #86 |
+| 115 | `learn/services/where-next.md:34` "A service is at-most-once request-reply: it stores nothing, and **when an instance stops, its in-flight work is gone**" — against `scaling.md:164` "Requests the instance already accepted keep processing in the background", `scaling.md:376` "A graceful `Stop()` that drains in-flight work and leaves the queue group, so the survivors absorb the load with nothing dropped", and this page's own `:46` "each `Stop()` drains in-flight requests". Observed on 2.14.6, both are true of different stops and the pages do not say which they mean: `Stop()` called two seconds into a five-second handler returned in **1.3 ms**, removed all fifteen subscriptions at once (endpoint and `$SRV` both answered `No responders` immediately), and the handler still replied at 5.001 s **because the process stayed alive**; a `kill -9` in the same place lost the work and the caller learned nothing but a timeout | `learn/services/where-next.md` (line 34) | nats-docs | inconsistent | medium | not filed | wiki separates the two on `concepts/services-framework` — *Stopping one* — and gives the shutdown order on `operations/services-on-core-nats` |
+| 116 | `ADR-32.md:78–81` "Note that this prefix needs to be overridable much in the way as we do for `$JS`, in order to enable targetting tools to work across accounts" — **stated as a requirement in 2022-11-23 and still not implemented, with nothing in the ADR saying so.** nats.go v1.53.1 declares `APIPrefix = "$SRV"` as a `const` (`micro/service.go:264–265`) with no configuration path; a grep of the docs mirror finds no mention of an override on any page. The ADR has had five revisions since, the most recent 2025-02-17, and none records the gap. A tool author reading the ADR will design for a configurable prefix that no client offers | `raw/adr/ADR-32.md` (lines 78–81) | ADR repo | enhancement | low | not filed | wiki says the prefix is fixed in practice on `concepts/services-framework` and `entities/nats-go` |
+| 117 | `reference/services/stats-response.md:51` "The time the service was **stated** in RFC3339 format" — the typo is not the docs page's, it is in the schema the page is generated from: `schemas/micro/v1/stats_response.json` at `nats-io/jsm.go` v0.4.1 carries the same string in the `started` field's `description` (mirrored as `raw/jsm-go/micro-stats_response-v0.4.1.json:52`). Fixing the docs page alone will regress at the next generation | `reference/services/stats-response.md` (line 51) | jsm.go | enhancement | low | not filed | wiki writes `started` correctly on `concepts/services-framework` and cites the schema |
 
 ---
 
@@ -3573,6 +3583,16 @@ which case it is dropped. The `weight` reference page could carry the one-line e
 | 105 | `wiki/reference/wire-protocol.md` — *The message forms, exactly*, *Origin clusters*, *Leafnode reconnect delays*; `wiki/concepts/leafnode.md` — *What a leafnode connection puts on the wire*; `wiki/gotchas/duplicate-messages-across-a-leafnode.md` |
 | 106 | `wiki/concepts/gateway.md` — *Interest-only is the default, and has been since 2.9.0*; `wiki/gotchas/supercluster-slows-when-a-remote-subscriber-joins.md` — *Not the interest-mode switch*; `wiki/reference/wire-protocol.md` — *Gateway interest* |
 | 107 | `wiki/reference/wire-protocol.md` — *`INFO`*, *What each kind sends*; `wiki/operations/build-a-3-node-cluster.md` — *Checking a route port without a client*; `wiki/operations/how-clients-reach-a-cluster.md` |
+| 108 | `wiki/concepts/services-framework.md` — *The three verbs, and what comes back*, *The counters, and their units* |
+| 109 | `wiki/concepts/services-framework.md` — *Limits and failure modes* (the last bullet); the rules themselves from `wiki/summaries/s-adr-32-service-api.md` |
+| 110 | `wiki/concepts/services-framework.md` — *Scaling: the queue group is the whole mechanism*; `wiki/entities/nats-go.md` — *What bites you — the `micro` package* |
+| 111 | `wiki/concepts/subject-permissions.md` — *`$SRV.>` is an ordinary permission*; `wiki/concepts/leafnode.md` — *Where that leaves a service at the edge*; `wiki/reference/advisories.md` — *Service latency is not the services framework's counters* |
+| 112 | `wiki/concepts/services-framework.md` — *The subjects it creates*, *The three verbs, and what comes back* |
+| 113 | `wiki/reference/system-subjects.md` — *`$SRV` — the one reserved prefix the server does not own*; `wiki/concepts/services-framework.md` — *What the operator has to configure: permissions* |
+| 114 | `wiki/concepts/services-framework.md` — *Scaling: the queue group is the whole mechanism*; `wiki/operations/services-on-core-nats.md` — *Size the timeout from the queue, not from the handler*; `wiki/concepts/queue-groups.md` — *The services framework's queue groups* |
+| 115 | `wiki/concepts/services-framework.md` — *Stopping one: `Stop()` drains, a signal does not*; `wiki/operations/services-on-core-nats.md` — *Drain on stop* |
+| 116 | `wiki/concepts/services-framework.md` — *Across a cluster, a leafnode and an account*; `wiki/entities/nats-go.md` — *What bites you — the `micro` package* |
+| 117 | `wiki/concepts/services-framework.md` — *The counters, and their units*; `raw/jsm-go/_provenance.md` |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
 
@@ -3712,6 +3732,13 @@ members of group `inv`, one answering at once and one running `sleep 1` before e
 concurrent requests: the slow member received **8 of 20**, then **12 of 20** on the repeat (`/subsz`:
 `msgs 8`, `msgs 12`), and answered them one per second, so the batch took 8.6 s and 12.3 s; 20 sequential
 requests split 8 / 12. The busy member kept receiving while busy.
+
+**A second, harder run** (2026-09-04, `services-observed-v2.14.6.md` C7, a nats.go v1.53.1 service):
+two instances, both handlers blocking 3 s, **eight** requests fired at once with an 8 s caller timeout.
+Every request was delivered at t = 11.086–11.087, split **3 / 5** at random; each instance then worked
+through its own queue serially, and **four of the eight callers timed out** — s7, s2, s4 and s8 were
+answered at 20.09 s, 23.09 s and 26.09 s, into inboxes nobody was listening on. Capacity existed the
+whole time; nothing was re-routed. See also **#114**, which is the rest of the same sentence.
 
 **Why it matters**: an architect reading L272 sizes a service on the assumption that a stalled instance
 sheds its load to its peers; it does not — its random share queues behind the stall until the requesters'
@@ -4767,3 +4794,305 @@ absence is how the server distinguishes a route from a client; add `cluster`, `l
 `cluster_dynamic`; extend the INFO list; split the `ip` paragraph into "the listener's own INFO" and
 "the forwarded peer INFO"; add the `|` queue form to `RMSG` and the `LS+` / `LS-` origin-cluster
 rows.
+
+## 108 · The three service response schemas render their objects collapsed
+
+The chapter calls Reference "versioned and exhaustive" (`where-next.md:24`). The three pages it points
+at show this, verbatim, where the objects should be:
+
+```
+reference/services/info-response.md:47   ▶metadataoneOf
+reference/services/info-response.md:53   ▶endpointsobject\[]
+                                         List of declared endpoints
+reference/services/stats-response.md:55  ▶endpointsobject\[]required
+                                         Statistics for each known endpoint
+```
+
+Nothing expands them. The source schemas at `nats-io/jsm.go` **v0.4.1** (mirrored verbatim as
+`raw/jsm-go/micro-info_response-v0.4.1.json` and `micro-stats_response-v0.4.1.json`) hold, in
+`endpoints.items`:
+
+| response | required in each entry | optional |
+|---|---|---|
+| INFO | `name`, `subject` | `queue_group`, `metadata` |
+| STATS | `name`, `subject`, `num_requests`, `num_errors`, `last_error`, `processing_time`, `average_processing_time` | `queue_group`, `data` |
+
+The units are in the schemas' `$comment` fields and nowhere on the pages: `processing_time` and
+`average_processing_time` are "nanoseconds depicting a duration in time, signed 64 bit integer".
+`last_error` being **required** is what makes it appear as `""` in every reply — observed on 2.14.6,
+`"last_error":""` in a stats body from a service that had never failed.
+
+`learn/services/observability.md:14–20` lists five of these in prose, which is where a reader ends up
+having to go; the reference pages, which the same chapter says are the exhaustive ones, list none of
+them.
+
+**Suggested fix**: expand the `endpoints` item schema and the `metadata` `oneOf` in the renderer, and
+carry the `$comment` text for the two nanosecond fields into their descriptions.
+
+## 109 · Nine hand-offs to a services configuration reference that was never written
+
+Every page of the chapter defers the field list to Reference:
+
+```
+your-first-service.md:122   The full set of service configuration fields and their valid ranges is documented in Reference.
+your-first-service.md:337   Reference — every service configuration field and its valid range.
+endpoints-and-groups.md:294 The full set of endpoint and group options is documented in Reference.
+endpoints-and-groups.md:527 Reference — the full set of endpoint and group configuration options.
+scaling.md:264              You'll find the full set of service lifecycle and queue-group fields in Reference.
+scaling.md:390              Reference — the full set of service lifecycle and queue-group configuration fields.
+where-next.md:24            The exact config fields, their valid ranges, and the wire format of the discovery verbs live in Reference, which is versioned and exhaustive.
+where-next.md:26            The handoff phrases throughout this chapter … all point into it.
+where-next.md:93            Reference — every service config field, endpoint option, and $SRV wire schema, versioned and exhaustive.
+```
+
+`reference/services/` contains three files — `info-response.md`, `ping-response.md`,
+`stats-response.md` — all of them response schemas, none of them configuration.
+`reference/services.md` is a 51-line prose overview with no field in it.
+
+So the name charset, the SemVer requirement, the `queueGroup` precedence, the `statsHandler`
+signature, the endpoint options and the metadata immutability rule are documented publicly only in
+**ADR-32**, which the chapter never cites. `where-next.md:26` is explicit that the hand-off phrases
+"all point into it" — into a page that does not exist.
+
+**Suggested fix**: either write `reference/services/configuration.md` from ADR-32's *Design* and
+*Adding groups and endpoints* sections, or change the nine hand-offs to cite ADR-32 directly.
+
+## 110 · A cross-reference to an option the target page never names
+
+`learn/services/scaling.md:158`:
+
+> Disabling the queue group breaks this. You met `WithEndpointQueueGroupDisabled` on
+> [endpoints and groups](/learn/services/endpoints-and-groups.md)
+
+`grep -rn 'WithEndpointQueueGroupDisabled' raw/nats-docs/` returns **that line and nothing else** in
+861 pages. The page it points at says only "You control this with one option"
+(`endpoints-and-groups.md:311`) and shows a CLI block that demonstrates an *override*, not a disable.
+
+The option exists — `micro.WithEndpointQueueGroupDisabled()` in nats.go v1.53.1, `resolveQueueGroup`
+at `micro/service.go:868–881` — so this is a documentation gap, not a wrong name.
+
+**Suggested fix**: name the option where the pitfall is explained (`endpoints-and-groups.md:311`), or
+drop "You met … on" from `scaling.md:158`.
+
+## 111 · Three chapters promised `$SRV` coverage; `$SRV` is in none of them
+
+`learn/services/where-next.md` sends the reader onward three times:
+
+> `:38` The Security deep dive covers subject isolation for `$SRV` subjects, account access control,
+> and cross-account service placement.
+> `:40` The service-latency advisory schema itself lives in Reference.
+> `:42` The Topologies deep dive covers … how `$SRV` and service subjects propagate across leaf nodes
+> and gateways, and how to place instances in more than one region.
+
+`grep -rl 'SRV' raw/nats-docs/` over the whole mirror returns fourteen files: the eleven services
+pages, `concepts/subjects.md`, `learn/core-nats/subjects-and-wildcards.md` and the site index. Nothing
+under `learn/security/`, `learn/topologies/` or `learn/monitoring/`; no service-latency schema under
+`reference/services/`.
+
+These are not decorative gaps. The three questions they name are the three an operator actually has:
+who may see `$SRV`, what happens to a service across a leafnode, and where service latency comes
+from. Measured answers for all three are in `raw/nats-server-src/services-observed-v2.14.6.md`, and
+the third is a different mechanism entirely — `io.nats.server.metric.v1.service_latency` is emitted by
+a **server** for a cross-account service export with `latency {}` configured, not by the framework.
+
+**Suggested fix**: either write the three sections, or soften the three sentences to say what those
+chapters do cover. The latency sentence should say which mechanism it means.
+
+## 112 · The reference overview lists capabilities the schemas do not have
+
+`reference/services.md` is 51 lines of prose. Six of its claims have no counterpart in ADR-32 or in
+the three schemas:
+
+| the page | what exists |
+|---|---|
+| `:47` "Discovery - Services announce themselves on startup" | nothing is announced. `discovery.md:18`: "A service doesn't publish to `$SRV` itself; it subscribes there and replies to your requests"; ADR-32 L75–76: the service "will automatically create a subscription to handle discovery and monitoring requests" |
+| `:38` "Request counts **and rates**" | `num_requests` and `num_errors`. No rate field in `stats_response.json` |
+| `:41` "Resource utilization" | no such field anywhere in the schema |
+| `:30–31` "Service availability status · Response time measurement" | `ping_response` carries `type`, `name`, `id`, `version`, `metadata`. RTT is measured by the caller |
+| `:50` "Versioning - API version management support" | a SemVer string, validated at creation |
+| `:51` "Observability - Structured logging and metrics" | the framework has no logging component and emits no metrics |
+
+The first is the one that misleads: a reader who believes services announce themselves will expect a
+registry to be populated and a stopped instance to deregister, and will not build the deadline-collect
+loop that discovery actually requires.
+
+The page also never names the `$SRV` subject tree — `grep 'SRV' reference/services.md` is empty —
+although it is the reference entry point for it.
+
+**Suggested fix**: replace the two bullet lists with the schemas' actual fields, and rewrite `:47` as
+"Discovery — services subscribe under `$SRV` and answer PING, INFO and STATS requests".
+
+## 113 · ★ `$SRV` is documented as server-reserved; the server reserves nothing
+
+Two pages say the server owns the prefix:
+
+> `concepts/subjects.md:1080–1086`: "Subjects starting with `$` are reserved for system use: … `$SRV`
+> - Service API subjects"
+> `learn/services/discovery.md:469`: "**`$SRV` is a reserved subject prefix: do not publish to it
+> yourself.** The framework owns the entire `$SRV` tree … Publishing your own messages under `$SRV`
+> collides with that machinery and corrupts what callers discover."
+
+**The server**: `$SRV` does not appear in `nats-server` at v2.14.6 at all. There is no handler, no
+reserved-prefix check and no permission special case; the prefix is a client-library convention,
+defined by ADR-32, whose own wording is "This prefix is reserved for internal handlers" (L351–353) —
+that is, reserved from *handler authors*, not from clients.
+
+**Run** (2026-09-04, `services-observed-v2.14.6.md` B1, nats CLI 0.4.0, no auth configured):
+
+```
+$ nats pub '$SRV.PING' hello
+05:10:10 Published 5 bytes to "$SRV.PING"
+pub exit=0
+
+$ nats sub '$SRV.>'                       # an ordinary client, no special permission
+[#1] Received on "$SRV.PING.DEMO" with reply "_INBOX.eUWs5RxzZwA8NY0n7Q9nJy.pnZiDtWq"
+```
+
+Both were accepted. The second is the sharper one: any client that may subscribe to `$SRV.>` sees
+every discovery request in the account, complete with the requester's inbox.
+
+**Why it matters**: an operator who reads these two pages concludes the tree is protected and does not
+write the subject permission. It is the only protection there is — measured, a user without publish
+permission on `$SRV.>` cannot discover, and one with it can enumerate every service, endpoint, subject
+and queue group in the account. The wrong belief is silent: nothing fails, the estate is simply
+readable by everyone.
+
+**Suggested fix**: `concepts/subjects.md` — move `$SRV` (and `_INBOX`) out of the "reserved for system
+use" list into a second list of *conventional* prefixes the server does not enforce.
+`discovery.md:469` — "By convention the client libraries own the whole `$SRV` tree; the server does
+not reserve it, so restrict it with subject permissions if that matters to you."
+
+## 114 · ★ "Handlers run synchronously on the service's connection" — wrong in both directions
+
+`learn/services/scaling.md:272`:
+
+> **A blocking handler stops its instance from serving other requests.** Handlers run synchronously on
+> the service's connection. While one handler blocks (a slow database call, a sleep, a lock it can't
+> get), that instance answers no other request. The queue group masks this for a while by sending
+> requests to the busy instance's peers instead, but if every instance blocks, the whole service
+> stalls.
+
+**Within one instance the sentence is too pessimistic.** `addEndpoint` creates one `QueueSubscribe`
+per endpoint (`nats.go@v1.53.1/micro/service.go:448–464`), and nats.go runs one dispatcher goroutine
+per subscription, so endpoints do not block each other. Run C5 on 2.14.6, one instance, `slow`
+blocking 3 s:
+
+```
+[05:12:03.901 A] slow    <- "blocking" (blocking 3s)
+[05:12:04.206 A] check   <- "fast" on orders.inventory.check     # answered in 327 µs
+[05:12:04.532 A] vip     <- "vip"                                # answered in 508 µs
+[05:12:06.902 A] slow    -> replying
+```
+
+**Across instances it is far too optimistic**, and this is the half that costs money. "sending
+requests to the busy instance's peers instead" is the same claim as **#86** and the server does no such
+thing: it picks a member at random per message (`server/client.go:5514–5520`) and never reads a
+member's state. Run C7, two instances, both handlers blocking 3 s, eight requests fired at once:
+
+```
+=== instance A ===                          === instance B ===
+[05:12:11.087] slow <- "s5"                 [05:12:11.086] slow <- "s3"
+[05:12:14.088] slow <- "s6"                 [05:12:14.087] slow <- "s1"
+[05:12:17.089] slow <- "s7"                 [05:12:17.088] slow <- "s4"
+                                            [05:12:20.090] slow <- "s2"
+                                            [05:12:23.091] slow <- "s8"
+```
+
+Every request was delivered at t = 11.086–11.087, split **3 / 5** at random. Each instance then worked
+through its own queue serially. Four of the eight callers (8 s timeout) got a reply; **s7, s2, s4 and
+s8 were answered at 20.09 s, 23.09 s and 26.09 s**, into inboxes nobody was listening on.
+
+**Why it matters**: an architect reading this sentence sizes a fleet for "a stall is absorbed by the
+peers". The real behaviour is that a stalled member holds its random share hostage until the callers'
+timeouts fire, so the caller's deadline has to cover the queue depth, not the handler. That is a
+different design.
+
+**Suggested fix**: "Handlers on one endpoint run one at a time; other endpoints of the same service
+are unaffected (client-dependent — nats.go gives each endpoint its own subscription). A blocked
+instance keeps receiving its share of the queue group: the server picks a member at random and does
+not know a handler is busy, so those requests wait behind the block until the caller times out. Size
+the caller's timeout for the queue, not for the handler."
+
+## 115 · "In-flight work is gone" and "`Stop()` drains in-flight requests", on the same chapter
+
+| page | says |
+|---|---|
+| `where-next.md:34` | "A service is at-most-once request-reply: it stores nothing, and when an instance stops, its in-flight work is gone" |
+| `where-next.md:46` | "each `Stop()` drains in-flight requests and unsubscribes the discovery verbs" |
+| `scaling.md:164` | "Requests the instance already accepted keep processing in the background" |
+| `scaling.md:376` | "A graceful `Stop()` that drains in-flight work and leaves the queue group, so the survivors absorb the load with nothing dropped" |
+
+**Run** (2026-09-04, `services-observed-v2.14.6.md` D1 and D2). `Stop()` two seconds into a five-second
+handler:
+
+```
+[05:17:34.297 A] slow    <- "mid-flight" (blocking 5s)
+[05:17:36.266 A] calling Stop()
+[05:17:36.267 A] Stop() returned after 1.3 ms err=<nil>
+[05:17:39.297 A] slow    -> replying
+```
+
+and immediately after `Stop()` returned, with the process still alive:
+
+```
+05:17:36 No responders are available      # the endpoint
+05:17:36 No responders are available      # $SRV.PING
+```
+
+`/subsz?subs=1&acc=$G` showed none of the instance's fifteen subscriptions. The caller of the
+mid-flight request got its reply, `rtt 5.001267583s`. The same shape with `kill -9` one second into
+the handler: the caller printed `Sending request on "orders.inventory.slow"` and received **nothing**,
+waiting out its 10 s timeout.
+
+So both sentences are true of different stops, and neither page says which: a graceful `Stop()` keeps
+the in-flight work **provided the process stays alive**, an abrupt exit loses it, and in the abrupt
+case the caller gets no no-responders answer either, because the request had already been accepted.
+
+**Suggested fix**: `where-next.md:34` → "when an instance is killed, its in-flight work is gone; a
+graceful `Stop()` lets it finish, as long as the process stays alive to finish it".
+
+## 116 · ADR-32's overridable `$SRV` prefix, three years unimplemented and unmarked
+
+`raw/adr/ADR-32.md:78–81`:
+
+> The subject for discovery and requests is prefixed by `$SRV`. Note that this prefix needs to be
+> overridable much in the way as we do for `$JS`, in order to enable targetting tools to work across
+> accounts.
+
+**nats.go v1.53.1** (`micro/service.go:264–265`):
+
+```go
+	// APIPrefix is the root of all control subjects
+	APIPrefix = "$SRV"
+```
+
+A `const`, used at `:949`, `:952` and `:954` to build the three subject levels, with no option, field
+or environment variable that changes it. A grep of the docs mirror finds no mention of an override on
+any page.
+
+The ADR has been revised five times since 2022-11-23, most recently 2025-02-17, and no revision
+records that this requirement is outstanding. A tool author reading it will design for a configurable
+prefix; a cross-account tool has no way to address a differently-prefixed tree, which is exactly the
+case the sentence exists for.
+
+**Suggested fix**: mark the sentence as not-yet-implemented with a pointer to the tracking issue, or
+drop it and state that `$SRV` is fixed.
+
+## 117 · "was stated" is in the schema, not the page
+
+`reference/services/stats-response.md:51` renders "The time the service was **stated** in RFC3339
+format". The page is generated, and the string is in its source:
+
+```json
+    "started": {
+      "description": "The time the service was stated in RFC3339 format",
+```
+
+`schemas/micro/v1/stats_response.json` at `nats-io/jsm.go` **v0.4.1**, line 52 — mirrored verbatim as
+`raw/jsm-go/micro-stats_response-v0.4.1.json`.
+
+Recorded not for the typo but for where it lives: a fix applied to the docs page alone is regenerated
+away. `destination: jsm.go`.
+
+**Suggested fix**: "The time the service was started, in RFC3339 format", in the schema.
+
