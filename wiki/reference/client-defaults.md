@@ -7,7 +7,7 @@ verified-against: nats.go v1.53.1, natscli 0.4.0, nats-server 2.14.6
 verified-on: 2026-09-04
 tags: [client-defaults, reconnect, ReconnectWait, MaxReconnect, jitter, reconnect-buffer, ping, MaxPingsOut, DrainTimeout, flush, pending-limits, connect-timeout, discovery]
 aliases: [client defaults, connection defaults, reconnect defaults, ReconnectWait, MaxReconnect, ReconnectBufSize, PingInterval, MaxPingsOut, DrainTimeout, DefaultSubPendingMsgsLimit, DefaultSubPendingBytesLimit, "connect timeout", "reconnect buffer size", "ping interval"]
-sources: [s-nats-go-connection, s-nats-cli-reconnect, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-server-client-lifecycle-observed, s-nats-go-subscription, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-faults-observed]
+sources: [s-nats-go-connection, s-nats-cli-reconnect, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-server-client-lifecycle-observed, s-nats-go-subscription, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-faults-observed, s-docs-protocol-client, s-nats-server-wire-protocol]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -167,6 +167,30 @@ nats.net load once and need the credential-callback form
 (source: [[s-docs-resilient-clients-tls-and-auth]]).
 
 
+## The server's own connection defaults
+
+The client values above are half the story: the other half is what the *server* will tolerate, and
+every one of these is a hard stop the client cannot negotiate. Read from `const.go` at v2.14.6
+(source: [[s-nats-server-wire-protocol]]); the full table with the `-ERR` each one produces is
+[[wire-protocol]].
+
+| setting | constant | default | what happens at the limit |
+|---|---|---|---|
+| `ping_interval` | `DEFAULT_PING_INTERVAL` | **`2m`** | with `ping_max`, gives a 6-minute stale budget |
+| `ping_max` | `DEFAULT_PING_MAX_OUT` | **`2`** | `-ERR 'Stale Connection'` on interval `ping_max + 1` |
+| `authorization { timeout }` | `AUTH_TIMEOUT` | **`2s`** | `-ERR 'Authentication Timeout'` |
+| `tls { timeout }` | `TLS_TIMEOUT` | **`2s`** | the socket is dropped with **no** `-ERR` |
+| `max_control_line` | `MAX_CONTROL_LINE_SIZE` | **`4096`** | `-ERR 'maximum control line exceeded'`; ×16 for non-client kinds |
+| `max_payload` | `MAX_PAYLOAD_SIZE` | **`1MB`** | `-ERR 'Maximum Payload Violation'` |
+| `max_pending` | `MAX_PENDING_SIZE` | **`64MB`** | the connection is closed with **no** `-ERR` |
+| `max_connections` | `DEFAULT_MAX_CONNECTIONS` | **`65536`** | `-ERR 'maximum connections exceeded'` |
+| `max_subscriptions` | — | **`0`** (unlimited) | `-ERR 'maximum subscriptions exceeded'`, connection survives |
+
+`reference/protocols/client.md` states three of these wrongly on one table — the auth timeout as
+1 second, `max_control_line` as 1024 bytes and the pending limit as 10 MB (`inbox/docs-issues.md`
+#102, source: [[s-docs-protocol-client]]).
+
+
 ## How this was derived
 
 - **nats.go**: `raw/nats-go-src/connection-v1.53.1.md` — 26 verbatim ranges of `nats.go` at tag
@@ -195,4 +219,4 @@ nats.net load once and need the credential-callback form
 - [[s-docs-resilient-clients-reconnection-and-events]] — reconnect, buffer, keepalive, events, per
   client.
 - [[s-docs-resilient-clients-drain-and-shutdown]] — drain, flush, RTT, per client.
-- [[s-nats-server-client-lifecycle-observed]] — every measured row. · [[s-nats-go-subscription]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-faults-observed]]
+- [[s-nats-server-client-lifecycle-observed]] — every measured row. · [[s-nats-go-subscription]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-faults-observed]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]

@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [leafnode, supercluster, gateway, duplicates, loop, deny_imports, dns, urls]
 aliases: ["duplicate messages leafnode", "messages repeated leafnode", "leafnode loop", "message loop", "duplicates supercluster"]
-sources: [s-gh-4823-leafnode-supercluster-duplicates, s-docs-leaf-nodes, s-docs-super-clusters, s-nats-server-topology, s-relnotes-2.10]
+sources: [s-gh-4823-leafnode-supercluster-duplicates, s-docs-leaf-nodes, s-docs-super-clusters, s-nats-server-topology, s-relnotes-2.10, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Duplicate messages across a leafnode
@@ -143,6 +143,36 @@ A duplicate seen on anything older than **2.10.26** may be one of these before i
 [[leafnode]] — what a `urls` list is, and why a leaf bridges *systems*.
 [[gateway]] — why a supercluster is one system.
 
+## How to see loop detection working, in one command
+
+The mechanism has a visible subject. Every account gets one `$LDS.<nuid>`
+(`leafNodeLoopDetectionSubjectPrefix`, `leafnode.go:59`), and a leaf announces it as an ordinary
+`LS+` in the first frames after CONNECT — so a plain TCP client on the hub's leafnode port is enough
+to see it (source: [[s-nats-server-wire-protocol]]):
+
+```
+$ nc 127.0.0.1 7422
+INFO {…}
+CONNECT {"name":"probe","cluster":"EDGE"}
+LS+ $SYS.REQ.ACCOUNT.PING.CONNZ
+LS+ $SYS.REQ.ACCOUNT.PING.STATZ
+LS+ $SYS.REQ.SERVER.PING.CONNZ
+LS+ $SYS.REQ.USER.INFO
+LS+ $LDS.7DmzskwZH3rqXncz35KEqQ
+```
+
+When a server sees **its own** `$LDS.` subject arrive over a leafnode connection it closes the link
+and refuses to re-solicit for `leafNodeReconnectDelayAfterLoopDetected` = **30 s**
+(`leafnode.go:48–49`). A leaf that reconnects on a 30-second beat is therefore either looping, hitting
+a permissions violation, or sharing a cluster name with its hub — three constants of the same value,
+told apart by the hub's log (see [[leafnode]]).
+
+**`$LDS.` is a subject, not a verb.** `reference/protocols/leafnode.md:17` lists `LDS` in its message
+table as something the hub sends; there is no such operation in the parser
+(`inbox/docs-issues.md` #105, source: [[s-docs-protocols-internal]]). Anything you match on should
+match the `LS+` line, not an `LDS` one. The full verb table is [[wire-protocol]].
+
+
 ## Related
 
 [[leafnode]] · [[gateway]] · [[choosing-a-topology]] · [[cross-account-sharing]] ·
@@ -151,7 +181,7 @@ A duplicate seen on anything older than **2.10.26** may be one of these before i
 ## Sources
 
 [[s-gh-4823-leafnode-supercluster-duplicates]] · [[s-docs-leaf-nodes]] · [[s-docs-super-clusters]] ·
-[[s-nats-server-topology]] · [[s-relnotes-2.10]]
+[[s-nats-server-topology]] · [[s-relnotes-2.10]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
 
 ## To verify
 

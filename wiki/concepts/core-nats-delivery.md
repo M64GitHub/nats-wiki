@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [at-most-once, interest-graph, ordering, fire-and-forget, echo, NoEcho, max_payload, headers, no_header_support, wire-tap, subsz, nats-trace, reconnect, lame-duck, slow-consumer]
 aliases: [core NATS, at-most-once delivery, interest graph, fire and forget, core NATS ordering, message ordering in core NATS, echo, NoEcho, "Maximum Payload Violation", "nats: maximum payload exceeded", debugging delivery, why did my message not arrive]
-sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting]
+sources: [s-docs-core-nats-publish-subscribe, s-gh-7577-core-nats-ordering, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-subjects-and-mapping, s-nats-cli-core-commands, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-request-reply, s-docs-core-nats-queue-groups, s-gh-2760-one-connection-or-two, s-relnotes-2.2.0, s-adr-4-message-headers, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-connecting, s-docs-protocol-client, s-nats-server-wire-protocol]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -186,6 +186,38 @@ same outage loses nothing at a low rate and a burst at a high one, and neither o
 - The reconnect buffer's size and overflow error, from nats.go at v1.53.1 rather than the docs' "8 MB"
   — step 3 of `inbox/plan-the-client-side-2026-09-03.md`.
 
+## What delivery looks like on the wire
+
+Everything above happens in six verbs. A client publishes `PUB` or `HPUB`, subscribes with `SUB`,
+receives `MSG` or `HMSG`, and the server acknowledges only when `verbose` is on:
+
+```
+PUB  <subject> [reply] <#bytes>␍␊<payload>␍␊
+HPUB <subject> [reply] <#hdr> <#total>␍␊<headers>␍␊␍␊<payload>␍␊
+SUB  <subject> [queue] <sid>␍␊
+UNSUB <sid> [max]␍␊
+MSG  <subject> <sid> [reply] <#bytes>␍␊<payload>␍␊
+HMSG <subject> <sid> [reply] <#hdr> <#total>␍␊<headers>␍␊␍␊<payload>␍␊
+```
+
+The `sid` is chosen by the client and is what ties a `MSG` back to a subscription; the server never
+interprets it. Operation names are case-insensitive — `sub foo 1` works (observed, source:
+[[s-docs-protocol-client]]). `UNSUB <sid> <max>` counts **deliveries**, and is armed before any
+message arrives: `SUB foo 1` / `UNSUB 1 2` followed by three publishes delivers two and drops the
+third (observed).
+
+**A malformed subject does not close the connection.** `SUB foo. 1` gets
+`-ERR 'Invalid Subject'`, `PUB foo..bar` and `PUB foo.*` get `-ERR 'Invalid Publish Subject'`, and in
+all three cases the connection keeps working — the next `PING` is answered
+(source: [[s-nats-server-wire-protocol]]). Four `-ERR`s are recoverable this way; the rest are not.
+The complete table is [[wire-protocol]].
+
+Once a message leaves the server for another server it changes shape: a route or gateway frame gains
+an account token (`RMSG $G orders.new 11`), a leafnode frame does not (`LMSG edge.ping 5`), and a
+queue delivery gains a `|` and the queue names. That is where [[queue-groups]] and [[gateway]] pick
+the story up.
+
+
 ## Related
 
 [[subjects-and-wildcards]] · [[publishing]] · [[nats-timeout]] · [[slow-consumer-detected]] ·
@@ -210,4 +242,4 @@ same outage loses nothing at a low rate and a burst at a high one, and neither o
 - [[s-docs-core-nats-request-reply]] · [[s-docs-core-nats-queue-groups]] — the request/reply and queue-group
   pages of the chapter, for the two pointer sentences above.
 - [[s-gh-2760-one-connection-or-two]] — one connection or two, the maintainers' rule.
-- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]]
+- [[s-relnotes-2.2.0]] — headers and the 503 since 2.2.0. [[s-adr-4-message-headers]] — the framing. · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]

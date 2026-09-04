@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6, nats.go v1.53.1, nats CLI 0.4.0
 verified-on: 2026-09-04
 tags: [slow-consumer, pending-limits, SetPendingLimits, Dropped, async-error-callback, ErrSlowConsumer]
 aliases: ["ErrSlowConsumer", "slow consumer, messages dropped", "client-side slow consumer", "SubscriptionSlowConsumer", "MessageDropped"]
-sources: [s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-nats-go-connection, s-nats-cli-reconnect]
+sources: [s-docs-resilient-clients-slow-consumers-and-request-reply, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-nats-go-connection, s-nats-cli-reconnect, s-docs-protocol-client]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -171,6 +171,25 @@ path). So a sustained overflow re-arms and re-fires: **13 callbacks for 4,888 dr
 [[client-connection-lifecycle]] for the connection's states and callbacks;
 [[core-nats-delivery]] for why a core subscriber may lose messages at all.
 
+## Why there is nothing on the wire to match on
+
+Worth stating once, because it is the reason this page has to be about client-side counters rather
+than about an error string: `reference/protocols/client.md:431` lists
+
+> `Slow Consumer` — The server pending data size for the connection has reached the maximum size
+> (default 10MB).
+
+as one of the fifteen `-ERR`s a client can receive. Neither half holds. The default is
+`MAX_PENDING_SIZE = 64 MB` (`const.go:102`), and **no `-ERR` is sent at all** — both server-side
+branches close with `skipFlushOnClose` set, so the enqueued bytes are discarded and the client reads
+EOF (`inbox/docs-issues.md` #102, source: [[s-docs-protocol-client]]).
+
+A client that waits for a string here waits forever. The five reasons a NATS connection dies without
+an error — the two slow-consumer branches, a read error, a write error and a TLS handshake timeout —
+are listed on [[wire-protocol]], and telling them apart means reading the server's log or
+`/connz?state=closed`, not the socket.
+
+
 ## Related
 
 - [[slow-consumer-detected]] — the server's version of this failure, which closes the connection
@@ -187,4 +206,4 @@ path). So a sustained overflow re-arms and re-fires: **13 callbacks for 4,888 dr
 - [[s-nats-server-client-errors]] — that the server sends nothing on either slow-consumer branch
 - [[s-nats-server-client-faults-observed]] — runs A1–A6 on nats-server 2.14.6
 - [[s-docs-system-errors]] — the documented error tables, swept
-- [[s-nats-cli-reconnect]] — why a plain `nats sub` prints nothing when it drops messages
+- [[s-nats-cli-reconnect]] — why a plain `nats sub` prints nothing when it drops messages · [[s-docs-protocol-client]]

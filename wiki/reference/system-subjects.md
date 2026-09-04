@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [system-account, "$SYS", "$SYS.REQ", events, monitoring, acl]
 aliases: ["$SYS", "$SYS.REQ", "$SYS.REQ.SERVER", system subjects, system account subjects, system events, system requests]
-sources: [s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-docs-system-advisories-and-metrics, s-docs-jetstream-api-index, s-docs-jetstream-advisories-reference, s-gh-5768-track-connected-clients, s-gh-5902-leafnode-connect-events, s-nats-server-kick-ldm-mqtt-session, s-nats-server-auth-and-tls, s-gh-7854-jwt-push-timeout, s-docs-accounts-and-multitenancy, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-surveyor-metrics-observed]
+sources: [s-nats-server-system-subjects, s-nats-server-system-subjects-observed, s-docs-system-monitor-reference, s-docs-system-advisories-and-metrics, s-docs-jetstream-api-index, s-docs-jetstream-advisories-reference, s-gh-5768-track-connected-clients, s-gh-5902-leafnode-connect-events, s-nats-server-kick-ldm-mqtt-session, s-nats-server-auth-and-tls, s-gh-7854-jwt-push-timeout, s-docs-accounts-and-multitenancy, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-nats-surveyor-metrics-observed, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-09-03
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # `$SYS` subjects
@@ -228,6 +228,42 @@ observed against the lab on 2026-09-03 and tabled on [[metrics]] (source:
 [[s-nats-surveyor-metrics-observed]]).
 
 
+## The reserved prefixes, and which layer owns each
+
+`$SYS` is one of seven reserved prefixes a capture can show. The others belong to layers this page
+does not cover, and two of them are not subjects an application ever publishes to
+(source: [[s-nats-server-wire-protocol]]):
+
+| prefix | owner | where it is described |
+|---|---|---|
+| `_INBOX.` | the client library's reply subjects | [[request-reply]] |
+| `$SYS.` | the system account | this page |
+| `$JS.` | the JetStream API and ack subjects | [[js-api-subjects]] |
+| `$SRV.` | the services framework's discovery, stats and info | (step 6) |
+| `$LDS.<nuid>` | leafnode loop detection, one per account | [[leafnode]] |
+| `_GR_.<cluster hash>.<server hash>.` | a reply mapped across a gateway | [[gateway]] |
+| `$GR.` | the **old** gateway reply prefix (`oldGWReplyPrefix`, `gateway.go:43`) | — |
+
+`$LDS.`, `$GR.` and `_GR_.` are exempt from permission checks on a leafnode `LS+`
+(`leafnode.go:2969`), which is why they can cross a connection whose account denies everything else.
+
+**A hub pushes its `$SYS` interest to a leaf the moment the leaf connects**, before any application
+subscription exists. Observed on a 2.14.6 leafnode listener (source: [[s-docs-protocols-internal]]):
+
+```
+LS+ $SYS.REQ.ACCOUNT.PING.CONNZ
+LS+ $SYS.REQ.ACCOUNT.PING.STATZ
+LS+ $SYS.REQ.SERVER.PING.CONNZ
+LS+ $SYS.REQ.USER.INFO
+LS+ $LDS.7DmzskwZH3rqXncz35KEqQ
+```
+
+Four `$SYS` subjects and the loop-detection subject — that set, and no more, is what a leafnode
+connection carries by default. Between cluster peers the same interest appears as `RS+ $SYS …` with
+the account named, and a gateway sends the same list account-prefixed. The verb forms are on
+[[wire-protocol]].
+
+
 ## Related
 
 [[monitoring-endpoints]] · [[advisories]] · [[js-api-subjects]] · [[account]] ·
@@ -241,4 +277,4 @@ observed against the lab on 2026-09-03 and tabled on [[metrics]] (source:
 [[s-gh-5768-track-connected-clients]] · [[s-gh-5902-leafnode-connect-events]] ·
 [[s-nats-server-kick-ldm-mqtt-session]] · [[s-nats-server-auth-and-tls]] ·
 [[s-gh-7854-jwt-push-timeout]] · [[s-docs-accounts-and-multitenancy]] · [[s-relnotes-2.10]] ·
-[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-surveyor-metrics-observed]]
+[[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-nats-surveyor-metrics-observed]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]

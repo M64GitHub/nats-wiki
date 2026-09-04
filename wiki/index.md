@@ -277,6 +277,12 @@ exists to answer live in `inbox/question-bank.md`.
   reconnect policy, buffers, keepalive, drain and flush. nats.go at v1.53.1 and the `nats` CLI at 0.4.0
   read from source with file and line; every other client is the documentation's word, marked as such —
   plus a table of what was measured on 2.14.6.
+- [[wire-protocol]] — every byte a NATS connection can carry at 2.14.6: the 49 `INFO` fields and which
+  listener sends each, the 22 `CONNECT` fields and the three that default to `true` when omitted, the
+  verbs of all four connection kinds with the forms observed on the wire, and every `-ERR` string with
+  the setting behind it and whether the connection survives — including the four that are recoverable,
+  the five ways a connection dies silently, and the twelve strings the docs list that the server never
+  sends.
 
 ## Entities
 
@@ -473,6 +479,14 @@ exists to answer live in `inbox/question-bank.md`.
   annotated as a duration.
 - [[s-docs-system-errors]] — the docs' second `-ERR` list, swept row by row against the server: 70
   identifier rows and 37 close reasons accurate, 11 of 22 claimed wire errors not sent at all.
+- [[s-docs-protocol-client]] — `reference/protocols` and `reference/protocols/client`: the twelve verbs,
+  the `INFO` and `CONNECT` tables and the fifteen-row `-ERR` table, swept against 2.14.6 — three wrong
+  defaults, six wrong strings, `client_id` listed twice with two types, six INFO fields a client is sent
+  that no row has, and a `Required` column the server has no counterpart for.
+- [[s-docs-protocols-internal]] — `route`, `gateway` and `leafnode` read as one: the three at a glance,
+  the verb forms the parser rejects (`LS+` with two tokens, `LMSG` with header sizes, the origin cluster
+  last), the leaf CONNECT's three wrong field names, six "common errors" that do not exist, and the
+  optimistic gateway mode that 2.9.0 retired.
 - [[s-docs-system-advisories-and-metrics]] — the three system events and the latency metric as the docs
   give them: a `CONNECTIONS` subject that does not exist, a "limits reached" trigger that is a 30 s
   heartbeat, and a latency subject the server never uses.
@@ -594,6 +608,11 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-nats-server-client-errors]] — every `-ERR` a client can be sent (58 call sites), the 37
   `ClosedState` reasons `/connz` reports, both server-side slow-consumer branches and why neither
   sends anything, the zero-length expiry timer, and `handshake_first`'s five accepted values.
+- [[s-nats-server-wire-protocol]] — the wire protocol read at the tag and then provoked on the binary:
+  the one `Info` struct behind four connection kinds, the `INFO` line's trailing space, `CONNECT {}` as a
+  verbose connection, the `-ERR` count corrected to 60, the five close reasons that discard the error they
+  just wrote, `(ping_max + 1) × ping_interval` timed at 6.14 s, every verb traced with `-DV`, and
+  `gateway_iom` — interest-only by default since 2.9.0.
 
 **The `nats.go` client source**
 
@@ -1086,7 +1105,11 @@ discussions on 2026-08-31 found nobody publicly reporting a KV watcher missing a
 watcher failure people do report is `kv-watchers-stall-the-cluster`, in the Gotchas section above;
 the gap is recorded under `## To verify` on the `key-value` page.
 
-Reference: *(all six reference tables are written — see the Reference section above)*
+Reference: *(every reference table is written — see the Reference section above)*
+
+Patterns: [[services-on-core-nats]] — linked from the `$SRV.` prefix row of `wire-protocol`, which names
+the framework's discovery, stats and info subjects. The page that explains the pattern is step 6 of the
+client-side plan (bank row 134).
 
 Entities: *(all the repos, clients, tools, releases, products and organisations the ecosystem page
 names now have pages — see the Entities section above. People: none yet.)*
@@ -1095,10 +1118,10 @@ names now have pages — see the Entities section above. People: none yet.)*
 
 - `inbox/question-bank.md` — the questions this wiki must answer, with the page that answers each
 - `inbox/adr-toc.md` — one row per ADR of `nats-architecture-and-design`
-- `inbox/docs-issues.md` — **95** errors and gaps found in **public NATS documentation**, each verified
+- `inbox/docs-issues.md` — **107** errors and gaps found in **public NATS documentation**, each verified
   against the server at a release tag with file and line, kept so they can be sent to the maintainers.
   **None has been filed yet** — every row's `upstream` column reads `not filed`. Routed by a
-  `destination` column: 82 to `nats-docs`, 7 (#7, #30, #31, #37, #49, #51, #90) to the ADR repo, 3 (#40, #89, #91)
+  `destination` column: 94 to `nats-docs`, 7 (#7, #30, #31, #37, #49, #51, #90) to the ADR repo, 3 (#40, #89, #91)
   to `natscli`, and one each to `jsm.go`, `nats-surveyor` and a published blog post (#39).
 - `inbox/server-issues.md` — **8** findings about **`nats-server` itself**, kept separate because a
   server finding cannot be settled the way a docs finding can: there is no higher authority to check it

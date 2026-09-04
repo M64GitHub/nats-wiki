@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, stalled_clients, stalls, no_fast_producer_stall, bench]
 aliases: ["supercluster performance degradation", "slow gateway", "cross-region slowdown", "producer stalled", "geo-affinity not working"]
-sources: [s-gh-7494-supercluster-degradation, s-nats-server-topology, s-docs-super-clusters, s-docs-monitoring-endpoints]
+sources: [s-gh-7494-supercluster-degradation, s-nats-server-topology, s-docs-super-clusters, s-docs-monitoring-endpoints, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # A supercluster slows down when a remote subscriber joins
@@ -133,6 +133,28 @@ subscription on `>`, or a service reply flowing back. `nats server report gatewa
 
 [[gateway]] — geo-affinity as implemented, and what `psi` means for it.
 
+## Not the interest-mode switch
+
+One explanation to rule out early, because the gateway documentation still invites it: the
+**optimistic → interest-only** transition. `reference/protocols/gateway.md:251–270` describes a
+gateway starting optimistic — forwarding everything for an account and collecting `RS-` replies —
+and switching to interest-only once too many arrive
+(`defaultGatewayMaxRUnsubBeforeSwitch = 1000`, `gateway.go:41`). A burst of cross-cluster traffic
+followed by a slowdown looks exactly like that story.
+
+It is not what happens on any 2.9+ server. `info.GatewayIOM = true` is set unconditionally outside
+tests — "since v2.9.0 … this server will switch all accounts to InterestOnly mode when accepting an
+inbound or when a new account is fetched" (`gateway.go:552–558`) — and the flag was observed on a
+2.14.6 gateway listener as `"gateway_iom":true` (source: [[s-nats-server-wire-protocol]]). Both sides
+are interest-only from the first frame, so the threshold is never reached and there is no transition
+to blame. The one-off `RS+`/`RS-` cost of a new remote subscriber is a handful of control frames, not
+a rate change.
+
+What remains is the stall counter above. The frames themselves — `RS+`, `RS-`, `RMSG` with its `|`
+queue list and the `_GR_.` mapped reply — are on [[wire-protocol]]
+(source: [[s-docs-protocols-internal]]).
+
+
 ## Related
 
 [[gateway]] · [[choosing-a-topology]] · [[multi-region-jetstream]] · [[slow-consumer-detected]] ·
@@ -141,7 +163,7 @@ subscription on `>`, or a service reply flowing back. `nats server report gatewa
 ## Sources
 
 [[s-gh-7494-supercluster-degradation]] · [[s-nats-server-topology]] · [[s-docs-super-clusters]] ·
-[[s-docs-monitoring-endpoints]]
+[[s-docs-monitoring-endpoints]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
 
 ## To verify
 

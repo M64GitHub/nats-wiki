@@ -67,6 +67,15 @@ read at the tag (`raw/nats-server-src/client-errors-v2.14.6.md`), **nats.go v1.5
 **sweep**: all 129 rows of `reference/system/errors.md` checked against the 58 `-ERR` call sites in
 the server, with the counts of what held and what did not stated in the entry.
 
+Rows **102–107** come from step 5 of the same plan (the wire protocol) and rest on three authorities:
+`nats-server` v2.14.6 read at the tag (`raw/nats-server-src/wire-protocol-v2.14.6.md`, 30 ranges),
+the `-ERR` call-site table of `raw/nats-server-src/client-errors-v2.14.6.md`, and **runs A–G on the
+2.14.6 binary** (`raw/nats-server-src/wire-protocol-observed-v2.14.6.md`) — seven passes that captured
+the `INFO` line of all four listeners, sixteen `-ERR`s provoked with their exact bytes, and the
+server's own `-DV` trace of every route, gateway and leafnode verb. All four pages of
+`reference/protocols/` were read; one row per page, plus two for `client.md`, which carries three
+separate tables.
+
 | # | issue | where | destination | kind | severity | upstream | status |
 |---|---|---|---|---|---|---|---|
 | 1 | Nak advisory subject is `MSG_NAK`; the server publishes `MSG_NAKED` | `reference/jetstream/advisory/nak.md` | nats-docs | wrong-value | ★ high | not filed | wiki uses the server value |
@@ -170,6 +179,12 @@ the server, with the counts of what held and what did not stated in the entry.
 | 99 | `learn/resilient-clients/tls-and-auth.md:220` describes credential expiry as "the server sends `-ERR 'User Authentication Expired'` and closes the connection. The client then tries to reconnect, and **the server rejects each attempt with an authorization violation**". Two gaps. (a) The **account** JWT produces a different string, `-ERR 'Account Authentication Expired'` (`client.go:2505–2508`), and closes *every* connection in the account at once (`accounts.go:3272–3284`); the chapter never mentions it, and neither does `learn/security/`. (b) "each attempt" is wrong for the first one: `jwt/v2` checks `now > Expires` at one-second resolution (`claims.go:287` at v2.8.2), so a reconnect inside the expiry second is accepted and immediately expired by a zero-length timer (`client.go:1344–1353`, `:5980–5985`), returning `User Authentication Expired` again. Measured on 2.14.6: at `ReconnectWait 500ms` the first reconnect got `User Authentication Expired` and nats.go aborted after **one** attempt; at the library default of 2 s the first reconnect got `Authorization Violation` and it aborted after **two** | `learn/resilient-clients/tls-and-auth.md` (line 220) | nats-docs | missing | medium | not filed | wiki states both on `gotchas/connection-closed-after-auth-error` and `concepts/operator-mode` |
 | 100 | `reference/system/errors.md:4` claims to document "**all** non-JetStream errors that the NATS server can return to clients, routes, gateways, and leafnode connections". Swept row by row against nats-server v2.14.6: of its **129** rows, the **70** that name a Go identifier from `server/errors.go` are accurate (one cosmetic difference) and the **37** *Connection Close Reasons* rows match the `ClosedState` enum exactly — but **11 of the 22** rows presenting a literal string as an error returned to clients are not sent as `-ERR` at that tag. Eight appear nowhere in `server/*.go` (`Maximum Clients Exceeded`, `Parser Error`, `TLS Handshake Error`, `Route Authorization Violation`, `Consumer Is Slow`, `Write Deadline Exceeded`, and two whose real text differs: `Connection Throttling Is Active` vs `Connection throttling is active. Please try again later.` at `server.go:3503`, `Connection to Gateway Rejected` vs `Connection to gateway %q rejected` at `gateway.go:1015`); three exist only as a log line or a monitoring reason (`Slow Consumer Detected` — `c.Noticef` at `client.go:2613`, never on the wire; `Protocol Violation` and `Duplicate Route` — `ClosedState.String()` in `monitor.go`). The authority is the 58 `sendErr` / `sendErrAndDebug` / `sendErrAndErr` call sites, the only paths that write `errProto = "-ERR '%s'"`. The sibling list at `reference/protocols/client.md:419–435` disagrees with this one on five further strings | `reference/system/errors.md` (lines 32, 33, 46, 47, 78, 127, 157, 158, 164, 165, 166) | nats-docs | wrong-value | ★ medium | not filed | wiki states the sweep on `reference/error-codes` and the no-`-ERR` consequence on `gotchas/slow-consumer-detected` |
 | 101 | `learn/resilient-clients/slow-consumers.md:16` and `:124`, and `where-next.md:95`, give the Go pending-buffer default as one pair — "500,000 messages and 64 MB in the Go client". nats.go sets the **message** limit from the subscription type at subscribe time: `sub.pMsgsLimit = cap(ch)` for a channel-backed or synchronous subscription and `DefaultSubPendingMsgsLimit` only for an async one (`nats.go:5048–5054` at v1.53.1), so a `SubscribeSync` starts at `DefaultMaxChanLen` = **65,536**, not 500,000. Read off a running client on 2.14.6: `msgs=500000 bytes=67108864` for `Subscribe`, `msgs=65536 bytes=67108864` for `SubscribeSync`. The page also does not state that `SetPendingLimits(0, …)` returns `ErrInvalidArg` and that a negative limit means unlimited, both of which its own advice ("set limits sized to your own workload") depends on | `learn/resilient-clients/slow-consumers.md` (lines 16, 124), `where-next.md` (line 95) | nats-docs | wrong-value | low | not filed | wiki states both defaults on `reference/client-defaults` and `gotchas/slow-consumer-in-the-client` |
+| 102 | `reference/protocols/client.md:419–435` — the `-ERR` table. **Three defaults are wrong on one table**: `Authorization Timeout … (default 1 second)` against `AUTH_TIMEOUT = 2 * time.Second` (`const.go:117`); `max_control_line … The default is 1024 bytes` against `MAX_CONTROL_LINE_SIZE = 4096` (`const.go:90`, while the sibling `learn/core-nats/request-reply.md:37` says 4 KB); `Slow Consumer … (default 10MB)` against `MAX_PENDING_SIZE = 64 MB` (`const.go:102`). **Six of the fifteen strings are not what the server sends**: the literal is `Authentication Timeout`, not `Authorization Timeout` (`client.go:2496`); `maximum connections exceeded`, `attempted to connect to route port` and `invalid client protocol` are lowercase, because they come from `errors.New(…)` in `errors.go` rather than from a call-site literal; `Maximum Control Line Exceeded` and `Parser Error` are `ClosedState` names (`monitor.go:2650`, `:2639`) and the wire gives `maximum control line exceeded` and `Unknown Protocol Operation`. **Two strings can never arrive**: `Slow Consumer` (no `-ERR` is sent — see #100) and `Secure Connection - TLS Required`, which is composed at `server.go:3684` and discarded on the next line because `TLSHandshakeError` is in `markConnAsClosed`'s skip-flush set (`client.go:2022–2025`). **Observed**: a plain client against `tls { timeout: 2 }` gets zero bytes and is dropped at 2002.8 ms. **The `Recoverable` column is incomplete**: `Invalid Publish Subject` and `maximum subscriptions exceeded` are both recoverable and on no row — observed, the connection kept delivering. Finally the page never states the ping values it describes (`DEFAULT_PING_INTERVAL = 2m`, `DEFAULT_PING_MAX_OUT = 2`, `const.go:120,123`), whose rule is `(ping_max + 1) × ping_interval` — observed at 6139.9 ms with `2s` / `2` | `reference/protocols/client.md` (lines 419–435, 359–363) | nats-docs | wrong-value | ★ high | not filed | wiki states the server's strings on `reference/wire-protocol` and marks each disagreement in the row |
+| 103 | `reference/protocols/client.md:41–67` — the `INFO` table. **`client_id` is listed twice with two types**: `:52` as `uint64` ("The internal client identifier in the server") and `:63` as `string` ("The ID of the client"). The struct has one field, `CID uint64` (`server.go:125`). **Six fields a 2.14.6 client is sent appear on no row**: `cluster_dynamic`, `compression`, `connect_info`, `acc_is_sys`, `api_lvl`, `xkey` — and the last two are on the **default** INFO of a standalone server with no configuration at all (observed: `…"api_lvl":4,"xkey":"XDHX…"}`). The route-, gateway- and leafnode-only fields the same struct carries (`lnoc`, `lnocu`, `route_pool_size`, `gossip_mode`, `gateway_iom`, `gateway_nrp`, `leafnode_urls`, `info_on_connect`) are on no page at all. **Undocumented wire detail**: `generateInfoJSON` joins `["INFO", <json>, "␍␊"]` with `" "` (`util.go:360–364`), so an `INFO` line carries **a space between the JSON and its CRLF** — every capture in the run shows it, and the gateway path (`InfoProto`, `route.go:129`) does not, so the two differ | `reference/protocols/client.md` (lines 41–67, and the `Example` at 92) | nats-docs | wrong-value | medium | not filed | wiki gives the field table by connection kind on `reference/wire-protocol`, with the trailing space stated |
+| 104 | `reference/protocols/client.md:107–124` — the `CONNECT` table's **`Required` column has no counterpart in the server**. `verbose`, `pedantic`, `tls_required`, `lang` and `version` are marked required; `CONNECT {}` is accepted and answered (observed). What is really true is the opposite and more useful: `var defaultOpts = ClientOpts{Verbose: true, Pedantic: true, Echo: true}` (`client.go:706`) is what an omitted field means, so **`CONNECT {}` is a verbose, pedantic, echoing connection** and gets an `+OK` per operation. The only `CONNECT` that fails outright is one whose JSON does not parse, and it receives **no `-ERR` at all** — the socket is simply closed (observed). Five accepted fields are undocumented (`account`, `new_account`, `import`, `export`, `remote_account`, plus `proxy_sig`), and `account` / `new_account` are now an **error**: "we used to have this as an optional feature for dynamic sandbox environments. Now its considered an error" (`client.go:2387–2392`) — the client gets `Authorization Violation` | `reference/protocols/client.md` (lines 107–124) | nats-docs | wrong-value | medium | not filed | wiki gives the field table with "omitted means" instead of "required" on `reference/wire-protocol` |
+| 105 | `reference/protocols/leafnode.md` — **four verb forms the parser rejects or does not have.** (a) `LS+ <subject> <queue_group>` (`:112`): `processLeafSub` accepts **1 or 3** arguments and nothing else (`leafnode.go:2926–2941`); a two-token `LS+` returns `processLeafSub Parse Error`. (b) `LS+ <subject> <queue_group> <weight> <origin_cluster>` (`:142`) and `LS- … <origin_cluster>` (`:181`): the origin cluster is the **first** token, and it is a **route** protocol form, not a leafnode one (`route.go:1729–1740`) — observed as `LS+ LEAF1 $G edge.ping` on a route while the leaf's own frame is `LS+ edge.ping`. (c) `LMSG <subject> … <header_size> <total_size>` (`:217`): a leaf's header messages are **`HMSG`** (`parser.go:381–385`), and a three-token `LMSG` is parsed as *subject, reply, size* (`leafnode.go:3241–3245`) — observed `HMSG edge.ping 22 33` and `HMSG edge.work | W 18 31`. (d) **`LDS` is listed as a message type** (`:17`, "Sent By: Hub Server"); there is no such operation — `$LDS.<nuid>` is a subject carried by an ordinary `LS+` (`leafnode.go:59`, observed). **Three CONNECT field names are wrong** (`:75–89`): the compression field is `compress_mode` — the old `compression` tag "has never been used" (`leafnode.go:2189–2193`) — `hub` is `is_hub`, `proto` is `protocol`; `deny_pub` and `isolate` are real and undocumented. `proto` in the leafnode **INFO** is **3**, not the "1 for current leafnode protocol" of `:36`, and `client_id` is the connection id, not "Client ID for compression negotiation" (`:50`). **Four of the six "common errors" do not exist** (`:392–397`): no `Loop Detected`, no `Leafnode Not Allowed`, no `Maximum Payload Exceeded` (the literal is `Maximum Payload Violation`, `client.go:2554`) and no bare `Permissions Violation` (the leaf forms name the subject, `leafnode.go:3488`, `:3491`). The **compression list** (`:291–296`) has six of the server's eight names, omitting `s2_best` and `not supported` and all the aliases (`server.go:444–452`). The "30-second reconnection delay" (`:275`, `:353`) is **three** constants of that value plus a fourth of 5 s (`leafnode.go:48–67`) | `reference/protocols/leafnode.md` (lines 17, 36, 50, 75–89, 112, 142, 181, 217, 275, 291–296, 353, 392–397) | nats-docs | wrong-value | ★ medium | not filed | wiki gives the observed verb forms on `reference/wire-protocol` and the delays and field names on `concepts/leafnode` |
+| 106 | `reference/protocols/gateway.md` — **the interest-mode section describes pre-2.9 behaviour.** `:251–270` presents optimistic mode as the initial state and "too many `RS-` messages" as the trigger for interest-only. Since **v2.9.0** a server sets `info.GatewayIOM = true` unconditionally outside tests — "this server will switch all accounts to InterestOnly mode when accepting an inbound or when a new account is fetched" (`gateway.go:552–558`) — so between two 2.9+ servers the optimistic path is never entered and the threshold (`defaultGatewayMaxRUnsubBeforeSwitch = 1000`, `gateway.go:41`, which the page describes without naming) is never reached. **Observed**: `"gateway_iom":true` on a 2.14.6 gateway listener's INFO, a field the page does not list. Also on that page: `gateway_url` is given as `nats-gw://<hostname>:<port>` (`:50`) and observed as a bare `192.168.178.61:17222`; the gateway `CONNECT` is said to carry `lang` and `version` (`:83–84`) and carries neither; the `RMSG` syntax (`:204`) omits the `+` reply indicator and the `| <queue…>` list that a queue delivery uses — observed `RMSG $G x.svc + _GR_.DdEU99.DSpI1m._INBOX.… NATS-RPLY-22 3`; and two of the four "common errors" (`:298–299`) — `Invalid Account`, `Gateway Protocol Error` — appear nowhere in `gateway.go`, while the four rejections it does send are on no page. The mapped-reply prefix the page never mentions is `_GR_.<6-char cluster hash>.<6-char server hash>.` (`gateway.go:47–52`); `$GR.` is `oldGWReplyPrefix` | `reference/protocols/gateway.md` (lines 50, 83–84, 204, 251–270, 298–299) | nats-docs | wrong-value | medium | not filed | wiki states interest-only-by-default on `concepts/gateway` and the frames on `reference/wire-protocol` |
+| 107 | `reference/protocols/route.md` — **the CONNECT table lists the two fields whose absence is the protocol's own client/route discriminator.** `:73–74` gives `lang` ("The implementation language of the server (go)") and `version`; a route sends neither, and `processRouteConnect` rejects any CONNECT that has `lang` with `-ERR 'attempted to connect to route port'` — "Client provide Lang in the CONNECT protocol while ROUTEs don't" (`route.go:3022–3028`). Observed, a real route CONNECT: `{"echo":true,"verbose":false,"pedantic":false,"tls_required":false,"headers":true,"name":"<server id>","cluster":"HUBC","lnoc":true}` — `name` is the remote's **server ID**, not the "Generated Server Name" of `:72`, and `cluster`, `lnoc`, `lnocu` and `cluster_dynamic` are undocumented. The `INFO` field list (`:37–46`) omits nine fields a 2.14.6 route listener sends (`server_name`, `proto`, `headers`, `jetstream`, `nonce`, `cluster`, `domain`, `compression`, `lnoc`, `lnocu`, `route_pool_size`, `gateway_url`, `leafnode_urls`) and its account of `ip` (`:25`) reads as if the listener's own greeting carries one — it does not; that field is added to a **forwarded** peer INFO (observed). The `RMSG` syntax (`:133`) omits the `| <queue…>` form (observed `RMSG $G work.a | WORKERS 6`), and the page has no `LS+` / `LS-` rows at all, though a route carries leaf-origin subscriptions with them | `reference/protocols/route.md` (lines 25, 37–46, 72–74, 133) | nats-docs | wrong-value | medium | not filed | wiki gives the route field tables and the origin-cluster form on `reference/wire-protocol`, and the `nc` check on `operations/build-a-3-node-cluster` |
 
 ---
 
@@ -3552,6 +3567,12 @@ which case it is dropped. The `weight` reference page could carry the one-line e
 | 99 | `wiki/gotchas/connection-closed-after-auth-error.md` — *Symptom*, cause 1; `wiki/concepts/operator-mode.md` — *What expiry looks like on the wire, and when* |
 | 100 | `wiki/reference/error-codes.md` — *The other error list*; `wiki/gotchas/slow-consumer-detected.md` — *Two branches, two log lines, and no `-ERR` on either*; `wiki/summaries/s-docs-system-errors.md` |
 | 101 | `wiki/reference/client-defaults.md` — *Pending limits: the Go default is two numbers, not one*; `wiki/gotchas/slow-consumer-in-the-client.md` — cause 2 |
+| 102 | `wiki/reference/wire-protocol.md` — *`-ERR` — every string, its setting, and whether the connection survives* and *Strings the documentation lists that the server never sends*; `wiki/reference/defaults-and-limits.md` — *The `-ERR` each connection limit produces*; `wiki/concepts/tls-in-nats.md` — *What the client is told, and what it is not*; `wiki/gotchas/slow-consumer-in-the-client.md`, `wiki/gotchas/connection-closed-after-auth-error.md` |
+| 103 | `wiki/reference/wire-protocol.md` — *`INFO` — the fields the server sends* and *The trailing space*; `wiki/reference/monitoring-endpoints.md` — *`client_id` on the wire is `cid` in `/connz`* |
+| 104 | `wiki/reference/wire-protocol.md` — *`CONNECT` — the fields a client sends*; `wiki/concepts/client-connection-lifecycle.md` — *`CONNECT {}` is a verbose connection* |
+| 105 | `wiki/reference/wire-protocol.md` — *The message forms, exactly*, *Origin clusters*, *Leafnode reconnect delays*; `wiki/concepts/leafnode.md` — *What a leafnode connection puts on the wire*; `wiki/gotchas/duplicate-messages-across-a-leafnode.md` |
+| 106 | `wiki/concepts/gateway.md` — *Interest-only is the default, and has been since 2.9.0*; `wiki/gotchas/supercluster-slows-when-a-remote-subscriber-joins.md` — *Not the interest-mode switch*; `wiki/reference/wire-protocol.md` — *Gateway interest* |
+| 107 | `wiki/reference/wire-protocol.md` — *`INFO`*, *What each kind sends*; `wiki/operations/build-a-3-node-cluster.md` — *Checking a route port without a client*; `wiki/operations/how-clients-reach-a-cluster.md` |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
 
@@ -4297,3 +4318,452 @@ and reads back as `msgs=100 bytes=-1`.
 **Suggested fix**: say "500,000 messages for an asynchronous subscription, 65,536 for a synchronous
 or channel-backed one, 64 MB either way", and add one sentence that zero is rejected and a negative
 limit means unlimited.
+
+## 102 · The `-ERR` table: three wrong defaults, six wrong strings, two that can never arrive ★
+
+`reference/protocols/client.md:419–435` is the list a client author reaches for. Swept string by
+string against `nats-server` v2.14.6 and then provoked on the binary
+(`raw/nats-server-src/wire-protocol-observed-v2.14.6.md`, run C).
+
+### The three defaults
+
+| the page | line | the server |
+|---|---|---|
+| `Authorization Timeout` … "Client took too long to authenticate to the server after establishing a connection **(default 1 second)**" | `:424` | `AUTH_TIMEOUT = 2 * time.Second` (`const.go:117`) |
+| `Maximum Control Line Exceeded` … "specified by the `max_control_line` server option. **The default is 1024 bytes.**" | `:426` | `MAX_CONTROL_LINE_SIZE = 4096` (`const.go:90`) |
+| `Slow Consumer` … "The server pending data size for the connection has reached the maximum size **(default 10MB)**" | `:431` | `MAX_PENDING_SIZE = 64 * 1024 * 1024` (`const.go:102`) |
+
+The `max_control_line` row also contradicts a sibling page in the same tree:
+`learn/core-nats/request-reply.md:37` gives 4 KB.
+
+### The six strings
+
+`-ERR` text is written two ways in the server, and only one of them is Title Case. A message that
+comes from an `errors.New(…)` in `server/errors.go` is **lowercase**; one written as a literal at the
+`sendErr` call site is Title Case. The page renders all fifteen in Title Case.
+
+| the page | the wire, at v2.14.6 |
+|---|---|
+| `Authorization Timeout` | `Authentication Timeout` (`client.go:2496`) |
+| `Maximum Connections Exceeded` | `maximum connections exceeded` (`errors.go:65`) |
+| `Attempted To Connect To Route Port` | `attempted to connect to route port` (`errors.go:83`) |
+| `Invalid Client Protocol` | `invalid client protocol` (`errors.go:61`) |
+| `Maximum Control Line Exceeded` | `maximum control line exceeded` (`errors.go:46`) — the Title Case form is a `ClosedState` name (`monitor.go:2650`) |
+| `Parser Error` | `Unknown Protocol Operation` (`parser.go:1253`), or the parse error's own text — the Title Case form is a `ClosedState` name (`monitor.go:2639`) |
+
+Observed, in that order:
+
+```
+-ERR 'Authentication Timeout'          (at 1003.0 ms, with authorization { timeout: 1 })
+-ERR 'maximum connections exceeded'    (max_connections: 1, second connection)
+-ERR 'attempted to connect to route port'
+-ERR 'invalid client protocol'         (CONNECT {"protocol":2})
+-ERR 'maximum control line exceeded'   (max_control_line: 1024, a 2000-byte SUB argument)
+-ERR 'Unknown Protocol Operation'      (FOO bar)
+```
+
+### The two that can never arrive
+
+**`Slow Consumer`** — no `-ERR` is sent on either server-side branch; this is #100's finding, and the
+mechanism is `markConnAsClosed` setting `skipFlushOnClose` for `SlowConsumerPendingBytes` and
+`SlowConsumerWriteDeadline` (`client.go:2022–2025`).
+
+**`Secure Connection - TLS Required`** — the same mechanism. There is exactly one place it is
+composed, a TLS **handshake timeout**:
+
+```go
+  3684			c.sendErr("Secure Connection - TLS Required")
+  3685			c.closeConnection(TLSHandshakeError)
+```
+
+and `TLSHandshakeError` is the fifth member of the skip-flush set, so the enqueued bytes are discarded
+rather than flushed. **Observed** with `tls { cert_file: …, key_file: …, timeout: 2 }` and a client
+that sends a plaintext `CONNECT`:
+
+```
+[     1.5 ms] >> CONNECT {"verbose":false}
+[     1.5 ms] >> PING
+[  2002.8 ms] -- socket closed by the server
+```
+
+Nothing on the wire. The description ("The server requires TLS and the client does not have TLS
+enabled") also does not describe the trigger, which is the timeout rather than the client's choice.
+
+### The `Recoverable` column
+
+Two recoverable errors are on no row, and both were observed keeping the connection alive:
+
+```
+-ERR 'Invalid Publish Subject'        (PUB foo..bar 1 / PUB foo.* 1)  … then PONG
+-ERR 'maximum subscriptions exceeded' (max_subscriptions: 2, a third SUB) … then MSG, then PONG
+```
+
+### The ping values
+
+`:359–363` describes the mechanism — "the server will continuously send `PING` messages to the client
+at a configurable interval", "the ping/pong interval is configurable" — and never states a number.
+`DEFAULT_PING_INTERVAL = 2m` and `DEFAULT_PING_MAX_OUT = 2` (`const.go:120,123`), and the rule is not
+"after `ping_max` pings" but `(ping_max + 1) × ping_interval`, because the check is
+`c.ping.out+1 > maxPingsOut` on the *next* timer (`client.go:5865`). Observed with `2s` / `2`: PING at
+2137.9 ms, PING at 4138.6 ms, `-ERR 'Stale Connection'` at **6139.9 ms**.
+
+**Suggested fix**: generate the table from the `sendErr` / `sendErrAndDebug` / `sendErrAndErr` call
+sites and the two `enqueueProto(errProto, "Stale Connection")` sites rather than maintaining it by
+hand; take the defaults from `const.go`; drop the two strings that are discarded before flushing, or
+mark them explicitly as "logged, not sent"; and add `DEFAULT_PING_INTERVAL` and
+`DEFAULT_PING_MAX_OUT` with the `(ping_max + 1)` arithmetic to the PING/PONG section.
+
+## 103 · The `INFO` table: `client_id` twice, six fields missing, and an undocumented trailing space
+
+`reference/protocols/client.md:41–67`.
+
+### `client_id` is two rows
+
+```
+| `client_id` | The internal client identifier in the server. … | uint64 | optional |   (:52)
+| `client_id` | The ID of the client.                          | string | optional |   (:63)
+```
+
+The struct has one field: `CID uint64 \`json:"client_id,omitempty"\`` (`server.go:125`). The second
+row is one of a short run (`ip`, `client_id`, `client_ip`, `nonce`, `cluster`, `domain`) that reads
+like a later append.
+
+### Six fields a 2.14.6 client is sent, on no row
+
+`cluster_dynamic`, `compression`, `connect_info`, `acc_is_sys`, `api_lvl`, `xkey`. **Observed**, the
+greeting of a standalone server whose whole configuration is a port:
+
+```
+INFO {"server_id":"NA4H…","server_name":"WP1","version":"2.14.6","proto":1,"go":"go1.27.0","host":"0.0.0.0","port":14222,"headers":true,"max_payload":1048576,"client_id":5,"client_ip":"127.0.0.1","api_lvl":4,"xkey":"XDHX…"} 
+```
+
+`api_lvl` is the JetStream API level (4 at 2.14.6) and `xkey` the server's x25519 public key. Neither
+is exotic; both are on the default INFO. The route-, gateway- and leafnode-only fields of the same
+struct (`lnoc`, `lnocu`, `route_pool_size`, `route_pool_idx`, `route_account`, `route_acc_add_reqid`,
+`gossip_mode`, `info_on_connect`, `gateway_nrp`, `gateway_iom`, `leafnode_urls`) appear on no page in
+the tree.
+
+### The trailing space
+
+```go
+   360	func generateInfoJSON(info *Info) []byte {
+   361		b, _ := json.Marshal(info)
+   362		pcs := [][]byte{[]byte("INFO"), b, []byte(CR_LF)}
+   363		return bytes.Join(pcs, []byte(" "))
+   364	}
+```
+
+Joining three pieces with `" "` inserts **two** separators: one after `INFO`, and one between the
+JSON and the CRLF. Every `INFO` in the run shows it. The gateway path formats
+`InfoProto = "INFO %s" + _CRLF_` (`route.go:129`) and does not, so the same protocol line has two
+byte-exact forms depending on which listener sent it. A hand-written parser that assumes the byte
+after `}` is `\r` works against a gateway and fails against a client port.
+
+**Suggested fix**: delete the duplicate `client_id` row, add the six fields, and add one sentence to
+the `INFO` syntax section noting the space before the CRLF.
+
+## 104 · The `CONNECT` table's `Required` column, and the field that is now an error
+
+`reference/protocols/client.md:107–124` marks `verbose`, `pedantic`, `tls_required`, `lang` and
+`version` as `Required: true`. None is.
+
+**Observed**: `CONNECT {}` followed by `PING` returns
+
+```
+[     1.6 ms] << +OK
+[     1.6 ms] << PONG
+```
+
+The `+OK` is the interesting half. `json.Unmarshal` merges the CONNECT into a struct that is already
+populated:
+
+```go
+   706	var defaultOpts = ClientOpts{Verbose: true, Pedantic: true, Echo: true}
+```
+
+so an omitted `verbose`, `pedantic` or `echo` means **true**, and `CONNECT {}` is a verbose
+connection. The page states this correctly one section later ("When the `verbose` connection option
+is set to `true` (the default value)", `:399`) and the two do not agree.
+
+The only `CONNECT` that fails outright is malformed JSON, and it produces **no `-ERR`**:
+
+```
+[     1.1 ms] >> CONNECT {oops}
+[     1.3 ms] -- socket closed by the server
+```
+
+Six accepted fields are undocumented — `account`, `new_account`, `import`, `export`,
+`remote_account`, `proxy_sig` (`client.go:675–704`) — and the first two are now rejected:
+
+```go
+  2387			// Check for Account designation, we used to have this as an optional feature for dynamic
+  2388			// sandbox environments. Now its considered an error.
+  2389			if accountNew || account != _EMPTY_ {
+  2390				c.authViolation()
+```
+
+Observed: `CONNECT {"account":"APP"}` → `-ERR 'Authorization Violation'`, socket closed. A client
+author reading only this page has no way to know the field exists, let alone that sending it is fatal.
+
+**Suggested fix**: replace the `Required` column with an "omitted means" column carrying the three
+`true` defaults, note that malformed JSON closes the connection silently, and add the six fields —
+marking `account` / `new_account` as rejected since the sandbox feature was withdrawn.
+
+## 105 · The leafnode page: four verb forms the parser does not have ★
+
+`reference/protocols/leafnode.md`. Each row below was checked in the parser and then observed in the
+server's own `-DV` trace of a live hub/leaf pair.
+
+### (a) `LS+` with two tokens
+
+```
+LS+ <subject> <queue_group>\r\n        (:112)
+```
+
+```go
+  2926		switch len(args) {
+  2927		case 1:
+  2928			sub.queue = nil
+  2929		case 3:
+  2930			sub.queue = args[1]
+  2931			sub.qw = int32(parseSize(args[2]))
+  …
+  2940		default:
+  2941			return fmt.Errorf("processLeafSub Parse Error: '%s'", arg)
+```
+
+One or three. A queue subscription must carry its weight. Observed: `LS+ edge.work W 1`.
+
+### (b) The origin cluster, last and on the wrong protocol
+
+```
+LS+ <subject> <queue_group> <weight> <origin_cluster>\r\n   (:142)
+LS- <subject> <queue_group> <origin_cluster>\r\n            (:181)
+```
+
+The origin cluster is written **first**, and by a *route*, not a leafnode:
+
+```go
+  1729		if len(sub.origin) > 0 && c.route.lnoc {
+  1730			if isSubProto {
+  1731				buf = append(buf, lSubBytes...)
+  1732				buf = append(buf, sub.origin...)
+  1733				buf = append(buf, ' ')
+```
+
+Observed, the same subscription on both connections of one hub:
+
+```
+lid:11 <<- [LS+ edge.ping]                    the leaf's own frame — no cluster
+rid:8  ->> [LS+ LEAF1 $G edge.ping]           the hub forwarding it to a cluster peer
+rid:8  ->> [LS- LEAF1 $G edge.work W]
+```
+
+`lnoc` / `lnocu` are route `INFO` fields (`server.go:143–144`), not leafnode ones.
+
+### (c) The header form of `LMSG`
+
+```
+LMSG <subject> [+ reply] [| queue_groups...] <header_size> <total_size>\r\n…   (:217)
+```
+
+A leaf's header messages are **`HMSG`**:
+
+```go
+   381				} else if c.kind == LEAF {
+   382					if trace {
+   383						c.traceInOp("HMSG", arg)
+   384					}
+   385					err = c.processLeafHeaderMsgArgs(arg)
+```
+
+and the documented three-token shape would be misread, because `processLeafMsgArgs` treats a
+three-argument `LMSG` as *subject, reply, size* (`leafnode.go:3241–3245`). Observed:
+
+```
+LMSG edge.ping 5                                              plain
+LMSG edge.ping answers.here 10                                reply, no '+' — undocumented
+LMSG edge.work | W 6                                          queue
+LMSG edge.svc + _INBOX.NdE7…DrsNzzjW NATS-RPLY-22 3           reply + queue
+HMSG edge.ping 22 33                                          headers
+HMSG edge.work | W 18 31                                      headers + queue
+```
+
+### (d) `LDS` as a message type
+
+The overview table lists it (`:17`, "Sent By: Hub Server", "Loop detection subjects to prevent
+routing loops"), and `:255–283` gives it a section of its own. There is no `LDS` operation in
+`parser.go`. `leafNodeLoopDetectionSubjectPrefix = "$LDS."` (`leafnode.go:59`) is a **subject**,
+announced with an ordinary `LS+`. Observed, a leaf-shaped CONNECT on a hub's leafnode port:
+
+```
+[     1.4 ms] << LS+ $SYS.REQ.ACCOUNT.PING.CONNZ
+[     1.4 ms] << LS+ $SYS.REQ.ACCOUNT.PING.STATZ
+[     1.4 ms] << LS+ $SYS.REQ.SERVER.PING.CONNZ
+[     1.4 ms] << LS+ $SYS.REQ.USER.INFO
+[     1.4 ms] << LS+ $LDS.7DmzskwZH3rqXncz35KEqQ
+```
+
+### The CONNECT field names, the INFO `proto`, and the errors
+
+`leafConnectInfo` (`leafnode.go:2171–2208`) against `:75–89`: the compression field is
+**`compress_mode`**, and the tag the page gives has a comment explaining why —
+
+```go
+  2189		// There was an existing field called:
+  2190		// >> Comp bool `json:"compression,omitempty"`
+  2191		// that has never been used. …
+  2193		Compression string `json:"compress_mode,omitempty"`
+```
+
+— `hub` is `is_hub`, `proto` is `protocol`; `deny_pub` and `isolate` are real and undocumented.
+
+`:36` says `proto` is "1 for current leafnode protocol"; observed `"proto":3`. `:50` calls
+`client_id` "Client ID for compression negotiation"; it is the connection id, one greater than the
+client connection made a moment earlier in the same run.
+
+Of the six "common errors" at `:392–397`, four do not exist in `leafnode.go`: `Loop Detected`,
+`Leafnode Not Allowed`, `Maximum Payload Exceeded` (the literal is `Maximum Payload Violation`,
+`client.go:2554`) and the bare `Permissions Violation` (the leaf forms are
+`Permissions Violation for Publish to %q` and `… for Subscription to %q`, `leafnode.go:3488`,
+`:3491`). What the file does send and the page does not list: `Invalid Subscription`,
+`Stale Leaf Node Connection - Closing`, `remote leafnode has same cluster name`,
+`cluster name cannot contain spaces`, `connection rejected since minimum version required is %q`,
+`Rejecting connection from gateway %q on the leafnode port`, `Duplicate Remote LeafNode Connection`.
+
+### Compression and the delays
+
+`:291–296` lists six of eight modes, omitting `s2_best` and `not supported`, and no aliases —
+`on` / `enabled` / `true`, `disabled` / `false`, `not_supported` are all accepted
+(`server.go:444–452`, `validateAndNormalizeCompressionOption`). The "30-second reconnection delay"
+(`:275`, `:353`) is three separate constants of that value — after a loop, after a permissions
+violation, after a same-cluster-name rejection — plus `leafNodeMinVersionReconnectDelay = 5s`
+(`leafnode.go:48–67`). Knowing which is which is how an operator reads a leaf that reconnects on a
+30-second beat.
+
+**Suggested fix**: correct the four verb forms against the parser, move the origin-cluster section to
+the route page with the token first, drop the `LDS` row and say `$LDS.` is a subject carried by
+`LS+`, fix the three CONNECT tags, and replace the invented error list with the `sendErr` call sites
+of `leafnode.go`.
+
+## 106 · The gateway's optimistic mode was retired in 2.9.0
+
+`reference/protocols/gateway.md:247–270` (*Interest Management*) describes the mode a super-cluster
+operator will look for first:
+
+> Initially, gateways operate in optimistic mode, assuming interest exists and forwarding messages.
+> They track `RS-` responses to build a "no interest" list. … When too many `RS-` messages are
+> received (indicating low interest overlap), the gateway switches to interest-only mode.
+
+At v2.14.6 the transition described is not reached between two current servers:
+
+```go
+   552		// Unless in some tests we want to keep the old behavior, we are now
+   553		// (since v2.9.0) indicate that this server will switch all accounts
+   554		// to InterestOnly mode when accepting an inbound or when a new
+   555		// account is fetched.
+   556		if !gwDoNotForceInterestOnlyMode {
+   557			info.GatewayIOM = true
+   558		}
+```
+
+`gwDoNotForceInterestOnlyMode` is a test hook. The receiving side stores the flag as
+`c.gw.interestOnlyMode` (`gateway.go:1134`) and it gates the optimistic assumption directly:
+`psi := !accountInMap && !c.gw.interestOnlyMode` (`gateway.go:2174`). **Observed** on the gateway
+listener of a 2.14.6 server with no gateway configuration beyond a name and a port:
+
+```
+INFO {…,"gateway":"WPC","gateway_urls":["…:17222"],"gateway_url":"…:17222","gateway_nrp":true,"gateway_iom":true}
+```
+
+`gateway_iom` is on the page's own INFO field list nowhere. The threshold the page describes without
+naming is `defaultGatewayMaxRUnsubBeforeSwitch = 1000` (`gateway.go:41`).
+
+This matters beyond tidiness: an operator debugging cross-cluster traffic reads that section and
+starts looking for a transition that will never happen, and a capacity plan built on "optimistic
+until 1000 no-interest replies" is planning for the wrong steady state.
+
+### Four smaller things on the same page
+
+- `gateway_url` is given as `nats-gw://<hostname>:<port>` (`:50`); observed as a bare
+  `192.168.178.61:17222`.
+- The gateway `CONNECT` is said to carry `lang` and `version` (`:83–84`). Observed:
+  `{"echo":false,"verbose":false,"pedantic":false,"tls_required":false,"headers":false,"name":"<server id>","cluster":"","gateway":"CB"}` — neither field, and `echo` and `headers` are `false`.
+- `RMSG <account> <subject> [reply-to] <bytes>` (`:204`) omits the `+` reply indicator and the queue
+  list. Observed: `RMSG $G x.svc + _GR_.DdEU99.DSpI1m._INBOX.IyBx… NATS-RPLY-22 3`.
+- `Invalid Account` and `Gateway Protocol Error` (`:298–299`) appear nowhere in `gateway.go`. The four
+  rejections it does send — `Connection to gateway %q rejected`,
+  `Attempt to connect to gateway %q using wrong port`,
+  `Connection from %q rejected, wanted to connect to %q, this is %q`,
+  `Account absent from receive-all-subscriptions-%s command` — are on no page.
+
+The mapped-reply prefix the page never mentions is `_GR_.<6-char cluster hash>.<6-char server hash>.`
+(`gateway.go:47–52`), which is what an operator actually sees in a capture; `$GR.` is
+`oldGWReplyPrefix` (`:43`).
+
+**Suggested fix**: rewrite *Interest Management* around `gateway_iom`, keeping the optimistic
+description as the pre-2.9 history it is; add `gateway_iom` to the INFO list; correct `gateway_url`,
+the CONNECT fields and the `RMSG` syntax; replace the error list with the `sendErr` call sites; and
+document `_GR_.`.
+
+## 107 · The route CONNECT table lists the two fields that identify a *client*
+
+`reference/protocols/route.md:73–74` gives a route's CONNECT as carrying
+
+```
+* `lang`: The implementation language of the server (go).
+* `version`: The version of the server.
+```
+
+A route sends neither, and the absence is load-bearing:
+
+```go
+  3022		// Way to detect clients that incorrectly connect to the route listen
+  3023		// port. Client provide Lang in the CONNECT protocol while ROUTEs don't.
+  3024		if lang != "" {
+  3025			c.sendErrAndErr(ErrClientConnectedToRoutePort.Error())
+  3026			c.closeConnection(WrongPort)
+```
+
+So a CONNECT written from this page's own field list would be rejected as a misconfigured client.
+**Observed**, a real route CONNECT between two 2.14.6 servers:
+
+```
+CONNECT {"echo":true,"verbose":false,"pedantic":false,"tls_required":false,"headers":true,"name":"NDDCZEMZ…P742","cluster":"HUBC","lnoc":true}
+```
+
+`name` is the remote's **server ID**, not the "Generated Server Name" of `:72`; `cluster`, `lnoc`,
+`lnocu` and `cluster_dynamic` (`connectInfo`, `route.go:110–124`) are undocumented, and `cluster` is
+the field the receiving server checks before anything else.
+
+### The INFO list, and `ip`
+
+`:37–46` gives ten fields. Observed on a route listener, thirteen more:
+
+```
+INFO {"server_id":"…","server_name":"WP1","version":"2.14.6","proto":3,"go":"go1.27.0","host":"0.0.0.0","port":16222,"headers":true,"max_payload":1048576,"jetstream":true,"nonce":"…","cluster":"WPC","domain":"WPD","connect_urls":["…:14222"],"compression":"accept","lnoc":true,"lnocu":true,"route_pool_size":3,"gateway_url":"…:17222","leafnode_urls":["…:17422"]} 
+```
+
+`route_pool_size` (route pooling, since 2.10) and `compression` (S2 on routes, since 2.10) are the two
+an operator most often wants to confirm, and neither is listed.
+
+`:25–27` reads as though a route listener's greeting carries `ip`:
+
+> The accepting server will add an `ip` field containing the address and port of the connecting
+> server, and forward the new server's `INFO` message to all servers it is routed to.
+
+That is accurate about the *forwarded* INFO and misleading about the listener's own — a fresh
+connection to the route port has no `ip` field at all (observed). Since the paragraph is the
+description of route gossip, the distinction is the point of it.
+
+### `RMSG`, and the missing verbs
+
+`RMSG <account> <subject> [reply-to] <bytes>` (`:133`) has no queue form; observed
+`RMSG $G work.a | WORKERS 6`, where `|` introduces the queue names. The page also has no `LS+` /
+`LS-` rows, although a route carries every leaf-origin subscription with them — see #105(b).
+
+**Suggested fix**: remove `lang` and `version` from the CONNECT list and say instead that their
+absence is how the server distinguishes a route from a client; add `cluster`, `lnoc`, `lnocu`,
+`cluster_dynamic`; extend the INFO list; split the `ip` paragraph into "the listener's own INFO" and
+"the forwarded peer INFO"; add the `|` queue form to `RMSG` and the `LS+` / `LS-` origin-cluster
+rows.

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6, nats.go v1.53.1, nats CLI 0.4.0
 verified-on: 2026-09-04
 tags: [creds, jwt-expiry, authorization-violation, user-authentication-expired, IgnoreAuthErrorAbort, credential-rotation, revocation]
 aliases: ["User Authentication Expired", "Account Authentication Expired", "Authorization Violation", "nats: authentication expired", "IgnoreAuthErrorAbort", "auth error abort"]
-sources: [s-docs-resilient-clients-tls-and-auth, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-nats-go-connection]
+sources: [s-docs-resilient-clients-tls-and-auth, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-system-errors, s-nats-go-connection, s-docs-protocol-client]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -202,6 +202,30 @@ same applies to a client whose subscribe permissions do not cover `_INBOX.>` —
 [[client-connection-lifecycle]] — the reconnect loop this rule interrupts, and the CLOSED state;
 [[operator-mode]] — where the JWT, the expiry and the revocation list come from.
 
+## Which auth failures have their own string, and which collapse
+
+Four credential failures reach the client as their own message; **every other rejection collapses into
+one string**, sent regardless of the internal cause (`client.go:2529–2530`). That is why an
+`Authorization Violation` alone never tells you whether the password was wrong, the account was over
+its connection limit, the user was not in the account, or the `CONNECT` carried an `account` field:
+
+| the client is sent | when |
+|---|---|
+| `Authentication Timeout` | no `CONNECT` arrived within `authorization { timeout }` — **default 2s** |
+| `User Authentication Expired` | the user JWT's `exp` passed under a live connection |
+| `Account Authentication Expired` | the account JWT's `exp` passed |
+| `User Authentication Revoked` | the user was revoked |
+| `Authorization Violation` | everything else, including `account` / `new_account` in the `CONNECT` |
+
+`reference/protocols/client.md:424` gives the first as **`Authorization Timeout`** and its default as
+**1 second**; both are wrong — the literal is `Authentication Timeout` (`client.go:2496`) and
+`AUTH_TIMEOUT = 2 * time.Second` (`const.go:117`). Observed firing at 1003 ms with an explicit
+`timeout: 1` (`inbox/docs-issues.md` #102, source: [[s-docs-protocol-client]]).
+
+A client that matches on the documented spelling will never see the timeout case. The complete
+inventory, with the setting behind each string, is [[wire-protocol]].
+
+
 ## Related
 
 - [[set-up-operator-mode]] — issuing and distributing the credentials
@@ -217,4 +241,4 @@ same applies to a client whose subscribe permissions do not cover `_INBOX.>` —
 - [[s-nats-go-connection]] — the reconnect loop and `ReconnectWait`
 - [[s-nats-server-client-errors]] — the four credential strings, `setExpiration`, the account timer
 - [[s-nats-server-client-faults-observed]] — runs B1–B7 on nats-server 2.14.6
-- [[s-docs-system-errors]] — the documented error tables, swept
+- [[s-docs-system-errors]] — the documented error tables, swept · [[s-docs-protocol-client]]

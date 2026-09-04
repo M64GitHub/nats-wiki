@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [error-codes, err_code, errors.json, 10005, 10052]
 aliases: [error codes, err_code, JetStream errors, "10005", "10052"]
-sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-system-errors, s-nats-server-client-errors]
+sources: [s-nats-server-jetstream-resources, s-adr-7-server-error-codes, s-adr-1-jetstream-json-api, s-nats-server-auth-and-tls, s-gh-5606-cross-account-jetstream, s-adr-59-sourcing-and-mirroring, s-adr-61-meta-quorum-rescue, s-adr-10-extended-purge, s-adr-43-per-message-ttl, s-docs-accounts-and-multitenancy, s-docs-cross-account, s-docs-disaster-recovery, s-docs-mirrors-and-sources, s-docs-scaling-and-peers, s-docs-single-server, s-docs-stream-backup-restore, s-gh-7982-no-suitable-peers, s-issue-4281-insufficient-storage, s-nats-server-snapshot-restore, s-docs-advanced-publishing, s-docs-subject-mapping, s-adr-51-message-scheduler, s-gh-7672-cron-schedules, s-nats-server-message-schedules-observed, s-nats-server-jetstream-cluster, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-system-errors, s-nats-server-client-errors, s-docs-protocol-client, s-nats-server-wire-protocol]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -359,6 +359,26 @@ sourcing stream whose upstream consumer is durable but not `AckFlowControl` gets
 [[s-relnotes-2.14]]).
 
 
+## `-ERR` strings are not `err_code`s
+
+The `10xxx` codes on this page are **JetStream API JSON**, returned in an `error` object on a reply to
+a `$JS.API.…` request. The other error surface a client sees is the **connection** protocol's
+`-ERR '<message>'`, and it carries no numeric code at all — nothing on that wire is machine-readable
+beyond the string itself (source: [[s-nats-server-wire-protocol]]).
+
+The two never overlap: a `-ERR` closes or wounds the connection, an `err_code` answers one request on
+a healthy one. Matching on `-ERR` text is therefore matching on **exact bytes**, and the casing is not
+uniform: a message that comes from an `errors.New(…)` in `server/errors.go` is lowercase
+(`maximum connections exceeded`, `invalid client protocol`), one written as a literal at the call
+site is Title Case (`Authorization Violation`, `Maximum Payload Violation`). The documentation renders
+them all in Title Case, so six of the fifteen strings on
+`reference/protocols/client.md:419–435` will not match what arrives (`inbox/docs-issues.md` #102,
+source: [[s-docs-protocol-client]]).
+
+The complete list of strings, with the setting behind each and whether the connection survives, is
+[[wire-protocol]].
+
+
 ## Related
 
 [[js-api]] · [[js-api-subjects]] · [[no-suitable-peers-for-placement]] · [[message-ttl]] ·
@@ -382,4 +402,4 @@ summaries that put them there — [[s-adr-43-per-message-ttl]] (`10052`, `10165`
 [[s-docs-stream-backup-restore]] (`10064`) · [[s-gh-7982-no-suitable-peers]] (`10005`) ·
 [[s-issue-4281-insufficient-storage]] (`10028`, `10047`) · [[s-nats-server-snapshot-restore]]
 (`10060`, `10064`, `10130`) · [[s-docs-advanced-publishing]] (the eleven `JSAtomicPublish*` and
-`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-system-errors]] · [[s-nats-server-client-errors]]
+`JSBatchPublish*` codes) · [[s-docs-subject-mapping]] (`10052` as a republish cycle). · [[s-adr-51-message-scheduler]] · [[s-gh-7672-cron-schedules]] · [[s-nats-server-message-schedules-observed]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-system-errors]] · [[s-nats-server-client-errors]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]

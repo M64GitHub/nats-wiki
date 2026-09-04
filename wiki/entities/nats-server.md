@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [repo, server, cncf, apache-2.0, security-audit, docker, single-binary]
 aliases: [nats-server, "nats-io/nats-server", the server, nats server]
-sources: [s-nats-server-systemd-units, s-docs-hardening, s-nats-server-readme, s-github-repo-facts, s-docs-ecosystem, s-docs-getting-started, s-nats-server-constants-2.14.6, s-nats-server-signals, s-cncf-nats-project]
+sources: [s-nats-server-systemd-units, s-docs-hardening, s-nats-server-readme, s-github-repo-facts, s-docs-ecosystem, s-docs-getting-started, s-nats-server-constants-2.14.6, s-nats-server-signals, s-cncf-nats-project, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-08-31
-updated: 2026-09-01
+updated: 2026-09-04
 ---
 
 # nats-server
@@ -109,6 +109,25 @@ actually asked to do, and the first line to read when a shutdown did not behave.
   a server inside a Go test — which is why [[nats-py]] ships a `nats-server` package doing the same
   thing for Python.
 
+## The protocol it speaks
+
+Four connection kinds share one text protocol and one `Info` struct: client (4222), route, gateway
+and leafnode. What tells them apart on the wire is what the `CONNECT` carries — `lang` means a client,
+`gateway` means a gateway, `cluster` with no `lang` means a route — and what the `INFO` advertises:
+`proto: 1` to a client, `proto: 3` on every server-to-server listener
+(source: [[s-nats-server-wire-protocol]]).
+
+The whole reference — 49 `INFO` fields, 22 `CONNECT` fields, every verb and every `-ERR` string with
+its setting — is [[wire-protocol]], read from the source at v2.14.6 and provoked on the binary. Two
+things worth knowing about the server as a program rather than as a protocol:
+
+- **`nc <host> <port>` identifies any listener in one line**, before any auth. Useful for a liveness
+  check, a version check, and for telling a misconfigured port from a firewall.
+- **The documentation of this protocol is the least maintained part of the docs tree.** Six wire
+  strings, three defaults and six verb forms on the four `reference/protocols/` pages do not match the
+  server; the sweep is `inbox/docs-issues.md` #102–#107 (source: [[s-docs-protocols-internal]]).
+
+
 ## Related
 
 [[nats-server-2.14]] · [[nats-server-2.12]] · [[nats-server-2.11]] · [[nats-server-2.10]] ·
@@ -121,4 +140,4 @@ actually asked to do, and the first line to read when a shutdown did not behave.
 [[s-nats-server-readme]] · [[s-github-repo-facts]] · [[s-docs-ecosystem]] ·
 [[s-docs-getting-started]] · [[s-nats-server-constants-2.14.6]] ·
 [[s-nats-server-systemd-units]] · [[s-docs-hardening]] · [[s-nats-server-signals]] ·
-[[s-cncf-nats-project]]
+[[s-cncf-nats-project]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]

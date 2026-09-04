@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, gossip, reject_unknown_cluster, 7222, stalled_clients]
 aliases: [gateways, super-cluster, supercluster, super cluster, cluster of clusters, geo-affinity, geo affinity]
-sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups]
+sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Gateway
@@ -198,6 +198,47 @@ could be counted more than once (source: [[s-relnotes-2.14]]). **2.14.3**: a rac
 rejected (#8527).
 
 
+## Interest-only is the default, and has been since 2.9.0
+
+The gateway protocol has two interest modes, and every account-level description of them written
+before 2.9 is now the wrong one.
+
+- **Optimistic** — send everything for an account until the far side says "no interest" with an
+  `RS-` per subject, and keep a no-interest list. After
+  `defaultGatewayMaxRUnsubBeforeSwitch = 1000` such replies the account switches
+  (`gateway.go:41`).
+- **Interest-only** — send nothing unless the far side has sent an explicit `RS+`.
+
+Since **2.9.0** a server advertises `"gateway_iom":true` in its gateway `INFO` unconditionally, and
+the comment says what it means: "this server will switch all accounts to InterestOnly mode when
+accepting an inbound or when a new account is fetched" (`gateway.go:552–558`). Between two 2.9+
+servers the optimistic path is therefore never entered, and the 1000-`RS-` threshold never reached.
+Observed on a 2.14.6 gateway listener (source: [[s-nats-server-wire-protocol]]):
+
+```
+INFO {"server_id":"…","version":"2.14.6","proto":3,"go":"","host":"…","port":17222,"headers":true,"max_payload":1048576,"gateway":"WPC","gateway_urls":["…:17222"],"gateway_url":"…:17222","gateway_nrp":true,"gateway_iom":true}
+```
+
+`reference/protocols/gateway.md:251–270` still presents optimistic mode as the initial state and the
+`RS-` count as the trigger; that is the pre-2.9 behaviour (`inbox/docs-issues.md` #106).
+
+**A reply that crosses a gateway is rewritten.** The origin cluster puts
+`_GR_.<6-char cluster hash>.<6-char server hash>.` in front of the client's own reply subject and
+strips it again on the way back — so a capture on the far side shows an inbox nobody subscribed to:
+
+```
+CA  RMSG $G x.svc + _GR_.DdEU99.DSpI1m._INBOX.IyBx… NATS-RPLY-22 3
+CB  RMSG $G _GR_.DdEU99.DSpI1m._INBOX.IyBx… 8
+```
+
+`$GR.` is the **old** prefix (`oldGWReplyPrefix`, `gateway.go:43`) and `$GNR.` a name that survives
+only in comments. The frames, the `A+` / `A-` account verbs and the `gateway_cmd` codes are in
+[[wire-protocol]] (source: [[s-docs-protocols-internal]]).
+
+**Gateways ping regardless of traffic.** `gwMaxPingInterval = 15s` (`gateway.go:58`) caps whatever
+`ping_interval` is configured, because `s2_auto` compression picks its level from measured RTT.
+
+
 ## Related
 
 [[leafnode]] · [[choosing-a-topology]] · [[multi-region-jetstream]] · [[build-a-3-node-cluster]] ·
@@ -210,7 +251,7 @@ rejected (#8527).
 [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-4823-leafnode-supercluster-duplicates]] ·
 [[s-gh-6328-jetstream-behind-gateways]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-request-reply]] · [[s-nats-server-request-reply-observed]]
-- [[s-docs-core-nats-queue-groups]] — the docs' one sentence on geo-affinity for queue groups.
+- [[s-docs-core-nats-queue-groups]] — the docs' one sentence on geo-affinity for queue groups. · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
 
 ## To verify
 

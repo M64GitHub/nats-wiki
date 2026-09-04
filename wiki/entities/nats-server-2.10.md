@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [release, 2.10, compression, kv-sources, kv-mirrors, auth-callout, subject-transforms, changelog]
 aliases: ["2.10", v2.10, v2.10.0, v2.10.29, v2.10.28, v2.10.27-binary]
-sources: [s-adr-8-key-value-store, s-adr-20-object-store, s-gh-4535-unauthenticated-connections, s-gh-5202-max-unique-subjects, s-relnotes-2.11.2, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-gh-6005-sourcing-memory-stream-restart]
+sources: [s-adr-8-key-value-store, s-adr-20-object-store, s-gh-4535-unauthenticated-connections, s-gh-5202-max-unique-subjects, s-relnotes-2.11.2, s-relnotes-2.10, s-gh-6748-cve-binary-release-docker-images, s-gh-6005-sourcing-memory-stream-restart, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # nats-server 2.10
@@ -173,6 +173,33 @@ v2.10.29 and v2.11.17: what the diff shows is arrivals, not changes (source: [[s
 the diff in `wiki/log.md` under 2026-09-03).
 
 
+## Route pooling and compression, as they appear on the wire
+
+Two of 2.10's headline features are visible in a route listener's `INFO` line, which is the quickest
+way to confirm a node is running them. Observed on 2.14.6, which still advertises both the same way
+(source: [[s-nats-server-wire-protocol]]):
+
+```
+INFO {…,"proto":3,"cluster":"WPC","compression":"accept","lnoc":true,"lnocu":true,"route_pool_size":3,…}
+```
+
+- **`route_pool_size`** — the number of route connections this node opens per peer. `3` is the
+  default; `1` means pooling is off.
+- **`compression`** — the mode this node will accept or propose. The cluster default is **`accept`**
+  (accept what the remote proposes, never initiate) and the leafnode default is **`s2_auto`**
+  (`opts.go:6062–6108`). `s2_auto` picks its level from measured RTT: ≤10 ms uncompressed, ≤50 ms
+  fast, ≤100 ms better, above that best (`server.go:457–464`) — which is why a route's ping interval
+  is capped at 30 s, so the RTT measurement stays current.
+- **`lnoc` / `lnocu`** — this node can carry a leaf-origin subscription on a route, as
+  `LS+ <origin cluster> <account> <subject>`. Older peers fall back to `RS+` without the origin.
+
+There are **eight** compression names, not the six
+`reference/protocols/leafnode.md:291–296` lists: `not supported`, `off`, `accept`, `s2_auto`,
+`s2_uncompressed`, `s2_fast`, `s2_better`, `s2_best`, plus the aliases `on` / `enabled` / `true`,
+`disabled` / `false` and `not_supported` (`server.go:444–452`, `inbox/docs-issues.md` #107,
+source: [[s-docs-protocols-internal]]).
+
+
 ## Related
 
 [[nats-server-2.11]] · [[upgrade-a-cluster]] · [[key-value]] · [[object-store]] · [[stream]] ·
@@ -180,4 +207,4 @@ the diff in `wiki/log.md` under 2026-09-03).
 
 ## Sources
 
-[[s-adr-8-key-value-store]] · [[s-adr-20-object-store]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5202-max-unique-subjects]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-gh-6005-sourcing-memory-stream-restart]]
+[[s-adr-8-key-value-store]] · [[s-adr-20-object-store]] · [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5202-max-unique-subjects]] · [[s-relnotes-2.11.2]] · [[s-relnotes-2.10]] · [[s-gh-6748-cve-binary-release-docker-images]] · [[s-gh-6005-sourcing-memory-stream-restart]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]

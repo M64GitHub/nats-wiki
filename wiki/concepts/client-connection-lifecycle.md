@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-04
 tags: [connection, state-machine, reconnect, backoff, jitter, MaxReconnect, reconnect-buffer, ErrReconnectBufExceeded, keepalive, ping, MaxPingsOut, stale-connection, drain, DrainTimeout, flush, lame-duck, ldm, discovery, connect_urls, readiness, force-reconnect]
 aliases: [connection lifecycle, client reconnect, reconnect, reconnection, reconnect buffer, drain, "Drain()", DRAINING_SUBS, DRAINING_PUBS, "stale connection", "nats: stale connection", "Stale Connection", keepalive, ping interval, MaxPingsOut, RECONNECTING, ClosedHandler, lame duck client, ldm, "connection events", readiness probe, ForceReconnect, flush, RTT]
-sources: [s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-connection, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-adr-40-nats-connection, s-docs-core-nats-publish-subscribe, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth]
+sources: [s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-connection, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-adr-40-nats-connection, s-docs-core-nats-publish-subscribe, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-docs-protocol-client, s-nats-server-wire-protocol]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -299,6 +299,46 @@ advertised `headers`, because both fields come from the same value (source:
 [[s-nats-go-subscription]]). See [[request-reply]].
 
 
+## The server's side of the keepalive, timed
+
+The client's own stale detection is above; this is what the *server* does, and the two rules are the
+same shape. `processPingTimer` closes a connection when `ping.out + 1 > maxPingsOut` — that is, on
+the timer **after** the last allowed unanswered ping, so the wall-clock budget is
+**`(ping_max + 1) × ping_interval`**. With the defaults (`ping_interval: 2m`, `ping_max: 2`) that is
+**six minutes**, the same number nats.go measures from the other end.
+
+Observed on 2.14.6 with `ping_interval: 2s, ping_max: 2` and a client that never answers
+(source: [[s-nats-server-wire-protocol]]):
+
+```
+[     1.6 ms] >> CONNECT {"verbose":false}
+[  2137.9 ms] << PING
+[  4138.6 ms] << PING
+[  6139.9 ms] << -ERR 'Stale Connection'
+[  6140.0 ms] -- socket closed by the server
+```
+
+Two PINGs go unanswered and the connection survives. The server logs nothing at default level.
+
+**Only a client gets the traffic proxy.** `processPingTimer` sends unconditionally for `ROUTER`,
+`GATEWAY` and a spoke `LEAF` (`client.go:5846–5857`); for a client, inbound data within the interval
+counts as a PONG, which is what `reference/protocols/client.md:363` describes. The first ping is also
+different: `firstClientPingInterval = 2s` for a client and `firstPingInterval = 1s` for everything
+else, plus up to 20 % random offset (`client.go:6994–7029`).
+
+**`Stale Connection` is the one `-ERR` that does not go through `sendErr`** — it is written straight
+with `enqueueProto` (`client.go:5867`, `:5908`), which is why it survives paths where other errors do
+not. The full inventory is [[wire-protocol]].
+
+### `CONNECT {}` is a verbose connection
+
+Nothing in a `CONNECT` is required, and three fields default to **`true`** when omitted:
+`var defaultOpts = ClientOpts{Verbose: true, Pedantic: true, Echo: true}` (`client.go:706`). A
+hand-written client or a `telnet` session that sends `CONNECT {}` gets an `+OK` for every op and must
+read them — observed (source: [[s-docs-protocol-client]]). Every library sends `"verbose":false`
+explicitly; the CLI's own line is on [[wire-protocol]].
+
+
 ## Related
 
 [[core-nats-delivery]] · [[client-defaults]] · [[how-clients-reach-a-cluster]] ·
@@ -319,4 +359,4 @@ advertised `headers`, because both fields come from the same value (source:
 - [[s-nats-server-client-lifecycle-observed]] — the runs on 2.14.6 behind every measured number.
 - [[s-adr-40-nats-connection]] — ADR-40, and the keepalive disagreement it is one side of.
 - [[s-docs-core-nats-publish-subscribe]] — the at-most-once promise the reconnect gap is an instance
-  of. · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]]
+  of. · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]

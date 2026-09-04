@@ -8,9 +8,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-01
 tags: [cluster, routes, gossip, seed, cluster-name, no_advertise, failover, tls, 6222]
 aliases: [cluster, clustering, "form a cluster", "first cluster", routes, "cluster setup"]
-sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection, s-docs-encryption-and-tls, s-docs-putting-it-together, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-single-server, s-gh-5859-unexpected-nats-timeout, s-nats-server-systemd-units, s-nats-server-jetstream-cluster, s-nats-server-meta-layer-rerun-observed]
+sources: [s-docs-your-first-cluster, s-gh-7190-asymmetric-cluster, s-gh-3569-connect-to-route-port, s-docs-forming-a-cluster, s-nats-server-route-cluster-formation, s-docs-hardening, s-docs-kubernetes, s-nats-server-topology, s-docs-super-clusters, s-adr-40-nats-connection, s-docs-encryption-and-tls, s-docs-putting-it-together, s-docs-rolling-upgrades, s-docs-scaling-and-peers, s-docs-single-server, s-gh-5859-unexpected-nats-timeout, s-nats-server-systemd-units, s-nats-server-jetstream-cluster, s-nats-server-meta-layer-rerun-observed, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-08-31
-updated: 2026-09-02
+updated: 2026-09-04
 ---
 
 # Build a 3-node cluster
@@ -434,6 +434,41 @@ the full 4–9 s election window (5.1–5.3 s on two runs), with a `Healthcheck 
 none if nothing polls (source: [[s-nats-server-meta-layer-rerun-observed]]). That is normal, not a failure.
 
 
+## Checking a route port without a client
+
+Every listener answers a bare TCP connection with one `INFO` line, so `nc` is a complete smoke test
+for a route port — no credentials, no client library, no monitoring port
+(source: [[s-nats-server-wire-protocol]]):
+
+```
+nc 127.0.0.1 6222
+```
+
+```
+INFO {"server_id":"…","server_name":"WP1","version":"2.14.6","proto":3,"go":"go1.27.0","host":"0.0.0.0","port":16222,"headers":true,"max_payload":1048576,"jetstream":true,"nonce":"…","cluster":"WPC","domain":"WPD","connect_urls":["192.168.178.61:14222"],"compression":"accept","lnoc":true,"lnocu":true,"route_pool_size":3,"gateway_url":"…:17222","leafnode_urls":["…:17422"]} 
+```
+
+`cluster` is the name this node will insist on, `compression` its cluster default (`accept`),
+`route_pool_size` the number of route connections it will open per peer. `proto: 3` marks it as a
+server-to-server listener; a client port answers `proto: 1`.
+
+Two failures show up here rather than in the log:
+
+```
+CONNECT {"name":"x","cluster":"WRONGNAME"}
+-ERR 'Rejecting connection, cluster name "WRONGNAME" does not match "WPC"'
+
+CONNECT {"lang":"go","version":"1"}
+-ERR 'attempted to connect to route port'
+```
+
+The second is the whole mechanism by which the server tells a misconfigured client from a peer:
+"Client provide Lang in the CONNECT protocol while ROUTEs don't" (`route.go:3022–3028`). A route's own
+`CONNECT` carries `name` (the remote's **server ID**), `cluster` and `lnoc`, and no `lang` or
+`version` at all — despite `reference/protocols/route.md:73–74` listing both
+(source: [[s-docs-protocols-internal]]). The full field tables are on [[wire-protocol]].
+
+
 ## Related
 
 [[install-nats-server]] · [[replicas]] · [[raft-in-nats]] · [[stream-placement]] ·
@@ -451,4 +486,4 @@ none if nothing polls (source: [[s-nats-server-meta-layer-rerun-observed]]). Tha
 [[s-nats-server-topology]] · [[s-docs-super-clusters]] · [[s-adr-40-nats-connection]] ·
 [[s-docs-encryption-and-tls]] · [[s-docs-putting-it-together]] · [[s-docs-rolling-upgrades]] ·
 [[s-docs-scaling-and-peers]] · [[s-docs-single-server]] · [[s-gh-5859-unexpected-nats-timeout]] ·
-[[s-nats-server-systemd-units]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-meta-layer-rerun-observed]]
+[[s-nats-server-systemd-units]] · [[s-nats-server-jetstream-cluster]] · [[s-nats-server-meta-layer-rerun-observed]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]

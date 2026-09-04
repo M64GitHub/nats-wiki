@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [permissions, allow, deny, default_permissions, allow_responses, queue-group, _INBOX, "$JS.API"]
 aliases: [permissions, authorization, allow list, deny list, publish permissions, subscribe permissions, default_permissions, allow_responses]
-sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-docs-core-nats-request-reply, s-nats-go-subscription, s-nats-server-client-errors, s-docs-resilient-clients-slow-consumers-and-request-reply]
+sources: [s-docs-authorization, s-docs-authentication-basics, s-gh-5044-restrict-durable-consumers, s-nats-server-auth-and-tls, s-docs-security-checklist, s-docs-kv-under-the-hood, s-docs-object-store-under-the-hood, s-docs-mqtt-topics-and-subjects, s-docs-mqtt-auth-and-clustering, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-auth-callout, s-docs-cross-account, s-docs-decentralized-auth, s-gh-4535-unauthenticated-connections, s-gh-5941-restrict-leafnode-subjects, s-gh-7505-auth-callout-nkey, s-adr-51-message-scheduler, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.10, s-docs-core-nats-request-reply, s-nats-go-subscription, s-nats-server-client-errors, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-protocol-client, s-nats-server-wire-protocol, s-docs-protocols-internal]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -384,6 +384,36 @@ The allow-list above grants `_INBOX.>`; an application on `--inbox-prefix APP1` 
 and gets the silent failure in the pitfall above if it does not — [[request-reply]].
 
 
+## The exact strings a violation produces
+
+A permission failure is one of five `-ERR` messages, and **none of them closes the connection** — the
+rejected `SUB` or `PUB` is dropped and everything else keeps working. Observed on 2.14.6
+(source: [[s-nats-server-wire-protocol]]):
+
+| what the client did | `-ERR '…'` |
+|---|---|
+| `SUB nope 1` | `Permissions Violation for Subscription to "nope"` |
+| `SUB nope Q 1` | `Permissions Violation for Subscription to "nope" using queue "Q"` |
+| `PUB nope 1` | `Permissions Violation for Publish to "nope"` |
+| published with a reply subject outside `allow_responses` | `Permissions Violation for Publish with Reply of "x"` |
+| subscribed to a subject with too many tokens | `Permissions Violation for Subscription to "x", too many tokens` |
+
+The subject is quoted with Go's `%q`, so it arrives inside double quotes. The strings are formatted at
+`client.go:5783–5820`.
+
+**Two more forms exist, and they mean something different.** `Permissions Violation for Subscription
+to "x" (sid "1")` — with the sid — is sent by the **config-reload** path (`client.go:6146`, `:6149`),
+when a reload revokes permissions on subscriptions that were already open. Seeing a `sid` in the
+string tells you the permission changed under a live connection rather than the client asking for
+something it never had.
+
+On a **leafnode** connection the forms are `Permissions Violation for Publish to %q` and
+`… for Subscription to %q` (`leafnode.go:3488`, `:3491`), and a violation there also costs the leaf a
+30-second reconnect delay — see [[leafnode]]. `reference/protocols/leafnode.md:392` gives the string
+as a bare `Permissions Violation`, which the server never sends (`inbox/docs-issues.md` #105,
+source: [[s-docs-protocols-internal]]).
+
+
 ## Related
 
 [[account]] · [[operator-mode]] · [[auth-callout]] · [[tls-in-nats]] · [[cross-account-sharing]] ·
@@ -399,4 +429,4 @@ and gets the silent failure in the pitfall above if it does not — [[request-re
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
 [[s-docs-auth-callout]] · [[s-docs-cross-account]] · [[s-docs-decentralized-auth]] ·
 [[s-gh-4535-unauthenticated-connections]] · [[s-gh-5941-restrict-leafnode-subjects]] ·
-[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-docs-core-nats-request-reply]] · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]]
+[[s-gh-7505-auth-callout-nkey]] · [[s-adr-51-message-scheduler]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-docs-core-nats-request-reply]] · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-docs-protocols-internal]]

@@ -4648,3 +4648,88 @@ comment; both carry `verified-against: nats-server 2.14.6, nats.go v1.53.1, nats
 the staleness report's *authority the tool cannot check* list. [[slow-consumer-detected]]'s
 `verified-against` moved from `2.14` to `2.14.6`, the tag its constants were read at. Lint: **393 pages**
 (385 → 393), drift 0, unlanded **0**, wanted 0, unverified 12, staleness 0 behind 2.14.6.
+
+## 2026-09-04 — phase F step 5: the wire protocol
+
+*Operation: ingest* — step 5 of `inbox/plan-the-client-side-2026-09-03.md`. The last unread tree of the
+docs (`reference/protocols/`, four pages, 1,303 lines), read against the server at v2.14.6 and then
+provoked on the binary. Three summaries as planned, one new reference page, sixteen ripples, six docs
+issues.
+
+**Sources.** [[s-docs-protocol-client]] (`reference/protocols.md` folded in, plus `client.md`),
+[[s-docs-protocols-internal]] (`route.md`, `gateway.md`, `leafnode.md` read as one, with a
+three-at-a-glance table and the shared defects recorded once), and [[s-nats-server-wire-protocol]] —
+the extract `raw/nats-server-src/wire-protocol-v2.14.6.md` (30 verbatim ranges from `server.go`,
+`client.go`, `parser.go`, `route.go`, `gateway.go`, `leafnode.go`, `const.go`, `util.go`) plus
+`raw/nats-server-src/wire-protocol-observed-v2.14.6.md`, runs A–G in seven passes with
+`wire-protocol-raw.py` and nine scripts beside it.
+
+**Page.** [[wire-protocol]] (`reference/`): the verb table by connection kind with the message forms
+exactly; the 49 `INFO` fields split into common / route / gateway / leafnode, with the six a client is
+sent that no doc row has; the 22 `CONNECT` fields with an *omitted means* column instead of the docs'
+*Required* one; the `-ERR` inventory with the setting behind each string and whether the connection
+survives; the strings the docs list that the server never sends; the five ways a connection dies
+silently; PING/PONG per kind; the reserved prefixes; gateway interest; compression; the leafnode
+delays; and a *Smoke-testing a port* section, because an `INFO` line identifies any listener before
+auth.
+
+**What the runs settled.** The standalone default `INFO` carries `api_lvl` and `xkey` (A1). **An `INFO`
+line ends with a space before its CRLF** — `generateInfoJSON` joins three pieces with `" "`
+(`util.go:360–364`) — except from a gateway, which formats `InfoProto` and does not (A1–A5). The
+leafnode and route listeners advertise `proto: 3`, not the `1` their pages state (A3/A4).
+**`CONNECT {}` gets a `+OK`**, because `defaultOpts` seeds `Verbose`, `Pedantic` and `Echo` to true
+(B2/B13) — the docs' `Required` column has no counterpart, and a CONNECT with broken JSON gets **no
+`-ERR` at all** (B9). Sixteen errors provoked: `Authentication Timeout` (not `Authorization Timeout`)
+at 1003 ms with `timeout: 1` (C15); a TLS-required server sends **nothing** and drops at 2002.8 ms,
+because `TLSHandshakeError` is the fifth member of `markConnAsClosed`'s skip-flush set, so
+`Secure Connection - TLS Required` is unreachable at this release (C16); `-ERR 'Stale Connection'` at
+**6139.9 ms** with `2s`/`2`, which is `(ping_max + 1) × ping_interval` and the server-side counterpart
+of nats.go's six minutes from step 3 (C17); and **four `-ERR`s leave the connection usable** —
+`Invalid Subject`, `Invalid Publish Subject`, the permission violations and
+`maximum subscriptions exceeded` (C2/C3/C11/C19). The `-ERR` inventory is **60** sites, not the 58 of
+step 4: `Stale Connection` is written with `enqueueProto` directly (`client.go:5867`, `:5908`), which
+the new extract records as a correction to `client-errors-v2.14.6.md`.
+
+On the server-to-server side, the `-DV` traces settled every verb form. `$LDS.` arrives as an ordinary
+`LS+` — **there is no `LDS` verb** (E1b). The origin cluster is the **first** token, and of a *route's*
+`LS+`/`LS-`, not a leafnode's: `LS+ LEAF1 $G edge.ping` on the route while the leaf's own frame is
+`LS+ edge.ping` (E/F). A leaf's header messages are **`HMSG`** (`HMSG edge.work | W 18 31`), and
+`LMSG` has an undocumented three-token reply form with no `+`. `RMSG` carries `|` and the queue names.
+A gateway rewrites a reply to `_GR_.<6-char cluster hash>.<6-char server hash>.<original reply>` (G).
+And **`gateway_iom: true`**: since 2.9.0 every account goes to interest-only at once
+(`gateway.go:552–558`), so the optimistic mode `reference/protocols/gateway.md` still describes as
+current is never entered between two modern servers — which also rules it out as an explanation on
+[[supercluster-slows-when-a-remote-subscriber-joins]].
+
+**Ripples (16).** [[gateway]] — *Interest-only is the default, and has been since 2.9.0*;
+[[leafnode]] — *What a leafnode connection puts on the wire*, the four reconnect delays and the three
+wrong CONNECT tags; [[client-connection-lifecycle]] — the server's side of the keepalive, timed;
+[[client-defaults]] — *The server's own connection defaults*; [[core-nats-delivery]] — *What delivery
+looks like on the wire*; [[defaults-and-limits]] — *The `-ERR` each connection limit produces*;
+[[error-codes]] — *`-ERR` strings are not `err_code`s*; [[subject-permissions]] — the five exact
+strings and the two `(sid …)` reload variants; [[tls-in-nats]] — why a plain client gets no error;
+[[monitoring-endpoints]] — `client_id` ↔ `cid`; [[how-clients-reach-a-cluster]] — `connect_urls` and
+`protocol: 1`; [[build-a-3-node-cluster]] — *Checking a route port without a client*;
+[[system-subjects]] — the seven reserved prefixes; [[duplicate-messages-across-a-leafnode]] — loop
+detection in one command; [[supercluster-slows-when-a-remote-subscriber-joins]] — *Not the
+interest-mode switch*; [[nats-server]] and [[nats-server-2.10]]. The two step-4 gotchas each gained a
+paragraph on the string that is documented and never sent. Unlanded **21 → 0**.
+
+**Docs issues** #102–#107, one per protocol page plus two more for `client.md`, which carries three
+separate tables. **#102 ★** is the `-ERR` table: three wrong defaults (auth timeout 1 s vs `2s`,
+`max_control_line` 1024 vs 4096, slow consumer 10MB vs 64MB), six strings that are not what the server
+sends (the casing rule is that `errors.New` text is lowercase and call-site literals are Title Case),
+two that can never arrive, an incomplete `Recoverable` column and no ping values anywhere. **#105 ★**
+is the leafnode page's four verb forms the parser does not have. #103 is the duplicated `client_id`
+row, the six missing INFO fields and the undocumented trailing space; #104 the `Required` column and
+`account` / `new_account` now being an error; #106 the retired optimistic mode; #107 the route CONNECT
+table listing the two fields whose *absence* is the client/route discriminator. No server issue —
+everything surprising was settled against the source.
+
+**Bank**: rows 183–187 added (`own`, answered on arrival) — a `-ERR` and its setting, identifying a
+listener with `nc`, reading the server-to-server verbs in a capture, what a `CONNECT` must carry, and
+whether the gateway interest switch is something to size for. **155 / 187**, `own` 32. No strike from
+any *Pages touched*. `since: [2.10]` on the new page with the *present at 2.10* comment.
+Lint: **397 pages** (393 → 397), drift 0, unlanded **0**, unverified 12, staleness 0 behind 2.14.6.
+Wanted is **1**: `services-on-core-nats`, registered deliberately in `wiki/index.md` because
+[[wire-protocol]]'s `$SRV.` prefix row points at it and step 6 writes it.

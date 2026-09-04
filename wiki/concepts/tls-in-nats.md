@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [tls, mtls, verify, verify_and_map, handshake_first, tls_timeout, encryption-at-rest, prev_key, tls_cert_not_after]
 aliases: [tls, mtls, mutual tls, verify_and_map, handshake_first, encryption at rest, tls block, certificates]
-sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-errors, s-nats-server-client-faults-observed]
+sources: [s-docs-encryption-and-tls, s-nats-server-auth-and-tls, s-gh-7684-certificate-expiry, s-docs-hardening, s-adr-40-nats-connection, s-docs-security-checklist, s-nats-server-tls-reload, s-docs-websocket-tls-and-proxies, s-docs-websocket-leaf-nodes-over-websocket, s-natscli-account-tls, s-adr-35-filestore-compression, s-docs-authentication-basics, s-gh-7834-leafnode-same-js-domain, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-protocol-client, s-nats-server-wire-protocol]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -342,6 +342,35 @@ OCSP fixes along the line: staple resumption for gateways after a certificate re
   `allow_non_tls` no longer logs that TLS is required at startup (#8420).
 
 
+## What the client is told, and what it is not
+
+**`tls_required`, `tls_verify` and `tls_available` are `INFO` fields**, sent before any handshake, and
+all three are `omitempty` — a server with no TLS sends none of them, so their absence is the signal.
+`tls_available` says the client *may* present a certificate; `tls_required` says it must handshake;
+`tls_verify` says the server will verify what it presents (`server.go:119–121`, source:
+[[s-docs-protocol-client]]).
+
+**A plain client against a TLS-required server gets no error at all.** The server composes
+`-ERR 'Secure Connection - TLS Required'` on the handshake timeout (`server.go:3684`) and then throws
+it away: the very next line calls `closeConnection(TLSHandshakeError)`, and `TLSHandshakeError` is one
+of the five reasons `markConnAsClosed` sets `skipFlushOnClose` for (`client.go:2022–2025`). Observed
+on 2.14.6 with `tls { timeout: 2 }` (source: [[s-nats-server-wire-protocol]]):
+
+```
+[     1.5 ms] >> CONNECT {"verbose":false}
+[     1.5 ms] >> PING
+[  2002.8 ms] -- socket closed by the server
+```
+
+Nothing on the wire, and the server logs only `TLS required for client connections` at startup. So
+the string on `reference/protocols/client.md:428` is unreachable at this release
+(`inbox/docs-issues.md` #102), and **a silent drop exactly `tls.timeout` after connecting is the
+symptom of a client that is not doing TLS** — there is no error to look for.
+
+The other four silent-drop reasons are `ReadError`, `WriteError` and the two slow-consumer branches
+(see [[slow-consumer-in-the-client]]); the full list is on [[wire-protocol]].
+
+
 ## Related
 
 [[rotate-tls-certificates]] · [[account]] · [[subject-permissions]] · [[operator-mode]] ·
@@ -356,4 +385,4 @@ OCSP fixes along the line: staple resumption for gateways after a certificate re
 [[s-nats-server-tls-reload]] ·
 [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-leaf-nodes-over-websocket]] ·
 [[s-natscli-account-tls]] · [[s-adr-35-filestore-compression]] ·
-[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]]
+[[s-docs-authentication-basics]] · [[s-gh-7834-leafnode-same-js-domain]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]

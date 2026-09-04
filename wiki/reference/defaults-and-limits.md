@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-go-connection, s-nats-server-client-errors, s-nats-server-client-faults-observed]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-go-connection, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-protocol-client, s-nats-server-wire-protocol]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -558,6 +558,34 @@ and no subject length or token limit at all — the primer's "~16 tokens and und
 issue #81 (source: [[s-docs-core-nats-subjects-and-mapping]]).
 
 
+## The `-ERR` each connection limit produces
+
+Every limit in the connection block above announces itself with a specific string, and four of them
+leave the connection usable afterwards. Observed on 2.14.6 (source: [[s-nats-server-wire-protocol]]);
+the full inventory, including the strings only a route, gateway or leafnode can be sent, is
+[[wire-protocol]].
+
+| setting | default | `-ERR '…'` | connection survives |
+|---|---|---|---|
+| `max_subscriptions` | `0` (unlimited) | `maximum subscriptions exceeded` | **yes** |
+| `permissions` | — | `Permissions Violation for Subscription to "x"` (and `… using queue "q"`, `… for Publish to "x"`) | **yes** |
+| `max_connections` | `65536` | `maximum connections exceeded` | no |
+| `max_control_line` | `4096` | `maximum control line exceeded` | no |
+| `max_payload` | `1MB` | `Maximum Payload Violation` | no |
+| `authorization { timeout }` | `2s` | `Authentication Timeout` | no |
+| `ping_interval` / `ping_max` | `2m` / `2` | `Stale Connection`, after `(ping_max + 1) × ping_interval` | no |
+| `max_pending` | `64MB` | **nothing** — the pending output is discarded and the socket closed | no |
+| `tls { timeout }` | `2s` | **nothing** — `TLSHandshakeError` is in the skip-flush set | no |
+| `write_deadline` | `10s` | **nothing** — same reason | no |
+
+`max_control_line` is multiplied by **16** for a route, gateway or leafnode connection
+(`parser.go:1276–1284`), so the 4 KB default is a 64 KB allowance there.
+
+`reference/protocols/client.md:419–435` gives three of these defaults wrongly — the auth timeout as
+"1 second", `max_control_line` as "1024 bytes" and the pending limit as "10MB"
+(`inbox/docs-issues.md` #102, source: [[s-docs-protocol-client]]).
+
+
 ## Related
 
 [[config-keys]] · [[jetstream-sizing]] · [[stream]] · [[consumer]] · [[ack-and-redelivery]] ·
@@ -577,4 +605,4 @@ issue #81 (source: [[s-docs-core-nats-subjects-and-mapping]]).
 [[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] ·
 [[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
 [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-go-connection]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]]
+[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-go-connection]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]

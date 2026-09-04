@@ -7,9 +7,9 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [leafnode, hub, spoke, remotes, 7422, deny_exports, deny_imports, jetstream-domain, account]
 aliases: [leaf node, leaf nodes, leafnodes, leaf, hub and spoke, spoke, "nats-leaf"]
-sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed, s-nats-server-service-imports, s-ghsa-2026-08-request-info-spoofing, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups]
+sources: [s-docs-leaf-nodes, s-nats-server-topology, s-gh-5941-restrict-leafnode-subjects, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-leafnode-js-domains, s-docs-putting-it-together, s-gh-7438-multi-region-availability, s-nats-server-tls-reload, s-nats-server-object-store-leafnode, s-docs-websocket-leaf-nodes-over-websocket, s-gh-7505-auth-callout-nkey, s-gh-7881-cross-domain-sourcing, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-gh-5902-leafnode-connect-events, s-nats-server-system-subjects-observed, s-nats-server-service-imports, s-ghsa-2026-08-request-info-spoofing, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Leafnode
@@ -433,6 +433,61 @@ share on top of its own. The full rule set is on [[queue-groups]]; the docs' que
 clusters and says nothing about a leafnode (source: [[s-docs-core-nats-queue-groups]]).
 
 
+## What a leafnode connection puts on the wire
+
+A leafnode connection is bound to **one account** at CONNECT time, so — unlike a route or a gateway —
+its frames carry no account token. The verbs are `LS+` / `LS-` for interest, `LMSG` for a message and
+**`HMSG`** for a message with headers. Observed from a hub's own `-DV` trace on 2.14.6
+(source: [[s-nats-server-wire-protocol]]):
+
+```
+LS+ edge.ping                              LS- edge.ping
+LS+ edge.work W 1                          LS- edge.work W
+LMSG edge.ping 5                           LMSG edge.ping answers.here 10
+LMSG edge.work | W 6                       LMSG edge.svc + _INBOX.… NATS-RPLY-22 3
+HMSG edge.ping 22 33                       HMSG edge.work | W 18 31
+```
+
+`+` marks a reply and `|` marks the queue list. Three things the documentation gets wrong here, all
+recorded in `inbox/docs-issues.md` #105: `LS+` takes **one or three** arguments and never two (a queue
+subscription must carry its weight, `leafnode.go:2926–2941`); there is **no header form of `LMSG`**;
+and the origin-cluster token belongs to the **route** protocol, first rather than last —
+`LS+ LEAF1 $G edge.ping` is how a hub forwards a leaf's interest to its cluster peers
+(`route.go:1729–1740`). The full table is in [[wire-protocol]].
+
+**`$LDS.` is a subject, not a verb.** `leafNodeLoopDetectionSubjectPrefix = "$LDS."`
+(`leafnode.go:59`), one `$LDS.<nuid>` per account, and it arrives as an ordinary `LS+` alongside the
+`$SYS.REQ.…` interest the hub pushes the moment a leaf connects (source:
+[[s-nats-server-wire-protocol]]). `reference/protocols/leafnode.md:17` lists `LDS` as a message type.
+
+### The reconnect delays are four constants, not one
+
+`leafnode.go:48–67` (source: [[s-nats-server-wire-protocol]]):
+
+| after | the leaf waits |
+|---|---|
+| a loop detected via `$LDS.` | `30s` (`leafNodeReconnectDelayAfterLoopDetected`) |
+| a permissions violation | `30s` (`leafNodeReconnectAfterPermViolation`) |
+| the hub having the same cluster name | `30s` (`leafNodeReconnectDelayAfterClusterNameSame`) |
+| a `min_version` rejection | `5s` (`leafNodeMinVersionReconnectDelay`) |
+
+A leaf that reconnects on a 30-second beat is therefore reporting one of the first three, and the hub
+log says which. The docs mention two of them and call both "a 30-second reconnection delay".
+
+### The leaf CONNECT's field names
+
+`leafConnectInfo` (`leafnode.go:2171–2208`) — three of the names
+`reference/protocols/leafnode.md:75–89` gives are not the JSON tags: the compression field is
+**`compress_mode`** (the old `compression` tag "has never been used"), `hub` is **`is_hub`**, and
+`proto` is **`protocol`**. `deny_pub` and `isolate` are real and undocumented. The leafnode `INFO`
+advertises `proto: 3`, not the `1` the page states (source: [[s-docs-protocols-internal]]).
+
+**A client that dials a leafnode port** gets `-ERR 'attempted to connect to leaf node port'` — but
+only when the port needs no auth. `checkAuthentication` runs before the leafnode handler, so on a
+leafnode port that requires credentials the same client gets `Authorization Violation` instead
+(observed, source: [[s-nats-server-wire-protocol]]).
+
+
 ## Related
 
 [[gateway]] · [[choosing-a-topology]] · [[jetstream-domain]] · [[account]] ·
@@ -449,7 +504,7 @@ clusters and says nothing about a leafnode (source: [[s-docs-core-nats-queue-gro
 [[s-nats-server-object-store-leafnode]] ·
 [[s-docs-websocket-leaf-nodes-over-websocket]] ·
 [[s-gh-7505-auth-callout-nkey]] · [[s-gh-7881-cross-domain-sourcing]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-gh-5902-leafnode-connect-events]] · [[s-nats-server-system-subjects-observed]] · [[s-nats-server-service-imports]] · [[s-ghsa-2026-08-request-info-spoofing]] · [[s-nats-server-request-reply]] · [[s-nats-server-request-reply-observed]]
-- [[s-docs-core-nats-queue-groups]] — silent on leafnodes; cited for that.
+- [[s-docs-core-nats-queue-groups]] — silent on leafnodes; cited for that. · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
 
 ## To verify
 

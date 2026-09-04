@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [connect_urls, no_advertise, client_advertise, seed-urls, loadbalancer, kubernetes, discovery, reconnect]
 aliases: ["seed URLs", "server discovery", "connect_urls", "no_advertise", "client_advertise", "LoadBalancer vs seed URLs", "client connection URLs"]
-sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls, s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-nats-server-client-lifecycle-observed]
+sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls, s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-nats-server-client-lifecycle-observed, s-docs-protocol-client, s-docs-protocols-internal, s-nats-server-wire-protocol]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -223,6 +223,37 @@ empty instead, which is the cost of design 2: the drain tells clients nothing ab
 
 - **`since:` is deliberately absent.** `client_advertise`, `no_advertise` and INFO-driven discovery are dated by no release body from v2.10.0 to v2.14.6 (the first body naming discovery at all is v2.14.0's `ignore_discovered_servers`), and the docs' generated config reference carries no *since* for them.
 
+## What discovery looks like on the wire
+
+`connect_urls` is a field of the `INFO` line, and it is the only thing a client needs to learn the
+rest of the cluster. Two rules, both observed on 2.14.6 (source: [[s-nats-server-wire-protocol]]):
+
+- **The list is the advertised address, not `host`.** A node listening on `0.0.0.0` advertises its
+  routable address; a two-node cluster's client `INFO` carried
+  `"connect_urls":["192.168.178.61:14222","192.168.178.61:14223"]` while `host` was still `0.0.0.0`.
+  This is what `client_advertise` and `no_advertise` change.
+- **A client only gets updates if it asked for them.** `protocol: 1` in the `CONNECT` is what tells
+  the server the client can handle an asynchronous `INFO`; with `protocol: 0` or the field absent, the
+  server never sends the second one (`ClientProtoInfo`, `client.go:88`). Every current library sends
+  `1` — the `nats` CLI's own line is `…"protocol":1,"echo":true,"headers":true,"no_responders":true}`.
+
+A quick check of what a node will hand out, with no client library:
+
+```
+nc 127.0.0.1 4222
+```
+
+The `INFO` line names `cluster`, `connect_urls`, `domain`, `jetstream` and `api_lvl`. On the **route**
+port the same trick shows `route_pool_size`, `lnoc`, `lnocu`, `gateway_url` and `leafnode_urls` —
+and it is the fastest way to confirm that a node believes it is in the cluster you think it is
+(source: [[s-docs-protocols-internal]]). Which fields identify which listener is on [[wire-protocol]].
+
+**Route gossip is a forwarded `INFO`, not the listener's own.** `reference/protocols/route.md:25`
+describes the accepting server adding an `ip` field and forwarding it; a fresh connection to the route
+port has **no `ip`** — that field appears only on the peer INFO being propagated
+(source: [[s-docs-protocol-client]]).
+
+
 ## Related
 
 [[build-a-3-node-cluster]] · [[upgrade-a-cluster]] · [[tls-in-nats]] · [[nats-helm-charts]] ·
@@ -239,4 +270,4 @@ empty instead, which is the cost of design 2: the drain tells clients nothing ab
 - `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md` — the `INFO` lines quoted
   above, observed on the v2.14.6 binary
 - [[s-docs-websocket-tls-and-proxies]]
-- [[s-docs-websocket-your-first-websocket-connection]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-nats-server-client-lifecycle-observed]]
+- [[s-docs-websocket-your-first-websocket-connection]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-protocol-client]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
