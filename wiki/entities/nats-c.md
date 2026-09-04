@@ -4,10 +4,10 @@ type: entity
 kind: client
 area: [clients, jetstream]
 verified-against: nats.c v3.13.0
-verified-on: 2026-08-31
+verified-on: 2026-09-04
 tags: [client, tier-1, c, ffi, embedded, libsodium, streaming]
 aliases: [nats.c, "nats-io/nats.c", c client]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-core-nats-subjects-and-mapping, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-core-nats-subjects-and-mapping, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-client-releases-and-issues, s-nats-server-core-delivery-observed]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -91,10 +91,42 @@ Status codes the chapter names: **`NATS_NO_SERVER`** ("no server in the pool ans
 is a rejected connect"), `NATS_DRAINING`, `NATS_CONNECTION_CLOSED`, `NATS_SLOW_CONSUMER`.
 
 
+
+## What bites you
+
+Read from the client's **last ten release bodies** (v3.10.0 2025-02-28 → v3.13.0 2026-06-01) and its
+open issues at 2026-09-04 (source: [[s-client-releases-and-issues]]). The C client's own notes are
+unusually explicit about what changed, which is the only way to date the docs' unversioned claims.
+
+- **Two identical auth errors used to end the connection with no way to opt out.** The escape hatch,
+  `natsOptions_SetIgnoreAuthErrorAbort`, arrived only in **v3.13.0** (2026-06-01, #974): "Clients can
+  now be configured to opt out of aborting subsequent reconnect attempts if server returns the same
+  auth error twice". On v3.12 or earlier, an expired credential that the server rejects twice closes
+  the connection permanently, whatever the reconnect budget says — see
+  [[connection-closed-after-auth-error]] and the per-client table on [[client-defaults]].
+- **A `tls://` URL did not by itself turn TLS on until v3.13.0** ("TLS is now automatically enabled
+  when a URL with the `tls://` scheme is used", #951). Older code must call the TLS options
+  explicitly; a URL scheme alone was not enough.
+- **Draining on v3.10 or earlier could lose a reply.** "Connection drain could cause missed reply
+  and/or a 100ms delay" was fixed in **v3.11.0** (#915), and "`natsConnection_Close` could fail to
+  properly flush if data was just written to the socket and the buffer is empty" in **v3.13.0**
+  (#982). A C service that drains on shutdown wants v3.13.0.
+- **The publish subject is still not checked.** The docs say `natsConnection_PublishString` with a
+  space in the subject "does NOT fail" (source: [[s-docs-core-nats-subjects-and-mapping]]); none of
+  the last ten releases adds subject validation, where Go got it at v1.48.0, Java at 2.25.1,
+  JavaScript at v3.3.0 and Rust at v0.47.0. The server's half is reproduced on 2.14.6 (source:
+  [[s-nats-server-core-delivery-observed]], run A2); the rule is on [[subjects-and-wildcards]].
+- **No per-attempt reconnect-error callback**, so a long outage is quieter here than in any other
+  client (the documentation's word; the release record adds no such callback either).
+- **The event-loop adapters are where the open bugs are.** #1005 and #1007 (both 2026-08-05) report a
+  libuv crash after a silent-failure disconnect and a parser leaked on disconnect; #735 (2024-03-20)
+  reports callbacks firing after `natsConnection_destroy`. If you embed the client in libuv or
+  libevent rather than using its own thread, the disconnect path is the part to test.
+
 ## Related
 
 [[nats-go]] · [[nats-streaming]] · [[nk]] · [[orbit]] · [[nats-server]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-client-releases-and-issues]] · [[s-nats-server-core-delivery-observed]]

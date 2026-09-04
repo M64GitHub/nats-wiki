@@ -4,12 +4,12 @@ type: entity
 kind: client
 area: [clients, jetstream, interop]
 verified-against: nats.js v3.4.0
-verified-on: 2026-08-31
+verified-on: 2026-09-04
 tags: [client, tier-1, javascript, typescript, deno, bun, websocket, monorepo]
 aliases: [nats.js, "nats-io/nats.js", javascript client, typescript client, nats.deno, nats.ws, nats.node]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-get-direct, s-adr-47-request-many, s-docs-core-nats-request-reply]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-get-direct, s-adr-47-request-many, s-docs-core-nats-request-reply, s-client-releases-and-issues, s-docs-resilient-clients-connecting]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # nats.js
@@ -69,10 +69,41 @@ first reply and drops the rest; the error for a missing service is `RequestError
 `isNoResponders()`, for a slow one `TimeoutError` — [[request-reply]].
 
 
+
+## What bites you
+
+Read from the last ten releases (v3.1.0 → v3.4.0, 2026-05-08) and the open issues at 2026-09-04
+(source: [[s-client-releases-and-issues]]), with the two defaults from the documentation's per-client
+table (source: [[s-docs-resilient-clients-connecting]]).
+
+- **Two defaults are unlike every other client's: a 20 s connect timeout and a `MaxReconnect` of
+  10.** Everyone else dials for 2 s (5 in Rust) and retries 60 times. A browser or Node service that
+  looks slow to fail over and then gives up early is on those two numbers, not on the network —
+  [[client-defaults]], [[client-connection-lifecycle]].
+- **The client-side buffer is unbounded and never drops.** Its slow-consumer option only raises a
+  status. So the failure mode here is not the missing messages other clients report but **memory
+  growth in the process** — [[slow-consumer-in-the-client]].
+- **The inbox shape changed in v3.4.0.** "inboxes match go client `_INBOX.<nuid>.<token>` (was
+  `_INBOX.<nuid>.<nuid>`); nuids now base62" (#398). Both are two tokens after the prefix, so a
+  `_INBOX.>` permission is unaffected, but anything matching on the token's character set is —
+  [[subject-permissions]], [[request-reply]].
+- **A truncated KV history can look complete.** Open issue **#426** (2026-08-10): "kv: history()
+  reports a truncated read as a complete one when the link drops". A watcher rebuilt after a
+  reconnect can therefore start from a partial view with no error — [[key-value]].
+- **`status()` yields a `reconnect` status per retry**, not per reconnection — open issue **#423**
+  (2026-06-12). Anything counting reconnects from the iterator over-counts them.
+- **Object-store digest validation was wrong before v3.3.1** (2026-02-11): "Fixes a check on the
+  validation of the digest. This is an important integrity fix." A `get` before that release could
+  accept an object whose digest did not match — [[object-store]].
+- **Subject validation only since v3.3.0** (2025-12-16, #348, "Validate subjects for illegal
+  whitespace characters") — [[subjects-and-wildcards]].
+- **`getServers()`/`setServers()` and `reconnectToServer` are v3.4.0** (#400, #403). Pinning a client
+  to a particular server, or listing what it discovered, is not available below it.
+
 ## Related
 
 [[orbit]] · [[nats-go]] · [[nats-server]] · [[nats-cli]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-docs-get-direct]] · [[s-adr-47-request-many]] · [[s-docs-core-nats-request-reply]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-docs-get-direct]] · [[s-adr-47-request-many]] · [[s-docs-core-nats-request-reply]] · [[s-client-releases-and-issues]] · [[s-docs-resilient-clients-connecting]]

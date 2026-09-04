@@ -4925,3 +4925,80 @@ pages that now state its answer. **167 / 197**, `own` 39. `inbox/adr-toc.md` row
 
 Lint: **413 pages** (405 → 413), drift 0, unlanded **0**, wanted **0**, unverified 12, staleness 0
 behind 2.14.6.
+
+## 2026-09-04 — phase F step 8: *What bites you* on the twelve client entities
+
+*Operation: consolidate* over the entity layer, with the one thing the entity layer had never been
+given: a **dated** source per client. Every per-client sentence in `learn/resilient-clients` is
+unversioned by design, and the READMEs already in `raw/github-repos/` say what a client *does*, not
+what it *did*. So the step began by fetching, for each of the twelve official clients, the last ten
+release bodies and every open issue — 12 files under `raw/github-repos/nats-io__<repo>.releases-2026-09-04.md`,
+release bodies verbatim, issues as number, open date and title (`gh api …/releases?per_page=10` and
+`gh api …/issues?state=open --paginate`; the search API rate-limits at 30/min and was abandoned for
+the core issues endpoint after the first pass). Then two source reads the release record could not
+substitute for.
+
+**Three summaries.** [[s-client-releases-and-issues]] — the twelve clients' release record read as
+one source, which is what dates the chapter's claims. [[s-nats-pure-rb-client-source]] — seven quoted
+ranges of `lib/nats/io/client.rb` at tag **v2.5.0**, read because **no `learn/` page names Ruby at
+all** and the ten release bodies state no default: the preferred Ruby client's behaviour under a fault
+was, until now, publicly undocumented. [[s-nats-server-tcp-nodelay]] and
+[[s-nats-server-connect-urls-gossip]] are two greps of the server tree that close two bank rows
+(below), each recorded in `raw/nats-server-src/` as a source reading, explicitly not a run.
+
+**Twelve `## What bites you` sections**, one per client entity — ten new, two second passes
+([[nats-go]], [[nats-net]]) for what steps 1–7 produced. Each bullet is an operator-visible behaviour
+with the release that introduced it or the open issue that reports it. What the reading turned up:
+
+- **Subject validation is a version question, not a language one.** It arrived separately in every
+  client and recently: nats.js **v3.3.0** (2025-12-16), nats.go **v1.48.0** (2025-12-17), nats.java
+  **2.25.1** (2026-01-15), nats.rs **v0.47.0** (2026-03-31); nats.net deprecated its
+  `SkipSubjectValidation` opt-out at **v3.0.0**, giving the mechanism better than the docs do — "a
+  subject containing a space splits into subject and reply-to tokens on the wire with no error",
+  which is exactly run A2 of step 1. **nats.c and nats.py add none in their last ten releases.** The
+  table is now on [[client-defaults]].
+- **The Python maintainers publish a message-loss figure for their own client**: "\* nats-py dropped
+  47-87% of messages under load", footnoting the `nats-core/v0.1.0` benchmark, against "Zero message
+  loss with nats-core across all configurations".
+- **Ruby diverges from every documented client in two ways**: a publish **blocks** when the outbound
+  `SizedQueue` fills instead of failing, and the stale check is `>=` rather than `>`, so a dead link
+  is caught on the **second** unanswered ping — about four minutes against Go's six. That settles
+  docs issue **#90** as a real cross-client divergence: **nats-pure.rb implements ADR-40's rule as
+  written and nats.go does not.**
+- **`nats.swift` ships JetStream** — its v0.4.0 notes and `Sources/JetStream/` both say so — while its
+  README has said "on the roadmap" for 22 months. The wiki page had carried the README's claim; the
+  Facts table and the intro are corrected.
+
+**Two bank rows closed from the server source.** Row **148** (`TCP_NODELAY`): the server never calls
+`SetNoDelay` anywhere at v2.14.6 and has no key for it, because Go's `net.newTCPConn` calls
+`setNoDelay(fd, true)` on every TCP connection it makes — Nagle is off on every connection kind and
+cannot be turned on. Row **156** (supercluster discovery): the two connect-URL helpers in `server.go`
+have exactly **three call sites, all in `route.go`** (`:2389`, `:728`, `:3205`), all gated on
+`!opts.Cluster.NoAdvertise`; `gateway.go` and `leafnode.go` call neither, so a client never learns
+another cluster exists. Row **87** re-checked against the READMEs and left as it stood, with the
+answer sharpened: seven Orbit repos, versioned per module, and three (`orbit.py`, `orbit.net`,
+`orbit.c`) with no published release.
+
+**Ripples beyond the twelve entities** (7): [[client-defaults]] — *Three C# cells are out of date, and
+the client says so*, *Ruby — read from the client, because the documentation never names it*,
+*Publish subject validation, per client and per version*, and two new rows in *The auth-error abort*;
+[[subjects-and-wildcards]] — the per-client arrival dates replacing "until the client pages are read";
+[[client-connection-lifecycle]] — the Ruby keepalive beside the ADR-40 paragraph, and discovery
+stopping at the gateway; [[defaults-and-limits]] — *The socket options the server never sets*;
+[[wire-protocol]] — *The one socket option, which the server does not set*; [[gateway]] — *A client
+never learns another cluster exists*; [[how-clients-reach-a-cluster]] — *Discovery stops at the
+cluster edge*.
+
+**Docs issues #121–#122.** #121: `learn/resilient-clients` states two .NET defaults that nats.net
+**v3.0.0** changed on 2026-07-10, seven weeks before the docs tree was fetched — the 1,024-message
+channel is 16,384 with `DropNewest`, and "C# is the exception: it has no drain call on a single
+subscription" is answered by `INatsSub<T>.DrainAsync()`. Both were true of the v2 line, and the
+chapter carries no version anywhere, which is the finding. #122: the `nats.swift` README contradicts
+its own release notes and its own source tree about JetStream, and docs.nats.io delegates capability
+to that README — a new `destination` value, the client repository itself. No server issue: every
+surprise here is a client's, and a client has a maintainer to ask.
+
+**Bank**: rows **148** and **156** filled, **87** re-checked. **169 / 197**, `own` 39.
+
+Lint: **417 pages** (413 → 417), drift 0, unlanded **0**, wanted **0**, unverified 12, staleness 0
+behind 2.14.6.

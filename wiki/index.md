@@ -314,25 +314,35 @@ exists to answer live in `inbox/question-bank.md`.
 
 *Tier 1 — "track new server features at release".*
 
-- [[nats-go]] — the reference implementation, and the parity target the other clients name.
+Every client page carries a **`## What bites you`** section: the operator-visible behaviours, each
+dated to the release that introduced it.
+
+- [[nats-go]] — the reference implementation, and the parity target the other clients name. A write
+  error does not force a reconnect unless you ask.
 - [[nats-js]] — the v3 mono-repo: Node/Bun, Deno and the browser, with the base client split into
-  modules.
+  modules. A 20 s connect timeout, 10 reconnects, and a buffer that never drops.
 - [[nats-py]] — `nats-py` today, a modular `nats-core` (Python 3.13+) in progress; the docs name
-  neither.
-- [[nats-java]] — the artifact is `io.nats:jnats`, not the repo name.
+  neither. The maintainers' own benchmark: "nats-py dropped 47-87% of messages under load".
+- [[nats-java]] — the artifact is `io.nats:jnats`, not the repo name. `drain()`'s future says `true`
+  even when it timed out.
 - [[nats-rs]] — `async-nats`: stable API on 0.x versions, and the `chrono` feature that poisons a
-  whole build.
-- [[nats-net]] — v3 added OpenTelemetry and **dropped .NET 6**.
+  whole build. `flush()` waits for the socket, not for the server.
+- [[nats-net]] — v3 added OpenTelemetry and **dropped .NET 6** — and moved two of the defaults the
+  docs still state.
 - [[nats-c]] — the FFI and embedded client; a port of the Go client's semantics, with no support
-  matrix.
+  matrix. Two auth errors ended the connection, with no opt-out before v3.13.0.
 
 *Tier 2 — "may lag behind on new server features".*
 
-- [[nats-zig]] — pre-1.0; no Object Store, no mTLS.
-- [[nats-swift]] — **Core NATS only**; JetStream, KV, Object Store and Services are roadmap.
-- [[nats-pure-rb]] — the preferred Ruby client, thread-safe, no EventMachine.
+- [[nats-zig]] — pre-1.0; no Object Store, no mTLS; one release, and Zig moves under it.
+- [[nats-swift]] — Core NATS **and JetStream since v0.4.0**, whatever its README says; no KV, no
+  Object Store, no Services.
+- [[nats-pure-rb]] — the preferred Ruby client, thread-safe, no EventMachine. Read from its source,
+  because no `learn/` page names Ruby at all: a budget of 10, a publisher that blocks, a four-minute
+  keepalive.
 - [[nats-rb]] — legacy Ruby, no release since 2019. Use [[nats-pure-rb]].
-- [[nats-ex]] — Elixir, published to hex as **`gnat`**, MIT-licensed.
+- [[nats-ex]] — Elixir, published to hex as **`gnat`**, MIT-licensed. KV watchers were dropped as slow
+  consumers before v1.14.0.
 
 **Tools**
 
@@ -1132,6 +1142,16 @@ exists to answer live in `inbox/question-bank.md`.
 - [[s-cncf-nats-project]] — accepted 2018-03-15 at the Incubating maturity level.
 - [[s-jsm-go-config-schemas]] — the two configuration JSON schemas at jsm.go v0.4.1: 38 stream and 34
   consumer properties, the consumer descriptions the docs never render, and one wrong deliver policy.
+- [[s-client-releases-and-issues]] — the last ten release bodies and every open issue of all twelve
+  clients: what dates each of the chapter's unversioned per-client claims, when subject validation
+  arrived in each, and the two .NET defaults v3.0.0 moved out from under the docs.
+- [[s-nats-pure-rb-client-source]] — the Ruby client read from `lib/nats/io/client.rb` at v2.5.0,
+  because no `learn/` page names Ruby: the constants, the four-minute keepalive, the publisher that
+  blocks and the drain that returns immediately.
+- [[s-nats-server-tcp-nodelay]] — the two greps that settle Nagle: the server never sets
+  `TCP_NODELAY`, and Go sets it on every TCP connection anyway.
+- [[s-nats-server-connect-urls-gossip]] — `connect_urls` is fed by routes and by nothing else, so a
+  client never learns the other clusters of a supercluster.
 
 ## Wanted pages (topics with no source yet)
 

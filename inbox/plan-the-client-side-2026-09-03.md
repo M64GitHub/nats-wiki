@@ -535,7 +535,7 @@ phase H); when not (JetStream as a request/reply transport; core for anything wi
 `[[core-or-jetstream]]`, `own` replaced by a URL if the scout found the public form; phase G's G7 row
 struck in the megaplan table. Index, log, lint.
 
-## Step 8 — *What bites you* on the ten client entities · status: open
+## Step 8 — *What bites you* on the ten client entities · status: done 2026-09-04 — s-client-releases-and-issues, s-nats-pure-rb-client-source, s-nats-server-tcp-nodelay, s-nats-server-connect-urls-gossip; **twelve** `## What bites you` sections (ten new, second passes on `nats-go` and `nats-net`); 12 raw release+issue files, the Ruby source extract and two server-source extracts; 7 ripples beyond the entities; docs issues **#121–#122**; bank 148 and 156 filled from the server source, 87 re-checked; 413 → 417 pages, bank 167 → **169 / 197**, lint 0 · 0, wanted 0
 
 *Operation: consolidate* over the entity layer, no new docs. For each of `nats-c`, `nats-ex`,
 `nats-java`, `nats-js`, `nats-pure-rb`, `nats-py`, `nats-rb`, `nats-rs`, `nats-swift`, `nats-zig`

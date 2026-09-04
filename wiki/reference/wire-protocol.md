@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-04
 tags: [wire-protocol, INFO, CONNECT, PUB, SUB, MSG, HPUB, HMSG, PING, PONG, -ERR, +OK, RS+, RS-, RMSG, LS+, LS-, LMSG, A+, A-, LDS, telnet, nc]
 aliases: [protocol, nats protocol, client protocol, route protocol, gateway protocol, leafnode protocol, "-ERR", "+OK", INFO, CONNECT, RMSG, LMSG, "protocol errors", "wire format"]
-sources: [s-nats-server-wire-protocol, s-docs-protocol-client, s-docs-protocols-internal, s-nats-server-client-errors, s-docs-system-errors]
+sources: [s-nats-server-wire-protocol, s-docs-protocol-client, s-docs-protocols-internal, s-nats-server-client-errors, s-docs-system-errors, s-nats-server-tcp-nodelay]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -422,6 +422,20 @@ delay" and omit the fourth.
 
 ---
 
+## The one socket option, which the server does not set
+
+`TCP_NODELAY` is **on** — Nagle disabled — on every connection of every kind, and no configuration
+key changes it. The server never calls `SetNoDelay`: a grep of the whole v2.14.6 tree for
+`SetNoDelay`, `NoDelay` and `TCP_NODELAY` returns nothing. Go does it instead, in
+`net.newTCPConn` — `setNoDelay(fd, true)` on every accepted and every dialled `*TCPConn`
+(`$GOROOT/src/net/tcpsock.go:289–290`, go1.27.0) — so client, route, leafnode, gateway, WebSocket
+and MQTT sockets all inherit it (source: [[s-nats-server-tcp-nodelay]]). The values on
+[[defaults-and-limits]] carry the same row.
+
+That is the whole socket-option surface this reference covers: everything else on the wire is the
+verbs above.
+
+
 ## Smoke-testing a port
 
 The `INFO` line is free and identifies the listener:
@@ -468,8 +482,4 @@ it is told to and timestamps every reply.
 
 ## Sources
 
-- [[s-nats-server-wire-protocol]] — the extract and runs A–G; every table above.
-- [[s-docs-protocol-client]] — `reference/protocols/client.md` and the four-page index.
-- [[s-docs-protocols-internal]] — `route.md`, `gateway.md`, `leafnode.md`.
-- [[s-nats-server-client-errors]] — the 58 `sendErr` call sites and the `ClosedState` enum.
-- [[s-docs-system-errors]] — the docs tree's other `-ERR` list, swept in step 4.
+[[s-nats-server-wire-protocol]] · [[s-docs-protocol-client]] · [[s-docs-protocols-internal]] · [[s-nats-server-client-errors]] · [[s-docs-system-errors]] · [[s-nats-server-tcp-nodelay]]

@@ -4,12 +4,12 @@ type: entity
 kind: client
 area: [clients, jetstream]
 verified-against: nats.py v2.15.0 · PyPI nats-py 2.15.0 / nats-core 0.2.0
-verified-on: 2026-08-31
+verified-on: 2026-09-04
 tags: [client, tier-1, python, asyncio, nats-py, nats-core]
 aliases: [nats.py, "nats-io/nats.py", python client, nats-py, nats-core]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-gh-4535-unauthenticated-connections, s-docs-getting-started, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-gh-4535-unauthenticated-connections, s-docs-getting-started, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-client-releases-and-issues, s-docs-resilient-clients-reconnection-and-events]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # nats.py
@@ -83,11 +83,44 @@ pip install nats-core[websocket]    # the new core package, WebSocket transport 
   public source read states this; the repository layout suggests a modular split like [[nats-js]]'s,
   but that is inference, not a claim **(unverified)**.
 
+
+## What bites you
+
+Read from the last ten releases (v2.9.0 → v2.15.0, 2026-06-05, plus the `nats-core/v0.1.0` notes) and
+the open issues at 2026-09-04 (source: [[s-client-releases-and-issues]]).
+
+- **The maintainers publish a message-loss figure for this client.** The `nats-core/v0.1.0` notes
+  (2025-12-19) benchmark the new package against `nats-py` — 1M messages, publisher and subscriber in
+  one process on an Apple M3 Max — and footnote the `nats-py` column: "\* nats-py dropped 47-87% of
+  messages under load", against "Zero message loss with nats-core across all configurations". The
+  subscriber throughput in the same table is **8,769 msg/s** at 8 B for `nats-py` and **553,636** for
+  `nats-core`. Read it as the shape rather than as a number for your hardware: the asyncio client's
+  subscriber path is where a Python service loses messages, and it does so without the server
+  reporting anything ([[slow-consumer-in-the-client]], [[slow-consumer-detected]]).
+- **The reconnect buffer is 2 MB, the smallest of any client** (8 MB in Go and Java; documentation's
+  word, source: [[s-docs-resilient-clients-reconnection-and-events]]). A publisher that keeps writing
+  through a reconnect fills it four times sooner. Open issue **#461** (2023-06-19) reports the
+  matching symptom: "OutboundBufferLimitError exception on connection after `drain_timeout` passed".
+- **`publish` still does not check the subject.** The docs say so (`orders.us created` goes out as
+  subject `orders.us`, reply subject `created`; source: [[s-docs-core-nats-subjects-and-mapping]]) and
+  none of the last ten releases adds validation, where Go got it at v1.48.0 and Rust at v0.47.0. The
+  server's half is reproduced on 2.14.6 (source: [[s-nats-server-core-delivery-observed]], run A2) —
+  [[subjects-and-wildcards]].
+- **Lame duck mode was only handled from v2.15.0** (2026-06-05, #869, "Lame duck mode handling for
+  graceful reconnection"). A rolling upgrade against an older `nats-py` gets an ordinary disconnect
+  where other clients get an orderly move — [[upgrade-a-cluster]].
+- **Pull-consumer streams leak their disconnect and reconnect callbacks.** Open issue **#962**
+  (2026-05-29): "never deregistered on stop()". A long-running service that creates and stops
+  consumers accumulates them.
+- **`fetch()` can still stall.** Open issue **#986** (2026-07-06): "fetch() still stalls on an orphan
+  lingering request in 2.15.0 (regression / incomplete fix for #933)" — [[consumer]].
+- **`nats-core` is a different client, not a version bump**, and it needs Python 3.13+. The loss
+  figure above is the reason it exists.
+
 ## Related
 
 [[orbit]] · [[nats-js]] · [[nats-go]] · [[nats-server]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-gh-4535-unauthenticated-connections]] ·
-[[s-docs-getting-started]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-gh-4535-unauthenticated-connections]] · [[s-docs-getting-started]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-client-releases-and-issues]] · [[s-docs-resilient-clients-reconnection-and-events]]

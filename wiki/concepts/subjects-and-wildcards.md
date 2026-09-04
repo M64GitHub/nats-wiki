@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-03
 tags: [subjects, tokens, wildcards, "*", ">", reserved-prefixes, "$SYS", "_INBOX", max_subscription_tokens, max_sub_tokens, max_control_line, Invalid Subject, Invalid Publish Subject, pedantic, cardinality]
 aliases: [subject, subjects, wildcard, wildcards, tokens, subject naming, reserved prefixes, "$ prefix", "_INBOX prefix", max_subscription_tokens, max_sub_tokens, "Invalid Subject", "Invalid Publish Subject", subject length limit, subject token limit, "Permissions Violation for Subscription to, too many tokens"]
-sources: [s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-nats-cli-core-commands, s-gh-8333-high-cardinality-subjects, s-nats-server-stream-scale-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-publish-subscribe, s-gh-5172-mapping-in-config-or-stream, s-docs-core-nats-chapter]
+sources: [s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-gh-5097-subject-token-limit, s-gh-2855-publish-with-wildcards, s-nats-cli-core-commands, s-gh-8333-high-cardinality-subjects, s-nats-server-stream-scale-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-publish-subscribe, s-gh-5172-mapping-in-config-or-stream, s-docs-core-nats-chapter, s-client-releases-and-issues]
 created: 2026-09-03
 updated: 2026-09-04
 ---
@@ -50,8 +50,14 @@ a reply subject and the server has no way to tell. The CLI and most clients refu
 sending (`nats: error: nats: invalid subject`, exit 1 — run A3); the docs name the ones that do not:
 nats.py's `publish`, the C client, and nats.go before **v1.48.0** — the last dated by that release's
 line "Add publish subject validation and a connection option to skip it (#1974, #1979)", 2025-12-17
-(source: [[s-nats-go-relnotes-1.48.0]]); the first two are the docs' word and stay so
-until the client pages are read ([[nats-py]], [[nats-c]]). **Pedantic mode is advisory**: the check
+(source: [[s-nats-go-relnotes-1.48.0]]). Reading the twelve clients' release notes dates the rest:
+the check arrived in **nats.js v3.3.0** (2025-12-16), **nats.java 2.25.1** (2026-01-15) and
+**nats.rs v0.47.0** (2026-03-31), nats.net deprecated its `SkipSubjectValidation` opt-out at
+**v3.0.0** (2026-07-10) — "a subject containing a space splits into subject and reply-to tokens on
+the wire with no error", its own words for the mechanism — and **neither nats.c nor nats.py adds it
+in their last ten releases**, so for those two the docs' word still stands (source:
+[[s-client-releases-and-issues]]; the table is on [[client-defaults]], the pages are [[nats-py]] and
+[[nats-c]]). **Whether a client rejects a bad subject is a version question, not a language one.** **Pedantic mode is advisory**: the check
 sends the error and returns `nil`, so the message is processed (`client.go:2984–2986`). **The NUL and
 invalid-UTF-8 checks exist but the subscribe path does not run them** (`checkRunes` is false), so "any
 UTF-8 except whitespace" holds for routing.
@@ -177,15 +183,4 @@ subject.
 
 ## Sources
 
-- [[s-docs-core-nats-subjects-and-mapping]] — tokens, the two wildcards, the reserved prefixes, the
-  whitespace pitfall, with the primer's three surplus lines.
-- [[s-nats-server-core-delivery]] — `isValidSubject`, the pedantic check, `max_subscription_tokens`, the
-  `$NRG.` refusal, at v2.14.6 with lines.
-- [[s-nats-server-core-delivery-observed]] — runs A–C on the binary: the misroute, the literal `*`, the
-  pedantic error that delivers, the token limit and its refused reload.
-- [[s-gh-5097-subject-token-limit]] — the maintainer on the 16-token guidance.
-- [[s-gh-2855-publish-with-wildcards]] — "Wildcards are only applicable for subscriptions."
-- [[s-nats-cli-core-commands]] — the CLI's own subject check and flags.
-- [[s-gh-8333-high-cardinality-subjects]] — the per-million memory figure.
-- [[s-nats-server-stream-scale-observed]] — the 380 B measurement and the `*`-inside-a-token trap.
-- [[s-nats-go-relnotes-1.48.0]] — the release that added the Go client's publish-subject check. · [[s-docs-core-nats-publish-subscribe]] · [[s-gh-5172-mapping-in-config-or-stream]] · [[s-docs-core-nats-chapter]]
+[[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-gh-5097-subject-token-limit]] · [[s-gh-2855-publish-with-wildcards]] · [[s-nats-cli-core-commands]] · [[s-gh-8333-high-cardinality-subjects]] · [[s-nats-server-stream-scale-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-publish-subscribe]] · [[s-gh-5172-mapping-in-config-or-stream]] · [[s-docs-core-nats-chapter]] · [[s-client-releases-and-issues]]

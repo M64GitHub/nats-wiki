@@ -4,10 +4,10 @@ type: reference
 area: [core, jetstream, deploy]
 since: [2.10]   # present at 2.10, the oldest line this wiki covers; not the arrival
 verified-against: nats-server 2.14.6
-verified-on: 2026-09-03
+verified-on: 2026-09-04
 tags: [defaults, limits, max_payload, ack_wait, duplicate_window, sync_interval]
 aliases: [defaults, limits, default values]
-sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-go-connection, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-protocol-client, s-nats-server-wire-protocol]
+sources: [s-nats-server-jetstream-resources, s-nats-server-constants-2.14.6, s-docs-stream-config, s-docs-sizing-and-resources, s-docs-connection-limits-config, s-docs-acknowledgment, s-docs-pull-consumers, s-nats-server-auth-and-tls, s-docs-encryption-and-tls, s-docs-authentication-basics, s-nats-server-topology, s-nats-server-filestore-layout, s-docs-policies, s-docs-raft-and-leaders, s-docs-upgrade-to-2.12, s-synadia-jetstream-anti-patterns, s-docs-consumer-config, s-nats-server-jetstream-log-warnings, s-adr-31-direct-get, s-docs-auth-callout, s-gh-6070-lame-duck-under-systemd, s-issue-8322-dynamic-maxstore-shrinks, s-docs-advanced-publishing, s-docs-reading-back, s-adr-20-object-store, s-docs-object-store-chunking, s-docs-object-store-under-the-hood, s-nats-server-object-store-observed, s-docs-mqtt-qos-sessions-and-retained, s-docs-websocket-browsers-and-origins, s-nats-server-mqtt-websocket-observed, s-docs-mqtt-your-first-mqtt-client, s-docs-websocket-your-first-websocket-connection, s-nats-server-filestore-recovery, s-nats-server-stream-scale-observed, s-gh-7147-one-billion-cap, s-relnotes-2.10, s-relnotes-2.11, s-relnotes-2.12, s-relnotes-2.14, s-relnotes-2.15-preview, s-nats-server-stream-consumer-config, s-nats-server-config-mutability-observed, s-nats-server-core-delivery, s-nats-server-core-delivery-observed, s-docs-core-nats-publish-subscribe, s-docs-core-nats-subjects-and-mapping, s-nats-go-connection, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-protocol-client, s-nats-server-wire-protocol, s-nats-server-tcp-nodelay]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -442,6 +442,26 @@ its own timers, and the client's `max_payload` check is a copy of the value the 
 its `INFO`, enforced before the send.
 
 
+## The socket options the server never sets
+
+One row, because it is the one people ask for and the answer is an absence.
+
+| option | who sets it | value | configurable? |
+|---|---|---|---|
+| `TCP_NODELAY` (Nagle) | **Go's `net` package**, not `nats-server` | **on** — Nagle disabled | **no** |
+
+A grep of the whole v2.14.6 release tree for `SetNoDelay`, `NoDelay` and `TCP_NODELAY` returns
+**nothing**, and there is no `no_delay`-shaped key in `server/opts.go` or `conf/`. It does not need
+one: `net.newTCPConn` calls `setNoDelay(fd, true)` on every accepted and every dialled TCP connection
+(`$GOROOT/src/net/tcpsock.go:289–290` at go1.27.0), and the exported method's own comment states the
+default — "The default is true (no delay), meaning that data is sent as soon as possible after a
+Write." So client, route, leafnode, gateway, WebSocket and MQTT connections all have Nagle off,
+because Go set it and the server never unsets it (source: [[s-nats-server-tcp-nodelay]]).
+
+The same reasoning covers the Go clients and the `nats` CLI. A client in a language whose sockets
+default to Nagle **on** must disable it itself; nothing here says what any non-Go client does.
+
+
 ## What is deliberately not here
 
 - **Consumer `ConsumerConfig` fields with no named constant and no docs statement.** Only the ones
@@ -594,15 +614,4 @@ the full inventory, including the strings only a route, gateway or leafnode can 
 
 ## Sources
 
-[[s-nats-server-constants-2.14.6]] · [[s-docs-stream-config]] · [[s-docs-sizing-and-resources]] ·
-[[s-docs-connection-limits-config]] · [[s-docs-acknowledgment]] · [[s-docs-pull-consumers]] ·
-[[s-docs-policies]] · [[s-docs-raft-and-leaders]] · [[s-docs-upgrade-to-2.12]] ·
-[[s-synadia-jetstream-anti-patterns]] · [[s-docs-consumer-config]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] · [[s-docs-authentication-basics]] ·
-[[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] ·
-[[s-nats-server-filestore-layout]] ·
-[[s-adr-31-direct-get]] · [[s-docs-auth-callout]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] ·
-[[s-docs-advanced-publishing]] · [[s-docs-reading-back]] · [[s-adr-20-object-store]] ·
-[[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] ·
-[[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] ·
-[[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] ·
-[[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-go-connection]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]
+[[s-nats-server-constants-2.14.6]] · [[s-docs-stream-config]] · [[s-docs-sizing-and-resources]] · [[s-docs-connection-limits-config]] · [[s-docs-acknowledgment]] · [[s-docs-pull-consumers]] · [[s-docs-policies]] · [[s-docs-raft-and-leaders]] · [[s-docs-upgrade-to-2.12]] · [[s-synadia-jetstream-anti-patterns]] · [[s-docs-consumer-config]] · [[s-nats-server-auth-and-tls]] · [[s-docs-encryption-and-tls]] · [[s-docs-authentication-basics]] · [[s-nats-server-jetstream-resources]] · [[s-nats-server-jetstream-log-warnings]] · [[s-nats-server-topology]] · [[s-nats-server-filestore-layout]] · [[s-adr-31-direct-get]] · [[s-docs-auth-callout]] · [[s-gh-6070-lame-duck-under-systemd]] · [[s-issue-8322-dynamic-maxstore-shrinks]] · [[s-docs-advanced-publishing]] · [[s-docs-reading-back]] · [[s-adr-20-object-store]] · [[s-docs-object-store-chunking]] · [[s-docs-object-store-under-the-hood]] · [[s-nats-server-object-store-observed]] · [[s-docs-mqtt-qos-sessions-and-retained]] · [[s-docs-websocket-browsers-and-origins]] · [[s-nats-server-mqtt-websocket-observed]] · [[s-docs-mqtt-your-first-mqtt-client]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-nats-server-filestore-recovery]] · [[s-nats-server-stream-scale-observed]] · [[s-gh-7147-one-billion-cap]] · [[s-relnotes-2.10]] · [[s-relnotes-2.11]] · [[s-relnotes-2.12]] · [[s-relnotes-2.14]] · [[s-relnotes-2.15-preview]] · [[s-nats-server-stream-consumer-config]] · [[s-nats-server-config-mutability-observed]] · [[s-nats-server-core-delivery]] · [[s-nats-server-core-delivery-observed]] · [[s-docs-core-nats-publish-subscribe]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-go-connection]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-nats-server-tcp-nodelay]]

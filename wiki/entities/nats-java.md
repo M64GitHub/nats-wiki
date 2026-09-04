@@ -4,12 +4,12 @@ type: entity
 kind: client
 area: [clients, jetstream]
 verified-against: nats.java 2.26.2
-verified-on: 2026-08-31
+verified-on: 2026-09-04
 tags: [client, tier-1, java, jvm, kotlin, scala, jnats]
 aliases: [nats.java, "nats-io/nats.java", java client, jnats, "io.nats:jnats"]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-core-nats-request-reply]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-docs-core-nats-request-reply, s-client-releases-and-issues]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # nats.java
@@ -65,10 +65,41 @@ example, not as the version to use (source: [[s-docs-getting-started]]).
   client the docs cover reports no responders by default — [[request-reply]].
 
 
+
+## What bites you — the connection
+
+Read from the last ten releases (2.23.x → 2.26.2, 2026-08-13) and the open issues at 2026-09-04
+(source: [[s-client-releases-and-issues]]). The one above — no-responders is opt-in — is the docs'
+word; these are the release record's.
+
+- **`drain()`'s future says `true` even when the drain timed out.** Open issue **#1616**
+  (2026-08-18). A shutdown that branches on the boolean cannot tell a completed drain from an expired
+  one, so in-flight work can be dropped by a path that reported success. Until it is fixed, measure
+  the elapsed time against the `Duration` you passed rather than trusting the result.
+- **A DNS name with several A records used to burn the reconnect budget once per address.** Fixed in
+  **2.26.1** (2026-08-04, #1595): "Count connect failure once per server, not once per resolved IP".
+  Before it, a `nats://nats.svc:4222` that resolves to three pods spent `maxReconnects` three times as
+  fast — exactly the shape a Kubernetes headless service produces ([[nats-helm-charts]]).
+- **`max_payload` counts the headers.** "'Payload Size' includes header bytes, not just data" —
+  **2.25.2** (2026-03-03, #1525). A publisher sized against the server's `max_payload`
+  ([[config-keys]] · [[client-defaults]]) with large headers was measuring the
+  wrong number before that release.
+- **Subject validation arrived at 2.25.1** (2026-01-15, #1501, plus #1503 "Subject validation readme
+  and backfill"). Before it, Java published a subject with a space as written and the server split it
+  into subject and reply-to — [[subjects-and-wildcards]].
+- **Reconnect has been reworked twice recently**: "fix race condition in reconnect" (2.25.2, #1523),
+  "Reconnect Delay Behavior and options cleanup" (2.26.0, #1578) and "Address forceReconnectImpl
+  reader/writer stop race" (2.26.1, #1601). A JVM service pinned below 2.25.2 is on the pre-fix path.
+- **`discardWhenFull` miscounted until 2.25.1** ("[bug] Properly count message/bytes when in
+  discardWhenFull mode", #1498) — so the pending-limit accounting a slow-consumer alarm reads was
+  wrong on the mode designed for slow consumers ([[slow-consumer-in-the-client]]).
+- **The docs' install snippet is a minor behind** (2.25.2 against 2.26.2) — quote it as an example,
+  not as the version to pin.
+
 ## Related
 
 [[orbit]] · [[nats-go]] · [[nats-server]] · [[consumer]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-docs-core-nats-request-reply]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-docs-core-nats-request-reply]] · [[s-client-releases-and-issues]]

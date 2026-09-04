@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [connect_urls, no_advertise, client_advertise, seed-urls, loadbalancer, kubernetes, discovery, reconnect]
 aliases: ["seed URLs", "server discovery", "connect_urls", "no_advertise", "client_advertise", "LoadBalancer vs seed URLs", "client connection URLs"]
-sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls, s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-nats-server-client-lifecycle-observed, s-docs-protocol-client, s-docs-protocols-internal, s-nats-server-wire-protocol]
+sources: [s-adr-40-nats-connection, s-nats-helm-chart-values-2.14.6, s-docs-kubernetes, s-docs-encryption-and-tls, s-docs-websocket-tls-and-proxies, s-docs-websocket-your-first-websocket-connection, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-nats-server-client-lifecycle-observed, s-docs-protocol-client, s-docs-protocols-internal, s-nats-server-wire-protocol, s-nats-server-connect-urls-gossip]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -148,6 +148,23 @@ that do not exist outside the cluster. It works until the first failover.
 | TLS SANs | node names | the VIP name | every advertised name |
 | spreads clients across the cluster | yes (shuffled) | only as well as the LB does | yes |
 
+## Discovery stops at the cluster edge
+
+Everything on this page is about one cluster. Across a supercluster it simply does not apply: the
+`connect_urls` a server advertises are fed from **routes only** — the three call sites of the
+connect-URL helpers are all in `server/route.go` (`:2389`, `:728`, `:3205` at v2.14.6), and neither
+`gateway.go` nor `leafnode.go` calls either (source: [[s-nats-server-connect-urls-gossip]]). A
+gateway moves interest and messages, never a client address.
+
+So a client in `east` will never be told that `west` exists, and losing `east` entirely empties its
+pool and closes the connection while the supercluster is healthy. Cross-cluster failover is one of
+the three designs below applied **twice**: either list both clusters' seeds in the client's URL set,
+or put a single health-checked name in front of both — and with the second, set `no_advertise: true`
+so gossip does not hand out the per-node addresses the name exists to hide. [[gateway]] states the
+same from the topology side; a stream in the other cluster is a separate problem
+([[jetstream-domain]]).
+
+
 ## When *not* to use discovery at all
 
 - When clients are outside a boundary the advertised addresses do not cross, and you are not willing
@@ -261,13 +278,4 @@ port has **no `ip`** — that field appears only on the peer INFO being propagat
 
 ## Sources
 
-- [[s-adr-40-nats-connection]] — the connection and reconnect specification, the client defaults,
-  and the discovery section that is still a TODO
-- [[s-nats-helm-chart-values-2.14.6]] — `config.cluster.noAdvertise: true`, its comment, and the
-  ClusterIP Service
-- [[s-docs-kubernetes]] — the headless and ClusterIP services the chart creates
-- [[s-docs-encryption-and-tls]] — advertised IPs versus the hostname a client verifies
-- `raw/nats-server-src/compression-purge-discovery-observed-v2.14.6.md` — the `INFO` lines quoted
-  above, observed on the v2.14.6 binary
-- [[s-docs-websocket-tls-and-proxies]]
-- [[s-docs-websocket-your-first-websocket-connection]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-protocol-client]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
+[[s-adr-40-nats-connection]] · [[s-nats-helm-chart-values-2.14.6]] · [[s-docs-kubernetes]] · [[s-docs-encryption-and-tls]] · [[s-docs-websocket-tls-and-proxies]] · [[s-docs-websocket-your-first-websocket-connection]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-protocol-client]] · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]] · [[s-nats-server-connect-urls-gossip]]

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-09-04
 tags: [connection, state-machine, reconnect, backoff, jitter, MaxReconnect, reconnect-buffer, ErrReconnectBufExceeded, keepalive, ping, MaxPingsOut, stale-connection, drain, DrainTimeout, flush, lame-duck, ldm, discovery, connect_urls, readiness, force-reconnect]
 aliases: [connection lifecycle, client reconnect, reconnect, reconnection, reconnect buffer, drain, "Drain()", DRAINING_SUBS, DRAINING_PUBS, "stale connection", "nats: stale connection", "Stale Connection", keepalive, ping interval, MaxPingsOut, RECONNECTING, ClosedHandler, lame duck client, ldm, "connection events", readiness probe, ForceReconnect, flush, RTT]
-sources: [s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-connection, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-adr-40-nats-connection, s-docs-core-nats-publish-subscribe, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-docs-protocol-client, s-nats-server-wire-protocol, s-docs-services-scaling]
+sources: [s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-connection, s-nats-cli-reconnect, s-nats-server-client-lifecycle-observed, s-adr-40-nats-connection, s-docs-core-nats-publish-subscribe, s-nats-go-subscription, s-nats-server-client-errors, s-nats-server-client-faults-observed, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-docs-protocol-client, s-nats-server-wire-protocol, s-docs-services-scaling, s-nats-pure-rb-client-source, s-nats-server-connect-urls-gossip]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -67,6 +67,12 @@ One protocol detail matters when reading a raw capture: the server sends asynchr
 only to clients that have completed the **first PING/PONG** (`firstPongSent`, `route.go:1026–1028`).
 A hand-written client that sends `CONNECT` and stops never learns the pool changed, and never learns
 its server is leaving (source: [[s-nats-server-client-lifecycle-observed]], run B5).
+
+**Discovery never crosses a gateway.** The pool grows from `connect_urls`, and those are fed by
+routes alone — all three call sites are in `server/route.go` and neither `gateway.go` nor
+`leafnode.go` calls them (source: [[s-nats-server-connect-urls-gossip]]). A client therefore learns
+its own cluster and no other, and a client whose whole cluster disappears closes with a healthy
+supercluster next door. [[how-clients-reach-a-cluster]] says what to configure instead.
 
 ## Reconnecting
 
@@ -141,6 +147,13 @@ no matter how busy the link is — only a PONG clears the count**.
 "if two consecutive PONGs are missed, connection is marked as lost", which would be four minutes; the
 chapter, the nats.go source and the run all say the third ping. The wiki carries the run's reading;
 the disagreement is recorded as docs issue #90 (source: [[s-adr-40-nats-connection]]).
+
+**And one client implements the ADR's rule.** nats-pure.rb's ping loop tests
+`@pings_outstanding >= @options[:max_outstanding_pings]` at the same `120` × `2`
+(`lib/nats/io/client.rb:1421`, `:1883–1884` at v2.5.0, source: [[s-nats-pure-rb-client-source]]), so
+it raises `nats: stale connection` on the **second** unanswered ping — about **four minutes**, two
+sooner than Go. The disagreement is therefore real behaviour, not wording: a failover budget measured
+with one client does not carry to the other. Every value read this way is on [[client-defaults]].
 
 **The server enforces the same shape in the other direction.** With `ping_interval: "5s"` and
 `ping_max: 2`, a client that never answered got `PING` at t=2.19 and t=7.19 and then, where the third
@@ -361,15 +374,4 @@ second step drops exactly the work the first step was protecting; see [[services
 
 ## Sources
 
-- [[s-docs-resilient-clients-connecting]] — the state machine, connect options, discovery, the
-  handshake.
-- [[s-docs-resilient-clients-reconnection-and-events]] — backoff, jitter, `MaxReconnect`, the
-  reconnect buffer, the keepalive, the six events, readiness.
-- [[s-docs-resilient-clients-drain-and-shutdown]] — close vs drain, the timeout, per-subscription
-  drain, flush, lame duck.
-- [[s-nats-go-connection]] — nats.go v1.53.1: every default and every rule quoted above.
-- [[s-nats-cli-reconnect]] — natscli 0.4.0: the policy the CLI substitutes, and `nats reply`'s exit.
-- [[s-nats-server-client-lifecycle-observed]] — the runs on 2.14.6 behind every measured number.
-- [[s-adr-40-nats-connection]] — ADR-40, and the keepalive disagreement it is one side of.
-- [[s-docs-core-nats-publish-subscribe]] — the at-most-once promise the reconnect gap is an instance
-  of. · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-docs-services-scaling]]
+[[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-go-connection]] · [[s-nats-cli-reconnect]] · [[s-nats-server-client-lifecycle-observed]] · [[s-adr-40-nats-connection]] · [[s-docs-core-nats-publish-subscribe]] · [[s-nats-go-subscription]] · [[s-nats-server-client-errors]] · [[s-nats-server-client-faults-observed]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-docs-services-scaling]] · [[s-nats-pure-rb-client-source]] · [[s-nats-server-connect-urls-gossip]]

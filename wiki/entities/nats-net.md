@@ -3,13 +3,13 @@ title: nats.net
 type: entity
 kind: client
 area: [clients, jetstream, monitoring]
-verified-against: NATS .NET v3.2.0
-verified-on: 2026-08-31
+verified-against: NATS .NET v3.2.0 (behaviour changes read at v3.0.0)
+verified-on: 2026-09-04
 tags: [client, tier-1, dotnet, csharp, opentelemetry, net10, net6-dropped]
 aliases: [nats.net, "nats-io/nats.net", ".net client", "c# client", NATS.Net]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks, s-docs-core-nats-request-reply, s-adr-47-request-many]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-so-78603662-acked-but-redelivered, s-nats-server-redelivery-observed, s-issue-6921-last-per-subject-acks, s-docs-core-nats-request-reply, s-adr-47-request-many, s-client-releases-and-issues, s-nats-server-core-delivery-observed]
 created: 2026-08-31
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # nats.net
@@ -79,10 +79,53 @@ subject" — no opt-in, unlike Java — and the client ships ADR-47's gather hel
 each costs are on [[request-reply]].
 
 
+
+## What bites you — what v3.0.0 changed under you
+
+The two reports above are about the server. These are about the client, read from the last ten
+release bodies (v2.8.2 → v3.2.0, 2026-08-29) and the open issues at 2026-09-04 (source:
+[[s-client-releases-and-issues]]). **v3.0.0 (2026-07-10) moved two of the .NET numbers the
+documentation still states**, so the docs and the client disagree for anyone on v3 — recorded as
+`inbox/docs-issues.md` #121, and reflected on [[client-defaults]].
+
+- **The subscription channel is 16,384 and drops the newest, everywhere.** v3.0.0: "All entry points
+  (`NatsConnection`, `NatsClient`, DI builders) now share the `NatsOpts` defaults: pending channel
+  capacity 16384 (up from 1024) and `BoundedChannelFullMode.DropNewest`. Previously `NatsClient` and
+  the DI builders forced `Wait`, which can stall the socket read loop and get the client disconnected
+  as a slow consumer." So on v2, a `NatsClient` or DI-built connection with a slow handler got
+  **disconnected by the server** as a slow consumer; on v3 it silently **drops messages** and raises
+  `MessageDropped` instead. Both are data loss; only one shows up in the server's `slow_consumers`
+  counter ([[slow-consumer-detected]], [[slow-consumer-in-the-client]]).
+- **There is now a per-subscription drain**, against the documentation's "C# is the exception: it has
+  no drain call on a single subscription". v3.0.0: "`INatsSub<T>.DrainAsync()` drains a single
+  subscription without disposing the connection: no new deliveries, in-flight messages fenced with a
+  PING/PONG, channel completed." For JetStream loops the opt-in `DrainOnCancel` consume option
+  "delivers buffered messages after cancellation so handlers can still ack" — off by default, so a
+  cancelled consume still stops immediately unless you set it ([[ack-and-redelivery]]).
+- **`SkipSubjectValidation` is obsolete**, and the release notes state the mechanism better than the
+  docs do: "a subject containing a space splits into subject and reply-to tokens on the wire with no
+  error". That is exactly what this wiki reproduced on 2.14.6 (source:
+  [[s-nats-server-core-delivery-observed]], run A2) — [[subjects-and-wildcards]].
+- **Request/reply defaults to `Direct` mode** since v3.0.0: replies are correlated through the
+  connection's existing inbox subscription rather than a subscription and channel per request.
+  "Semantics are unchanged, including `ThrowIfNoResponders`" — but the inbox subject shape a
+  permission matches on changes with it ([[subject-permissions]], [[request-reply]]).
+- **A shared `NatsHeaders` instance is no longer safe across concurrent publishes.** v3.0.0:
+  "`NatsHeaders` no longer becomes read-only after publish, so a single `NatsHeaders` instance should
+  not be shared across concurrent publishes." Code that relied on the old read-only-after-publish
+  behaviour to reuse one instance now races.
+- **A DI-only package reference loses JetStream on upgrade.** "`NATS.Extensions.Microsoft.DependencyInjection`
+  now depends on `NATS.Client.Simplified` instead of the all-inclusive `NATS.Net`" — an app that
+  reached JetStream, KV, Object Store or Services through the transitive dependency has to add the
+  reference explicitly.
+- **`net6.0` is gone** (above), and a disposed connection can leave a reconnect task behind: open
+  issue **#1124** (2026-05-06), "UnobservedTaskException from orphaned reconnect task and async void
+  ReconnectLoop after DisposeAsync".
+
 ## Related
 
 [[orbit]] · [[nats-go]] · [[monitoring-endpoints]] · [[nats-server]]
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-docs-core-nats-request-reply]] · [[s-adr-47-request-many]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-so-78603662-acked-but-redelivered]] · [[s-nats-server-redelivery-observed]] · [[s-issue-6921-last-per-subject-acks]] · [[s-docs-core-nats-request-reply]] · [[s-adr-47-request-many]] · [[s-client-releases-and-issues]] · [[s-nats-server-core-delivery-observed]]

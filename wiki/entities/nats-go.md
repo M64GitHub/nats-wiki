@@ -4,10 +4,10 @@ type: entity
 kind: client
 area: [clients, jetstream, core]
 verified-against: nats.go v1.53.1
-verified-on: 2026-08-31
+verified-on: 2026-09-04
 tags: [client, tier-1, go, reference-implementation]
 aliases: [nats.go, "nats-io/nats.go", go client, golang client]
-sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-subscription, s-nats-server-client-faults-observed, s-adr-32-service-api, s-nats-server-services-observed, s-adr-22-publish-retries]
+sources: [s-docs-ecosystem, s-github-repo-facts, s-docs-getting-started, s-nats-go-kv-object-mirror, s-issue-5106-object-store-mirror-list, s-nats-server-mirrors-observed, s-nats-go-relnotes-1.48.0, s-docs-core-nats-subjects-and-mapping, s-nats-server-core-delivery-observed, s-nats-go-connection, s-nats-server-client-lifecycle-observed, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-go-subscription, s-nats-server-client-faults-observed, s-adr-32-service-api, s-nats-server-services-observed, s-adr-22-publish-retries, s-client-releases-and-issues]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -195,6 +195,41 @@ overall — check each. And `nats` CLI 0.4.0 does **not** go through this path a
 is not evidence about the Go client's ([[nats-cli]]).
 
 
+
+## What bites you — the release record
+
+The three sections above are read from the source at v1.53.1 and from runs. These are read from the
+last ten release bodies (v1.44.0 2025-08-04 → v1.53.1 2026-08-11) and the open issues at 2026-09-04
+(source: [[s-client-releases-and-issues]]) — what changed, and when, so a pinned version can be
+placed against it.
+
+- **A write error does not force a reconnect, unless you ask.** v1.51.0 (2026-04-14) added an "Option
+  to automatically reconnect on write error (#2055)" — which is the same sentence read backwards: at
+  the default, a failed socket write leaves the connection where it was and the client waits for the
+  keepalive to notice. On the six-minute keepalive above, that is a long time to be writing into a
+  dead socket ([[client-connection-lifecycle]]).
+- **Publish subject validation is v1.48.0** (2025-12-17): "Add publish subject validation and a
+  connection option to skip it (#1974, #1979)". Below it, a subject with a space went out as written
+  — [[subjects-and-wildcards]]. Java got the same at 2.25.1, JavaScript at v3.3.0, Rust at v0.47.0;
+  the C client and `nats.py` still have none.
+- **Two name checks arrived recently**: "Reject control characters in stream and consumer names"
+  (v1.50.0, #2038) and "Reject keys with consecutive dots in `keyValid` and `searchKeyValid`"
+  (v1.53.0, #2076). A KV key like `a..b` was accepted before, and what it produced was a subject the
+  server routes differently — [[key-value]], [[subjects-and-wildcards]].
+- **`Consume()` could deadlock when `Stop`/`Drain` was called from `ConsumeErrHandler`** until v1.51.0
+  (#2059), and `orderedSubscription.Drain()` had a race until v1.50.0 (#2030). Both are shutdown
+  paths, both recent.
+- **Async publish can exceed its own pending cap.** Open issue **#1612** (2024-04-16), "JetStream: the
+  value for max pending async messages can be exceeded" — worth knowing before sizing a publisher's
+  memory on that setting ([[jetstream-sizing]]).
+- **Slow-consumer memory growth is unbounded and reported.** Open issue **#1163** (2022-12-16),
+  "Unbound memory footprint growth with slow consumers", is the long-standing companion to the
+  pending-limit behaviour above ([[slow-consumer-in-the-client]]).
+- **`Drain()` on a nil connection panics.** Open issue **#1562** (2024-02-21) — a shutdown path that
+  drains without checking for a failed connect crashes the process instead of exiting.
+- **Some flush timeouts are hardcoded**, as the drain's 5 s above. Open issue **#580** (2020-06-24),
+  "Hardcoded FlushTimeout values".
+
 ## Related
 
 [[orbit]] · [[jsm-go]] · [[nats-cli]] · [[ordered-consumer]] · [[nats-js]] · [[nats-rs]] ·
@@ -202,4 +237,4 @@ is not evidence about the Go client's ([[nats-cli]]).
 
 ## Sources
 
-[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-go-subscription]] · [[s-nats-server-client-faults-observed]] · [[s-adr-32-service-api]] · [[s-nats-server-services-observed]] · [[s-adr-22-publish-retries]]
+[[s-docs-ecosystem]] · [[s-github-repo-facts]] · [[s-docs-getting-started]] · [[s-nats-go-kv-object-mirror]] · [[s-issue-5106-object-store-mirror-list]] · [[s-nats-server-mirrors-observed]] · [[s-nats-go-relnotes-1.48.0]] · [[s-docs-core-nats-subjects-and-mapping]] · [[s-nats-server-core-delivery-observed]] · [[s-nats-go-connection]] · [[s-nats-server-client-lifecycle-observed]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-go-subscription]] · [[s-nats-server-client-faults-observed]] · [[s-adr-32-service-api]] · [[s-nats-server-services-observed]] · [[s-adr-22-publish-retries]] · [[s-client-releases-and-issues]]

@@ -7,7 +7,7 @@ verified-against: nats-server 2.14.6
 verified-on: 2026-08-31
 tags: [gateway, supercluster, geo-affinity, queue-group, gossip, reject_unknown_cluster, 7222, stalled_clients]
 aliases: [gateways, super-cluster, supercluster, super cluster, cluster of clusters, geo-affinity, geo affinity]
-sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-protocols-internal, s-nats-server-wire-protocol]
+sources: [s-docs-super-clusters, s-nats-server-topology, s-gh-7494-supercluster-degradation, s-docs-putting-it-together, s-docs-jetstream-in-a-cluster, s-gh-7438-multi-region-availability, s-gh-4823-leafnode-supercluster-duplicates, s-gh-6328-jetstream-behind-gateways, s-nats-server-jetstream-cluster, s-relnotes-2.14, s-relnotes-2.10, s-nats-server-request-reply, s-nats-server-request-reply-observed, s-docs-core-nats-queue-groups, s-docs-protocols-internal, s-nats-server-wire-protocol, s-nats-server-connect-urls-gossip]
 created: 2026-08-31
 updated: 2026-09-04
 ---
@@ -105,6 +105,35 @@ leafnode is different again — a leaf's members are only a fallback, and their 
 own split — [[queue-groups]] and [[leafnode]] have the runs. The queue names the local delivery
 served are collected under `pmrCollectQueueNames` (`client.go:4481–4489`) and handed to
 `sendMsgToGateways` (`gateway.go:2638–2654`); the block above is quoted from that range.
+
+
+## A client never learns another cluster exists
+
+Cluster gossip stops at the gateway. The `connect_urls` a server advertises in its `INFO` — the list
+a client merges into its server pool as *discovered servers* — is fed from **routes only**: the three
+call sites of `addConnectURLsAndSendINFOToClients` / `removeConnectURLsAndSendINFOToClients` are all
+in `server/route.go` (`:2389`, `:728`, `:3205` at v2.14.6), and neither `gateway.go` nor
+`leafnode.go` calls either — all three gated on `!opts.Cluster.NoAdvertise` (source:
+[[s-nats-server-connect-urls-gossip]]). A gateway carries subject interest and messages between clusters; it
+carries **no client addresses**.
+
+So a client connected to `east` discovers `east`'s other servers and nothing else. If `east` goes
+away entirely, the client's pool is empty and it closes — the supercluster stayed up, and the client
+never knew where else to go. Failing clients over between clusters is therefore something **you**
+configure, not something the topology provides:
+
+- **List both clusters in the client's URL set.** The pool is your URLs plus what gossip adds; put
+  `west`'s seeds in it and randomisation will already spread the fleet
+  ([[client-connection-lifecycle]], [[how-clients-reach-a-cluster]]).
+- **Or put one name in front of both** — DNS with health-checked records, or an L4 load balancer per
+  region — and let the name move. Then set `no_advertise: true` so gossip does not hand clients the
+  pod addresses behind it, which is the same reason the Helm chart ships it that way
+  ([[nats-helm-charts]]).
+- **Expect the JetStream half to be a different question.** Reaching a stream that lives in another
+  cluster is a domain and mirror question, not a connection one — [[jetstream-domain]].
+
+The `INFO` field list is on [[wire-protocol]]; what a client does with the pool is on
+[[client-defaults]].
 
 
 ## What configures it
@@ -251,7 +280,7 @@ only in comments. The frames, the `A+` / `A-` account verbs and the `gateway_cmd
 [[s-nats-server-topology]] · [[s-gh-7494-supercluster-degradation]] ·
 [[s-gh-7438-multi-region-availability]] · [[s-gh-4823-leafnode-supercluster-duplicates]] ·
 [[s-gh-6328-jetstream-behind-gateways]] · [[s-nats-server-jetstream-cluster]] · [[s-relnotes-2.14]] · [[s-relnotes-2.10]] · [[s-nats-server-request-reply]] · [[s-nats-server-request-reply-observed]]
-- [[s-docs-core-nats-queue-groups]] — the docs' one sentence on geo-affinity for queue groups. · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]]
+- [[s-docs-core-nats-queue-groups]] — the docs' one sentence on geo-affinity for queue groups. · [[s-docs-protocols-internal]] · [[s-nats-server-wire-protocol]] · [[s-nats-server-connect-urls-gossip]]
 
 ## To verify
 

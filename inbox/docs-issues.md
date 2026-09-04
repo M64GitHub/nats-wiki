@@ -19,7 +19,7 @@ those are suggestions — the point of the report is the finding, not the patch.
 |---|---|
 | `★` | a **confirmed factual error with real impact** — following the documentation produces a broken result, **silently**. If you triage on one thing, triage on this |
 | `where` | the doc path. For docs.nats.io prefix `https://docs.nats.io/` |
-| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Five rows (#7, #30, #31, #37, #90) are ADR errors rather than docs errors, three (#40, #89, #91) are **CLI** findings, and one (#39) is a **published blog post** rather than a repository at all |
+| **`destination`** | which repository the fix belongs in: **`nats-docs`** for the documentation tree, **`ADR repo`** for `nats-io/nats-architecture-and-design`, **`natscli`** for `nats-io/natscli`. Five rows (#7, #30, #31, #37, #90) are ADR errors rather than docs errors, three (#40, #89, #91) are **CLI** findings, one (#117) belongs in **`jsm.go`**'s schemas, one (#122) is a **client repository's README** (`nats.swift`), and one (#39) is a **published blog post** rather than a repository at all |
 | `kind` | `wrong-value` and `missing` are defects; `enhancement` is correct-but-unhelpful |
 | `severity` | our estimate of consequence, not of effort |
 | **`upstream`** | where this was filed and what became of it. `not filed` means we have not sent it yet |
@@ -207,6 +207,8 @@ silently.
 | 118 | `learn/jetstream/where-next.md:53` "Stay on plain pub-sub when the next message supersedes the last; reach for a stream only when a missed message has consequences" is filed under "**Your first stream** — see [Pitfalls](/learn/jetstream/your-first-stream.md#pitfalls)", and **that page's Pitfalls section does not contain it**: it has exactly two items, *Unlimited defaults grow forever* and *A stream name is permanent*. The chapter's own answer to "when do I actually need a stream" therefore exists in one gathered checklist bullet pointing at a page that never states it. `supersede` occurs **twice in the 861-page tree** — here and at `learn/core-nats.md:18` — so the rule is stated once per chapter and explained on neither | `learn/jetstream/where-next.md` (line 53), `learn/jetstream/your-first-stream.md` (Pitfalls) | nats-docs | missing | medium | not filed | wiki states the rule from both sides on `operations/core-or-jetstream` and quotes both lines |
 | 119 | ★ **Nothing in the docs warns that a stream capturing a subject already used for request/reply answers those requests itself** — and the docs' own continuous example does exactly that. `learn/core-nats/request-reply.md:8` builds "an **inventory** service that answers that question on the subject `orders.inventory.check`"; `learn/core-nats/where-next.md` says that service is "still as you left [it]" and sends the reader to the JetStream chapter, which "resumes the same Acme ORDERS story right where you are now"; `learn/jetstream/your-first-stream.md`'s first command is `nats stream add ORDERS --subjects "orders.>" --defaults`. Run in that order on 2.14.6 the inventory service stops working: `nats request orders.inventory.check` returns `{"stream":"ORDERS","seq":1}` instead of `in stock: 42`, because the stream's `PubAck` reaches the requester's inbox first (374 µs behind it when both are gathered), and `nats stream subjects ORDERS` then shows `orders.inventory.check  2`. The server allows it silently — `server/stream.go:2170–2196` only demands `no_ack` for `>`, `$JS.>`/`$JSC.>`/`$NRG.>` and `$SYS.>` | `learn/jetstream/your-first-stream.md` (Create the stream), `learn/core-nats/request-reply.md` (line 8), `learn/core-nats/where-next.md` | nats-docs | missing | high | not filed | wiki makes it the first of *The two ways to get it wrong* on `operations/core-or-jetstream`, with sections on `concepts/stream`, `concepts/request-reply`, `operations/services-on-core-nats` and `operations/worker-pool` |
 | 120 | The stream configuration field **`no_ack` does not appear anywhere in the 861-page docs tree** — not in `reference/jetstream/api/stream/create.md`, not in the JetStream chapter, not once as `no_ack`, `NoAck` or `--no-ack` (two matches for the string exist and both are the unrelated consumer error name `JSConsumerAckFCRequiresNoAckWaitErr`). It is a `StreamConfig` field, it is what makes a stream stop replying, and the server hangs three hard subject rules off it at `server/stream.go:2170–2196`, each with its own rejection message. Its absence is why #119 has no page to be documented on | `reference/jetstream/api/stream/create.md`, `learn/jetstream/` (whole chapter) | nats-docs | missing | medium | not filed | wiki gives it its own section on `reference/stream-and-consumer-config` — *The three rules behind `no_ack`* — and the consequence on `operations/core-or-jetstream` |
+| 121 | `learn/resilient-clients` states two .NET defaults that **nats.net v3.0.0 changed seven weeks before this docs tree was fetched** (client released 2026-07-10; tree fetched 2026-08-31). `slow-consumers.md:18` "C# defaults to a **1,024**-message channel, and its two APIs differ on overflow: the low-level `NatsConnection` drops the newest queued message and raises a `MessageDropped` event, while the `NatsClient` wrapper **waits** instead" — against the v3.0.0 notes, "All entry points (`NatsConnection`, `NatsClient`, DI builders) now share the `NatsOpts` defaults: pending channel capacity **16384** (up from 1024) and `BoundedChannelFullMode.**DropNewest**`". `drain-and-shutdown.md:215` "C# is the exception: it has **no drain call on a single subscription**" — against "`INatsSub<T>.DrainAsync()` drains a single subscription without disposing the connection" (#1177, same release). Both statements were true of the v2 line; neither page carries a version, so a reader has no way to tell which line it is being told about | `learn/resilient-clients/slow-consumers.md` (line 18), `learn/resilient-clients/drain-and-shutdown.md` (line 215) | nats-docs | wrong-value | medium | not filed | wiki carries both, dated: `reference/client-defaults` gains *Three C# cells are out of date*, `entities/nats-net` gains *What bites you — what v3.0.0 changed under you* |
+| 122 | The `nats.swift` README says "JetStream, KV, Object Store, Service API are on the roadmap" (line 22, fetched 2026-08-31) while **the same repository's v0.4.0 release notes of 2024-10-31** say "This release introduces JetStream support, including: JetStream management API support (Streams and Consumers); Publishing messages to streams and getting/deleting individual messages; Pull consumer support with `fetch()`". `Sources/JetStream/` exists at tag v0.4.0 and on the default branch with `JetStreamContext.swift`, `Stream.swift`, `Consumer.swift` and `Consumer+Pull.swift`, so the release notes and the tree agree and the README is nearly two years stale. docs.nats.io itself makes no capability claim for Swift, and the ecosystem page delegates coverage to "each repo's README" — which is why a stale README propagates into architecture decisions: an evaluation that ruled Swift out for JetStream on the README's word ruled it out wrongly. KV, Object Store and the Service API do remain absent | `nats-io/nats.swift` `README.md` (line 22) | nats.swift | wrong-value | medium | not filed | wiki corrects the Facts table and the intro of `entities/nats-swift` and makes it the first item of that page's *What bites you* |
 
 ---
 
@@ -3608,6 +3610,8 @@ which case it is dropped. The `weight` reference page could carry the one-line e
 | 118 | `wiki/operations/core-or-jetstream.md` — *The problem*, *The decision*; `wiki/concepts/stream.md` — *Choosing the subject list*; `wiki/concepts/ack-and-redelivery.md` — *The two acks, in the docs' own words* |
 | 119 | `wiki/operations/core-or-jetstream.md` — *A stream laid over a request/reply subject answers the requests itself*; `wiki/concepts/stream.md` — *Choosing the subject list: what a stream quietly takes over*; `wiki/concepts/request-reply.md` — *A fourth outcome*; `wiki/operations/services-on-core-nats.md` — *Keep a stream off the service's subjects*; `wiki/operations/worker-pool.md` — *Why the stream goes behind the endpoint* |
 | 120 | `wiki/reference/stream-and-consumer-config.md` — *The three rules behind `no_ack`*; `wiki/operations/core-or-jetstream.md` — *The two ways to get it wrong* |
+| 121 | `wiki/reference/client-defaults.md` — *Three C# cells are out of date, and the client says so*; `wiki/entities/nats-net.md` — *What bites you — what v3.0.0 changed under you* |
+| 122 | `wiki/entities/nats-swift.md` — *Facts*, *What bites you* (first item) |
 
 ## 79 · Six import/export keys the server accepts and the config reference never lists
 
@@ -5270,3 +5274,92 @@ never succeed — nothing answers, so it waits out the full client deadline and 
 listing the three subject shapes that require it; and a sentence in the JetStream chapter, most
 naturally beside the pitfall #119 asks for.
 
+## 121 · Two .NET defaults the chapter states, changed by the client seven weeks earlier
+
+Not starred: following the documentation here produces a surprised operator, not a broken result. It is
+filed because the chapter carries **no version anywhere**, so the reader cannot tell it is being told
+about the v2 line.
+
+**The docs** (`raw/nats-docs/learn/resilient-clients/`, fetched 2026-08-31):
+
+```
+slow-consumers.md:18: … C# defaults to a 1,024-message channel, and its two APIs differ on
+overflow: the low-level `NatsConnection` drops the newest queued message and raises a
+`MessageDropped` event, while the `NatsClient` wrapper waits instead, which blocks the read loop
+rather than dropping. Check your client's default before you rely on one.
+
+drain-and-shutdown.md:215: C# is the exception: it has no drain call on a single subscription.
+Disposing a subscription unsubscribes and completes its message channel at once, so messages still
+on their way from the server are dropped.
+```
+
+**The client** — `nats-io/nats.net` **v3.0.0**, published **2026-07-10**, quoted from its release body
+(`raw/github-repos/nats-io__nats.net.releases-2026-09-04.md`):
+
+> ### Subscription channel overflow defaults unified (since preview.9)
+>
+> All entry points (`NatsConnection`, `NatsClient`, DI builders) now share the `NatsOpts` defaults:
+> pending channel capacity 16384 (up from 1024) and `BoundedChannelFullMode.DropNewest`. Previously
+> `NatsClient` and the DI builders forced `Wait`, which can stall the socket read loop and get the
+> client disconnected as a slow consumer.
+
+> ### Explicit drain (since preview.9)
+>
+> `INatsSub<T>.DrainAsync()` drains a single subscription without disposing the connection: no new
+> deliveries, in-flight messages fenced with a PING/PONG, channel completed.
+
+Both are the *documented* v3 behaviour, in the client's own words, and the change is exactly the one
+the chapter's sentence warns about — "which blocks the read loop rather than dropping" is the
+behaviour v3.0.0 removed, giving as its reason that it "can stall the socket read loop and get the
+client disconnected as a slow consumer".
+
+The consequence is not symmetrical. On v2 a slow `NatsClient` handler was **disconnected by the
+server** and appears in `slow_consumers` on `/varz`; on v3 the same handler **silently drops** and
+surfaces `MessageDropped` client-side. An operator who diagnosed the first will not find it after an
+upgrade, and the messages are gone either way.
+
+**Not checked**: the other five columns of that chapter's per-client table. This finding is one client
+at one release, not a sweep — the wiki says so on the page.
+
+**Suggested fix**: give the chapter a version line ("described against nats.net v2.x / nats.go
+v1.5x / …", or a per-cell version), and update the two C# statements. A per-client table without a
+version is the root of it: every cell ages independently and nothing on the page records when.
+
+## 122 · A client README contradicts its own release notes about JetStream
+
+**The README** — `nats-io/nats.swift`, `README.md:20–22`, fetched 2026-08-31
+(`raw/github-repos/nats-io__nats.swift.README.md`):
+
+```
+Currently, the client supports **Core NATS** with auth, TLS, lame duck mode and more.
+
+JetStream, KV, Object Store, Service API are on the roadmap.
+```
+
+**The release notes** — the same repository, tag **v0.4.0**, published **2024-10-31**
+(`raw/github-repos/nats-io__nats.swift.releases-2026-09-04.md`):
+
+> ## Overview
+>
+> This release introduces JetStream support, including:
+> - JetStream management API support (Streams and Consumers)
+> - Publishing messages to streams and getting/deleting individual messages
+> - Pull consumer support with `fetch()`
+
+**The tree settles it.** `gh api "repos/nats-io/nats.swift/contents/Sources?ref=v0.4.0"` lists
+`JetStream` beside `Nats`, and `Sources/JetStream/` holds `JetStreamContext.swift`,
+`JetStreamContext+Stream.swift`, `JetStreamContext+Consumer.swift`, `Stream.swift`, `Consumer.swift`,
+`Consumer+Pull.swift`, `JetStreamMessage.swift` and `JetStreamError.swift`. The same is true on the
+default branch. So JetStream shipped, and the roadmap line has been wrong for **22 months**.
+
+Why it matters beyond one repository: `concepts/ecosystem.md` gives Swift one row and delegates
+capability to the repo, and `concepts/what-is-nats.md:35` says only that tier 2 clients "may lag on
+new server features". The README is therefore the **only** public statement of what this client can
+do — and it is wrong in the direction that loses the project users, not the one that disappoints
+them.
+
+KV, Object Store and the Service API really are absent; only the JetStream clause is wrong.
+
+**Suggested fix**: change the README's two sentences to "Core NATS and JetStream (streams, consumers,
+publish, pull `fetch()`); KV, Object Store and the Service API are on the roadmap." Adding a dated
+capability table would keep the next gap honest.

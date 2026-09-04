@@ -7,7 +7,7 @@ verified-against: nats.go v1.53.1, natscli 0.4.0, nats-server 2.14.6
 verified-on: 2026-09-04
 tags: [client-defaults, reconnect, ReconnectWait, MaxReconnect, jitter, reconnect-buffer, ping, MaxPingsOut, DrainTimeout, flush, pending-limits, connect-timeout, discovery]
 aliases: [client defaults, connection defaults, reconnect defaults, ReconnectWait, MaxReconnect, ReconnectBufSize, PingInterval, MaxPingsOut, DrainTimeout, DefaultSubPendingMsgsLimit, DefaultSubPendingBytesLimit, "connect timeout", "reconnect buffer size", "ping interval"]
-sources: [s-nats-go-connection, s-nats-cli-reconnect, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-server-client-lifecycle-observed, s-nats-go-subscription, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-faults-observed, s-docs-protocol-client, s-nats-server-wire-protocol]
+sources: [s-nats-go-connection, s-nats-cli-reconnect, s-docs-resilient-clients-connecting, s-docs-resilient-clients-reconnection-and-events, s-docs-resilient-clients-drain-and-shutdown, s-nats-server-client-lifecycle-observed, s-nats-go-subscription, s-docs-resilient-clients-slow-consumers-and-request-reply, s-docs-resilient-clients-tls-and-auth, s-nats-server-client-faults-observed, s-docs-protocol-client, s-nats-server-wire-protocol, s-client-releases-and-issues, s-nats-pure-rb-client-source]
 created: 2026-09-04
 updated: 2026-09-04
 ---
@@ -97,6 +97,48 @@ checked them against the client (source: [[s-docs-resilient-clients-connecting]]
 | state getter | `Status()` (7) | `getStatus()` (5) | four `is_*` properties | **none** beyond `isClosed()`/`isDraining()` | `connection_state()` (3) | `ConnectionState` (5) |
 | first-connect retry | `RetryOnFailedConnect(true)` | `connectReconnectOnConnect` / `connectAsynchronously` | built in | `waitOnFirstConnect: true` | `retry_on_initial_connect()` | `RetryOnInitialConnect = true` |
 
+**Three C# cells are out of date, and the client says so.** nats.net **v3.0.0** (2026-07-10) shipped
+seven weeks before this documentation tree was fetched and changed all three (source:
+[[s-client-releases-and-issues]]; the row is `inbox/docs-issues.md` #121):
+
+| cell | the chapter | nats.net v3.0.0 |
+|---|---|---|
+| subscription pending | "a 1,024-message channel", `NatsClient` waits on overflow | **16,384** for every entry point, `BoundedChannelFullMode.DropNewest`, overflow surfaced as `MessageDropped` |
+| per-subscription drain | "**none**" | **`INatsSub<T>.DrainAsync()`** — "no new deliveries, in-flight messages fenced with a PING/PONG, channel completed" |
+| drain phases visible | opt-in on dispose | still `DrainSubscriptionsOnDispose` for the connection, **plus** the explicit call above |
+
+Prefer the client's own release notes over the chapter for .NET on v3; the chapter's cells still hold
+for the v2 line. The other five columns have not been re-checked this way — treat the table as the
+documentation's word with one dated exception.
+
+## Ruby — read from the client, because the documentation never names it
+
+The chapter's per-client table has no Ruby column, and neither has any other `learn/` page: Go, Java,
+Python, JavaScript, Rust and C# fill every sentence. These are read from `lib/nats/io/client.rb` at
+tag **v2.5.0** — the current release, 2025-02-21 (source: [[s-nats-pure-rb-client-source]]).
+
+| setting | nats-pure.rb v2.5.0 | line |
+|---|---|---|
+| connect timeout | **2 s** (`DEFAULT_CONNECT_TIMEOUT`) | `:1887` |
+| read/write timeout | **2 s** (`DEFAULT_READ_WRITE_TIMEOUT`) — no other client documents one | `:1888` |
+| `max_reconnect_attempts` | **10**, per server; `< 0` means unlimited | `:1869`, `:1714` |
+| reconnect wait | **2 s** fixed, **no jitter** | `:1870` |
+| ping interval × budget | **120 s × 2**, and the test is `>=` | `:1883–1884`, `:1421` |
+| stale detected on | the **second** unanswered ping — about **4 minutes** (Go takes 6) | `:1421` |
+| subscription pending | **65,536 msgs / 64 MB**, overflow **drops** with `NATS::IO::SlowConsumer` | `:1893–1894`, `:1041` |
+| outbound queue | `SizedQueue` of **32,768** commands — a publish **blocks** when full | `:458`, `:1873` |
+| drain | returns immediately (a thread); wait on `on_close` | `:842–848` |
+| drain / close timeout | **30 s** each | `:1889–1890` |
+| drain phases visible | **yes** — `DRAINING_SUBS`, `DRAINING_PUBS` | `:81–83` |
+| auth error | drops that server from the pool at once, before any budget | `:1717–1718` |
+| subscription concurrency | **24** threads total, **1** per subscription | `:1896–1897` |
+
+Two of those change how a Ruby service behaves under a fault in a way no other client shares: it
+**blocks the publisher** rather than failing the publish, and it gives up on a silent link two
+minutes sooner than Go. The keepalive row is also the one client that implements ADR-40's rule as
+written — see `inbox/docs-issues.md` #90.
+
+
 ## Measured, on nats-server 2.14.6
 
 From the runs in [[s-nats-server-client-lifecycle-observed]]; the shapes are in
@@ -151,6 +193,8 @@ the CLI row are read from source, the rest are the documentation's word):
 | nats.net | the same auth error twice in a row → `Failed` | same-named option |
 | nats.py | **no abort** — cycles until every server exceeds `max_reconnect_attempts` (60) | — |
 | nats.rs | **no abort** — cycles until `max_reconnects` runs out (unlimited) | — |
+| nats.c | the same auth error twice → abort, with **no opt-out before v3.13.0** | `natsOptions_SetIgnoreAuthErrorAbort`, **v3.13.0** (2026-06-01) |
+| nats-pure.rb | **any** auth error drops that server from the pool at once, whatever the budget | — |
 | `nats` CLI 0.4.0 | **no abort** — sets `IgnoreAuthErrorAbort` *and* unlimited reconnects | — |
 
 In the four clients with the rule, the abort applies **regardless of the retry budget**: unlimited
@@ -165,6 +209,26 @@ Which clients **re-read a `.creds` file** on every attempt, and which load it on
 rotated file reaches a reconnect at all: nats.go, nats.java and nats.py re-read; nats.js, nats.rs and
 nats.net load once and need the credential-callback form
 (source: [[s-docs-resilient-clients-tls-and-auth]]).
+
+
+## Publish subject validation, per client and per version
+
+Whether a client rejects `orders.us created` before it reaches the wire is a **version** question,
+not a language one — the check arrived separately in each client, all of it recently, and two clients
+still have none. Without it the server reads the space as the field separator and delivers to
+`orders.us` with reply subject `created`, silently (source: [[s-nats-server-core-delivery-observed]],
+run A2; the rule is on [[subjects-and-wildcards]]). Read from each client's release notes (source:
+[[s-client-releases-and-issues]]).
+
+| client | validation arrived | opt-out |
+|---|---|---|
+| nats.js | **v3.3.0**, 2025-12-16 (#348) | — |
+| nats.go | **v1.48.0**, 2025-12-17 (#1974, #1979) | yes, a connection option |
+| nats.java | **2.25.1**, 2026-01-15 (#1501) | — |
+| nats.rs | **v0.47.0**, 2026-03-31 (#1525) | yes |
+| nats.net | had it; `SkipSubjectValidation` **deprecated at v3.0.0**, 2026-07-10 | being removed |
+| nats.c | **none** in the last ten releases (v3.10.0 → v3.13.0) | n/a |
+| nats.py | **none** in the last ten releases (v2.9.0 → v2.15.0) | n/a |
 
 
 ## The server's own connection defaults
@@ -202,6 +266,14 @@ every one of these is a hard stop the client cannot negotiate. Read from `const.
   `$(go env GOMODCACHE)/github.com/nats-io/natscli@v0.4.0`.
 - **Other clients**: `raw/nats-docs/learn/resilient-clients/*.md`, fetched 2026-08-31. The chapter
   states these in prose and gives no version; every cell above quotes it directly.
+- **Client release notes and open issues**:
+  `raw/github-repos/nats-io__<repo>.releases-2026-09-04.md`, one file per client — the last ten
+  release bodies verbatim plus every open issue as number, date and title. Regenerate with
+  `gh api repos/nats-io/<repo>/releases?per_page=10` and
+  `gh api repos/nats-io/<repo>/issues?state=open --paginate`.
+- **nats-pure.rb**: `raw/github-repos/nats-io__nats-pure.rb.client-v2.5.0.md` — quoted ranges of
+  `lib/nats/io/client.rb` at tag v2.5.0. Regenerate with
+  `gh api "repos/nats-io/nats-pure.rb/contents/lib/nats/io/client.rb?ref=v2.5.0"`.
 - **Measured**: `raw/nats-server-src/client-lifecycle-observed-v2.14.6.md`, with
   `client-lifecycle-run.sh`, `-run2.sh`, `-run3.sh` and `-stale-run.sh` beside it. Re-run them
   against `tools/lab/cluster.sh` on the same release.
@@ -213,10 +285,4 @@ every one of these is a hard stop the client cannot negotiate. Read from `const.
 
 ## Sources
 
-- [[s-nats-go-connection]] — the nats.go v1.53.1 table.
-- [[s-nats-cli-reconnect]] — the natscli 0.4.0 table.
-- [[s-docs-resilient-clients-connecting]] — connect timeout and discovery, per client.
-- [[s-docs-resilient-clients-reconnection-and-events]] — reconnect, buffer, keepalive, events, per
-  client.
-- [[s-docs-resilient-clients-drain-and-shutdown]] — drain, flush, RTT, per client.
-- [[s-nats-server-client-lifecycle-observed]] — every measured row. · [[s-nats-go-subscription]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-faults-observed]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]]
+[[s-nats-go-connection]] · [[s-nats-cli-reconnect]] · [[s-docs-resilient-clients-connecting]] · [[s-docs-resilient-clients-reconnection-and-events]] · [[s-docs-resilient-clients-drain-and-shutdown]] · [[s-nats-server-client-lifecycle-observed]] · [[s-nats-go-subscription]] · [[s-docs-resilient-clients-slow-consumers-and-request-reply]] · [[s-docs-resilient-clients-tls-and-auth]] · [[s-nats-server-client-faults-observed]] · [[s-docs-protocol-client]] · [[s-nats-server-wire-protocol]] · [[s-client-releases-and-issues]] · [[s-nats-pure-rb-client-source]]
